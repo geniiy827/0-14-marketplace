@@ -41,16 +41,17 @@ public class BotService extends Service implements Bot.Ui {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         instance = this;
-        if (intent != null && "stop".equals(intent.getAction())) { stopBot(); return START_NOT_STICKY; }
+        if (intent != null && "stop".equals(intent.getAction())) { stopBot("Бот остановлен"); return START_NOT_STICKY; }
         startForegroundNow("Подключение…");
         SharedPreferences p = getSharedPreferences("bot", MODE_PRIVATE);
-        if (bot != null) bot.disconnect();
+        if (bot != null) { final Bot old = bot; new Thread(old::disconnect).start(); }
         bot = new Bot(this);
         bot.name = p.getString("name", "MineBot");
         bot.host = p.getString("host", "127.0.0.1");
         try { bot.port = Integer.parseInt(p.getString("port", "19132")); } catch (Exception e) { bot.port = 19132; }
         bot.owner = p.getString("owner", "").trim();
         bot.answerInChat = p.getBoolean("answer", true);
+        bot.debug = p.getBoolean("debug", false);
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "minebot:bot");
@@ -59,25 +60,30 @@ public class BotService extends Service implements Bot.Ui {
             if (wm != null) { wifi = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "minebot:wifi"); wifi.acquire(); }
         } catch (Exception ignored) {}
         active = true;
-        try { bot.connect(); } catch (Exception e) { status("Ошибка запуска: " + e.getMessage()); }
+        final Bot nb = bot;
+        new Thread(() -> { try { nb.connect(); } catch (Exception e) { status("Ошибка запуска: " + e.getMessage()); } }).start();
         return START_NOT_STICKY;
     }
 
-    void stopBot() {
+    void stopBot(String finalStatus) {
         active = false;
-        if (bot != null) { bot.disconnect(); bot = null; }
+        final Bot b = bot;
+        bot = null;
+        if (b != null) new Thread(b::disconnect).start();
         try { if (wake != null && wake.isHeld()) wake.release(); } catch (Exception ignored) {}
         try { if (wifi != null && wifi.isHeld()) wifi.release(); } catch (Exception ignored) {}
-        status = "Бот остановлен";
+        status = finalStatus;
         if (listener != null) main.post(() -> { if (listener != null) listener.onStatus(status); });
         stopForeground(true);
         stopSelf();
     }
 
-    void sayAsBot(String s) { if (bot != null) bot.chat(s); }
-    String info() { return bot != null ? bot.info() : ""; }
+    void sayAsBot(String s) { final Bot b = bot; if (b != null) new Thread(() -> b.chat(s)).start(); }
+    void command(String c) { final Bot b = bot; if (b != null) new Thread(() -> b.appCommand(c)).start(); }
+    String info() { Bot b = bot; return b != null ? b.info() : ""; }
+    boolean online() { Bot b = bot; return b != null && b.isOnline(); }
 
-    @Override public void onDestroy() { if (bot != null) bot.disconnect(); instance = null; active = false; super.onDestroy(); }
+    @Override public void onDestroy() { final Bot b = bot; bot = null; if (b != null) new Thread(b::disconnect).start(); instance = null; active = false; super.onDestroy(); }
 
     private void startForegroundNow(String text) {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -103,6 +109,9 @@ public class BotService extends Service implements Bot.Ui {
     // ---------- Bot.Ui ----------
     @Override public void status(String s) {
         status = s;
+        if (s.startsWith("Отключён") || s.startsWith("Кикнут") || s.startsWith("Сервер отклонил")) {
+            main.post(() -> { if (active) stopBot(s); });
+        }
         main.post(() -> {
             try {
                 NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);

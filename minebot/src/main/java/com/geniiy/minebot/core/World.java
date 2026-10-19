@@ -26,14 +26,30 @@ public final class World {
 
     private final Map<Long, Chunk> chunks = new ConcurrentHashMap<>();
     public final Map<Long, Ent> ents = new ConcurrentHashMap<>();
+    /** eid → ник (из списка игроков). */
+    public final Map<Long, String> names = new ConcurrentHashMap<>();
+
+    public String nameOf(long eid) { String n = names.get(eid); return n == null ? "" : n; }
 
     static long key(int cx, int cz) { return ((long) cx << 32) ^ (cz & 0xffffffffL); }
 
-    public void putChunk(int cx, int cz, byte[] data) {
+    /** order 0 — столбцами (x,z,y), 1 — слоями (y,z,x). */
+    public void putChunk(int cx, int cz, byte[] data, int order) {
         if (data.length < 32768 + 16384) return;
         Chunk c = new Chunk();
-        System.arraycopy(data, 0, c.ids, 0, 32768);
-        System.arraycopy(data, 32768, c.meta, 0, 16384);
+        if (order == 1) {
+            for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 0; y < 128; y++) {
+                int src = (y << 8) | (z << 4) | x, dst = (x << 11) | (z << 7) | y;
+                c.ids[dst] = data[src];
+                int sv = data[32768 + (src >> 1)] & 0xff;
+                int m = (src & 1) == 0 ? sv & 15 : sv >> 4;
+                int dv = c.meta[dst >> 1] & 0xff;
+                c.meta[dst >> 1] = (byte) ((dst & 1) == 0 ? (dv & 0xf0) | m : (dv & 0x0f) | (m << 4));
+            }
+        } else {
+            System.arraycopy(data, 0, c.ids, 0, 32768);
+            System.arraycopy(data, 32768, c.meta, 0, 16384);
+        }
         chunks.put(key(cx, cz), c);
     }
 
@@ -125,12 +141,13 @@ public final class World {
         return 1;
     }
 
-    public void clear() { chunks.clear(); ents.clear(); }
+    public void clear() { chunks.clear(); ents.clear(); names.clear(); }
 
     public Ent findPlayer(String name) {
         Ent best = null;
         for (Ent e : ents.values()) {
             if (!e.isPlayer()) continue;
+            if (e.name.isEmpty()) e.name = nameOf(e.eid);
             if (name == null || e.name.equalsIgnoreCase(name)) return e;
         }
         if (name != null) {

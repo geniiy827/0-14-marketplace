@@ -144,7 +144,7 @@ public final class RakClient {
 
     private void rawSend(Buf b) {
         if (!running) return;
-        try { sock.send(new DatagramPacket(b.b, b.len, server)); } catch (IOException e) { L.log("send: " + e); }
+        try { sock.send(new DatagramPacket(b.b, b.len, server)); } catch (Exception e) { if (running) L.log("send: " + e); }
     }
 
     private synchronized void tick() {
