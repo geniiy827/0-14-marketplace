@@ -34,9 +34,13 @@ public class MainActivity extends Activity implements BotService.Listener {
     private TextView statusView, infoView, logView;
     private ScrollView logScroll;
     private Button startBtn;
-    private LinearLayout found, settings, controls;
+    private LinearLayout found, settings, controls, invPanel;
+    private CheckBox allowTp, allowBuild, allowPvp, allowFun, reconnect;
+    private EditText loginCmd;
     private SharedPreferences prefs;
     private final Handler h = new Handler(Looper.getMainLooper());
+    private int invTick;
+    private String lastInvKey = "";
     private final Runnable poll = new Runnable() {
         @Override public void run() {
             BotService s = BotService.instance;
@@ -44,6 +48,7 @@ public class MainActivity extends Activity implements BotService.Listener {
             infoView.setText(inf);
             infoView.setVisibility(inf.isEmpty() ? View.GONE : View.VISIBLE);
             setControlsEnabled(s != null && s.online());
+            if (invPanel.getVisibility() == View.VISIBLE && ++invTick % 2 == 0) refreshInventory();
             refreshButton();
             h.postDelayed(this, 1000);
         }
@@ -94,7 +99,9 @@ public class MainActivity extends Activity implements BotService.Listener {
                 {"⛏ Копать", "копай"}, {"🕳 Туннель", "туннель 10"}, {"⬇ Вниз 5", "вниз 5"},
                 {"🎒 Собирать", "собирай"}, {"🚶 Гулять", "гуляй"}, {"💃 Танец", "танцуй"},
                 {"⤴ Прыжок", "прыг"}, {"🪑 Сесть", "сядь"}, {"👀 Смотри", "смотри"},
-                {"➖ Ближе", "ближе"}, {"➕ Дальше", "дальше"}, {"ℹ Инфо", "инфо"}};
+                {"➖ Ближе", "ближе"}, {"➕ Дальше", "дальше"}, {"ℹ Инфо", "инфо"},
+                {"🥊 ПвП со мной", "пвп"}, {"🌉 Мост 5", "мост 5"}, {"🗼 Столб 3", "столб 3"},
+                {"🍞 Поесть", "ешь"}, {"🏠 Домой", "дом"}, {"📍 Дом тут", "дом тут"}};
         LinearLayout row = null;
         for (int i = 0; i < rows.length; i++) {
             if (i % 3 == 0) { row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); controls.addView(row, lp(4)); }
@@ -130,6 +137,21 @@ public class MainActivity extends Activity implements BotService.Listener {
         col.addView(sayRow, lp(6));
         col.addView(text("Начни с «!», чтобы отдать боту команду прямо отсюда, например «!иди 10 64 5».", 12, DIM));
 
+        // ---- инвентарь ----
+        Button invBtn = new Button(this);
+        invBtn.setText("🎒 Инвентарь бота");
+        invBtn.setAllCaps(false);
+        invBtn.setTextColor(TXT);
+        invBtn.setBackground(round(BTN));
+        col.addView(invBtn, lp(12));
+        invPanel = new LinearLayout(this);
+        invPanel.setOrientation(LinearLayout.VERTICAL);
+        invPanel.setPadding(dp(10), dp(8), dp(10), dp(8));
+        invPanel.setBackground(round(CARD));
+        invPanel.setVisibility(View.GONE);
+        col.addView(invPanel, lp(4));
+        invBtn.setOnClickListener(v -> { invPanel.setVisibility(invPanel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE); refreshInventory(); });
+
         // ---- настройки ----
         Button setBtn = new Button(this);
         setBtn.setText("⚙ Настройки и поиск миров");
@@ -152,6 +174,13 @@ public class MainActivity extends Activity implements BotService.Listener {
         owner = field(settings, "Слушаться только ника (пусто — всех)", prefs.getString("owner", ""), false);
         answer = check(settings, "Отвечать в чат", prefs.getBoolean("answer", true));
         debug = check(settings, "Подробный журнал (для поиска ошибок)", prefs.getBoolean("debug", false));
+        settings.addView(text("Что разрешено боту (на серверах часть лучше выключить):", 13, DIM), lp(8));
+        allowTp = check(settings, "Телепорт к игроку (тп, догонялки)", prefs.getBoolean("allowTp", true));
+        allowBuild = check(settings, "Ломать и строить (копай, туннель, мост, столб)", prefs.getBoolean("allowBuild", true));
+        allowPvp = check(settings, "ПвП с игроками", prefs.getBoolean("allowPvp", true));
+        allowFun = check(settings, "Развлечения в чате (шутки, кубик, викторина)", prefs.getBoolean("allowFun", true));
+        loginCmd = field(settings, "Команда после входа (например /login пароль)", prefs.getString("loginCmd", ""), false);
+        reconnect = check(settings, "Переподключаться, если выкинуло", prefs.getBoolean("reconnect", false));
         Button scanBtn = new Button(this);
         scanBtn.setText("🔍 Найти миры рядом");
         scanBtn.setAllCaps(false);
@@ -163,9 +192,13 @@ public class MainActivity extends Activity implements BotService.Listener {
 
         TextView help = text(
                 "Как запустить: зайди в мир в Minecraft → открой MineBot → «Запустить бота» → вернись в игру.\n\n" +
-                "Команды в чате игры: «!команда» или «Имя_бота команда». Работает и на серверах с префиксами в чате.\n" +
-                "ко мне · за мной [ник] · стоп · иди x y z · тп · охрана · атакуй · копай [x y z] · туннель N · вниз N · " +
-                "собирай · гуляй · танцуй · прыг · сядь · смотри · ближе · дальше · где · инфо · скажи текст · уйди · помощь", 13, DIM);
+                "Команды в чате: «!команда» или «Имя_бота команда». Список по разделам: !хелп 1 … !хелп 5.\n\n" +
+                "1 Движение: ко мне, за мной [ник], стоп, жди, иди x y z, тп, дом, дом тут, гуляй, ближе, дальше, прыг, сядь, смотри\n" +
+                "2 Бой: охрана [ник], атакуй, пвп [ник], пвп стат [ник], пвп сброс\n" +
+                "3 Работа: копай [x y z], туннель N, вниз N, мост N, столб N, поставь, собирай\n" +
+                "4 Вещи: инв, возьми <что>, дай <что>, выбрось <что>, ешь\n" +
+                "5 Прочее: где, инфо, кто, компас [ник], время, шутка, кубик [N], монетка, шар, комплимент, викторина, танцуй, скажи, уйди\n\n" +
+                "ПвП-бот учится: запоминает, как дерётся каждый игрок, и подбирает тактику. Играет честно — обычная дальность и скорость ударов.", 13, DIM);
         help.setPadding(p, p, p, p);
         help.setBackground(round(CARD));
         col.addView(help, lp(12));
@@ -175,8 +208,10 @@ public class MainActivity extends Activity implements BotService.Listener {
         logView = text("", 12, 0xFFB0BAC5);
         logView.setTypeface(Typeface.MONOSPACE);
         logView.setPadding(dp(10), dp(10), dp(10), dp(10));
-        logView.setTextIsSelectable(true);
         logScroll.addView(logView);
+        logScroll.setFocusable(false);
+        logScroll.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        logView.setFocusable(false);
         logScroll.setBackground(round(0xFF0D1014));
         col.addView(logScroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240)));
 
@@ -198,7 +233,10 @@ public class MainActivity extends Activity implements BotService.Listener {
             if (!n.matches("[A-Za-z0-9_]{3,16}")) { statusView.setText("Имя: 3–16 символов, только латиница, цифры и _"); settings.setVisibility(View.VISIBLE); return; }
             prefs.edit().putString("name", n).putString("host", host.getText().toString().trim())
                     .putString("port", port.getText().toString().trim()).putString("owner", owner.getText().toString().trim())
-                    .putBoolean("answer", answer.isChecked()).putBoolean("debug", debug.isChecked()).apply();
+                    .putBoolean("answer", answer.isChecked()).putBoolean("debug", debug.isChecked())
+                    .putBoolean("allowTp", allowTp.isChecked()).putBoolean("allowBuild", allowBuild.isChecked())
+                    .putBoolean("allowPvp", allowPvp.isChecked()).putBoolean("allowFun", allowFun.isChecked())
+                    .putString("loginCmd", loginCmd.getText().toString().trim()).putBoolean("reconnect", reconnect.isChecked()).apply();
             synchronized (BotService.LOG) { BotService.LOG.clear(); }
             logView.setText("");
             settings.setVisibility(View.GONE);
@@ -234,6 +272,38 @@ public class MainActivity extends Activity implements BotService.Listener {
         }).start();
     }
 
+    private void refreshInventory() {
+        BotService s = BotService.instance;
+        List<int[]> items = s != null ? s.inventory() : new ArrayList<>();
+        StringBuilder key = new StringBuilder();
+        for (int[] it : items) key.append(it[0]).append(':').append(it[1]).append(':').append(it[2]).append(':').append(it[5]).append(';');
+        if (key.toString().equals(lastInvKey) && invPanel.getChildCount() > 0) return;
+        lastInvKey = key.toString();
+        invPanel.removeAllViews();
+        if (s == null || !s.online()) { invPanel.addView(text("Бот не в мире.", 14, DIM)); return; }
+        if (items.isEmpty()) {
+            invPanel.addView(text(s.gameMode() == 1 ? "Бот в творческом режиме: попроси в чате «!возьми алмазный меч» — возьмёт любой предмет." : "Инвентарь пуст. Кинь боту вещи — он их подберёт.", 14, DIM));
+            return;
+        }
+        invPanel.addView(text("Нажми — взять в руку, ✕ — выбросить. ★ — в руке, ▣ — на панели быстрого доступа", 12, DIM));
+        for (int[] it : items) {
+            LinearLayout r = new LinearLayout(this);
+            r.setOrientation(LinearLayout.HORIZONTAL);
+            r.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            String label = (it[5] == 1 ? "★ " : it[4] == 1 ? "▣ " : "    ") + com.geniiy.minebot.core.Items.name(it[1]) + "  ×" + it[2];
+            TextView t = text(label, 15, it[5] == 1 ? GREEN : TXT);
+            t.setPadding(dp(8), dp(10), dp(8), dp(10));
+            final int slot = it[0];
+            t.setOnClickListener(v -> { BotService sv = BotService.instance; if (sv != null) sv.equip(slot); lastInvKey = ""; });
+            r.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            Button d = new Button(this);
+            d.setText("✕");
+            d.setOnClickListener(v -> { BotService sv = BotService.instance; if (sv != null) sv.drop(slot); lastInvKey = ""; });
+            r.addView(d, new LinearLayout.LayoutParams(dp(48), dp(40)));
+            invPanel.addView(r);
+        }
+    }
+
     private void refreshButton() {
         boolean on = BotService.active;
         startBtn.setText(on ? "⏹ Отключить бота" : "▶ Запустить бота");
@@ -257,7 +327,9 @@ public class MainActivity extends Activity implements BotService.Listener {
             CharSequence t = logView.getText();
             logView.setText(t.subSequence(t.length() / 2, t.length()));
         }
-        logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+        // прокручиваем только сам журнал и только если он и так был внизу — экран не прыгает
+        final boolean atBottom = logScroll.getScrollY() + logScroll.getHeight() >= logView.getHeight() - dp(40);
+        if (atBottom) logScroll.post(() -> logScroll.scrollTo(0, Math.max(0, logView.getHeight() - logScroll.getHeight())));
     }
 
     // ---------- helpers ----------

@@ -17,8 +17,23 @@ public final class World {
         public String name = "";
         public float x, y, z, yaw, pitch; // y — ноги
         public long seen = System.currentTimeMillis();
+        public double vx, vz;        // скорость (блоков за такт), оценка
         public Ent(long eid) { this.eid = eid; }
+        /** Обновить позицию и оценить скорость. */
+        public void moveTo(float nx, float ny, float nz) {
+            long now = System.currentTimeMillis();
+            double dt = Math.max(1, (now - seen) / 50.0);
+            double jx = nx - x, jz = nz - z;
+            if (now - seen < 1000 && jx * jx + jz * jz < 4) { vx = vx * 0.5 + jx / dt * 0.5; vz = vz * 0.5 + jz / dt * 0.5; }
+            else { vx = 0; vz = 0; } // телепорт или давно не двигался
+            double sp = Math.sqrt(vx * vx + vz * vz);
+            if (sp > 0.6) { vx *= 0.6 / sp; vz *= 0.6 / sp; }
+            x = nx; y = ny; z = nz; seen = now;
+        }
         public boolean isPlayer() { return type == 63; }
+        /** Скорость с учётом того, что стоящая сущность не шлёт обновлений. */
+        public double curVx() { return System.currentTimeMillis() - seen < 400 ? vx : 0; }
+        public double curVz() { return System.currentTimeMillis() - seen < 400 ? vz : 0; }
         public double dist2(double px, double py, double pz) {
             double dx = x - px, dy = y - py, dz = z - pz; return dx * dx + dy * dy + dz * dz;
         }
@@ -92,7 +107,7 @@ public final class World {
     private static final boolean[] LIQUID = new boolean[256];
     static {
         int[] pass = {0, 6, 8, 9, 10, 11, 27, 28, 30, 31, 32, 37, 38, 39, 40, 50, 51, 55, 59, 63, 66, 68, 69, 70, 72, 75, 76,
-                77, 78, 83, 90, 104, 105, 106, 115, 126, 131, 132, 141, 142, 143, 147, 148, 171, 175, 244};
+                65, 77, 78, 83, 90, 104, 105, 106, 115, 126, 131, 132, 141, 142, 143, 147, 148, 171, 175, 244};
         for (int p : pass) PASS[p] = true;
         int[] danger = {10, 11, 51, 81, 30, 90};
         for (int d : danger) DANGER[d] = true;

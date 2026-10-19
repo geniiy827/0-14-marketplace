@@ -52,6 +52,15 @@ public class BotService extends Service implements Bot.Ui {
         bot.owner = p.getString("owner", "").trim();
         bot.answerInChat = p.getBoolean("answer", true);
         bot.debug = p.getBoolean("debug", false);
+        bot.allowTp = p.getBoolean("allowTp", true);
+        bot.allowBuild = p.getBoolean("allowBuild", true);
+        bot.allowPvp = p.getBoolean("allowPvp", true);
+        bot.allowFun = p.getBoolean("allowFun", true);
+        bot.loginCommand = p.getString("loginCmd", "");
+        bot.autoReconnect = p.getBoolean("reconnect", false);
+        bot.loadBrain(p.getString("brain", ""));
+        main.removeCallbacks(saveBrain);
+        main.postDelayed(saveBrain, 60000);
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "minebot:bot");
@@ -65,9 +74,18 @@ public class BotService extends Service implements Bot.Ui {
         return START_NOT_STICKY;
     }
 
+    private final Runnable saveBrain = new Runnable() {
+        @Override public void run() {
+            Bot b = bot;
+            if (b != null) { getSharedPreferences("bot", MODE_PRIVATE).edit().putString("brain", b.brainData()).apply(); main.postDelayed(this, 60000); }
+        }
+    };
+
     void stopBot(String finalStatus) {
         active = false;
+        main.removeCallbacks(saveBrain);
         final Bot b = bot;
+        if (b != null) getSharedPreferences("bot", MODE_PRIVATE).edit().putString("brain", b.brainData()).apply();
         bot = null;
         if (b != null) new Thread(b::disconnect).start();
         try { if (wake != null && wake.isHeld()) wake.release(); } catch (Exception ignored) {}
@@ -82,6 +100,10 @@ public class BotService extends Service implements Bot.Ui {
     void command(String c) { final Bot b = bot; if (b != null) new Thread(() -> b.appCommand(c)).start(); }
     String info() { Bot b = bot; return b != null ? b.info() : ""; }
     boolean online() { Bot b = bot; return b != null && b.isOnline(); }
+    java.util.List<int[]> inventory() { Bot b = bot; return b != null ? b.inventory() : new java.util.ArrayList<>(); }
+    int gameMode() { Bot b = bot; return b != null ? b.gameMode() : 0; }
+    void equip(int slot) { final Bot b = bot; if (b != null) new Thread(() -> b.equip(slot)).start(); }
+    void drop(int slot) { final Bot b = bot; if (b != null) new Thread(() -> b.drop(slot)).start(); }
 
     @Override public void onDestroy() { final Bot b = bot; bot = null; if (b != null) new Thread(b::disconnect).start(); instance = null; active = false; super.onDestroy(); }
 

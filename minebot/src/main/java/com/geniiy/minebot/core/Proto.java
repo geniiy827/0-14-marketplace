@@ -15,7 +15,7 @@ public final class Proto {
             MOVE_PLAYER = 0x9d, REMOVE_BLOCK = 0x9e, UPDATE_BLOCK = 0x9f, EXPLODE = 0xa1, LEVEL_EVENT = 0xa2,
             ENTITY_EVENT = 0xa4, MOB_EQUIPMENT = 0xa7, INTERACT = 0xa9, USE_ITEM = 0xaa, PLAYER_ACTION = 0xab,
             SET_ENTITY_DATA = 0xad, SET_ENTITY_MOTION = 0xae, SET_HEALTH = 0xb0, SET_SPAWN_POSITION = 0xb1,
-            ANIMATE = 0xb2, RESPAWN = 0xb3, CONTAINER_SET_CONTENT = 0xb9, ADVENTURE_SETTINGS = 0xbc,
+            ANIMATE = 0xb2, RESPAWN = 0xb3, DROP_ITEM = 0xb4, CONTAINER_SET_SLOT = 0xb7, CONTAINER_SET_CONTENT = 0xb9, ADVENTURE_SETTINGS = 0xbc,
             FULL_CHUNK_DATA = 0xbf, SET_PLAYER_GAMETYPE = 0xc2, PLAYER_LIST = 0xc3,
             REQUEST_CHUNK_RADIUS = 0xc8, CHUNK_RADIUS_UPDATE = 0xc9;
 
@@ -78,6 +78,14 @@ public final class Proto {
     static void slot(Buf b, int id, int count, int meta) {
         if (id == 0) { b.i16(0); return; }
         b.i16(id).u8(count).i16(meta).li16(0);
+    }
+
+    public static byte[] entityEvent(long eid, int event) { return pk(ENTITY_EVENT).i64(eid).u8(event).bytes(); }
+
+    public static byte[] dropItem(int itemId, int count, int meta) {
+        Buf b = pk(DROP_ITEM).u8(0);
+        slot(b, itemId, count, meta);
+        return b.bytes();
     }
 
     public static byte[] respawn(float x, float y, float z) { return pk(RESPAWN).f32(x).f32(y).f32(z).bytes(); }
