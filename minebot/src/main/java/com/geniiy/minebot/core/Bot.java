@@ -91,7 +91,9 @@ public final class Bot implements RakClient.Listener {
     @Override public void onConnected() {
         ui.status("Соединение есть, вхожу в мир…");
         UUID uuid = UUID.nameUUIDFromBytes(("MineBot:" + name).getBytes());
-        rak.send(Proto.login(name, rnd.nextLong(), uuid, host + ":" + port, Skin.make()));
+        int proto = rak.gameProtocol != 0 ? rak.gameProtocol : Proto.PROTOCOL;
+        ui.log("Вход: протокол " + proto);
+        rak.send(Proto.login(proto, name, rnd.nextLong(), uuid, host + ":" + port, Skin.make()));
     }
 
     @Override public void onClosed(String reason) {
@@ -136,8 +138,10 @@ public final class Bot implements RakClient.Listener {
             case Proto.PLAY_STATUS: {
                 int st = b.i32();
                 if (st == 0) ui.log("Вход принят");
-                else if (st == 1) { ui.status("Сервер отклонил вход: старая версия клиента"); disconnect(); }
-                else if (st == 2) { ui.status("Сервер отклонил вход: другая версия игры"); disconnect(); }
+                else if (st == 1 || st == 2) {
+                    String m = "Сервер отклонил вход: " + (st == 1 ? "у бота старая версия протокола" : "у бота новее версия протокола");
+                    ui.log(m); ui.status(m); disconnect();
+                }
                 else if (st == 3) {
                     spawned = true;
                     ui.status("В мире! Позиция " + fmtPos());
@@ -148,6 +152,7 @@ public final class Bot implements RakClient.Listener {
             }
             case Proto.DISCONNECT: {
                 String m = b.str();
+                ui.log("Кикнут: " + m);
                 ui.status("Кикнут: " + m);
                 disconnect();
                 break;

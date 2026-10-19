@@ -7,7 +7,7 @@ import java.util.zip.Inflater;
 
 /** Пакеты MCPE 0.14.0/0.14.1 (протокол 45). */
 public final class Proto {
-    public static final int PROTOCOL = 45;
+    public static final int PROTOCOL = 46; // 0.14.1 (0.14.0 = 45)
 
     public static final int LOGIN = 0x8f, PLAY_STATUS = 0x90, DISCONNECT = 0x91, BATCH = 0x92, TEXT = 0x93,
             SET_TIME = 0x94, START_GAME = 0x95, ADD_PLAYER = 0x96, REMOVE_PLAYER = 0x97, ADD_ENTITY = 0x98,
@@ -28,10 +28,10 @@ public final class Proto {
     static Buf pk(int id) { return new Buf().u8(0x8e).u8(id); }
 
     // ---------------- клиент → сервер ----------------
-    public static byte[] login(String name, long clientId, UUID uuid, String serverAddr, byte[] skin) {
+    public static byte[] login(int protocol, String name, long clientId, UUID uuid, String serverAddr, byte[] skin) {
         Buf b = pk(LOGIN);
         b.str(name);
-        b.i32(PROTOCOL).i32(PROTOCOL);
+        b.i32(protocol).i32(protocol);
         b.i64(clientId);
         b.i64(uuid.getMostSignificantBits()).i64(uuid.getLeastSignificantBits());
         b.str(serverAddr);

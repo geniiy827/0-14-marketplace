@@ -45,6 +45,8 @@ public final class RakClient {
     private int protocol = 7;
     private boolean protocolForced;
     private String pongSeen;
+    /** Протокол игры из ответа на пинг (0 — неизвестен). */
+    public volatile int gameProtocol;
     /** Попытки подключения: {версия RakNet, MTU}. */
     private static final int[][] ATTEMPTS = {
             {7, 1492}, {6, 1492}, {8, 1492}, {7, 1200}, {6, 1200}, {5, 1492}, {8, 1200}, {7, 576}, {6, 576}, {9, 1200}};
@@ -141,6 +143,7 @@ public final class RakClient {
     }
 
     private void rawSend(Buf b) {
+        if (!running) return;
         try { sock.send(new DatagramPacket(b.b, b.len, server)); } catch (IOException e) { L.log("send: " + e); }
     }
 
@@ -313,8 +316,9 @@ public final class RakClient {
                 String motd = f.length > 1 ? f[1] : s;
                 if (pongSeen == null) {
                     L.log("Сервер найден: " + s);
-                    if (f.length > 3 && !f[2].equals("45"))
-                        L.log("Внимание: у сервера протокол " + f[2] + " (версия " + f[3] + "), а бот умеет только 45 (0.14.0/0.14.1)");
+                    try { gameProtocol = Integer.parseInt(f[2].trim()); } catch (Exception ignored) {}
+                    if (gameProtocol != 0 && gameProtocol != 45 && gameProtocol != 46)
+                        L.log("Внимание: у сервера протокол " + gameProtocol + " (версия " + (f.length > 3 ? f[3] : "?") + "). Бот сделан для 0.14.0/0.14.1, попробую всё равно");
                 }
                 pongSeen = motd;
             } catch (Exception e) { if (pongSeen == null) { pongSeen = "?"; L.log("Сервер ответил на пинг"); } }
