@@ -26,19 +26,23 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Adder.apk
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk Adder.apk
+          cp snake/build/outputs/apk/debug/snake-debug.apk Snake.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Adder-apk
-          path: Adder.apk
+          name: apks
+          path: '*.apk'
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: Сборка ${{ github.run_number }}
-          files: Adder.apk
+          files: |
+            Adder.apk
+            Snake.apk
           make_latest: true
