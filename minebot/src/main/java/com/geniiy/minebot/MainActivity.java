@@ -27,6 +27,7 @@ public class MainActivity extends Activity implements BotService.Listener {
     private TextView statusView, logView;
     private ScrollView logScroll;
     private Button startBtn;
+    private LinearLayout found;
     private SharedPreferences prefs;
 
     @Override
@@ -63,6 +64,15 @@ public class MainActivity extends Activity implements BotService.Listener {
         answer.setTextColor(TXT);
         answer.setChecked(prefs.getBoolean("answer", true));
         card.addView(answer);
+
+        Button scanBtn = new Button(this);
+        scanBtn.setText("Найти миры рядом");
+        scanBtn.setAllCaps(false);
+        scanBtn.setOnClickListener(v -> scan());
+        col.addView(scanBtn, lp(8));
+        found = new LinearLayout(this);
+        found.setOrientation(LinearLayout.VERTICAL);
+        col.addView(found);
 
         startBtn = new Button(this);
         startBtn.setTextSize(17);
@@ -140,6 +150,31 @@ public class MainActivity extends Activity implements BotService.Listener {
         }
         statusView.postDelayed(this::refreshButton, 300);
         refreshButton();
+    }
+
+    private void scan() {
+        found.removeAllViews();
+        found.addView(text("Ищу миры… (2–3 секунды)", 14, DIM));
+        new Thread(() -> {
+            java.util.List<String> extra = new java.util.ArrayList<>();
+            String h = host.getText().toString().trim();
+            if (!h.isEmpty()) extra.add(h);
+            java.util.List<com.geniiy.minebot.core.LanScanner.Found> list = com.geniiy.minebot.core.LanScanner.scan(extra, 2500);
+            runOnUiThread(() -> {
+                found.removeAllViews();
+                if (list.isEmpty()) {
+                    found.addView(text("Ничего не найдено. Открой мир в Minecraft и проверь, что включена игра по локальной сети.", 14, RED));
+                    return;
+                }
+                for (com.geniiy.minebot.core.LanScanner.Found f : list) {
+                    TextView t = text("▶ " + com.geniiy.minebot.core.LanScanner.pretty(f.info) + "\n   " + f.host + ":" + f.port, 14, TXT);
+                    t.setPadding(dp(12), dp(10), dp(12), dp(10));
+                    t.setBackground(round(CARD));
+                    t.setOnClickListener(v -> { host.setText(f.host); port.setText(String.valueOf(f.port)); statusView.setText("Выбран: " + f.host + ":" + f.port); });
+                    found.addView(t, lp(6));
+                }
+            });
+        }).start();
     }
 
     private void refreshButton() {

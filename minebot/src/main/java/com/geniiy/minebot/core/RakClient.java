@@ -34,13 +34,20 @@ public final class RakClient {
     public static final int UNRELIABLE = 0, RELIABLE = 2, RELIABLE_ORDERED = 3;
 
     private final Listener L;
-    private final InetSocketAddress server;
+    private InetSocketAddress server;
+    private final String host;
+    private final int port;
     private DatagramSocket sock;
     private final long guid = new Random().nextLong();
     private volatile boolean running;
     private Thread thread;
 
     private int protocol = 7;
+    private boolean protocolForced;
+    private String pongSeen;
+    /** Попытки подключения: {версия RakNet, MTU}. */
+    private static final int[][] ATTEMPTS = {
+            {7, 1492}, {6, 1492}, {8, 1492}, {7, 1200}, {6, 1200}, {5, 1492}, {8, 1200}, {7, 576}, {6, 576}, {9, 1200}};
     private int mtu = 1492;
     private int state; // 0 OCR1, 1 OCR2, 2 connecting, 3 connected, 4 closed
     private long stateTime, lastRecv, lastPing, startTime;
@@ -66,7 +73,8 @@ public final class RakClient {
 
     public RakClient(String host, int port, Listener l) throws IOException {
         this.L = l;
-        this.server = new InetSocketAddress(InetAddress.getByName(host), port);
+        this.host = host;
+        this.port = port;
         for (int i = 0; i < 32; i++) { orderWait.add(new HashMap<>()); highestSequenced[i] = -1; }
     }
 
@@ -78,7 +86,16 @@ public final class RakClient {
         running = true;
         startTime = now();
         state = 0; stateTime = 0;
-        thread = new Thread(this::loop, "raknet");
+        thread = new Thread(() -> {
+            try {
+                server = new InetSocketAddress(InetAddress.getByName(host), port);
+                L.log("Адрес: " + server.getAddress().getHostAddress() + ":" + port);
+            } catch (Exception e) {
+                shutdown("Не найден адрес " + host);
+                return;
+            }
+            loop();
+        }, "raknet");
         thread.setDaemon(true);
         thread.start();
     }
@@ -132,10 +149,21 @@ public final class RakClient {
         if (state == 0) {
             if (t - stateTime > 500) {
                 stateTime = t;
+                if (ocr1Tries % 2 == 0) {
+                    // пинг без соединения: проверяем, что сервер вообще слышит нас
+                    rawSend(new Buf().u8(0x01).i64(t - startTime).raw(MAGIC).i64(guid));
+                }
+                if (ocr1Tries >= ATTEMPTS.length * 2) {
+                    shutdown(pongSeen == null
+                            ? "Сервер не отвечает ни на что. Мир открыт? Правильный адрес/порт?"
+                            : "Сервер «" + pongSeen + "» отвечает на пинг, но не пускает. Пришли журнал разработчику");
+                    return;
+                }
+                int[] at = ATTEMPTS[ocr1Tries / 2];
+                if (!protocolForced) protocol = at[0];
+                mtu = at[1];
                 ocr1Tries++;
-                if (ocr1Tries > 4) mtu = 1200;
-                if (ocr1Tries > 8) mtu = 576;
-                if (ocr1Tries > 16) { shutdown("Сервер не отвечает (мир открыт для сети?)"); return; }
+                L.log("RakNet: запрос 1 (протокол " + protocol + ", MTU " + mtu + ")");
                 Buf b = new Buf().u8(0x05).raw(MAGIC).u8(protocol);
                 b.zeros(Math.max(0, mtu - 28 - b.len));
                 rawSend(b);
@@ -276,7 +304,22 @@ public final class RakClient {
         } else if (id == 0x19) { // несовместимая версия протокола
             int p = b.u8();
             L.log("RakNet: сервер просит протокол " + p);
-            if (p != protocol) { protocol = p; synchronized (this) { stateTime = 0; ocr1Tries = 0; } }
+            if (p != protocol) { protocol = p; protocolForced = true; synchronized (this) { stateTime = 0; } }
+        } else if (id == 0x1c) {
+            try {
+                b.i64(); b.i64(); b.skip(16);
+                String s = b.str();
+                String[] f = s.split(";");
+                String motd = f.length > 1 ? f[1] : s;
+                if (pongSeen == null) {
+                    L.log("Сервер найден: " + s);
+                    if (f.length > 3 && !f[2].equals("45"))
+                        L.log("Внимание: у сервера протокол " + f[2] + " (версия " + f[3] + "), а бот умеет только 45 (0.14.0/0.14.1)");
+                }
+                pongSeen = motd;
+            } catch (Exception e) { if (pongSeen == null) { pongSeen = "?"; L.log("Сервер ответил на пинг"); } }
+        } else if (id == 0x1a || id == 0x12 || id == 0x14 || id == 0x17) {
+            L.log("RakNet: сервер отказал (код 0x" + Integer.toHexString(id) + ")");
         } else if (id == 0x08 && state == 1) {
             synchronized (this) {
                 state = 2;
@@ -284,8 +327,8 @@ public final class RakClient {
                 queue(new Buf().u8(0x09).i64(guid).i64(now() - startTime).u8(0).bytes(), RELIABLE, 0);
                 flush();
             }
-        } else if (id == 0x1c) {
-            // ответ на пинг без соединения — не нужен
+        } else {
+            L.log("RakNet: пакет 0x" + Integer.toHexString(id) + " (" + b.len + " байт)");
         }
     }
 
