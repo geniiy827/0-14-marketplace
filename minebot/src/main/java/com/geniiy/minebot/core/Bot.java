@@ -37,7 +37,7 @@ public final class Bot implements RakClient.Listener {
     // ---------- состояние игрока ----------
     private long eid = -1;
     private boolean spawned, started;
-    private double x, y, z, vy;
+    private double x, y, z, vy, kx, kz; // kx/kz — отталкивание
     private float yaw, pitch;
     private boolean onGround, sneaking;
     private int health = 20;
@@ -138,7 +138,9 @@ public final class Bot implements RakClient.Listener {
 
     private void handleGame(Buf b) throws Exception {
         int id = b.u8();
-        synchronized (pktCount) { pktCount.merge(id, 1, Integer::sum); }
+        boolean first;
+        synchronized (pktCount) { first = !pktCount.containsKey(id); pktCount.merge(id, 1, Integer::sum); }
+        if (first && debug) ui.log("Первый пакет 0x" + Integer.toHexString(id) + " (" + b.left() + " байт)");
         if (id == Proto.BATCH) {
             int n = b.i32();
             byte[] raw = Proto.inflate(b.take(Math.min(n, b.left())));
@@ -167,6 +169,7 @@ public final class Bot implements RakClient.Listener {
                     ui.log(m); ui.status(m); new Thread(this::disconnect).start();
                 } else if (st == 3) {
                     spawned = true;
+                    if (!started) { started = true; ui.log("StartGame не получен — продолжаю без него"); send(Proto.requestChunkRadius(5)); }
                     ui.status("В мире! Позиция " + fmtPos());
                     ui.log("Заспавнился");
                     say("Привет! Я " + name + ". Команды: напиши " + name + " помощь");
@@ -181,6 +184,7 @@ public final class Bot implements RakClient.Listener {
                 break;
             }
             case Proto.START_GAME: {
+                if (debug) ui.log("StartGame: " + b.left() + " байт");
                 b.i32(); b.u8(); b.i32(); b.i32();
                 eid = b.i64();
                 b.i32(); b.i32(); b.i32();
@@ -276,6 +280,15 @@ public final class Bot implements RakClient.Listener {
                 world.putChunk(cx, cz, data, order);
                 break;
             }
+            case Proto.SET_ENTITY_MOTION: {
+                int n = b.i32();
+                for (int i = 0; i < n && b.left() >= 20; i++) {
+                    long e = b.i64();
+                    float mx = b.f32(), my = b.f32(), mz = b.f32();
+                    if (e == eid) { kx = mx; kz = mz; vy = my; onGround = false; }
+                }
+                break;
+            }
             case Proto.UPDATE_BLOCK: {
                 int n = b.i32();
                 for (int i = 0; i < n && b.left() >= 11; i++) {
@@ -298,7 +311,8 @@ public final class Bot implements RakClient.Listener {
             }
             case Proto.SET_HEALTH: {
                 health = b.i32();
-                if (health <= 0 && deadSince == 0) { deadSince = System.currentTimeMillis(); ui.log("Бот погиб"); }
+                if (health <= 0 && deadSince == 0) { deadSince = System.currentTimeMillis(); ui.log("Бот погиб (здоровье " + health + ")"); }
+                if (health > 0) deadSince = 0;
                 break;
             }
             case Proto.RESPAWN: {
@@ -540,17 +554,15 @@ public final class Bot implements RakClient.Listener {
     // ======================= такт =======================
     private void tick() {
         RakClient r = rak;
-        if (r == null || !r.isConnected() || !started || eid < 0) return;
+        if (r == null || !r.isConnected() || !spawned) return;
         tickNo++;
-        if (health <= 0) {
-            if (deadSince > 0 && System.currentTimeMillis() - deadSince > 1500) {
-                send(Proto.action(eid, Proto.ACTION_RESPAWN, 0, 0, 0, -1));
-                deadSince = System.currentTimeMillis();
-            }
-            return;
+        if (health <= 0 && deadSince > 0) {
+            long dt = System.currentTimeMillis() - deadSince;
+            if (dt > 1500 && dt < 1600) send(Proto.action(eid, Proto.ACTION_RESPAWN, 0, 0, 0, -1));
+            if (dt > 6000) { health = 20; deadSince = 0; } // сервер не подтвердил смерть — считаем живым
         }
-        if (!spawned) return;
 
+        if (world.chunkCount() == 0 && tickNo % 100 == 0) send(Proto.requestChunkRadius(5));
         boolean known = world.loaded(bx(), bz());
         double mx = 0, mz = 0;
         boolean wantJump = jumpReq; jumpReq = false;
@@ -834,6 +846,17 @@ public final class Bot implements RakClient.Listener {
         if (collides(x, y, z)) {
             for (int i = 1; i <= 4; i++) if (!collides(x, y + i, z)) { y = Math.floor(y) + i; vy = 0; break; }
         }
+        // отталкивание: удар/взрыв и толкание игроками
+        for (World.Ent e : world.ents.values()) {
+            if (!e.isPlayer() && !(e.type >= 10 && e.type <= 45)) continue;
+            double dx = x - e.x, dz = z - e.z, d2 = dx * dx + dz * dz;
+            if (d2 < 0.36 && d2 > 1e-6 && Math.abs(e.y - y) < 1.8) { double d = Math.sqrt(d2); kx += dx / d * 0.05; kz += dz / d * 0.05; }
+        }
+        mx += kx; mz += kz;
+        double fr = onGround ? 0.546 : 0.91;
+        kx *= fr; kz *= fr;
+        if (Math.abs(kx) < 0.003) kx = 0;
+        if (Math.abs(kz) < 0.003) kz = 0;
         boolean inWater = world.liquid((int) Math.floor(x), (int) Math.floor(y + 0.4), (int) Math.floor(z));
         if (inWater) {
             vy = Math.min(vy + 0.06, 0.12);
@@ -957,7 +980,7 @@ public final class Bot implements RakClient.Listener {
     public synchronized String info() {
         if (rak == null || !spawned) return "";
         StringBuilder sb = new StringBuilder();
-        sb.append("Режим: ").append(modeName()).append("  ♥").append(health)
+        sb.append("Режим: ").append(modeName()).append("  ♥").append(health).append("  id ").append(eid)
                 .append("\nПозиция: ").append(fmtPos())
                 .append("\nЧанков: ").append(world.chunkCount()).append(world.loaded(bx(), bz()) ? " (под ботом есть)" : " (под ботом НЕТ)")
                 .append(", игроков: ").append(countPlayers()).append(", сущностей: ").append(world.ents.size());
