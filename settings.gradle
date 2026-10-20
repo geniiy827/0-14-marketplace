@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Adder"
-include ':app', ':snake', ':minebot'
+include ':app', ':snake', ':minebot', ':swarm'

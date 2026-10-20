@@ -31,6 +31,7 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk Adder.apk
           cp snake/build/outputs/apk/debug/snake-debug.apk Snake.apk
           cp minebot/build/outputs/apk/debug/minebot-debug.apk MineBot.apk
+          cp swarm/build/outputs/apk/debug/swarm-debug.apk ServerTest.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -47,4 +48,5 @@ jobs:
             Adder.apk
             Snake.apk
             MineBot.apk
+            ServerTest.apk
           make_latest: true
