@@ -7,7 +7,8 @@ import java.util.Map;
 public final class ChunkConv {
     public static final int SECTIONS = 8;   // 128 / 16
     // id типов блок-сущностей 1.20.1 (порядок BlockEntityType)
-    private static final int BE_CHEST = 1, BE_TRAPPED = 2, BE_ENDER = 3, BE_SIGN = 7, BE_SKULL = 15, BE_BED = 24;
+    static final int BE_CHEST = 1, BE_TRAPPED = 2, BE_ENDER = 3, BE_SIGN = 7, BE_ENCHANT = 12, BE_END_PORTAL = 13,
+            BE_SKULL = 15, BE_BANNER = 19, BE_BED = 24;
 
     /** Хранимый чанк: java-состояния блоков [x<<11|z<<7|y] и свет. */
     public static final class Chunk {
@@ -15,6 +16,29 @@ public final class ChunkConv {
         public final byte[] pe = new byte[32768];   // id блока 0.14 (для логики)
         public final byte[] sky = new byte[16384];  // ниблы в порядке 0.14
         public final byte[] blk = new byte[16384];
+        /** Блок-сущности 0.14 (таблички и т.п.) по индексу блока. */
+        public final Map<Integer, Map<String, Object>> tiles = new HashMap<>();
+        public long received = System.currentTimeMillis();
+    }
+
+    /** Тип блок-сущности Java для блока 0.14 (или -1). */
+    static int beType(int peId) {
+        switch (peId) {
+            case 54: return BE_CHEST; case 146: return BE_TRAPPED; case 130: return BE_ENDER;
+            case 63: case 68: return BE_SIGN; case 144: return BE_SKULL; case 26: return BE_BED;
+            case 176: case 177: return BE_BANNER; case 116: return BE_ENCHANT; case 119: return BE_END_PORTAL;
+            default: return -1;
+        }
+    }
+
+    /** NBT блок-сущности для Java (у табличек — текст). */
+    static byte[] beNbt(Chunk c, int i) {
+        int id = c.pe[i] & 0xff;
+        if (id == 63 || id == 68) {
+            Map<String, Object> t = c.tiles.get(i);
+            return Nbt.signJava(t != null ? Nbt.signLines(t) : null);
+        }
+        return new byte[]{0};
     }
 
     static int idx(int x, int y, int z) { return (x << 11) | (z << 7) | y; }
@@ -41,6 +65,21 @@ public final class ChunkConv {
             }
         }
         if (!anySky) computeSky(c); // сервер не прислал свет — считаем простое небо
+        // карта высот (256), цвета биомов (1024), доп. данные, затем блок-сущности в NBT (LE)
+        int off = 32768 + 16384 * 3 + 256 + 1024;
+        if (d.length >= off + 4) {
+            try {
+                com.geniiy.bridge14.pe.Buf b = new com.geniiy.bridge14.pe.Buf(d, off, d.length);
+                int extra = b.li32();
+                if (extra >= 0 && extra < 100000) {
+                    b.skip(extra * 6);
+                    for (Map<String, Object> t : Nbt.readAllLE(b)) {
+                        int tx = Nbt.intOf(t.get("x"), 0), ty = Nbt.intOf(t.get("y"), -1), tz = Nbt.intOf(t.get("z"), 0);
+                        if (ty >= 0 && ty < 128) c.tiles.put(idx(tx & 15, ty, tz & 15), t);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
         return c;
     }
 
@@ -102,13 +141,10 @@ public final class ChunkConv {
         // блок-сущности (сундуки, кровати, таблички, головы — без них Java их не рисует)
         JBuf be = new JBuf(); int beCount = 0;
         for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 0; y < 128; y++) {
-            int id = c.pe[idx(x, y, z)] & 0xff, t;
-            switch (id) {
-                case 54: t = BE_CHEST; break; case 146: t = BE_TRAPPED; break; case 130: t = BE_ENDER; break;
-                case 63: case 68: t = BE_SIGN; break; case 144: t = BE_SKULL; break; case 26: t = BE_BED; break;
-                default: continue;
-            }
-            be.u8((x << 4) | z).i16(y).varint(t).u8(0); // пустой NBT
+            int i = idx(x, y, z);
+            int t = beType(c.pe[i] & 0xff);
+            if (t < 0 || c.state[i] == 0) continue;
+            be.u8((x << 4) | z).i16(y).varint(t).raw(beNbt(c, i));
             beCount++;
         }
         p.varint(beCount).raw(be.b, 0, be.len);

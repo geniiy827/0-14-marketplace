@@ -25,6 +25,8 @@ public final class Config {
 
     public String nick = "";
     public String skinPath = "";
+    /** Тонкие руки (модель «Алекс»). */
+    public boolean slim;
     public int chunkRadius = 6;
     public List<Server> servers = new ArrayList<>();
 

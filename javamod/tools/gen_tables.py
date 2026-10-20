@@ -70,6 +70,12 @@ for m in range(16):
     OV[(199, m)] = ('air', {})                                         # рамка (в Java это сущность)
     OV[(126, m)] = None                                                # активирующие рельсы = PC 157
     OV[(125, m)] = None                                                # выбрасыватель = PC 158
+# невидимая лестница (неправильный meta) -> невидимый проходимый блок света (лазать по нему можно: добавлен в тег climbable)
+for m in [0, 1] + list(range(6, 16)):
+    OV[(65, m)] = ('light', {'level': '0'})
+# стены без соединений: столбик (up=true), иначе стена вообще не рисуется
+OV[(139, 0)] = ('cobblestone_wall', {'up': 'true'})
+for m in range(1, 16): OV[(139, m)] = ('mossy_cobblestone_wall', {'up': 'true'})
 OV[(50, 0)] = ('torch', {}); OV[(75, 0)] = ('redstone_torch', {'lit': 'false'}); OV[(76, 0)] = ('redstone_torch', {'lit': 'true'})
 # плиты: у PE 6 — кварц, 7 — незер-кирпич (у PC наоборот)
 slab_pe = ['smooth_stone', 'sandstone', 'oak', 'cobblestone', 'brick', 'stone_brick', 'quartz', 'nether_brick']
@@ -197,3 +203,35 @@ nbt = b'\x0a' + wstr('') + payload('compound', codec['value'])
 open(OUT + '/codec.nbt', 'wb').write(nbt)
 open(OUT + '/meta.txt', 'w').write('plains=%d\nair=0\n' % plains)
 print('codec bytes', len(nbt), 'plains id', plains)
+
+# ---- формы для соединений заборов/стен/панелей ----
+shapes = json.load(open(D + '1.20/blockCollisionShapes.json'))
+FULL = None
+for k, v in shapes['shapes'].items():
+    if v == [[0.0, 0.0, 0.0, 1.0, 1.0, 1.0]]: FULL = int(k)
+nstates = max(b['maxStateId'] for b in blocks) + 1
+kinds = bytearray(nstates)
+NOCONN = {'barrier', 'carved_pumpkin', 'jack_o_lantern', 'melon', 'pumpkin'}
+ranges = []
+for b in blocks:
+    n = b['name']
+    k = 0
+    if n.endswith('_fence') and n != 'nether_brick_fence': k = 2
+    elif n == 'nether_brick_fence': k = 3
+    elif n.endswith('glass_pane') or n == 'iron_bars': k = 4
+    elif n.endswith('_wall') and 'wall_' not in n and not n.endswith('sign_wall'): k = 5
+    elif n.endswith('_fence_gate'): k = 6
+    if k in (2, 3, 4, 5): ranges.append((b['minStateId'], b['maxStateId'], k))
+    sh = shapes['blocks'].get(n)
+    for sid in range(b['minStateId'], b['maxStateId'] + 1):
+        if k:
+            kinds[sid] = k
+            continue
+        shp = sh[sid - b['minStateId']] if isinstance(sh, list) else sh
+        if shp == FULL and n not in NOCONN and not n.endswith('leaves') and 'shulker_box' not in n: kinds[sid] = 1
+with open(OUT + '/shapes.bin', 'wb') as f:
+    f.write(struct.pack('>i', nstates)); f.write(bytes(kinds))
+    f.write(struct.pack('>i', len(ranges)))
+    for a, z, k in ranges: f.write(struct.pack('>iib', a, z, k))
+print('shapes: states', nstates, 'connectable blocks', len(ranges), 'full id', FULL)
+# невидимая лестница: состояние light[level=0]

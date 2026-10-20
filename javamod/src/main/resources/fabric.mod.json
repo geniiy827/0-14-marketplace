@@ -2,14 +2,15 @@
   "schemaVersion": 1,
   "id": "bridge14",
   "version": "${version}",
-  "name": "MCPE 0.14 Bridge",
-  "description": "Играй на серверах и в локальных мирах Minecraft PE 0.14 прямо из Java Edition.",
+  "name": "Bridge0_14",
+  "description": "Клиент для серверов и локальных миров Minecraft PE 0.14 прямо из Java Edition 1.20.1.",
   "authors": ["geniiy"],
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
     "client": ["com.geniiy.bridge14.Bridge14"]
   },
+  "mixins": ["bridge14.mixins.json"],
   "depends": {
     "fabricloader": ">=0.14.21",
     "fabric-api": "*",

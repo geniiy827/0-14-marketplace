@@ -8,7 +8,9 @@ import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -36,12 +38,15 @@ public class Bridge14 implements ClientModInitializer {
             for (int row = 0; row < 3; row++) {
                 int ty = h / 4 + 48 + row * 24;
                 boolean busy = false;
-                for (ClickableWidget b : Screens.getButtons(screen)) if (b.getX() >= bx - 2 && b.getX() < bx + 44 && b.getY() == ty) busy = true;
+                for (ClickableWidget b : Screens.getButtons(screen)) if (b.getX() >= bx - 2 && b.getX() < bx + 64 && b.getY() == ty) busy = true;
                 if (!busy) { y = ty; break; }
             }
-            Screens.getButtons(screen).add(ButtonWidget.builder(Text.literal("0.14"), b -> client.setScreen(new BridgeScreen(screen)))
-                    .dimensions(bx, y, 44, 20).build());
+            Screens.getButtons(screen).add(ButtonWidget.builder(Text.literal("Bridge0_14"), b -> client.setScreen(new BridgeScreen(screen)))
+                    .dimensions(bx, y, 64, 20).tooltip(Tooltip.of(Text.literal("Серверы и локальные миры Minecraft PE 0.14"))).build());
         });
+
+        // надписи сервера (монеты, ранг…) над хотбаром
+        HudRenderCallback.EVENT.register(Hud::render);
 
         // В режиме 0.14 в творческом инвентаре — только то, что есть в 0.14
         ItemGroupEvents.MODIFY_ENTRIES_ALL.register((group, entries) -> {
@@ -60,6 +65,8 @@ public class Bridge14 implements ClientModInitializer {
     public static void sessionEnded(String reason) {
         active = false;
         status = reason;
+        Hud.clear();
+        SkinStore.clearRemote();
         MinecraftClient.getInstance().execute(PROXY::stop);
     }
 }

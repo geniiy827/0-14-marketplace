@@ -45,12 +45,12 @@ jobs:
           make_latest: false
 
       - name: Rename jar
-        run: cp build/libs/bridge14-*[0-9].jar Bridge14-1.20.1.jar
+        run: cp build/libs/Bridge0_14-*[0-9].jar Bridge0_14-1.20.1.jar
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: mod-${{ github.run_number }}
-          name: Мод 0.14 для Java 1.20.1 — сборка ${{ github.run_number }}
-          files: javamod/Bridge14-1.20.1.jar
+          name: Bridge0_14 (Java 1.20.1) — сборка ${{ github.run_number }}
+          files: javamod/Bridge0_14-1.20.1.jar
           make_latest: false

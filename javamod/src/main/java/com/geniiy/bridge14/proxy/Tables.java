@@ -34,6 +34,7 @@ public final class Tables {
                 for (int i = 0; i < n; i++) { int k = in.readInt(), v = in.readInt(); ENTITY.put(k, v); }
             }
             CODEC = readAll(res("codec.nbt"));
+            Shapes.load(res("shapes.bin"));
             String meta = new String(readAll(res("meta.txt")));
             for (String line : meta.split("\n")) if (line.startsWith("plains=")) PLAINS = Integer.parseInt(line.substring(7).trim());
             Integer it = ENTITY.get(64); if (it != null) ITEM_ENTITY_TYPE = it;

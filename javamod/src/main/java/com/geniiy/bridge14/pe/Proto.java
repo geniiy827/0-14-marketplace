@@ -13,9 +13,10 @@ public final class Proto {
             SET_TIME = 0x94, START_GAME = 0x95, ADD_PLAYER = 0x96, REMOVE_PLAYER = 0x97, ADD_ENTITY = 0x98,
             REMOVE_ENTITY = 0x99, ADD_ITEM_ENTITY = 0x9a, TAKE_ITEM_ENTITY = 0x9b, MOVE_ENTITY = 0x9c,
             MOVE_PLAYER = 0x9d, REMOVE_BLOCK = 0x9e, UPDATE_BLOCK = 0x9f, EXPLODE = 0xa1, LEVEL_EVENT = 0xa2,
-            ENTITY_EVENT = 0xa4, MOB_EQUIPMENT = 0xa7, INTERACT = 0xa9, USE_ITEM = 0xaa, PLAYER_ACTION = 0xab,
+            ENTITY_EVENT = 0xa4, MOB_EFFECT = 0xa5, UPDATE_ATTRIBUTES = 0xa6, MOB_EQUIPMENT = 0xa7, MOB_ARMOR_EQUIPMENT = 0xa8, INTERACT = 0xa9, USE_ITEM = 0xaa, PLAYER_ACTION = 0xab,
             SET_ENTITY_DATA = 0xad, SET_ENTITY_MOTION = 0xae, SET_HEALTH = 0xb0, SET_SPAWN_POSITION = 0xb1,
-            ANIMATE = 0xb2, RESPAWN = 0xb3, DROP_ITEM = 0xb4, CONTAINER_SET_SLOT = 0xb7, CONTAINER_SET_CONTENT = 0xb9, ADVENTURE_SETTINGS = 0xbc,
+            ANIMATE = 0xb2, RESPAWN = 0xb3, DROP_ITEM = 0xb4, CONTAINER_OPEN = 0xb5, CONTAINER_CLOSE = 0xb6,
+            CONTAINER_SET_SLOT = 0xb7, CONTAINER_SET_DATA = 0xb8, CONTAINER_SET_CONTENT = 0xb9, ADVENTURE_SETTINGS = 0xbc, BLOCK_ENTITY_DATA = 0xbd,
             FULL_CHUNK_DATA = 0xbf, SET_PLAYER_GAMETYPE = 0xc2, PLAYER_LIST = 0xc3,
             REQUEST_CHUNK_RADIUS = 0xc8, CHUNK_RADIUS_UPDATE = 0xc9;
 
@@ -29,6 +30,10 @@ public final class Proto {
 
     // ---------------- клиент → сервер ----------------
     public static byte[] login(int protocol, String name, long clientId, UUID uuid, String serverAddr, byte[] skin) {
+        return login(protocol, name, clientId, uuid, serverAddr, skin, "Standard_Custom");
+    }
+
+    public static byte[] login(int protocol, String name, long clientId, UUID uuid, String serverAddr, byte[] skin, String skinName) {
         Buf b = pk(LOGIN);
         b.str(name);
         b.i32(protocol).i32(protocol);
@@ -36,7 +41,7 @@ public final class Proto {
         b.i64(uuid.getMostSignificantBits()).i64(uuid.getLeastSignificantBits());
         b.str(serverAddr);
         b.str(Long.toHexString(new java.util.Random().nextLong()));
-        b.str("Standard_Custom");
+        b.str(skinName);
         b.strBytes(skin);
         return b.bytes();
     }
@@ -86,6 +91,18 @@ public final class Proto {
         Buf b = pk(DROP_ITEM).u8(0);
         slot(b, itemId, count, meta);
         return b.bytes();
+    }
+
+    public static byte[] containerSetSlot(int window, int slot, int itemId, int count, int meta) {
+        Buf b = pk(CONTAINER_SET_SLOT).u8(window).i16(slot).i16(0);
+        slot(b, itemId, count, meta);
+        return b.bytes();
+    }
+
+    public static byte[] containerClose(int window) { return pk(CONTAINER_CLOSE).u8(window).bytes(); }
+
+    public static byte[] blockEntityData(int x, int y, int z, byte[] leNbt) {
+        return pk(BLOCK_ENTITY_DATA).i32(x).i32(y).i32(z).raw(leNbt).bytes();
     }
 
     public static byte[] respawn(float x, float y, float z) { return pk(RESPAWN).f32(x).f32(y).f32(z).bytes(); }

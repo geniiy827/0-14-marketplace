@@ -73,6 +73,13 @@ public final class TagsBuilder {
         }
         Map<String, Set<Integer>> resolved = new HashMap<>();
         for (String tag : raw.keySet()) resolve(tag, raw, reg, resolved, new HashSet<>());
+        if (reg == (Registry<?>) Registries.BLOCK) {
+            // невидимая лестница 0.14 у нас — блок света; по нему тоже можно лазать
+            Set<Integer> climb = new LinkedHashSet<>(resolved.getOrDefault("minecraft:climbable", new LinkedHashSet<>()));
+            Identifier light = new Identifier("minecraft", "light");
+            if (reg.containsId(light)) climb.add(reg.getRawId(reg.get(light)));
+            resolved.put("minecraft:climbable", climb);
+        }
         JBuf b = new JBuf();
         b.str(regId).varint(resolved.size());
         for (Map.Entry<String, Set<Integer>> e : resolved.entrySet()) {
