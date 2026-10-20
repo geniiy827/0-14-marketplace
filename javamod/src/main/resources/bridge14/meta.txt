@@ -1,0 +1,2 @@
+plains=39
+air=0

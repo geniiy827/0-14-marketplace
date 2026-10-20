@@ -1,0 +1,53 @@
+name: Build Java mod
+
+on:
+  push:
+    branches: [main]
+    paths: ['javamod/**', '.github/workflows/javamod.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: javamod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build mod
+        run: gradle build exportCp --no-daemon --stacktrace
+
+      - name: Pack classpath (for development)
+        run: |
+          cd build && zip -q -r ../cp.zip cp
+
+      - name: Upload classpath
+        uses: actions/upload-artifact@v4
+        with:
+          name: devcp
+          path: javamod/cp.zip
+          retention-days: 3
+
+      - name: Rename jar
+        run: cp build/libs/bridge14-*[0-9].jar Bridge14-1.20.1.jar
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mod-${{ github.run_number }}
+          name: Мод 0.14 для Java 1.20.1 — сборка ${{ github.run_number }}
+          files: javamod/Bridge14-1.20.1.jar
+          make_latest: false
