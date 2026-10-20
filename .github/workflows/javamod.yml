@@ -34,12 +34,15 @@ jobs:
         run: |
           cd build && zip -q -r ../cp.zip cp
 
-      - name: Upload classpath
-        uses: actions/upload-artifact@v4
+      - name: Upload classpath (dev, временный пререлиз)
+        if: ${{ hashFiles('javamod/.devcp') != '' }}
+        uses: softprops/action-gh-release@v2
         with:
-          name: devcp
-          path: javamod/cp.zip
-          retention-days: 3
+          tag_name: devcp-${{ github.run_number }}
+          name: dev classpath ${{ github.run_number }}
+          files: javamod/cp.zip
+          prerelease: true
+          make_latest: false
 
       - name: Rename jar
         run: cp build/libs/bridge14-*[0-9].jar Bridge14-1.20.1.jar
