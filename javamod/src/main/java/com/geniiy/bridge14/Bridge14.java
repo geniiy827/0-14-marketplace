@@ -1,8 +1,65 @@
 package com.geniiy.bridge14;
 
+import com.geniiy.bridge14.proxy.Proxy;
+import com.geniiy.bridge14.proxy.Tables;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.Screens;
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.text.Text;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Bridge14 implements ClientModInitializer {
+    public static final Logger LOG = LoggerFactory.getLogger("bridge14");
+    public static final Proxy PROXY = new Proxy();
+    /** true, пока идёт игра через мост (в творческом видны только предметы 0.14). */
+    public static volatile boolean active;
+    public static volatile String status = "";
+
     @Override
-    public void onInitializeClient() { }
+    public void onInitializeClient() {
+        try { Tables.load(); } catch (Exception e) { LOG.error("Таблицы 0.14 не загрузились", e); }
+
+        // Кнопка в главном меню
+        ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
+            if (!(screen instanceof TitleScreen)) return;
+            int bx = w / 2 + 104;
+            // справа от «Одиночной игры», а если занято — справа от следующей кнопки
+            int y = h / 4 + 48;
+            for (int row = 0; row < 3; row++) {
+                int ty = h / 4 + 48 + row * 24;
+                boolean busy = false;
+                for (ClickableWidget b : Screens.getButtons(screen)) if (b.getX() >= bx - 2 && b.getX() < bx + 44 && b.getY() == ty) busy = true;
+                if (!busy) { y = ty; break; }
+            }
+            Screens.getButtons(screen).add(ButtonWidget.builder(Text.literal("0.14"), b -> client.setScreen(new BridgeScreen(screen)))
+                    .dimensions(bx, y, 44, 20).build());
+        });
+
+        // В режиме 0.14 в творческом инвентаре — только то, что есть в 0.14
+        ItemGroupEvents.MODIFY_ENTRIES_ALL.register((group, entries) -> {
+            if (!active) return;
+            entries.getDisplayStacks().removeIf(Bridge14::notInPe);
+            entries.getSearchTabStacks().removeIf(Bridge14::notInPe);
+        });
+    }
+
+    private static boolean notInPe(ItemStack s) {
+        if (s.isEmpty()) return true;
+        if (s.hasNbt() && !s.getNbt().contains("Damage")) return true; // зачарованные книги, зелья с эффектами и т.п.
+        return Tables.itemBack(Registries.ITEM.getRawId(s.getItem())) == null;
+    }
+
+    public static void sessionEnded(String reason) {
+        active = false;
+        status = reason;
+        MinecraftClient.getInstance().execute(PROXY::stop);
+    }
 }

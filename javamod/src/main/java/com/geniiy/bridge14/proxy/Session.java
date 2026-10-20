@@ -31,6 +31,8 @@ public final class Session implements RakClient.Listener {
         public String host = "127.0.0.1";
         public int port = 19132;
         public int chunkRadius = 6;
+        /** Тело пакета тегов (из ванильных данных игры); null — не отправлять. */
+        public java.util.function.Supplier<byte[]> tags;
     }
 
     // ---- Java пакеты (1.20.1, протокол 763) ----
@@ -39,7 +41,7 @@ public final class Session implements RakClient.Listener {
             C_HURT = 0x21, C_KEEP_ALIVE = 0x23, C_CHUNK = 0x24, C_LOGIN = 0x28, C_ABILITIES = 0x34, C_PLAYER_REMOVE = 0x39,
             C_PLAYER_INFO = 0x3a, C_POSITION = 0x3c, C_DESTROY = 0x3e, C_RESPAWN = 0x41, C_HEAD_ROT = 0x42, C_SERVER_DATA = 0x45,
             C_HELD_SLOT = 0x4d, C_VIEW_POS = 0x4e, C_SPAWN_POS = 0x50, C_METADATA = 0x52, C_VELOCITY = 0x54, C_HEALTH = 0x57,
-            C_TIME = 0x5e, C_SYSTEM_CHAT = 0x64, C_COLLECT = 0x67, C_TELEPORT = 0x68;
+            C_TIME = 0x5e, C_SYSTEM_CHAT = 0x64, C_COLLECT = 0x67, C_TELEPORT = 0x68, C_FEATURES = 0x6b, C_TAGS = 0x6e;
     static final int S_TELEPORT_CONFIRM = 0x00, S_CHAT_COMMAND = 0x04, S_CHAT = 0x05, S_CLIENT_COMMAND = 0x07, S_USE_ENTITY = 0x10,
             S_KEEP_ALIVE = 0x12, S_POS = 0x14, S_POS_LOOK = 0x15, S_LOOK = 0x16, S_FLYING = 0x17, S_DIG = 0x1d, S_ACTION = 0x1e,
             S_HELD_SLOT = 0x28, S_CREATIVE_SLOT = 0x2b, S_SWING = 0x2f, S_PLACE = 0x31, S_USE_ITEM = 0x32;
@@ -660,6 +662,11 @@ public final class Session implements RakClient.Listener {
         lg.varint(20).varint(Math.max(2, cfg.chunkRadius)).varint(Math.max(2, cfg.chunkRadius));
         lg.bool(false).bool(true).bool(false).bool(false).bool(false).varint(0);
         send(C_LOGIN, lg);
+        send(C_FEATURES, new JBuf().varint(1).str("minecraft:vanilla"));
+        if (cfg.tags != null) {
+            try { byte[] t = cfg.tags.get(); if (t != null) send(C_TAGS, new JBuf().raw(t)); }
+            catch (Exception e) { L.log("Теги: " + e); }
+        }
         send(C_SERVER_DATA, new JBuf().str(chat("Сервер 0.14")).bool(false).bool(false));
         sendAbilities();
         send(C_HELD_SLOT, new JBuf().u8(held));
