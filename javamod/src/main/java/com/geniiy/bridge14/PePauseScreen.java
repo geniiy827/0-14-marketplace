@@ -22,13 +22,17 @@ public class PePauseScreen extends Screen {
         int lw = Math.min(200, width / 2 - 20);
         int x = width / 4 - lw / 2;
         if (x < 10) x = 10;
-        int y = height / 2 - 40;
+        int y = height / 2 - 52;
         addDrawableChild(new PeStyle.Button(x, y, lw, 24, Text.literal("Вернуться к игре"), b -> client.setScreen(null)));
         addDrawableChild(new PeStyle.Button(x, y + 30, lw, 24, Text.literal("Настройки"), b -> client.setScreen(new OptionsScreen(this, client.options))));
         addDrawableChild(new PeStyle.Button(x, y + 60, lw, 24, Text.literal("Выйти в главное меню"), b -> quit()));
         addDrawableChild(new PeStyle.Button(x, y + 90, lw, 20, Text.literal(ReachAround.label()),
                 b -> { ReachAround.toggle(); b.setMessage(Text.literal(ReachAround.label())); }));
+        addDrawableChild(new PeStyle.Button(x, y + 114, lw, 20, Text.literal(classicLabel()),
+                b -> { Bridge14.classicGui = !Bridge14.classicGui; Config c = Config.load(); c.classicGui = Bridge14.classicGui; c.save(); b.setMessage(Text.literal(classicLabel())); }));
     }
+
+    private static String classicLabel() { return "Classic GUI (эксперимент): " + (Bridge14.classicGui ? "ВКЛ" : "ВЫКЛ"); }
 
     private void quit() {
         if (client.world != null) client.world.disconnect();
@@ -47,7 +51,7 @@ public class PePauseScreen extends Screen {
         ctx.fillGradient(0, 0, width, height, 0x80101010, 0xA0101010);
         int lw = Math.min(200, width / 2 - 20);
         int x = Math.max(10, width / 4 - lw / 2);
-        ctx.drawCenteredTextWithShadow(textRenderer, "Меню игры", x + lw / 2, height / 2 - 62, 0xFFFFFF);
+        ctx.drawCenteredTextWithShadow(textRenderer, "Меню игры", x + lw / 2, height / 2 - 72, 0xFFFFFF);
 
         // игроки
         List<PlayerListEntry> list = new ArrayList<>();

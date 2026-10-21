@@ -21,6 +21,8 @@ public final class Crafting {
 
     public synchronized int size() { return recipes.size(); }
 
+    public synchronized List<Recipe> all() { return new ArrayList<>(recipes); }
+
     public synchronized void parse(Buf b) {
         recipes.clear();
         int n = b.i32();

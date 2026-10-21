@@ -20,7 +20,7 @@ public final class ItemNbt {
     private static final Map<Integer, Info> INFO = new HashMap<>();
     static { POOL.add(null); }
 
-    public static final class Info { public String name; public List<String> lore = new ArrayList<>(); public List<int[]> ench = new ArrayList<>(); public long map; public boolean hasMap; }
+    public static final class Info { public String name; public List<String> lore = new ArrayList<>(); public List<int[]> ench = new ArrayList<>(); public long map; public boolean hasMap; public Integer color; }
 
     private ItemNbt() {}
 
@@ -61,6 +61,8 @@ public final class ItemNbt {
                     Map<String, Object> em = (Map<String, Object>) x;
                     i.ench.add(new int[]{Nbt.intOf(em.get("id"), -1), Nbt.intOf(em.get("lvl"), 1)});
                 }
+                Object cc = m.get("customColor");
+                if (cc instanceof Number) i.color = ((Number) cc).intValue() & 0xFFFFFF;
                 Object mu = m.get("map_uuid");
                 if (mu instanceof String) { try { i.map = Long.parseLong((String) mu); i.hasMap = true; } catch (Exception ignored) {} }
                 else if (mu instanceof Number) { i.map = ((Number) mu).longValue(); i.hasMap = true; }
@@ -78,14 +80,15 @@ public final class ItemNbt {
     /** NBT для Java-слота (с корнем) или один байт 0, если нечего писать. */
     public static byte[] javaNbt(int[] it, int damage, LongToIntFunction mapId) {
         Info in = info(refOf(it));
-        boolean any = damage > 0 || (in != null && (in.name != null || !in.lore.isEmpty() || !in.ench.isEmpty() || in.hasMap));
+        boolean any = damage > 0 || (in != null && (in.name != null || !in.lore.isEmpty() || !in.ench.isEmpty() || in.hasMap || in.color != null));
         if (!any) return new byte[]{0};
         JBuf o = new JBuf();
         o.u8(10).i16(0);
         if (damage > 0) { tag(o, 3, "Damage"); o.i32(damage); }
         if (in != null) {
-            if (in.name != null || !in.lore.isEmpty()) {
+            if (in.name != null || !in.lore.isEmpty() || in.color != null) {
                 tag(o, 10, "display");
+                if (in.color != null) { tag(o, 3, "color"); o.i32(in.color); }
                 if (in.name != null) { tag(o, 8, "Name"); str(o, "{\"text\":\"" + Session.esc(in.name) + "\",\"italic\":false}"); }
                 if (!in.lore.isEmpty()) {
                     tag(o, 9, "Lore"); o.u8(8).i32(in.lore.size());

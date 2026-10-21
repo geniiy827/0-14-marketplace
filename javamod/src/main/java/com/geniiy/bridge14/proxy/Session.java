@@ -73,6 +73,8 @@ public final class Session {
     static final int TEXT_DISPLAY_TYPE = 100, ITEM_FRAME_TYPE = 56, PAINTING_TYPE = 68;
     static final int PE_ARMOR_WINDOW = 0x78, CRAFT_WIN = 127;
     static final String HIDE_TEAM = "b14hide";
+    static final java.util.Set<Integer> AGEABLE = new java.util.HashSet<>(java.util.Arrays.asList(10, 11, 12, 13, 14, 15, 16, 18, 22, 32, 36, 44));
+    static final int C_DECLARE_RECIPES = 0x6d, C_UNLOCK_RECIPES = 0x3d, C_COMMANDS = 0x10, S_RECIPE_REQUEST = 0x1b, S_STEER = 0x1f;
     static final String WORLD_A = "minecraft:overworld", WORLD_B = "bridge14:world";
 
     private final Socket sock;
@@ -156,6 +158,9 @@ public final class Session {
     private int nextMapId = 1;
     private int holoLogged, mapLogged;
     private boolean gotStartGame;
+    private int craftLogged;
+    private long riding;
+    private final List<Crafting.Recipe> javaRecipes = new ArrayList<>();
     // формат UseItem: с протокола 70 перед предметом идёт номер слота; часть серверов «0.14.3» ждёт его от всех.
     // Подбираем сами: если сервер в выживании отказал (вернул пустоту вместо блока) — пробуем другой формат.
     private Boolean useSlotField; private boolean useFlipped, useLocked;
@@ -164,7 +169,7 @@ public final class Session {
     static final class Ent {
         long pe; int jid, jtype; boolean player; UUID uuid; String name = "";
         float x, y, z, yaw, pitch; int[] item; int peType = -1;
-        String nametag = ""; boolean showTag, invisible, hologram; int flags;
+        String nametag = ""; boolean showTag, invisible, hologram, baby; int flags;
         int labelJid = -1;
         float eye = 0.225f, height = 0.25f;
         int[][] gear;
@@ -357,7 +362,8 @@ public final class Session {
                         breakBlock(p);
                         pending(seq, p[0], p[1], p[2]);
                         break;
-                    case 3: case 4: { // выбросить из руки (в 0.14 выбрасывается вся стопка)
+                    case 3: case 4: { // выбросить из руки (в 0.14 выбрасывается вся стопка; в творческом сервер не даёт)
+                        if (gamemode == 1) { resetView(); sendInventory(); ackNow(seq); break; }
                         dropFrom(new int[]{0, heldPeSlot()});
                         ackNow(seq);
                         break;
@@ -431,6 +437,12 @@ public final class Session {
                 peSend(Proto.blockEntityData(p[0], p[1], p[2], Nbt.writeLE(t)));
                 ChunkConv.Chunk c = chunks.get(ck(p[0] >> 4, p[2] >> 4));
                 if (c != null && p[1] >= 0 && p[1] < 128) c.tiles.put(ChunkConv.idx(p[0] & 15, p[1], p[2] & 15), t);
+                break;
+            }
+            case S_RECIPE_REQUEST: { int w = b.u8(); String r = b.str(); b.bool(); recipeRequest(w, r); break; }
+            case S_STEER: {
+                b.f32(); b.f32(); int fl = b.u8();
+                if ((fl & 2) != 0 && riding != 0) { peSend(Proto.interact(3, riding)); riding = 0; }
                 break;
             }
             case S_ACTION: {
@@ -783,7 +795,15 @@ public final class Session {
             case Proto.SET_TIME: { time = b.i32(); if (joined) sendTime(); break; }
             case Proto.SET_SPAWN_POSITION: { spawnX = b.i32(); spawnY = b.i32(); spawnZ = b.i32(); if (joined) sendSpawn(); break; }
             case Proto.ADVENTURE_SETTINGS: { advFlags = b.i32(); if (joined) sendAbilities(); break; }
-            case Proto.CRAFTING_DATA: { crafting.parse(b); L.log("Рецептов с сервера: " + crafting.size()); break; }
+            case Proto.CRAFTING_DATA: { crafting.parse(b); L.log("Рецептов с сервера: " + crafting.size()); if (joined) sendRecipes(); break; }
+            case Proto.SET_ENTITY_LINK: {
+                long from = b.i64(), to = b.i64(); int type = b.u8();
+                int vj = jid(from);
+                if (vj <= 0) break;
+                if (type == 0) { if (isSelf(to)) riding = 0; send(C_PASSENGERS, new JBuf().varint(vj).varint(0)); }
+                else { if (isSelf(to)) riding = from; int rj = jid(to); if (rj > 0) send(C_PASSENGERS, new JBuf().varint(vj).varint(1).varint(rj)); }
+                break;
+            }
             case Proto.FULL_CHUNK_DATA: {
                 int cx = b.i32(), cz = b.i32(); int order = b.u8(); int n = b.i32();
                 ChunkConv.Chunk c = ChunkConv.fromPe(b.take(Math.min(n, b.left())), order);
@@ -832,7 +852,7 @@ public final class Session {
                 int pid = c.pe[ix] & 0xff;
                 if (joined && (pid == 63 || pid == 68))
                     send(C_TILE_DATA, new JBuf().position(bx, by, bz).varint(ChunkConv.BE_SIGN).raw(ChunkConv.beNbt(c, ix)));
-                if (pid == 199) updateFrame(bx, by, bz, c.state[ix], t);
+                if (pid == 199) updateFrame(bx, by, bz, -1, t);
                 break;
             }
             case Proto.EXPLODE: {
@@ -865,6 +885,7 @@ public final class Session {
                     serverMove(px, py - 1.62, pz, pyaw, pp, mode);
                 } else {
                     Ent en = ents.get(e);
+                    if (en == null) en = revive(e);
                     if (en == null) break;
                     if (en.hologram && Math.abs(px - en.x) + Math.abs(pz - en.z) < 2) break; // текст стоит на месте
                     en.x = px; en.y = py - en.eye + holoLift(en); en.z = pz; en.yaw = pyaw; en.pitch = pp;
@@ -938,7 +959,13 @@ public final class Session {
                 if (en != null) applyMeta(en, m, joined);
                 break;
             }
-            case Proto.REMOVE_PLAYER: case Proto.REMOVE_ENTITY: { removeEnt(b.i64()); break; }
+            case Proto.REMOVE_PLAYER: case Proto.REMOVE_ENTITY: {
+                long e = b.i64();
+                Ent old = ents.get(e);
+                if (old != null && old.player && !old.hologram) gone.put(e, old); // мир с телефона убирает дальних игроков и потом только двигает их
+                removeEnt(e);
+                break;
+            }
             case Proto.TAKE_ITEM_ENTITY: {
                 long target = b.i64(), e = b.i64();
                 Ent en = ents.get(e);
@@ -952,6 +979,7 @@ public final class Session {
                     long e = b.i64();
                     float px = b.f32(), py = b.f32(), pz = b.f32(), pyaw = b.f32(), hy = b.f32(), pp = b.f32();
                     Ent en = ents.get(e);
+                    if (en == null) en = revive(e);
                     if (en == null) continue;
                     if (en.hologram && Math.abs(px - en.x) + Math.abs(pz - en.z) < 2) continue;
                     en.x = px; en.y = py - en.eye + holoLift(en); en.z = pz; en.yaw = pyaw; en.pitch = pp;
@@ -1412,6 +1440,8 @@ public final class Session {
             catch (Exception e) { L.log("Теги: " + e); }
         }
         send(C_SERVER_DATA, new JBuf().str(chat("Сервер 0.14")).bool(false).bool(false));
+        sendCommands();
+        sendRecipes();
         send(C_TEAMS, new JBuf().str(HIDE_TEAM).u8(0).str(chat("")).u8(0).str("never").str("always").varint(21)
                 .str(chat("")).str(chat("")).varint(0));
         joined = true;
@@ -1476,8 +1506,124 @@ public final class Session {
         }
     }
 
+    // ======================= книга рецептов и команды =======================
+    private static final String[] COMMANDS = {"help", "register", "reg", "login", "l", "logout", "spawn", "hub", "lobby", "tp", "tpa", "tpaccept",
+            "tpdeny", "tpahere", "msg", "tell", "w", "r", "me", "home", "sethome", "delhome", "warp", "setwarp", "kit", "money", "mymoney",
+            "pay", "shop", "sell", "buy", "gamemode", "gm", "give", "time", "weather", "kill", "list", "ban", "kick", "op", "deop", "say",
+            "version", "plugins", "pl", "f", "faction", "is", "island", "party", "friend", "friends", "mute", "unmute", "report", "rules", "vip",
+            "donate", "menu", "bw", "sw", "skywars", "bedwars", "quit", "leave", "server", "servers", "transfer", "join", "stats", "top",
+            "rg", "region", "wand", "pos1", "pos2", "heal", "feed", "fly", "god", "nick", "clear", "effect", "enchant", "xp", "seed",
+            "setspawn", "back", "afk", "ignore", "mail", "pm", "ac", "c", "case", "cases", "auth", "changepassword", "cp", "unregister"};
+
+    /** Список команд для подсказок в чате (0.14 сам команды не присылает — берём частые команды серверов). */
+    private void sendCommands() {
+        JBuf b = new JBuf();
+        int n = COMMANDS.length;
+        b.varint(n + 2);
+        b.u8(0x00).varint(n); for (int i = 0; i < n; i++) b.varint(i + 1);                 // корень
+        for (String c : COMMANDS) b.u8(0x01 | 0x04).varint(1).varint(n + 1).str(c);       // команда (можно без аргументов)
+        b.u8(0x02 | 0x04).varint(0).str("аргументы").varint(5).varint(2);                  // «всё остальное» строкой
+        b.varint(0);
+        send(C_COMMANDS, b);
+    }
+
+    /** Java-предметы, подходящие под ингредиент 0.14 (meta -1 — любой). */
+    private static List<Integer> javaItemsFor(int[] ing) {
+        List<Integer> out = new ArrayList<>();
+        if (isEmpty(ing)) return out;
+        if (ing[2] == -1 || ing[2] == 0x7fff) {
+            for (int m = 0; m < 16; m++) { int j = Tables.item(ing[0], m); if (j >= 0 && !out.contains(j)) out.add(j); }
+        } else { int j = Tables.item(ing[0], ing[2]); if (j >= 0) out.add(j); }
+        return out;
+    }
+
+    private void writeIngredient(JBuf b, int[] ing) {
+        List<Integer> js = javaItemsFor(ing);
+        b.varint(js.size());
+        for (int j : js) b.bool(true).varint(j).u8(1).u8(0);
+    }
+
+    /** Рецепты сервера 0.14 — в книгу рецептов Java. */
+    private void sendRecipes() {
+        List<Crafting.Recipe> all = crafting.all();
+        javaRecipes.clear();
+        JBuf body = new JBuf();
+        int count = 0;
+        JBuf list = new JBuf();
+        for (Crafting.Recipe r : all) {
+            if (Tables.item(r.result[0], r.result[2]) < 0) continue;
+            boolean ok = true;
+            for (int[] ing : r.ing) if (!isEmpty(ing) && javaItemsFor(ing).isEmpty()) ok = false;
+            if (!ok) continue;
+            String id = "bridge14:r" + javaRecipes.size();
+            javaRecipes.add(r);
+            if (r.type == 1) {
+                list.str("minecraft:crafting_shaped").str(id).varint(r.w).varint(r.h).str("").varint(3);
+                for (int[] ing : r.ing) writeIngredient(list, ing);
+                writeSlot(list, r.result);
+                list.bool(false);
+            } else {
+                list.str("minecraft:crafting_shapeless").str(id).str("").varint(3);
+                int n = 0; for (int[] ing : r.ing) if (!isEmpty(ing)) n += ing[1];
+                list.varint(n);
+                for (int[] ing : r.ing) if (!isEmpty(ing)) for (int k = 0; k < ing[1]; k++) writeIngredient(list, ing);
+                writeSlot(list, r.result);
+            }
+            count++;
+        }
+        body.varint(count).raw(list.b, 0, list.len);
+        send(C_DECLARE_RECIPES, body);
+        JBuf u = new JBuf().varint(0).bool(false).bool(false).bool(false).bool(false).bool(false).bool(false).bool(false).bool(false);
+        u.varint(javaRecipes.size()); for (int i = 0; i < javaRecipes.size(); i++) u.str("bridge14:r" + i);
+        u.varint(javaRecipes.size()); for (int i = 0; i < javaRecipes.size(); i++) u.str("bridge14:r" + i);
+        send(C_UNLOCK_RECIPES, u);
+    }
+
+    /** Клик по рецепту в книге: разложить ингредиенты из инвентаря в сетку. */
+    private void recipeRequest(int win, String id) {
+        if (!isCraftWindow(win) || !id.startsWith("bridge14:r")) return;
+        int idx; try { idx = Integer.parseInt(id.substring(10)); } catch (Exception e) { return; }
+        if (idx < 0 || idx >= javaRecipes.size()) return;
+        Crafting.Recipe r = javaRecipes.get(idx);
+        int size = gridSize(win);
+        if (r.type == 1 && (r.w > size || r.h > size)) return;
+        returnGrid();
+        int[][] v = new int[36][];
+        for (int i = 0; i < 36; i++) v[i] = copyOf(vInv[i]);
+        List<int[]> need = new ArrayList<>(); List<Integer> cells = new ArrayList<>();
+        if (r.type == 1) {
+            for (int yy = 0; yy < r.h; yy++) for (int xx = 0; xx < r.w; xx++) { int[] ing = r.ing[yy * r.w + xx]; if (!isEmpty(ing)) { need.add(ing); cells.add(yy * 3 + xx); } }
+        } else {
+            int c = 0;
+            for (int[] ing : r.ing) if (!isEmpty(ing)) for (int k = 0; k < ing[1]; k++) { need.add(ing); int cell = (c / size) * 3 + (c % size); cells.add(cell); c++; }
+        }
+        for (int k = 0; k < need.size(); k++) {
+            int[] ing = need.get(k);
+            int found = -1;
+            for (int i = 0; i < 36; i++) if (!isEmpty(v[i]) && v[i][0] == ing[0] && (ing[2] == -1 || ing[2] == 0x7fff || ing[2] == v[i][2])) { found = i; break; }
+            if (found < 0) { returnGrid(); sendWindow(win); return; }
+            grid[cells.get(k)] = withCount(v[found], 1);
+            v[found] = withCount(v[found], v[found][1] - 1);
+        }
+        for (int i = 0; i < 36; i++) vInv[i] = v[i];
+        updateCraft(win);
+        sendWindow(win);
+    }
+
     // ======================= сущности =======================
+    private final Map<Long, Ent> gone = new HashMap<>();
+
+    /** Игрок, которого убрали из вида, снова двигается — вернуть его. */
+    private Ent revive(long e) {
+        Ent g = gone.remove(e);
+        if (g == null) return null;
+        g.jid = nextJavaId++;
+        addEnt(g);
+        return g;
+    }
+
     private void addEnt(Ent en) {
+        gone.remove(en.pe);
         removeEnt(en.pe);
         ents.put(en.pe, en); javaToPe.put(en.jid, en.pe);
         if (joined) spawn(en);
@@ -1510,6 +1656,7 @@ public final class Session {
         if (m.get(0) instanceof Integer) { en.flags = (Integer) m.get(0); en.invisible = (en.flags & (1 << 5)) != 0; changed = true; }
         if (m.get(2) instanceof String) { en.nametag = (String) m.get(2); changed = true; }
         if (m.get(3) instanceof Integer) { en.showTag = (Integer) m.get(3) != 0; changed = true; }
+        if (m.get(14) instanceof Integer) { en.baby = ((Integer) m.get(14) & 1) != 0; changed = true; }
         if (!update) {
             en.hologram = en.invisible && !en.nametag.trim().isEmpty() && en.jtype != PAINTING_TYPE;
             return;
@@ -1554,6 +1701,7 @@ public final class Session {
             m.u8(6).varint(20).varint((e.flags & 2) != 0 ? 5 : 0); // присел
             m.u8(17).varint(0).u8(0x7F);                          // второй слой скина
         } else if (e.jtype != PAINTING_TYPE) {
+            if (AGEABLE.contains(e.peType)) m.u8(16).varint(8).bool(e.baby); // детёныш
             boolean named = !e.nametag.isEmpty();
             m.u8(2).varint(6).bool(named); if (named) m.str(chat(e.nametag));
             m.u8(3).varint(8).bool(named && e.showTag);
@@ -1617,7 +1765,7 @@ public final class Session {
                 m.u8(0xff);
                 send(C_METADATA, m);
             }
-            if (e.flags != 0 || !e.nametag.isEmpty()) sendMeta(e);
+            if (e.flags != 0 || !e.nametag.isEmpty() || e.baby) sendMeta(e);
             if (e.gear != null) sendGear(e);
         }
         send(C_HEAD_ROT, new JBuf().varint(e.jid).angle(e.yaw));
@@ -1901,6 +2049,7 @@ public final class Session {
         if (slot == 0 && isCraftWindow(win)) { craftClick(win, mode, cursorBefore); return; }
 
         // выбросить: Q над слотом
+        if (mode == 4 && slot >= 0 && gamemode == 1) { resetView(); sendWindow(win); return; }
         if (mode == 4 && slot >= 0) {
             int[] ps = peOf(win, slot);
             int g = gridIndex(win, slot);
@@ -1910,6 +2059,7 @@ public final class Session {
             return;
         }
         // за край окна с предметом на курсоре
+        if (slot == -999 && mode == 0 && gamemode == 1) { jCursor = null; resetView(); sendWindow(win); return; }
         if (slot == -999 && mode == 0) {
             if (!isEmpty(cursorBefore)) {
                 int[] it = cursorBefore;
@@ -1989,6 +2139,12 @@ public final class Session {
         Crafting.Match m = crafting.match(g, size);
         if (m != null && m.big && win == 0) m = null;
         int[] res = m == null ? null : m.recipe.result;
+        if (m == null && craftLogged < 10) {
+            StringBuilder sb = new StringBuilder();
+            for (int[] gi : g) sb.append(isEmpty(gi) ? "-" : gi[0] + ":" + gi[2]).append(' ');
+            boolean any = false; for (int[] gi : g) if (!isEmpty(gi)) any = true;
+            if (any) { craftLogged++; L.log("Крафт: нет рецепта для сетки " + sb + "(рецептов " + crafting.size() + ")"); }
+        }
         craftMatch = m;
         if (!same(res, craftResult)) {
             craftResult = res;
@@ -2112,8 +2268,15 @@ public final class Session {
         int[] ps = peOf(0, slot);
         if (ps == null) return;
         int[] pe;
-        if (it == null || it[1] <= 0) pe = empty();
-        else {
+        if (it == null || it[1] <= 0) {
+            // в 0.14 в творческом предмет из инвентаря не убрать — сервер его оставит; показываем как есть
+            int[] t = truthAt(ps);
+            setView(ps, t);
+            JBuf b = new JBuf().u8(0).varint(stateId++).i16(slot);
+            writeSlot(b, t);
+            send(C_SET_SLOT, b);
+            return;
+        } else {
             pe = toPe(it, allKnown());
             if (pe[0] == 0) { systemChat(chat("§eЭтого предмета нет в 0.14"), true); sendInventory(); return; }
             pe[1] = Math.max(1, it[1]);

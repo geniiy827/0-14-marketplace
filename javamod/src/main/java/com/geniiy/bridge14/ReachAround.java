@@ -87,7 +87,10 @@ public final class ReachAround {
                 Direction face = d.getOpposite();
                 Vec3d fc = Vec3d.ofCenter(s).add(face.getOffsetX() * 0.5, face.getOffsetY() * 0.5, face.getOffsetZ() * 0.5);
                 Vec3d toEye = eye.subtract(fc);
-                if (toEye.x * face.getOffsetX() + toEye.y * face.getOffsetY() + toEye.z * face.getOffsetZ() <= 0) continue; // грань не видна
+                boolean visible = toEye.x * face.getOffsetX() + toEye.y * face.getOffsetY() + toEye.z * face.getOffsetZ() > 0;
+                // как на телефоне: сбоку к блоку ниже уровня глаз можно приставить, даже стоя не на самом краю
+                boolean below = face.getAxis().isHorizontal() && cell.getY() + 1 <= eye.y - 0.5;
+                if (!visible && !below) continue;
                 if (eye.squaredDistanceTo(fc) > reach * reach) continue;
                 double dd = pt.squaredDistanceTo(fc);
                 if (dd < bestD) { bestD = dd; best = new BlockHitResult(fc, face, s, false); }

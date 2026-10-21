@@ -27,6 +27,8 @@ public final class Config {
     public String skinPath = "";
     /** Тонкие руки (модель «Алекс»). */
     public boolean slim;
+    /** Экспериментально: интерфейс сундуков/инвентаря в цветах 0.14. */
+    public boolean classicGui;
     public int chunkRadius = 6;
     public List<Server> servers = new ArrayList<>();
 

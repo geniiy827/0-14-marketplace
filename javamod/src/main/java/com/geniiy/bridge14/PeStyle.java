@@ -41,8 +41,14 @@ public final class PeStyle {
         int color = active ? 0xFFFFFF : 0xB0B0B0;
         int tw = tr.getWidth(text);
         int ty = y + (h - 8) / 2 - (pressed ? 0 : 1);
-        if (tw > w - 6) ctx.drawTextWithShadow(tr, text, x + 3, ty, color);
-        else ctx.drawTextWithShadow(tr, text, x + (w - tw) / 2, ty, color);
+        if (tw > w - 6) { // не влезает — уменьшаем
+            float sc = (w - 6) / (float) tw;
+            ctx.getMatrices().push();
+            ctx.getMatrices().translate(x + w / 2f, y + h / 2f, 0);
+            ctx.getMatrices().scale(sc, sc, 1);
+            ctx.drawTextWithShadow(tr, text, -tw / 2, -4, color);
+            ctx.getMatrices().pop();
+        } else ctx.drawTextWithShadow(tr, text, x + (w - tw) / 2, ty, color);
     }
 
     /** Полоса заголовка как в 0.14 (кнопка «Назад» рисуется отдельно). */

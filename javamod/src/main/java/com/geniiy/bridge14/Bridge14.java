@@ -32,10 +32,12 @@ public class Bridge14 implements ClientModInitializer {
     /** true, пока идёт игра через мост (в творческом видны только предметы 0.14). */
     public static volatile boolean active;
     public static volatile String status = "";
+    public static volatile boolean classicGui;
 
     @Override
     public void onInitializeClient() {
         try { Tables.load(); } catch (Exception e) { LOG.error("Таблицы 0.14 не загрузились", e); }
+        classicGui = Config.load().classicGui;
 
         // Кнопка в главном меню
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
