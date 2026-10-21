@@ -155,6 +155,11 @@ public final class Session {
     private final Map<Integer, byte[]> mapPackets = new HashMap<>();
     private int nextMapId = 1;
     private int holoLogged, mapLogged;
+    private boolean gotStartGame;
+    // формат UseItem: с протокола 70 перед предметом идёт номер слота; часть серверов «0.14.3» ждёт его от всех.
+    // Подбираем сами: если сервер в выживании отказал (вернул пустоту вместо блока) — пробуем другой формат.
+    private Boolean useSlotField; private boolean useFlipped, useLocked;
+    private int[] lastUse; private int[] lastUseItem; private long lastUsePlaceAt; private long lastUseTarget = Long.MIN_VALUE;
 
     static final class Ent {
         long pe; int jid, jtype; boolean player; UUID uuid; String name = "";
@@ -367,7 +372,13 @@ public final class Session {
                 float cx = b.f32(), cy = b.f32(), cz = b.f32(); b.bool(); int seq = b.varint();
                 int[] it = heldItem();
                 int target = peIdAt(p[0], p[1], p[2]);
-                peSend(Proto.useItem(p[0], p[1], p[2], face, cx, cy, cz, (float) x, (float) (y + 1.62), (float) z, it, peProtocol, held));
+                sendUse(p[0], p[1], p[2], face, cx, cy, cz, it);
+                if (gamemode != 1 && it[0] > 0 && it[0] < 256) {
+                    int[] dd = FACE[Math.min(5, Math.max(0, face))];
+                    lastUse = new int[]{p[0], p[1], p[2], face, Float.floatToIntBits(cx), Float.floatToIntBits(cy), Float.floatToIntBits(cz)};
+                    lastUseItem = it.clone(); lastUsePlaceAt = System.currentTimeMillis();
+                    lastUseTarget = pk(p[0] + dd[0], p[1] + dd[1], p[2] + dd[2]);
+                }
                 lastUseAt = System.currentTimeMillis();
                 int[] d = FACE[Math.min(5, Math.max(0, face))];
                 if (it[0] == 323) { // табличка: откроем редактор, когда сервер её поставит
@@ -380,7 +391,7 @@ public final class Session {
             }
             case S_USE_ITEM: {
                 b.varint(); int seq = b.varint();
-                peSend(Proto.useItem(0, 0, 0, 255, 0, 0, 0, (float) x, (float) (y + 1.62), (float) z, heldItem(), peProtocol, held));
+                sendUse(0, 0, 0, 255, 0, 0, 0, heldItem());
                 ackNow(seq);
                 break;
             }
@@ -391,7 +402,7 @@ public final class Session {
                     if (mouse == 1) peSend(Proto.itemFrameDrop(fr.x, fr.y, fr.z, fr.item == null ? empty() : fr.item));
                     else if (mouse == 0) {
                         int face = new int[]{5, 4, 3, 2}[Math.max(0, Math.min(3, peFrameMeta(fr.dir)))];
-                        peSend(Proto.useItem(fr.x, fr.y, fr.z, face, 0.5f, 0.5f, 0.5f, (float) x, (float) (y + 1.62), (float) z, heldItem(), peProtocol, held));
+                        sendUse(fr.x, fr.y, fr.z, face, 0.5f, 0.5f, 0.5f, heldItem());
                     }
                     break;
                 }
@@ -446,6 +457,30 @@ public final class Session {
         breakPos = k; breakAt = System.currentTimeMillis();
     }
 
+    private boolean slotField() { return useSlotField != null ? useSlotField : peProtocol >= 70; }
+
+    private void sendUse(int bx, int by, int bz, int face, float cx, float cy, float cz, int[] it) {
+        peSend(Proto.useItem(bx, by, bz, face, cx, cy, cz, (float) x, (float) (y + 1.62), (float) z, it, slotField() ? 70 : 46, held));
+    }
+
+    /** Ответ сервера на нашу установку блока в выживании. */
+    private void placeAnswer(long pos, int bid) {
+        if (pos != lastUseTarget || System.currentTimeMillis() - lastUsePlaceAt > 1500) return;
+        lastUseTarget = Long.MIN_VALUE;
+        if (bid != 0) { if (useFlipped) useLocked = true; return; }   // блок встал — формат верный
+        if (useLocked) return;
+        if (!useFlipped) {
+            useFlipped = true;
+            useSlotField = !slotField();
+            L.log("Сервер не поставил блок — пробую другой формат UseItem (слот " + (useSlotField ? "есть" : "нет") + ")");
+            int[] u = lastUse;
+            if (u != null) sendUse(u[0], u[1], u[2], u[3], Float.intBitsToFloat(u[4]), Float.intBitsToFloat(u[5]), Float.intBitsToFloat(u[6]), lastUseItem);
+        } else {
+            useSlotField = !useSlotField; // оба формата не помогли — значит, тут просто нельзя строить; вернём как было
+            useLocked = true;
+        }
+    }
+
     private void later(long ms, Runnable r) { Later l = new Later(); l.at = System.currentTimeMillis() + ms; l.r = r; later.add(l); }
 
     private int[] heldItem() { return inv[heldPeSlot()]; }
@@ -497,7 +532,7 @@ public final class Session {
         x = nx; y = ny; z = nz; yaw = nyaw; pitch = npitch;
         int cx = (int) Math.floor(x) >> 4, cz = (int) Math.floor(z) >> 4;
         if (cx != lastCx || cz != lastCz) { lastCx = cx; lastCz = cz; send(C_VIEW_POS, new JBuf().varint(cx).varint(cz)); pruneChunks(); }
-        if (selfEid < 0 || dead) return;
+        if (dead) return;
         long now = System.currentTimeMillis();
         boolean changed = Math.abs(x - sentX) > 1e-4 || Math.abs(y - sentY) > 1e-4 || Math.abs(z - sentZ) > 1e-4
                 || Math.abs(yaw - sentYaw) > 0.01f || Math.abs(pitch - sentPitch) > 0.01f;
@@ -720,7 +755,11 @@ public final class Session {
                     loginFail(st == 1 ? "Сервер новее этой версии 0.14" : "Сервер старее этой версии 0.14");
                     return;
                 }
-                if (st == 3 && !peSpawned) { peSpawned = true; join(); }
+                if (st == 3 && !peSpawned) {
+                    peSpawned = true;
+                    if (!gotStartGame) { L.log("StartGame не пришёл — продолжаю без него (так бывает у мира с телефона)"); RakClient r = rak; if (r != null) r.send(Proto.requestChunkRadius(cfg.chunkRadius)); }
+                    join();
+                }
                 break;
             }
             case Proto.DISCONNECT: {
@@ -735,8 +774,10 @@ public final class Session {
                 selfEid = b.i64();
                 spawnX = b.i32(); spawnY = b.i32(); spawnZ = b.i32();
                 x = b.f32(); y = b.f32(); z = b.f32();
+                gotStartGame = true;
                 RakClient r = rak;
                 if (r != null) r.send(Proto.requestChunkRadius(cfg.chunkRadius));
+                if (joined) sendPosition();
                 break;
             }
             case Proto.SET_TIME: { time = b.i32(); if (joined) sendTime(); break; }
@@ -769,6 +810,7 @@ public final class Session {
                         later(200, () -> { if (peIdAt(q[0], q[1], q[2]) != 0) peSend(Proto.removeBlock(selfEid, q[0], q[1], q[2])); });
                     }
                     setBlockLocal(bx, by, bz, bid, fm & 15, true);
+                    placeAnswer(pk(bx, by, bz), bid);
                     blockAnswered(bx, by, bz);
                     if (pendingSign != null && pendingSign[0] == bx && pendingSign[1] == by && pendingSign[2] == bz && (bid == 63 || bid == 68)) {
                         if (joined) send(C_OPEN_SIGN, new JBuf().position(bx, by, bz).bool(true));
