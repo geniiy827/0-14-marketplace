@@ -29,6 +29,10 @@ public final class Config {
     public boolean slim;
     /** Экспериментально: интерфейс сундуков/инвентаря в цветах 0.14. */
     public boolean classicGui;
+    /** Bedwars fix: тап по предмету в сундуке сразу кладёт его в инвентарь. */
+    public boolean bedwarsFix;
+    /** Мобильный режим строительства включён. */
+    public boolean mobileBuild;
     public int chunkRadius = 6;
     public List<Server> servers = new ArrayList<>();
 

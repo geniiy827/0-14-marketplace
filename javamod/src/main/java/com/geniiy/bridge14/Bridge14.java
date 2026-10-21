@@ -33,11 +33,37 @@ public class Bridge14 implements ClientModInitializer {
     public static volatile boolean active;
     public static volatile String status = "";
     public static volatile boolean classicGui;
+    public static KeyBinding keyBuild, keyClassic, keyBedwars;
+
+    /** Сохранить переключатели в config.json. */
+    public static void saveToggles() {
+        Config c = Config.load();
+        c.classicGui = classicGui; c.bedwarsFix = Session.bedwarsFix; c.mobileBuild = ReachAround.enabled;
+        c.save();
+    }
+
+    public static void toggleClassic(boolean announce) {
+        classicGui = !classicGui; saveToggles();
+        if (announce) say(ModSettingsScreen.classicLabel(), classicGui);
+    }
+
+    public static void toggleBedwars(boolean announce) {
+        Session.bedwarsFix = !Session.bedwarsFix; saveToggles();
+        if (announce) say(ModSettingsScreen.bedwarsLabel(), Session.bedwarsFix);
+    }
+
+    static void say(String s, boolean on) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player != null) mc.player.sendMessage(Text.literal((on ? "§a" : "§7") + s), true);
+    }
 
     @Override
     public void onInitializeClient() {
         try { Tables.load(); } catch (Exception e) { LOG.error("Таблицы 0.14 не загрузились", e); }
-        classicGui = Config.load().classicGui;
+        Config cfg0 = Config.load();
+        classicGui = cfg0.classicGui;
+        Session.bedwarsFix = cfg0.bedwarsFix;
+        ReachAround.enabled = cfg0.mobileBuild;
 
         // Кнопка в главном меню
         ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
@@ -59,9 +85,13 @@ public class Bridge14 implements ClientModInitializer {
         HudRenderCallback.EVENT.register(Hud::render);
 
         // клавиша: строительство как на телефоне
-        KeyBinding reach = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bridge14.reach", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "key.categories.bridge14"));
+        keyBuild = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bridge14.reach", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "key.categories.bridge14"));
+        keyClassic = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bridge14.classic", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "key.categories.bridge14"));
+        keyBedwars = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bridge14.bedwars", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "key.categories.bridge14"));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (reach.wasPressed()) if (active) ReachAround.toggle();
+            while (keyBuild.wasPressed()) if (active) { ReachAround.toggle(); saveToggles(); }
+            while (keyClassic.wasPressed()) if (active) toggleClassic(true);
+            while (keyBedwars.wasPressed()) if (active) toggleBedwars(true);
             ReachAround.tick(client);
             // меню паузы в стиле 0.14
             if (active && client.currentScreen instanceof GameMenuScreen && client.world != null) client.setScreen(new PePauseScreen());

@@ -1,6 +1,8 @@
 package com.geniiy.bridge14;
 
+import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.BlockItem;
@@ -66,37 +68,51 @@ public final class ReachAround {
         return false;
     }
 
+    /**
+     * Ищем по лучу взгляда пустые клетки, приставленные к грани блока, и берём ту грань, мимо которой луч проходит
+     * ближе всего (а не первую попавшуюся) — так обводка стоит там, куда смотрит прицел, и не «прыгает» под углом.
+     * Грань должна быть видна; исключение — край блока под ногами (как на телефоне: строить вперёд, глядя вниз).
+     */
     static BlockHitResult target(World w, ClientPlayerEntity p, double reach) {
         Vec3d eye = p.getEyePos();
-        Vec3d look = p.getRotationVec(1f);
+        Vec3d look = p.getRotationVec(1f).normalize();
         Box self = p.getBoundingBox();
+        int feetLayer = (int) Math.floor(p.getY() + 0.01) - 1;   // слой блока, на котором стоим
         BlockPos last = null;
+        BlockHitResult best = null; double bestScore = Double.MAX_VALUE;
         for (double t = 0.3; t <= reach; t += 0.05) {
             Vec3d pt = eye.add(look.multiply(t));
             BlockPos cell = BlockPos.ofFloored(pt);
             if (cell.equals(last)) continue;
             last = cell;
             BlockState cs = w.getBlockState(cell);
-            if (!cs.isReplaceable()) return null;                 // луч упёрся в блок — это обычная постановка
+            if (!cs.isReplaceable()) break;                        // луч упёрся в блок
             if (self.intersects(new Box(cell))) continue;           // в себя ставить нельзя
-            BlockHitResult best = null; double bestD = Double.MAX_VALUE;
             for (Direction d : Direction.values()) {
                 BlockPos s = cell.offset(d);
                 BlockState ss = w.getBlockState(s);
                 if (ss.isReplaceable() || ss.getCollisionShape(w, s).isEmpty()) continue;
+                if (ss.isOf(Blocks.BARRIER) || ss.getRenderType() == BlockRenderType.INVISIBLE) continue; // к невидимому не приставляем
                 Direction face = d.getOpposite();
                 Vec3d fc = Vec3d.ofCenter(s).add(face.getOffsetX() * 0.5, face.getOffsetY() * 0.5, face.getOffsetZ() * 0.5);
                 Vec3d toEye = eye.subtract(fc);
-                boolean visible = toEye.x * face.getOffsetX() + toEye.y * face.getOffsetY() + toEye.z * face.getOffsetZ() > 0;
-                // как на телефоне: сбоку к блоку ниже уровня глаз можно приставить, даже стоя не на самом краю
-                boolean below = face.getAxis().isHorizontal() && cell.getY() + 1 <= eye.y - 0.5;
-                if (!visible && !below) continue;
+                boolean visible = toEye.x * face.getOffsetX() + toEye.y * face.getOffsetY() + toEye.z * face.getOffsetZ() > 0.01;
+                boolean bridge = face.getAxis().isHorizontal() && cell.getY() == feetLayer && s.getY() == feetLayer
+                        && horiz(Vec3d.ofCenter(s), p.getPos()) < 2.2;
+                if (!visible && !bridge) continue;
                 if (eye.squaredDistanceTo(fc) > reach * reach) continue;
-                double dd = pt.squaredDistanceTo(fc);
-                if (dd < bestD) { bestD = dd; best = new BlockHitResult(fc, face, s, false); }
+                // насколько близко луч проходит мимо центра грани
+                Vec3d rel = fc.subtract(eye);
+                double along = rel.dotProduct(look);
+                if (along <= 0) continue;
+                double miss = rel.subtract(look.multiply(along)).length();
+                if (miss > 0.95) continue;
+                double score = miss + along * 0.03;
+                if (score < bestScore) { bestScore = score; best = new BlockHitResult(fc, face, s, false); }
             }
-            if (best != null) return best;
         }
-        return null;
+        return best;
     }
+
+    private static double horiz(Vec3d a, Vec3d b) { double dx = a.x - b.x, dz = a.z - b.z; return Math.sqrt(dx * dx + dz * dz); }
 }

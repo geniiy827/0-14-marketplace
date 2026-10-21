@@ -39,6 +39,7 @@ public final class StandaloneServer {
         p.setProperty("skin", "skin.png");
         p.setProperty("skin.slim", "false");
         p.setProperty("motd", "Сервер 0.14 через Bridge0_14");
+        p.setProperty("bedwars.fix", "false");
         if (cfgFile.isFile()) try (FileReader r = new FileReader(cfgFile, java.nio.charset.StandardCharsets.UTF_8)) { p.load(r); }
         else try (FileWriter w = new FileWriter(cfgFile, java.nio.charset.StandardCharsets.UTF_8)) {
             p.store(w, "Bridge0_14 server: pe.* - server MCPE 0.14, listen.* - where Java 1.20.1 players connect, nick empty = Java nickname");
@@ -51,10 +52,13 @@ public final class StandaloneServer {
             else if (a.equals("--nick") && i + 1 < args.length) p.setProperty("nick", args[++i]);
             else if (a.equals("--radius") && i + 1 < args.length) p.setProperty("chunk.radius", args[++i]);
             else if (a.equals("--skin") && i + 1 < args.length) p.setProperty("skin", args[++i]);
+            else if (a.equals("--bedwars")) p.setProperty("bedwars.fix", "true");
             else if (!a.startsWith("--")) { String[] hp = split(a, 19132); p.setProperty("pe.host", hp[0]); p.setProperty("pe.port", hp[1]); }
         }
 
         Tables.load();
+        Session.bedwarsFix = Boolean.parseBoolean(p.getProperty("bedwars.fix", "false").trim());
+        if (Session.bedwarsFix) log("Bedwars fix включён: тап по предмету в сундуке сразу кладёт его в инвентарь");
         byte[] tags = readRes("/bridge14/tags.bin");
         byte[] skin = null;
         File sf = new File(p.getProperty("skin", "skin.png"));
@@ -100,7 +104,7 @@ public final class StandaloneServer {
     }
 
     private static void usage() {
-        System.out.println("java -jar Bridge0_14-server.jar [host[:port]] [--listen 0.0.0.0:25565] [--nick Name] [--radius 6] [--skin skin.png]");
+        System.out.println("java -jar Bridge0_14-server.jar [host[:port]] [--listen 0.0.0.0:25565] [--nick Name] [--radius 6] [--skin skin.png] [--bedwars]");
         System.out.println("Без аргументов берёт настройки из bridge0_14-server.properties (создаётся при первом запуске).");
     }
 

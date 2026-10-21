@@ -8,7 +8,7 @@ import java.io.InputStream;
  * а Java ждёт её в самом состоянии блока — без этого стена без соединений вообще не рисуется.
  */
 public final class Shapes {
-    public static final int SOLID = 1, FENCE = 2, NETHER_FENCE = 3, PANE = 4, WALL = 5, GATE = 6, STAIRS = 7;
+    public static final int SOLID = 1, FENCE = 2, NETHER_FENCE = 3, PANE = 4, WALL = 5, GATE = 6, STAIRS = 7, DOOR = 8;
     private static byte[] kind = new byte[0];
     private static int[] rMin = new int[0], rMax = new int[0];
     private static byte[] insta = new byte[0];
@@ -33,7 +33,7 @@ public final class Shapes {
 
     public static int kind(int state) { return state >= 0 && state < kind.length ? kind[state] : 0; }
 
-    public static boolean connectable(int state) { int k = kind(state); return (k >= FENCE && k <= WALL) || k == STAIRS; }
+    public static boolean connectable(int state) { int k = kind(state); return (k >= FENCE && k <= WALL) || k == STAIRS || k == DOOR; }
 
     private static int base(int state) {
         int lo = 0, hi = rMin.length - 1;
@@ -86,10 +86,28 @@ public final class Shapes {
         return b + ((f * 2 + half) * 5 + shape) * 2 + wl;
     }
 
+    // двери: в 0.14 у верхней половины в meta только петля, а сторона и «открыта» — у нижней; Java ждёт всё в каждой половине.
+    // порядок свойств: facing(4) half(upper,lower) hinge(left,right) open(true,false) powered(true,false)
+    private static int door(int st, int x, int y, int z, Lookup w) {
+        int b = base(st);
+        if (b < 0) return st;
+        int off = st - b;
+        int powered = off % 2, open = (off / 2) % 2, hinge = (off / 4) % 2, half = (off / 8) % 2, f = off / 16;
+        if (half == 0) { // верх: сторона и «открыта» — от нижней половины
+            int lo = w.state(x, y - 1, z);
+            if (kind(lo) == DOOR && base(lo) == b && ((lo - b) / 8) % 2 == 1) { int lf = (lo - b); open = (lf / 2) % 2; f = lf / 16; powered = lf % 2; }
+        } else {           // низ: петля — от верхней
+            int up = w.state(x, y + 1, z);
+            if (kind(up) == DOOR && base(up) == b && ((up - b) / 8) % 2 == 0) hinge = ((up - b) / 4) % 2;
+        }
+        return b + (((f * 2 + half) * 2 + hinge) * 2 + open) * 2 + powered;
+    }
+
     /** Правильное состояние для блока в (x,y,z) с учётом соседей; если блок не соединяемый — без изменений. */
     public static int fix(int state, int x, int y, int z, Lookup w) {
         int k = kind(state);
         if (k == STAIRS) return stairs(state, x, y, z, w);
+        if (k == DOOR) return door(state, x, y, z, w);
         if (k < FENCE || k > WALL) return state;
         int b = base(state);
         if (b < 0) return state;

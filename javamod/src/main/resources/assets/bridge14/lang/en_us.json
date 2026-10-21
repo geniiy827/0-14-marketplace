@@ -1,4 +1,6 @@
 {
   "key.bridge14.reach": "Mobile building mode (toggle)",
-  "key.categories.bridge14": "Bridge0_14"
+  "key.categories.bridge14": "Bridge0_14",
+  "key.bridge14.classic": "Classic GUI (toggle)",
+  "key.bridge14.bedwars": "Bedwars fix (toggle)"
 }

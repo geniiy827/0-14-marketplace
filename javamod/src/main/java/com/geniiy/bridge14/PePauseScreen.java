@@ -26,13 +26,8 @@ public class PePauseScreen extends Screen {
         addDrawableChild(new PeStyle.Button(x, y, lw, 24, Text.literal("Вернуться к игре"), b -> client.setScreen(null)));
         addDrawableChild(new PeStyle.Button(x, y + 30, lw, 24, Text.literal("Настройки"), b -> client.setScreen(new OptionsScreen(this, client.options))));
         addDrawableChild(new PeStyle.Button(x, y + 60, lw, 24, Text.literal("Выйти в главное меню"), b -> quit()));
-        addDrawableChild(new PeStyle.Button(x, y + 90, lw, 20, Text.literal(ReachAround.label()),
-                b -> { ReachAround.toggle(); b.setMessage(Text.literal(ReachAround.label())); }));
-        addDrawableChild(new PeStyle.Button(x, y + 114, lw, 20, Text.literal(classicLabel()),
-                b -> { Bridge14.classicGui = !Bridge14.classicGui; Config c = Config.load(); c.classicGui = Bridge14.classicGui; c.save(); b.setMessage(Text.literal(classicLabel())); }));
+        addDrawableChild(new PeStyle.Button(x, y + 90, lw, 24, Text.literal("Настройки мода"), b -> client.setScreen(new ModSettingsScreen(this))));
     }
-
-    private static String classicLabel() { return "Classic GUI (эксперимент): " + (Bridge14.classicGui ? "ВКЛ" : "ВЫКЛ"); }
 
     private void quit() {
         if (client.world != null) client.world.disconnect();

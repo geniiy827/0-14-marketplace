@@ -76,6 +76,8 @@ public final class Session {
     static final java.util.Set<Integer> AGEABLE = new java.util.HashSet<>(java.util.Arrays.asList(10, 11, 12, 13, 14, 15, 16, 18, 22, 32, 36, 44));
     static final int C_DECLARE_RECIPES = 0x6d, C_UNLOCK_RECIPES = 0x3d, C_COMMANDS = 0x10, S_RECIPE_REQUEST = 0x1b, S_STEER = 0x1f;
     static final String WORLD_A = "minecraft:overworld", WORLD_B = "bridge14:world";
+    /** Bedwars fix: тап по предмету в сундуке сразу кладёт его в инвентарь (магазины мини-игр). */
+    public static volatile boolean bedwarsFix;
 
     private final Socket sock;
     private final Config cfg;
@@ -96,7 +98,7 @@ public final class Session {
 
     // состояние мира
     private long selfEid = -1;
-    private int gamemode, advFlags;
+    private int gamemode, advFlags, sentGm = -1;
     private double x, y, z; private float yaw, pitch;
     private int health = 20, food = 20; private float saturation = 5, xpBar; private int xpLevel;
     private boolean dead;
@@ -147,6 +149,14 @@ public final class Session {
     private int burnMax = 200;
 
     private int[] pendingSign; private long pendingSignAt;
+
+    // творческий: что Java держит на курсоре (взято из слота), чтобы отличить перенос от удаления
+    private static final class Pick { int[] item; int[] src; int left; boolean onServer; }
+    private Pick pick;
+    private int[] freshItem; private long freshAt;
+    // повтор целого блока сообщений (некоторые серверы шлют приветствие дважды — при входе и после телепорта)
+    private final List<Object[]> chatHist = new ArrayList<>();
+    private int chatReplay = -1;
 
     // рамки, карты
     private static final class Frame { int jid; int x, y, z, dir, rot; int[] item; UUID uuid = UUID.randomUUID(); }
@@ -291,6 +301,23 @@ public final class Session {
 
     static String chat(String s) { return "{\"text\":\"" + esc(s) + "\"}"; }
 
+    /** true — это повтор блока сообщений, пришедшего только что (тогда не показываем второй раз). */
+    private boolean chatRepeat(String m) {
+        long now = System.currentTimeMillis();
+        while (!chatHist.isEmpty() && now - (Long) chatHist.get(0)[1] > 5000) { chatHist.remove(0); if (chatReplay > 0) chatReplay--; }
+        if (chatReplay >= 0 && chatReplay < chatHist.size() && chatHist.get(chatReplay)[0].equals(m)) { chatReplay++; return true; }
+        chatReplay = -1;
+        if (m.trim().length() > 3) {
+            for (int k = 0; k < chatHist.size(); k++) {
+                boolean burstStart = k == 0 || (Long) chatHist.get(k)[1] - (Long) chatHist.get(k - 1)[1] > 200;
+                if (burstStart && chatHist.get(k)[0].equals(m) && chatHist.size() - k >= 3) { chatReplay = k + 1; return true; }
+            }
+        }
+        chatHist.add(new Object[]{m, now});
+        if (chatHist.size() > 64) chatHist.remove(0);
+        return false;
+    }
+
     private void systemChat(String json, boolean actionBar) { send(C_SYSTEM_CHAT, new JBuf().str(json).bool(actionBar)); }
 
     // ======================= Java → обработка =======================
@@ -362,8 +389,7 @@ public final class Session {
                         breakBlock(p);
                         pending(seq, p[0], p[1], p[2]);
                         break;
-                    case 3: case 4: { // выбросить из руки (в 0.14 выбрасывается вся стопка; в творческом сервер не даёт)
-                        if (gamemode == 1) { resetView(); sendInventory(); ackNow(seq); break; }
+                    case 3: case 4: { // выбросить из руки (в 0.14 выбрасывается вся стопка; можно ли — решает сервер)
                         dropFrom(new int[]{0, heldPeSlot()});
                         ackNow(seq);
                         break;
@@ -595,7 +621,7 @@ public final class Session {
     }
 
     private JBuf respawnPacket() {
-        return new JBuf().str("minecraft:overworld").str(worldB ? WORLD_B : WORLD_A).i64(0).u8(gamemode).u8(255)
+        return new JBuf().str("minecraft:overworld").str(worldB ? WORLD_B : WORLD_A).i64(0).u8(javaGm()).u8(255)
                 .bool(false).bool(false).u8(0).bool(false).varint(0);
     }
 
@@ -794,7 +820,7 @@ public final class Session {
             }
             case Proto.SET_TIME: { time = b.i32(); if (joined) sendTime(); break; }
             case Proto.SET_SPAWN_POSITION: { spawnX = b.i32(); spawnY = b.i32(); spawnZ = b.i32(); if (joined) sendSpawn(); break; }
-            case Proto.ADVENTURE_SETTINGS: { advFlags = b.i32(); if (joined) sendAbilities(); break; }
+            case Proto.ADVENTURE_SETTINGS: { advFlags = b.i32(); if (joined) { updateGm(); sendAbilities(); } break; }
             case Proto.CRAFTING_DATA: { crafting.parse(b); L.log("Рецептов с сервера: " + crafting.size()); if (joined) sendRecipes(); break; }
             case Proto.SET_ENTITY_LINK: {
                 long from = b.i64(), to = b.i64(); int type = b.u8();
@@ -1053,7 +1079,7 @@ public final class Session {
             }
             case Proto.SET_PLAYER_GAMETYPE: {
                 gamemode = b.i32();
-                if (joined) { send(C_GAME_EVENT, new JBuf().u8(3).f32(gamemode)); sendAbilities(); }
+                if (joined) { updateGm(); sendAbilities(); }
                 break;
             }
             case Proto.PLAYER_LIST: {
@@ -1095,6 +1121,7 @@ public final class Session {
                     for (int i = 0; i < c; i++) params.add(b.str());
                 } else msg = b.str();
                 if (!joined) break;
+                if (type != Proto.TEXT_POPUP && type != Proto.TEXT_TIP && chatRepeat(src + "\u0000" + msg)) break;
                 if (type == Proto.TEXT_CHAT) systemChat(chat(src.isEmpty() ? msg : "<" + src + "> " + msg), false);
                 else if (type == Proto.TEXT_TRANSLATION) {
                     String key = msg.startsWith("%") ? msg.substring(1) : msg;
@@ -1264,7 +1291,7 @@ public final class Session {
                 send(C_TILE_DATA, new JBuf().position(bx, by, bz).varint(be).raw(ChunkConv.beNbt(c, ChunkConv.idx(bx & 15, by, bz & 15))));
         }
         for (int[] d : FACE) {
-            if (d[1] < 0) continue;
+            if (d[1] < 0 && Shapes.kind(stateAt(bx, by - 1, bz)) != Shapes.DOOR) continue; // снизу зависят только двери (петля)
             refreshShape(bx + d[0], by + d[1], bz + d[2], notify);
         }
     }
@@ -1427,7 +1454,7 @@ public final class Session {
         send(0x02, new JBuf().uuid(selfUuid).str(nick).varint(0));
         jState = 3;
         JBuf lg = new JBuf();
-        lg.i32(1).bool(false).u8(gamemode).u8(255);
+        lg.i32(1).bool(false).u8(javaGm()).u8(255); sentGm = javaGm();
         lg.varint(2).str(WORLD_A).str(WORLD_B);
         lg.raw(Tables.CODEC);
         lg.str("minecraft:overworld").str(WORLD_A).i64(0);
@@ -1446,7 +1473,7 @@ public final class Session {
                 .str(chat("")).str(chat("")).varint(0));
         joined = true;
         if (cfg.skin != null) L.skin(selfUuid, cfg.skin, cfg.slim);
-        send(C_PLAYER_INFO, new JBuf().u8(0x1D).varint(1).uuid(selfUuid).str(trim16(nick)).varint(0).varint(gamemode).u8(1).varint(0));
+        send(C_PLAYER_INFO, new JBuf().u8(0x1D).varint(1).uuid(selfUuid).str(trim16(nick)).varint(0).varint(javaGm()).u8(1).varint(0));
         for (Map.Entry<UUID, String> e : tabList.entrySet()) sendInfo(e.getKey(), e.getValue(), true);
         afterWorldReset(true);
         L.status("В игре: " + cfg.host + ":" + cfg.port);
@@ -1458,9 +1485,30 @@ public final class Session {
                 .bool(true).str(chat(name)));
     }
 
+    /**
+     * Режим для Java. PocketMine шлёт клиенту 0.14 только бит «творческий» (наблюдатель = 3 → 1),
+     * а наблюдателя/приключение показывает флагами AdventureSettings: 0x100 — сквозь стены, 0x01 — мир нельзя менять.
+     */
+    private int javaGm() {
+        if (gamemode == 3 || (advFlags & 0x100) != 0) return 3;
+        if (gamemode == 2) return 2;
+        if (gamemode == 1) return 1;
+        return (advFlags & 0x01) != 0 ? 2 : 0;
+    }
+
+    private void updateGm() {
+        int g = javaGm();
+        if (g == sentGm) return;
+        sentGm = g;
+        send(C_GAME_EVENT, new JBuf().u8(3).f32(g));
+        if (selfUuid != null) send(C_PLAYER_INFO, new JBuf().u8(0x04).varint(1).uuid(selfUuid).varint(g));
+        if (g == 3 && pick != null) pick = null;
+    }
+
     private void sendAbilities() {
-        boolean fly = gamemode == 1 || (advFlags & 0x80) != 0;
-        int flags = (gamemode == 1 ? (0x01 | 0x08) : 0) | (fly ? 0x04 : 0);
+        int g = javaGm();
+        boolean fly = g == 1 || g == 3 || (advFlags & 0x80) != 0;
+        int flags = (g == 1 ? (0x01 | 0x08) : 0) | (g == 3 ? (0x01 | 0x02) : 0) | (fly ? 0x04 : 0);
         send(C_ABILITIES, new JBuf().u8(flags).f32(0.05f).f32(0.1f));
     }
 
@@ -1773,6 +1821,10 @@ public final class Session {
 
     private void sendGear(Ent e) {
         if (e.gear == null || e.hologram) return;
+        // снаряжение — только живым (игроки, мобы); у предмета на земле его нет — Java падает с ClassCastException
+        boolean living = e.player || (e.peType >= 10 && e.peType <= 63 && e.item == null
+                && e.jtype != TEXT_DISPLAY_TYPE && e.jtype != ITEM_FRAME_TYPE && e.jtype != PAINTING_TYPE);
+        if (!living) return;
         int[] javaSlot = {0, 5, 4, 3, 2};
         JBuf b = new JBuf().varint(e.jid);
         for (int i = 0; i < 5; i++) {
@@ -1914,6 +1966,7 @@ public final class Session {
         List<int[]> l = new ArrayList<>();
         for (int[] g : grid) if (!isEmpty(g)) l.add(g);
         if (!isEmpty(jCursor)) l.add(jCursor);
+        if (pick != null && pick.onServer && pick.left > 0) l.add(withCount(pick.item, pick.left));
         return l;
     }
 
@@ -2048,8 +2101,14 @@ public final class Session {
         // результат крафта
         if (slot == 0 && isCraftWindow(win)) { craftClick(win, mode, cursorBefore); return; }
 
-        // выбросить: Q над слотом
-        if (mode == 4 && slot >= 0 && gamemode == 1) { resetView(); sendWindow(win); return; }
+        // Bedwars fix: «тап» по предмету в сундуке сразу отправляет его в инвентарь, как на телефоне (так ждут магазины мини-игр)
+        if (bedwarsFix && win != 0 && !isCraftWindow(win) && (mode == 0 || mode == 1) && slot >= 0 && slot < javaContainerSize() && isEmpty(cursorBefore)) {
+            int[] ps = peOf(win, slot);
+            int[] it = truthAt(ps);
+            if (ps != null && !isEmpty(it)) { tapFromContainer(win, ps, it); return; }
+        }
+
+        // выбросить: Q над слотом (решает сервер — в творческом тоже)
         if (mode == 4 && slot >= 0) {
             int[] ps = peOf(win, slot);
             int g = gridIndex(win, slot);
@@ -2059,7 +2118,6 @@ public final class Session {
             return;
         }
         // за край окна с предметом на курсоре
-        if (slot == -999 && mode == 0 && gamemode == 1) { jCursor = null; resetView(); sendWindow(win); return; }
         if (slot == -999 && mode == 0) {
             if (!isEmpty(cursorBefore)) {
                 int[] it = cursorBefore;
@@ -2143,7 +2201,7 @@ public final class Session {
             StringBuilder sb = new StringBuilder();
             for (int[] gi : g) sb.append(isEmpty(gi) ? "-" : gi[0] + ":" + gi[2]).append(' ');
             boolean any = false; for (int[] gi : g) if (!isEmpty(gi)) any = true;
-            if (any) { craftLogged++; L.log("Крафт: нет рецепта для сетки " + sb + "(рецептов " + crafting.size() + ")"); }
+            if (any) { craftLogged++; L.log("Крафт: нет рецепта для сетки " + sb + "(рецептов " + crafting.size() + ")" + crafting.similar(g)); }
         }
         craftMatch = m;
         if (!same(res, craftResult)) {
@@ -2214,6 +2272,7 @@ public final class Session {
     }
 
     private void closeWindowFromJava(int w) {
+        if (pick != null) restorePick();
         boolean wasCraftPe = peCraftWin;
         if (w != 0 && w == openWin && (w != CRAFT_WIN || wasCraftPe)) peSend(Proto.containerClose(w));
         if (w == openWin || w == 0) {
@@ -2264,27 +2323,112 @@ public final class Session {
         dropFrom(new int[]{0, slot});
     }
 
-    private void creativeSlot(int slot, int[] it) {
+    /**
+     * Творческий инвентарь Java сам перекладывает предметы и сообщает только итог по слотам.
+     * Слот опустел → предмет у игрока на курсоре (запоминаем); появился в другом слоте → это перенос.
+     * Не появился (корзина, другой предмет с палитры, закрыл инвентарь) → удалять на сервере нельзя: возвращаем.
+     */
+    private void creativeSlot(int slot, int[] jit) {
+        if (slot == -1) { if (jit != null && jit[1] > 0) creativeThrow(jit); return; }
         int[] ps = peOf(0, slot);
         if (ps == null) return;
-        int[] pe;
-        if (it == null || it[1] <= 0) {
-            // в 0.14 в творческом предмет из инвентаря не убрать — сервер его оставит; показываем как есть
-            int[] t = truthAt(ps);
-            setView(ps, t);
-            JBuf b = new JBuf().u8(0).varint(stateId++).i16(slot);
-            writeSlot(b, t);
-            send(C_SET_SLOT, b);
+        int[] before = copyOf(viewAt(ps));
+        long now = System.currentTimeMillis();
+        if (jit == null || jit[1] <= 0) {
+            if (isEmpty(before)) return;
+            setView(ps, empty());
+            // shift-клик/цифра: предмет уже появился в другом слоте этим же кликом
+            if (freshItem != null && now - freshAt < 200 && sameItem(freshItem, before) && freshItem[1] == before[1]) {
+                freshItem = null;
+                syncSlot(ps);
+                return;
+            }
+            restorePick();
+            pick = newPick(before, ps, before[1], true);
             return;
-        } else {
-            pe = toPe(it, allKnown());
-            if (pe[0] == 0) { systemChat(chat("§eЭтого предмета нет в 0.14"), true); sendInventory(); return; }
-            pe[1] = Math.max(1, it[1]);
         }
-        if (ps[0] == 0) inv[ps[1]] = copyOf(pe); else armor[ps[1]] = copyOf(pe);
+        int[][] known = allKnown();
+        if (pick != null) { int[][] k2 = new int[known.length + 1][]; k2[0] = pick.item; System.arraycopy(known, 0, k2, 1, known.length); known = k2; }
+        int[] pe = toPe(jit, known);
+        if (pe[0] == 0) { systemChat(chat("§eЭтого предмета нет в 0.14"), true); sendInventory(); return; }
+        pe[1] = Math.max(1, jit[1]);
         setView(ps, pe);
+        freshItem = null;
+        if (sameItem(before, pe) && pe[1] < before[1]) {
+            // взял часть стопки (ПКМ): сервер пока не трогаем
+            restorePick();
+            pick = newPick(before, ps, before[1] - pe[1], true);
+            return;
+        }
+        setTruth(ps, pe);
         peSend(Proto.containerSetSlot(ps[0], ps[1], ps[0] == 0 ? ps[1] : 0, pe));
+        int added = pe[1] - (sameItem(before, pe) ? before[1] : 0);
+        if (pick != null && sameItem(pick.item, pe)) {
+            pick.left -= added;
+            if (pick.left <= 0) { Pick p = pick; pick = null; if (p.onServer) syncSlot(p.src); }
+        } else if (pick != null) restorePick();
+        else if (isEmpty(before)) { freshItem = copyOf(pe); freshAt = now; }
+        if (!isEmpty(before) && !sameItem(before, pe)) pick = newPick(before, ps, before[1], false); // поменял местами
         if (slot >= 36 && slot <= 44 && slot - 36 == held) equipHeld();
+    }
+
+    private static Pick newPick(int[] item, int[] src, int count, boolean onServer) {
+        Pick p = new Pick(); p.item = copyOf(item); p.src = src; p.left = count; p.onServer = onServer; return p;
+    }
+
+    private void setTruth(int[] ps, int[] it) {
+        if (ps[0] == 0) inv[ps[1]] = copyOf(it);
+        else if (ps[0] == PE_ARMOR_WINDOW) armor[ps[1]] = copyOf(it);
+        else if (ps[1] < cont.length) cont[ps[1]] = copyOf(it);
+    }
+
+    /** Привести слот на сервере к тому, что видит Java. */
+    private void syncSlot(int[] ps) {
+        int[] v = viewAt(ps);
+        if (same(v, truthAt(ps))) return;
+        setTruth(ps, v);
+        peSend(Proto.containerSetSlot(ps[0], ps[1], ps[0] == 0 ? ps[1] : 0, isEmpty(v) ? empty() : v));
+    }
+
+    /** Предмет с курсора не положили никуда — в творческом удалить его нельзя, кладём обратно. */
+    private void restorePick() {
+        Pick p = pick;
+        pick = null;
+        if (p == null || p.left <= 0) return;
+        int[] put = withCount(p.item, p.left);
+        int[] dst = null;
+        int[] sv = viewAt(p.src);
+        if (isEmpty(sv) || (sameItem(sv, put) && sv[1] + put[1] <= maxStack(put))) dst = p.src;
+        else {
+            for (int i = 9; i < 36 + 9 && dst == null; i++) { int s = i < 36 ? i : i - 36; if (isEmpty(vInv[s])) dst = new int[]{0, s}; }
+        }
+        if (dst == null) { if (p.onServer) syncSlot(p.src); sendInventory(); return; }
+        int[] cur = viewAt(dst);
+        setView(dst, isEmpty(cur) ? put : withCount(put, cur[1] + put[1]));
+        syncSlot(dst);
+        if (p.onServer && dst != p.src) syncSlot(p.src);
+        if (joined) sendInventory();
+    }
+
+    /** Творческий: выбросить предмет (с курсора или с палитры). Можно ли — решает сервер. */
+    private void creativeThrow(int[] jit) {
+        int[][] known = allKnown();
+        if (pick != null) { int[][] k2 = new int[known.length + 1][]; k2[0] = pick.item; System.arraycopy(known, 0, k2, 1, known.length); known = k2; }
+        int[] pe = toPe(jit, known);
+        if (isEmpty(pe)) return;
+        pe[1] = Math.max(1, jit[1]);
+        if (pick != null && sameItem(pick.item, pe)) {
+            Pick p = pick;
+            p.left -= pe[1];
+            if (p.left <= 0) { pick = null; if (p.onServer) syncSlot(p.src); }
+        }
+        int hs = heldPeSlot();
+        int[] hand = copyOf(inv[hs]);
+        peSend(Proto.containerSetSlot(0, hs, hs, pe));
+        peSend(Proto.mobEquipment(selfEid, pe, hs + 9, held));
+        peSend(Proto.dropItem(pe));
+        peSend(Proto.containerSetSlot(0, hs, hs, hand));
+        equipHeld();
     }
 
     // ---- сундуки, печи и т.п. ----

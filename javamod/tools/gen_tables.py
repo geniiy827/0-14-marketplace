@@ -82,6 +82,11 @@ slab_pe = ['smooth_stone', 'sandstone', 'oak', 'cobblestone', 'brick', 'stone_br
 for m in range(16):
     OV[(44, m)] = ('%s_slab' % slab_pe[m & 7], {'type': 'top' if m & 8 else 'bottom'})
     OV[(43, m)] = ('%s_slab' % slab_pe[m & 7], {'type': 'double'})
+# люки: в 0.14 бит 0x04 — верхняя половина, 0x08 — открыт (в PC наоборот); направление 0 восток, 1 запад, 2 юг, 3 север
+for pid, nm in ((96, 'oak_trapdoor'), (167, 'iron_trapdoor')):
+    for m in range(16):
+        OV[(pid, m)] = (nm, {'facing': ['east', 'west', 'south', 'north'][m & 3], 'half': 'top' if m & 4 else 'bottom',
+                             'open': 'true' if m & 8 else 'false'})
 OV_PC = {126: 157, 125: 158}
 
 btab = []
@@ -222,7 +227,8 @@ for b in blocks:
     elif n.endswith('_wall') and 'wall_' not in n and not n.endswith('sign_wall'): k = 5
     elif n.endswith('_fence_gate'): k = 6
     elif n.endswith('_stairs'): k = 7
-    if k in (2, 3, 4, 5, 7): ranges.append((b['minStateId'], b['maxStateId'], k))
+    elif n.endswith('_door') and not n.endswith('trapdoor'): k = 8
+    if k in (2, 3, 4, 5, 7, 8): ranges.append((b['minStateId'], b['maxStateId'], k))
     sh = shapes['blocks'].get(n)
     for sid in range(b['minStateId'], b['maxStateId'] + 1):
         if k:

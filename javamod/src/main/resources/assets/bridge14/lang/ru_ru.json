@@ -1,4 +1,6 @@
 {
   "key.bridge14.reach": "Мобильный режим строительства (вкл/выкл)",
-  "key.categories.bridge14": "Bridge0_14"
+  "key.categories.bridge14": "Bridge0_14",
+  "key.bridge14.classic": "Classic GUI (вкл/выкл)",
+  "key.bridge14.bedwars": "Bedwars fix (вкл/выкл)"
 }

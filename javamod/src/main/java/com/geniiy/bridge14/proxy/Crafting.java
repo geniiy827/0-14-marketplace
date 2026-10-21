@@ -35,7 +35,7 @@ public final class Crafting {
                 if (type == 0) {
                     Recipe r = new Recipe(); r.type = 0;
                     int c = e.i32(); r.ing = new int[c][];
-                    for (int k = 0; k < c; k++) r.ing[k] = Proto.readSlot(e);
+                    for (int k = 0; k < c; k++) r.ing[k] = ingredient(Proto.readSlot(e));
                     e.i32(); r.result = Proto.readSlot(e);
                     r.id = new UUID(e.i64(), e.i64());
                     recipes.add(r);
@@ -44,7 +44,7 @@ public final class Crafting {
                     r.w = e.i32(); r.h = e.i32();
                     if (r.w < 1 || r.h < 1 || r.w > 3 || r.h > 3) continue;
                     r.ing = new int[r.w * r.h][];
-                    for (int k = 0; k < r.ing.length; k++) r.ing[k] = Proto.readSlot(e);
+                    for (int k = 0; k < r.ing.length; k++) r.ing[k] = ingredient(Proto.readSlot(e));
                     e.i32(); r.result = Proto.readSlot(e);
                     r.id = new UUID(e.i64(), e.i64());
                     recipes.add(r);
@@ -52,6 +52,32 @@ public final class Crafting {
             } catch (Exception ignored) {}
         }
     }
+
+    /** Для журнала: рецепты, где встречаются все предметы из сетки (чтобы понять, чем формат сервера отличается). */
+    public synchronized String similar(int[][] grid) {
+        StringBuilder sb = new StringBuilder();
+        int shown = 0;
+        for (Recipe rec : recipes) {
+            boolean all = true, any = false;
+            for (int[] g : grid) {
+                if (empty(g)) continue;
+                any = true;
+                boolean has = false;
+                for (int[] in : rec.ing) if (!empty(in) && in[0] == g[0]) has = true;
+                if (!has) all = false;
+            }
+            if (!any || !all) continue;
+            sb.append(" | тип ").append(rec.type).append(' ').append(rec.w).append('x').append(rec.h).append(" ->")
+              .append(empty(rec.result) ? "-" : rec.result[0] + ":" + rec.result[2] + "x" + rec.result[1]).append(" [");
+            for (int[] in : rec.ing) sb.append(empty(in) ? "-" : in[0] + ":" + in[2] + "x" + in[1]).append(' ');
+            sb.append(']');
+            if (++shown >= 3) break;
+        }
+        return sb.toString();
+    }
+
+    /** Некоторые серверы пишут у ингредиента количество 0 — это всё равно «1 штука». */
+    private static int[] ingredient(int[] it) { if (it != null && it[0] > 0 && it[1] <= 0) it[1] = 1; return it; }
 
     private static boolean empty(int[] it) { return it == null || it[0] == 0 || it[1] <= 0; }
 
@@ -73,21 +99,28 @@ public final class Crafting {
         int bw = c1 - c0 + 1, bh = r1 - r0 + 1;
         for (Recipe rec : recipes) {
             if (rec.type == 1) {
-                if (rec.w != bw || rec.h != bh) continue;
-                for (int mirror = 0; mirror < 2; mirror++) {
-                    boolean ok = true;
-                    for (int y = 0; y < bh && ok; y++) for (int x = 0; x < bw; x++) {
-                        int gx = mirror == 0 ? x : bw - 1 - x;
-                        if (!fits(rec.ing[y * bw + x], grid[(r0 + y) * size + c0 + gx])) { ok = false; break; }
+                // обычно ширина×высота и строки подряд; у некоторых серверов размеры/порядок переставлены — пробуем и так
+                for (int variant = 0; variant < 4; variant++) {
+                    boolean swapDims = (variant & 1) != 0, colMajor = (variant & 2) != 0;
+                    int rw = swapDims ? rec.h : rec.w, rh = swapDims ? rec.w : rec.h;
+                    if (rw != bw || rh != bh) continue;
+                    if (variant > 0 && bw == 1 && bh == 1) continue;
+                    for (int mirror = 0; mirror < 2; mirror++) {
+                        boolean ok = true;
+                        for (int y = 0; y < bh && ok; y++) for (int x = 0; x < bw; x++) {
+                            int gx = mirror == 0 ? x : bw - 1 - x;
+                            int k = colMajor ? x * bh + y : y * bw + x;
+                            if (!fits(rec.ing[k], grid[(r0 + y) * size + c0 + gx])) { ok = false; break; }
+                        }
+                        if (!ok) continue;
+                        Match m = new Match(); m.recipe = rec; m.big = bw > 2 || bh > 2;
+                        for (int y = 0; y < 3; y++) for (int x = 0; x < 3; x++) {
+                            int[] it = null;
+                            if (x < bw && y < bh) { int gx = mirror == 0 ? x : bw - 1 - x; it = grid[(r0 + y) * size + c0 + gx]; }
+                            m.input[y * 3 + x] = empty(it) ? new int[4] : one(it);
+                        }
+                        return m;
                     }
-                    if (!ok) continue;
-                    Match m = new Match(); m.recipe = rec; m.big = bw > 2 || bh > 2;
-                    for (int y = 0; y < 3; y++) for (int x = 0; x < 3; x++) {
-                        int[] it = null;
-                        if (x < bw && y < bh) { int gx = mirror == 0 ? x : bw - 1 - x; it = grid[(r0 + y) * size + c0 + gx]; }
-                        m.input[y * 3 + x] = empty(it) ? new int[4] : one(it);
-                    }
-                    return m;
                 }
             } else {
                 int need = 0;
