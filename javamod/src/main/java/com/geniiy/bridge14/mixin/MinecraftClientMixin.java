@@ -24,7 +24,7 @@ public abstract class MinecraftClientMixin {
     }
 
     /** Меню паузы в стиле 0.14 сразу, без мелькания обычного. */
-    @Inject(method = "openGameMenu", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "openPauseMenu", at = @At("HEAD"), cancellable = true)
     private void bridge14$pause(boolean pauseOnly, CallbackInfo ci) {
         MinecraftClient mc = (MinecraftClient) (Object) this;
         if (Bridge14.active && mc.world != null) {
