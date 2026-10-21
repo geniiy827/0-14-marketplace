@@ -33,3 +33,18 @@ tasks.register('exportCp', Copy) {
     from configurations.compileClasspath
     into "$buildDir/cp"
 }
+
+// отдельный сервер-мост: java -jar Bridge0_14-server.jar
+tasks.register('serverJar', Jar) {
+    archiveFileName = 'Bridge0_14-server.jar'
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    from(sourceSets.main.output) {
+        include 'com/geniiy/bridge14/pe/**'
+        include 'com/geniiy/bridge14/proxy/**'
+        include 'com/geniiy/bridge14/server/**'
+        include 'bridge14/**'
+    }
+    manifest { attributes('Main-Class': 'com.geniiy.bridge14.server.StandaloneServer') }
+    dependsOn classes
+}
+build.dependsOn serverJar

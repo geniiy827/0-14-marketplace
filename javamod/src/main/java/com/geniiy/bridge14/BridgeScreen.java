@@ -8,7 +8,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ConnectScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
@@ -25,12 +24,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Главное меню Bridge0_14: профиль с 3D-куклой, серверы и локальные миры 0.14. */
+/** Главное меню Bridge0_14 в стиле Minecraft PE 0.14: профиль с 3D-куклой, серверы и миры по Wi-Fi. */
 public class BridgeScreen extends Screen {
     private final Screen parent;
     private final Config cfg;
     private TextFieldWidget nickField;
-    private ButtonWidget playBtn, editBtn, delBtn, modelBtn;
+    private PeStyle.Button modelBtn;
     private static volatile List<LanScanner.Found> lan = new ArrayList<>();
     private static volatile long lastScan;
     private static volatile boolean scanning;
@@ -38,16 +37,14 @@ public class BridgeScreen extends Screen {
     private static final Map<String, Long> PINGED_AT = new ConcurrentHashMap<>();
     private String skinInfo = "";
     private String message = "";
-    private int selected = -1, scroll;
-    private long lastClick; private int lastClickRow = -1;
+    private int scroll;
     private float dollYaw = 20, dollSpin = 0.4f; private boolean dragging; private double dragX;
     private int ticks;
 
-    // разметка
     private int lx, lw, rx, rw, top, listTop, listBottom, dollTop, dollH;
-    private static final int ROW_H = 36;
+    private static final int ROW_H = 36, SIDE = 26;
 
-    private static final class Row { String title, motd, addr, ver, players; long ping = -2; boolean lan; Config.Server saved; String host; int port; }
+    private static final class Row { String title, motd, ver, players; long ping = -2; boolean lan; Config.Server saved; String host; int port; }
 
     public BridgeScreen(Screen parent) {
         super(Text.literal("Bridge0_14"));
@@ -58,63 +55,65 @@ public class BridgeScreen extends Screen {
 
     @Override
     protected void init() {
-        lx = 8; lw = Math.max(128, Math.min(180, width * 3 / 10));
+        top = 32;
+        lx = 8; lw = Math.max(124, Math.min(170, width * 3 / 10));
         rx = lx + lw + 8; rw = width - rx - 8;
-        top = 30;
-        listTop = top + 16; listBottom = height - 8 - 48;
-        int panelBottom = height - 8;
-        int controls = 20 + 4 + 20 + 4 + 20 + 4 + 20 + 12;
-        dollTop = top + 14;
-        dollH = Math.max(40, Math.min(150, panelBottom - controls - dollTop - 8));
-        int y = dollTop + dollH + 8;
-        int fx = lx + 6, fw = lw - 12;
+        listTop = top; listBottom = height - 18;
+        addDrawableChild(new PeStyle.Button(4, 3, 56, 20, Text.literal("Назад"), b -> close()));
+        addDrawableChild(new PeStyle.Button(width - 4 - 96, 3, 96, 20, Text.literal("Новый сервер"), b -> client.setScreen(new ServerEditScreen(this, cfg, null))));
 
-        nickField = new TextFieldWidget(textRenderer, fx, y, fw, 20, Text.literal("Ник"));
+        int controls = 20 + 4 + 20 + 4 + 20 + 14;
+        dollTop = top + 14;
+        dollH = Math.max(40, Math.min(150, height - 8 - controls - dollTop - 8));
+        int y = dollTop + dollH + 6;
+        int fx = lx + 6, fw = lw - 12;
+        nickField = new TextFieldWidget(textRenderer, fx + 1, y + 1, fw - 2, 18, Text.literal("Имя"));
         nickField.setMaxLength(16);
-        nickField.setPlaceholder(Text.literal("Ник 0.14"));
+        nickField.setPlaceholder(Text.literal("Имя в 0.14"));
         nickField.setText(cfg.nick == null || cfg.nick.isEmpty() ? client.getSession().getUsername() : cfg.nick);
         nickField.setTextPredicate(s -> s.matches("[A-Za-z0-9_]{0,16}"));
         nickField.setChangedListener(s -> { cfg.nick = s; cfg.save(); });
         addDrawableChild(nickField);
         y += 24;
         int half = (fw - 4) / 2;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Скин…"), b -> pickSkin()).dimensions(fx, y, half, 20)
-                .tooltip(Tooltip.of(Text.literal("PNG 64×64 или 64×32 — так тебя увидят игроки 0.14"))).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Папка"), b -> Util.getOperatingSystem().open(Config.dir().toFile())).dimensions(fx + half + 4, y, fw - half - 4, 20)
-                .tooltip(Tooltip.of(Text.literal("Можно просто положить сюда skin.png"))).build());
+        PeStyle.Button skin = new PeStyle.Button(fx, y, half, 20, Text.literal("Скин…"), b -> pickSkin());
+        skin.setTooltip(Tooltip.of(Text.literal("PNG 64×64 или 64×32 — так тебя увидят игроки 0.14")));
+        addDrawableChild(skin);
+        PeStyle.Button folder = new PeStyle.Button(fx + half + 4, y, fw - half - 4, 20, Text.literal("Папка"), b -> Util.getOperatingSystem().open(Config.dir().toFile()));
+        folder.setTooltip(Tooltip.of(Text.literal("Можно просто положить сюда skin.png")));
+        addDrawableChild(folder);
         y += 24;
-        modelBtn = addDrawableChild(ButtonWidget.builder(modelText(), b -> { cfg.slim = !cfg.slim; cfg.save(); b.setMessage(modelText()); updateSkin(); })
-                .dimensions(fx, y, half, 20).tooltip(Tooltip.of(Text.literal("Стив — обычные руки, Алекс — тонкие"))).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Сброс"), b -> { cfg.skinPath = ""; cfg.save(); updateSkin(); })
-                .dimensions(fx + half + 4, y, fw - half - 4, 20).build());
-
-        // ---- кнопки списка ----
-        int by = height - 8 - 44;
-        int bw = (rw - 12) / 4;
-        playBtn = addDrawableChild(ButtonWidget.builder(Text.literal("§lИграть"), b -> playSelected()).dimensions(rx, by, bw, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Добавить"), b -> client.setScreen(new ServerEditScreen(this, cfg, null))).dimensions(rx + (bw + 4), by, bw, 20).build());
-        editBtn = addDrawableChild(ButtonWidget.builder(Text.literal("Изменить"), b -> { Row r = sel(); if (r != null && r.saved != null) client.setScreen(new ServerEditScreen(this, cfg, r.saved)); })
-                .dimensions(rx + (bw + 4) * 2, by, bw, 20).build());
-        delBtn = addDrawableChild(ButtonWidget.builder(Text.literal("Удалить"), b -> { Row r = sel(); if (r != null && r.saved != null) { cfg.servers.remove(r.saved); cfg.save(); selected = -1; } })
-                .dimensions(rx + (bw + 4) * 3, by, rw - (bw + 4) * 3, 20).build());
-        int hw = (rw - 4) / 2;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Обновить"), b -> { lastScan = 0; PINGED_AT.clear(); scan(); }).dimensions(rx, by + 24, hw, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Назад"), b -> close()).dimensions(rx + hw + 4, by + 24, rw - hw - 4, 20).build());
+        modelBtn = new PeStyle.Button(fx, y, half, 20, modelText(), b -> { cfg.slim = !cfg.slim; cfg.save(); updateSkin(); });
+        modelBtn.setTooltip(Tooltip.of(Text.literal("Стив — обычные руки, Алекс — тонкие")));
+        addDrawableChild(modelBtn);
+        addDrawableChild(new PeStyle.Button(fx + half + 4, y, fw - half - 4, 20, Text.literal("Сброс"), b -> { cfg.skinPath = ""; cfg.save(); updateSkin(); }));
         updateSkin();
+        rebuildRowButtons();
         scan();
-        updateButtons();
     }
 
     private Text modelText() { return Text.literal(cfg.slim ? "Алекс" : "Стив"); }
 
-    private void updateButtons() {
-        Row r = sel();
-        if (playBtn != null) playBtn.active = r != null;
-        if (editBtn != null) editBtn.active = r != null && r.saved != null;
-        if (delBtn != null) delBtn.active = r != null && r.saved != null;
-    }
+    private final List<PeStyle.Button> rowButtons = new ArrayList<>();
 
-    private Row sel() { List<Row> rs = rows(); return selected >= 0 && selected < rs.size() ? rs.get(selected) : null; }
+    /** Кнопки ✎ и ✕ у каждой видимой строки. */
+    private void rebuildRowButtons() {
+        for (PeStyle.Button b : rowButtons) remove(b);
+        rowButtons.clear();
+        List<Row> rs = rows();
+        int visible = Math.max(1, (listBottom - listTop) / ROW_H);
+        for (int i = 0; i < visible && scroll + i < rs.size(); i++) {
+            Row r = rs.get(scroll + i);
+            if (r.saved == null) continue;
+            int y = listTop + i * ROW_H;
+            final Config.Server s = r.saved;
+            PeStyle.Button del = new PeStyle.Button(rx + rw - SIDE, y + 2, SIDE, ROW_H - 4, Text.literal("✖"), b -> { cfg.servers.remove(s); cfg.save(); rebuildRowButtons(); });
+            del.red();
+            PeStyle.Button edit = new PeStyle.Button(rx + rw - SIDE * 2 - 2, y + 2, SIDE, ROW_H - 4, Text.literal("✎"), b -> client.setScreen(new ServerEditScreen(this, cfg, s)));
+            rowButtons.add(addDrawableChild(del));
+            rowButtons.add(addDrawableChild(edit));
+        }
+    }
 
     private List<Row> rows() {
         List<Row> out = new ArrayList<>();
@@ -122,19 +121,19 @@ public class BridgeScreen extends Screen {
             Row r = new Row();
             fill(r, f.info);
             r.title = r.motd == null || r.motd.isEmpty() ? "Мир" : r.motd;
-            r.motd = "Локальная сеть • " + f.host + (f.port != 19132 ? ":" + f.port : "");
+            r.motd = "Локальная сеть: " + f.host + (f.port != 19132 ? ":" + f.port : "");
             r.ping = f.ping; r.lan = true;
-            r.host = f.host; r.port = f.port; r.addr = f.host + ":" + f.port;
+            r.host = f.host; r.port = f.port;
             out.add(r);
         }
         for (Config.Server s : cfg.servers) {
             Row r = new Row();
             r.title = s.name; r.saved = s; r.host = s.host; r.port = s.port;
-            r.addr = s.host + (s.port != 19132 ? ":" + s.port : "");
+            String addr = s.name + ": " + s.host + (s.port != 19132 ? ":" + s.port : "");
             LanScanner.Found f = PINGS.get(s.host + ":" + s.port);
-            if (f != null) { fill(r, f.info); r.ping = f.ping; }
+            if (f != null) { fill(r, f.info); r.ping = f.ping; if (r.motd != null && !r.motd.isEmpty()) r.title = r.motd; }
             else r.ping = PINGED_AT.containsKey(s.host + ":" + s.port) ? -1 : -2;
-            if (r.motd == null || r.motd.isEmpty()) r.motd = r.addr;
+            r.motd = addr;
             out.add(r);
         }
         return out;
@@ -146,6 +145,8 @@ public class BridgeScreen extends Screen {
         r.ver = p.length > 3 ? p[3] : "";
         r.players = p.length > 5 ? p[4] + "/" + p[5] : "";
     }
+
+    private int rowCount = -1;
 
     private void scan() {
         if (!scanning && System.currentTimeMillis() - lastScan > 5000) {
@@ -178,7 +179,8 @@ public class BridgeScreen extends Screen {
         nickField.tick();
         if (ticks % 20 == 0) scan();
         if (!dragging) dollYaw += dollSpin;
-        updateButtons();
+        int rc = rows().size();
+        if (rc != rowCount) { rowCount = rc; rebuildRowButtons(); }
     }
 
     // ---------------- скин ----------------
@@ -188,13 +190,11 @@ public class BridgeScreen extends Screen {
         if (f == null) skinInfo = "§7Скин: стандартный";
         else {
             rgba = Proxy.loadSkin(f);
-            skinInfo = rgba == null ? "§cНужен PNG 64×64 или 64×32" : "§7" + shorten(f.getName(), 22);
+            skinInfo = rgba == null ? "§cНужен PNG 64×64 или 64×32" : "§7" + f.getName();
         }
         SkinStore.put(SkinStore.LOCAL, rgba != null ? rgba : DefaultSkin.make(), cfg.slim);
         if (modelBtn != null) modelBtn.setMessage(modelText());
     }
-
-    private static String shorten(String s, int n) { return s.length() > n ? s.substring(0, n - 1) + "…" : s; }
 
     private void pickSkin() {
         try (MemoryStack st = MemoryStack.stackPush()) {
@@ -209,11 +209,9 @@ public class BridgeScreen extends Screen {
     }
 
     // ---------------- игра ----------------
-    private void playSelected() { Row r = sel(); if (r != null) play(r); }
-
     private void play(Row r) {
         String nick = nickField.getText().trim();
-        if (!nick.matches("[A-Za-z0-9_]{3,16}")) { message = "§cНик: 3–16 латинских букв, цифр или _"; return; }
+        if (!nick.matches("[A-Za-z0-9_]{3,16}")) { message = "§cИмя: 3–16 латинских букв, цифр или _"; return; }
         cfg.nick = nick; cfg.save();
         Session.Config sc = new Session.Config();
         sc.nick = nick; sc.host = r.host; sc.port = r.port; sc.chunkRadius = cfg.chunkRadius; sc.slim = cfg.slim;
@@ -221,15 +219,9 @@ public class BridgeScreen extends Screen {
         File sf = cfg.skinFile();
         if (sf != null) sc.skin = Proxy.loadSkin(sf);
         try {
-            int port = Bridge14.PROXY.start(sc, new Session.Listener() {
-                public void status(String s) { Bridge14.LOG.info(s); }
-                public void log(String s) { Bridge14.LOG.info(s); }
-                public void ended(String reason) { Bridge14.sessionEnded(reason); }
-                public void popup(String text, boolean tip) { Hud.set(text, tip); }
-                public void skin(java.util.UUID u, byte[] rgba, boolean slim) { SkinStore.put(u, rgba, slim); }
-            });
+            int port = Bridge14.PROXY.start(sc, Bridge14.listener());
             Bridge14.active = true;
-            ConnectScreen.connect(this, client, new ServerAddress("127.0.0.1", port), new ServerInfo("0.14: " + r.title, "127.0.0.1:" + port, false), false);
+            ConnectScreen.connect(this, client, new ServerAddress("127.0.0.1", port), new ServerInfo("0.14: " + strip(r.title), "127.0.0.1:" + port, false), false);
         } catch (Exception e) {
             Bridge14.active = false;
             message = "§cНе удалось запустить мост: " + e.getMessage();
@@ -245,10 +237,8 @@ public class BridgeScreen extends Screen {
             int i = scroll + (int) ((my - listTop) / ROW_H);
             List<Row> rs = rows();
             if (i >= 0 && i < rs.size()) {
-                long now = System.currentTimeMillis();
-                if (i == lastClickRow && now - lastClick < 300) { selected = i; play(rs.get(i)); return true; }
-                selected = i; lastClick = now; lastClickRow = i;
-                updateButtons();
+                client.getSoundManager().play(net.minecraft.client.sound.PositionedSoundInstance.master(net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK, 1f));
+                play(rs.get(i));
                 return true;
             }
         }
@@ -271,94 +261,74 @@ public class BridgeScreen extends Screen {
     public boolean mouseScrolled(double mx, double my, double amount) {
         int visible = Math.max(1, (listBottom - listTop) / ROW_H);
         int max = Math.max(0, rows().size() - visible);
-        scroll = Math.max(0, Math.min(max, scroll - (int) Math.signum(amount)));
+        int ns = Math.max(0, Math.min(max, scroll - (int) Math.signum(amount)));
+        if (ns != scroll) { scroll = ns; rebuildRowButtons(); }
         return true;
-    }
-
-    @Override
-    public boolean keyPressed(int key, int scan, int mods) {
-        if ((key == 257 || key == 335) && !nickField.isFocused() && sel() != null) { playSelected(); return true; } // Enter
-        return super.keyPressed(key, scan, mods);
     }
 
     // ---------------- отрисовка ----------------
     @Override
-    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        renderBackground(ctx);
-        ctx.fillGradient(0, 0, width, height, 0x90101820, 0xC0080810);
-        // заголовок
-        ctx.getMatrices().push();
-        ctx.getMatrices().translate(lx, 7, 0);
-        ctx.getMatrices().scale(2f, 2f, 1f);
-        ctx.drawTextWithShadow(textRenderer, "§bBridge§f0_14", 0, 0, 0xFFFFFF);
-        ctx.getMatrices().pop();
-        ctx.drawTextWithShadow(textRenderer, "§7клиент для Minecraft PE 0.14", lx + textRenderer.getWidth("Bridge0_14") * 2 + 10, 14, 0xAAAAAA);
+    public void renderBackground(DrawContext ctx) { PeStyle.background(ctx, width, height, 0); }
 
-        // левая панель: профиль
-        panel(ctx, lx, top, lw, height - 8 - top);
+    @Override
+    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
+        PeStyle.background(ctx, width, height, delta);
+        PeStyle.bar(ctx, textRenderer, width, "Bridge0_14");
+
+        // профиль
+        ctx.fill(lx, top, lx + lw, height - 8, 0x50000000);
+        ctx.drawBorder(lx, top, lw, height - 8 - top, 0xFF1E1B19);
+        ctx.drawTextWithShadow(textRenderer, "Профиль", lx + 6, top + 4, 0xFFFFFF);
         Identifier tex = SkinStore.texture(SkinStore.LOCAL);
         int cx = lx + lw / 2;
         float lookX = (float) Math.max(-1, Math.min(1, (mouseX - cx) / 120.0));
         float lookY = (float) Math.max(-1, Math.min(1, (mouseY - (dollTop + dollH / 4)) / 120.0));
-        ctx.fill(lx + 10, dollTop + dollH - 3, lx + lw - 10, dollTop + dollH - 1, 0x40FFFFFF);
         PlayerDoll.draw(ctx, cx, dollTop + dollH - 4, Math.max(16, (int) (dollH / 2.25f)), dollYaw, lookX, lookY, tex, cfg.slim, ticks + delta);
-        ctx.drawTextWithShadow(textRenderer, "§eПрофиль", lx + 6, top + 4, 0xFFFFFF);
+        ctx.fill(nickField.getX() - 1, nickField.getY() - 1, nickField.getX() + nickField.getWidth() + 1, nickField.getY() + nickField.getHeight() + 1, 0xFF1E1B19);
         ctx.drawCenteredTextWithShadow(textRenderer, fit(skinInfo, lw - 8), cx, height - 8 - 11, 0xFFFFFF);
 
-        // правая панель: список
-        panel(ctx, rx, top, rw, listBottom - top + 4);
-        ctx.drawTextWithShadow(textRenderer, "§eСерверы и миры", rx + 6, top + 4, 0xFFFFFF);
-        if (scanning) ctx.drawTextWithShadow(textRenderer, "§7поиск в сети…", rx + rw - 6 - textRenderer.getWidth("поиск в сети…"), top + 4, 0xFFFFFF);
+        // список
         List<Row> rs = rows();
         int visible = Math.max(1, (listBottom - listTop) / ROW_H);
         if (scroll > Math.max(0, rs.size() - visible)) scroll = Math.max(0, rs.size() - visible);
         if (rs.isEmpty()) {
-            ctx.drawCenteredTextWithShadow(textRenderer, "§7Пусто. Открой мир на телефоне в той же Wi-Fi сети", rx + rw / 2, listTop + 20, 0xFFFFFF);
-            ctx.drawCenteredTextWithShadow(textRenderer, "§7или нажми «Добавить», чтобы добавить сервер.", rx + rw / 2, listTop + 32, 0xFFFFFF);
+            PeStyle.panel(ctx, rx, listTop, rw, ROW_H, PeStyle.ROW);
+            ctx.drawCenteredTextWithShadow(textRenderer, scanning ? "Ищу миры в локальной сети…" : "Пусто: открой мир на телефоне в той же Wi-Fi", rx + rw / 2, listTop + 8, 0xFFFFFF);
+            ctx.drawCenteredTextWithShadow(textRenderer, "§7или нажми «Новый сервер»", rx + rw / 2, listTop + 20, 0xFFFFFF);
         }
-        ctx.enableScissor(rx, listTop, rx + rw, listBottom);
-        for (int i = 0; i < visible + 1 && scroll + i < rs.size(); i++) {
-            int idx = scroll + i;
-            drawRow(ctx, rs.get(idx), rx + 3, listTop + i * ROW_H, rw - 6, idx == selected,
-                    mouseX >= rx && mouseX < rx + rw && mouseY >= listTop + i * ROW_H && mouseY < listTop + (i + 1) * ROW_H && mouseY < listBottom);
+        for (int i = 0; i < visible && scroll + i < rs.size(); i++) {
+            Row r = rs.get(scroll + i);
+            int y = listTop + i * ROW_H;
+            int w = r.saved != null ? rw - SIDE * 2 - 4 : rw;
+            boolean hover = mouseX >= rx && mouseX < rx + w && mouseY >= y && mouseY < y + ROW_H - 2;
+            drawRow(ctx, r, rx, y, w, hover);
         }
-        ctx.disableScissor();
         if (rs.size() > visible) {
             int barH = Math.max(10, (listBottom - listTop) * visible / rs.size());
             int barY = listTop + (listBottom - listTop - barH) * scroll / Math.max(1, rs.size() - visible);
-            ctx.fill(rx + rw - 3, barY, rx + rw - 1, barY + barH, 0x80FFFFFF);
+            ctx.fill(width - 6, barY, width - 4, barY + barH, 0xC0FFFFFF);
         }
-        if (!message.isEmpty()) ctx.drawCenteredTextWithShadow(textRenderer, message, rx + rw / 2, listBottom - 10, 0xFFFFFF);
+        String hint = !message.isEmpty() ? message : scanning ? "§7Поиск миров в локальной сети…" : "§7Нажми на сервер или мир, чтобы играть";
+        ctx.drawCenteredTextWithShadow(textRenderer, hint, rx + rw / 2, height - 13, 0xFFFFFF);
         super.render(ctx, mouseX, mouseY, delta);
     }
 
-    private static void panel(DrawContext ctx, int x, int y, int w, int h) {
-        ctx.fill(x, y, x + w, y + h, 0x70000000);
-        ctx.drawBorder(x, y, w, h, 0x30FFFFFF);
-    }
-
-    private void drawRow(DrawContext ctx, Row r, int x, int y, int w, boolean sel, boolean hover) {
-        if (sel) { ctx.fill(x, y + 1, x + w, y + ROW_H - 1, 0x5055AAFF); ctx.drawBorder(x, y + 1, w, ROW_H - 2, 0xA0AACCFF); }
-        else if (hover) ctx.fill(x, y + 1, x + w, y + ROW_H - 1, 0x25FFFFFF);
-        // значок
-        int ic = r.lan ? 0xFF2E9E4F : 0xFF3A6FD8;
-        ctx.fill(x + 4, y + 5, x + 30, y + 31, ic);
-        ctx.fill(x + 5, y + 6, x + 29, y + 30, ic + 0x00101010);
-        ctx.drawCenteredTextWithShadow(textRenderer, r.lan ? "LAN" : "PE", x + 17, y + 14, 0xFFFFFF);
-        int tx = x + 36;
+    private void drawRow(DrawContext ctx, Row r, int x, int y, int w, boolean hover) {
+        PeStyle.panel(ctx, x, y, w, ROW_H - 2, hover ? PeStyle.ROW_HOVER : PeStyle.ROW);
         int right = x + w - 6;
-        // пинг и игроки
-        String pingS; int pc;
-        if (r.ping >= 0) { pingS = r.ping + " мс"; pc = r.ping < 120 ? 0x55FF55 : r.ping < 300 ? 0xFFFF55 : 0xFF5555; }
-        else if (r.ping == -1) { pingS = "нет ответа"; pc = 0xFF5555; }
-        else { pingS = "…"; pc = 0xAAAAAA; }
-        int pw = textRenderer.getWidth(pingS);
-        ctx.drawTextWithShadow(textRenderer, pingS, right - pw, y + 6, pc);
-        String info = (r.players != null && !r.players.isEmpty() ? "§f" + r.players + " " : "") + (r.ver != null && !r.ver.isEmpty() ? "§7" + r.ver : "");
-        int iw = textRenderer.getWidth(info);
-        if (!info.isEmpty()) ctx.drawTextWithShadow(textRenderer, info, right - iw, y + 19, 0xFFFFFF);
-        int maxT = right - Math.max(pw, iw) - 8 - tx;
-        ctx.drawTextWithShadow(textRenderer, fit("§f§l" + strip(r.title), maxT), tx, y + 6, 0xFFFFFF);
+        int dotColor = r.ping >= 0 ? 0xFF55E040 : r.ping == -1 ? 0xFF6E6E6E : 0xFFE0C040;
+        PeStyle.dot(ctx, right - 6, y + ROW_H / 2 - 1, 6, dotColor);
+        int infoRight = right - 16;
+        String players = r.players != null && !r.players.isEmpty() ? r.players : (r.ping == -1 ? "нет ответа" : "");
+        int pw = textRenderer.getWidth(players);
+        if (!players.isEmpty()) ctx.drawTextWithShadow(textRenderer, players, infoRight - pw, y + 6, 0xFFFFFF);
+        String ver = r.ver == null ? "" : r.ver + (r.ping >= 0 ? "  " + r.ping + "мс" : "");
+        int vw = textRenderer.getWidth(ver);
+        if (!ver.isEmpty()) ctx.drawTextWithShadow(textRenderer, ver, infoRight - vw, y + 19, r.ver.startsWith("0.14") ? 0xE8E8E8 : 0xFF5050);
+        int tx = x + 8;
+        int maxT = infoRight - Math.max(pw, vw) - 8 - tx;
+        String title = (r.lan ? "§a" : "§f") + r.title;
+        ctx.drawTextWithShadow(textRenderer, fit(title, maxT), tx, y + 6, 0xFFFFFF);
         ctx.drawTextWithShadow(textRenderer, fit("§7" + r.motd, maxT), tx, y + 19, 0xFFFFFF);
     }
 

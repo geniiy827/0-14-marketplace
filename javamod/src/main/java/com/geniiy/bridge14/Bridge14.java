@@ -11,6 +11,13 @@ import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.minecraft.client.gui.screen.GameMenuScreen;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
+import com.geniiy.bridge14.proxy.Session;
+import org.lwjgl.glfw.GLFW;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -45,8 +52,16 @@ public class Bridge14 implements ClientModInitializer {
                     .dimensions(bx, y, 64, 20).tooltip(Tooltip.of(Text.literal("Серверы и локальные миры Minecraft PE 0.14"))).build());
         });
 
-        // надписи сервера (монеты, ранг…) над хотбаром
+        // надписи сервера (монеты, ранг…)
         HudRenderCallback.EVENT.register(Hud::render);
+
+        // клавиша: строительство как на телефоне
+        KeyBinding reach = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bridge14.reach", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "key.categories.bridge14"));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (reach.wasPressed()) if (active) ReachAround.toggle();
+            // меню паузы в стиле 0.14
+            if (active && client.currentScreen instanceof GameMenuScreen && client.world != null) client.setScreen(new PePauseScreen());
+        });
 
         // В режиме 0.14 в творческом инвентаре — только то, что есть в 0.14
         ItemGroupEvents.MODIFY_ENTRIES_ALL.register((group, entries) -> {
@@ -60,6 +75,17 @@ public class Bridge14 implements ClientModInitializer {
         if (s.isEmpty()) return true;
         if (s.hasNbt() && !s.getNbt().contains("Damage")) return true; // зачарованные книги, зелья с эффектами и т.п.
         return Tables.itemBack(Registries.ITEM.getRawId(s.getItem())) == null;
+    }
+
+    /** Слушатель сессии моста (лог, надписи на экране, скины). */
+    public static Session.Listener listener() {
+        return new Session.Listener() {
+            public void status(String s) { LOG.info(s); }
+            public void log(String s) { LOG.info(s); }
+            public void ended(String reason) { sessionEnded(reason); }
+            public void popup(String text, boolean tip) { Hud.set(text, tip); }
+            public void skin(java.util.UUID u, byte[] rgba, boolean slim) { SkinStore.put(u, rgba, slim); }
+        };
     }
 
     public static void sessionEnded(String reason) {

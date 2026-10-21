@@ -2,37 +2,36 @@ package com.geniiy.bridge14;
 
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
-/** Добавление и изменение сервера 0.14. */
+/** Добавление и изменение сервера 0.14 (оформление 0.14). */
 public class ServerEditScreen extends Screen {
-    private final BridgeScreen parent;
+    private final Screen parent;
     private final Config cfg;
     private final Config.Server editing;
     private TextFieldWidget name, address;
     private String error = "";
 
-    public ServerEditScreen(BridgeScreen parent, Config cfg, Config.Server editing) {
-        super(Text.literal(editing == null ? "Новый сервер 0.14" : "Изменить сервер"));
+    public ServerEditScreen(Screen parent, Config cfg, Config.Server editing) {
+        super(Text.literal(editing == null ? "Новый сервер" : "Изменить сервер"));
         this.parent = parent; this.cfg = cfg; this.editing = editing;
     }
 
     @Override
     protected void init() {
-        int cx = width / 2;
-        name = new TextFieldWidget(textRenderer, cx - 100, 60, 200, 20, Text.literal("Название"));
+        int cx = width / 2, fw = Math.min(260, width - 40);
+        addDrawableChild(new PeStyle.Button(4, 3, 56, 20, Text.literal("Назад"), b -> close()));
+        name = new TextFieldWidget(textRenderer, cx - fw / 2 + 1, 56, fw - 2, 18, Text.literal("Название"));
         name.setMaxLength(40);
         name.setText(editing != null ? editing.name : "Сервер 0.14");
         addDrawableChild(name);
-        address = new TextFieldWidget(textRenderer, cx - 100, 100, 200, 20, Text.literal("Адрес"));
+        address = new TextFieldWidget(textRenderer, cx - fw / 2 + 1, 98, fw - 2, 18, Text.literal("Адрес"));
         address.setMaxLength(128);
         address.setPlaceholder(Text.literal("play.example.ru:19132"));
         address.setText(editing != null ? editing.host + (editing.port != 19132 ? ":" + editing.port : "") : "");
         addDrawableChild(address);
-        addDrawableChild(ButtonWidget.builder(Text.literal("Сохранить"), b -> save()).dimensions(cx - 100, 140, 98, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Отмена"), b -> close()).dimensions(cx + 2, 140, 98, 20).build());
+        addDrawableChild(new PeStyle.Button(cx - fw / 2, 132, fw, 24, Text.literal("Сохранить"), b -> save()));
         setInitialFocus(editing == null ? address : name);
     }
 
@@ -54,13 +53,18 @@ public class ServerEditScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(DrawContext ctx) { PeStyle.background(ctx, width, height, 0); }
+
+    @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        renderBackground(ctx);
-        int cx = width / 2;
-        ctx.drawCenteredTextWithShadow(textRenderer, title, cx, 20, 0xFFFFFF);
-        ctx.drawTextWithShadow(textRenderer, "Название", cx - 100, 48, 0xAAAAAA);
-        ctx.drawTextWithShadow(textRenderer, "Адрес (порт по умолчанию 19132)", cx - 100, 88, 0xAAAAAA);
-        if (!error.isEmpty()) ctx.drawCenteredTextWithShadow(textRenderer, "§c" + error, cx, 170, 0xFFFFFF);
+        PeStyle.background(ctx, width, height, delta);
+        PeStyle.bar(ctx, textRenderer, width, title.getString());
+        int cx = width / 2, fw = Math.min(260, width - 40);
+        ctx.drawTextWithShadow(textRenderer, "Название", cx - fw / 2, 44, 0xFFFFFF);
+        ctx.drawTextWithShadow(textRenderer, "Адрес (порт по умолчанию 19132)", cx - fw / 2, 86, 0xFFFFFF);
+        ctx.fill(name.getX() - 1, name.getY() - 1, name.getX() + name.getWidth() + 1, name.getY() + name.getHeight() + 1, PeStyle.BORDER);
+        ctx.fill(address.getX() - 1, address.getY() - 1, address.getX() + address.getWidth() + 1, address.getY() + address.getHeight() + 1, PeStyle.BORDER);
+        if (!error.isEmpty()) ctx.drawCenteredTextWithShadow(textRenderer, "§c" + error, cx, 166, 0xFFFFFF);
         super.render(ctx, mouseX, mouseY, delta);
     }
 

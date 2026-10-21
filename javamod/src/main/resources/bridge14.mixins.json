@@ -4,6 +4,6 @@
   "package": "com.geniiy.bridge14.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "bridge14-refmap.json",
-  "client": ["PlayerListEntryMixin"],
+  "client": ["PlayerListEntryMixin", "MinecraftClientMixin"],
   "injectors": { "defaultRequire": 1 }
 }

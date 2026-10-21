@@ -72,7 +72,7 @@ for m in range(16):
     OV[(125, m)] = None                                                # выбрасыватель = PC 158
 # невидимая лестница (неправильный meta) -> невидимый проходимый блок света (лазать по нему можно: добавлен в тег climbable)
 for m in [0, 1] + list(range(6, 16)):
-    OV[(65, m)] = ('light', {'level': '0'})
+    OV[(65, m)] = ('barrier', {})   # в 0.14 «лестница» с неверным meta — невидимый сплошной блок
 # стены без соединений: столбик (up=true), иначе стена вообще не рисуется
 OV[(139, 0)] = ('cobblestone_wall', {'up': 'true'})
 for m in range(1, 16): OV[(139, m)] = ('mossy_cobblestone_wall', {'up': 'true'})
@@ -229,9 +229,59 @@ for b in blocks:
             continue
         shp = sh[sid - b['minStateId']] if isinstance(sh, list) else sh
         if shp == FULL and n not in NOCONN and not n.endswith('leaves') and 'shulker_box' not in n: kinds[sid] = 1
+insta = bytearray(nstates)
+for b in blocks:
+    if b.get('hardness') == 0 and b['name'] not in ('air', 'cave_air', 'void_air', 'water', 'lava'):
+        for sid in range(b['minStateId'], b['maxStateId'] + 1): insta[sid] = 1
 with open(OUT + '/shapes.bin', 'wb') as f:
     f.write(struct.pack('>i', nstates)); f.write(bytes(kinds))
     f.write(struct.pack('>i', len(ranges)))
     for a, z, k in ranges: f.write(struct.pack('>iib', a, z, k))
+    f.write(struct.pack('>i', nstates)); f.write(bytes(insta))
 print('shapes: states', nstates, 'connectable blocks', len(ranges), 'full id', FULL)
 # невидимая лестница: состояние light[level=0]
+
+# ---- теги (для отдельного серверного jar, где нет реестров игры) ----
+import zipfile, glob
+jars = glob.glob('/home/claude/jbridge/cp/cp/minecraft-merged*.jar')
+if jars:
+    z = zipfile.ZipFile(jars[0])
+    regs = {
+        'minecraft:block': ('blocks', {b['name']: b['id'] for b in blocks}),
+        'minecraft:item': ('items', {i['name']: i['id'] for i in items}),
+        'minecraft:fluid': ('fluids', {'empty': 0, 'flowing_water': 1, 'water': 2, 'flowing_lava': 3, 'lava': 4}),
+        'minecraft:entity_type': ('entity_types', {e['name']: e['id'] for e in ents}),
+    }
+    def vi(v):
+        o = b''
+        v &= 0xffffffff
+        while True:
+            if v & ~0x7f: o += bytes([(v & 0x7f) | 0x80]); v >>= 7
+            else: return o + bytes([v])
+    def js(sv): bb = sv.encode(); return vi(len(bb)) + bb
+    out = vi(len(regs))
+    for reg, (folder, ids) in regs.items():
+        pre = 'data/minecraft/tags/%s/' % folder
+        raw = {}
+        for n in z.namelist():
+            if n.startswith(pre) and n.endswith('.json'):
+                raw['minecraft:' + n[len(pre):-5]] = json.loads(z.read(n))
+        done = {}
+        def res(t, stack=()):
+            if t in done: return done[t]
+            o = []
+            if t in raw and t not in stack:
+                for v in raw[t].get('values', []):
+                    i = v['id'] if isinstance(v, dict) else v
+                    if i.startswith('#'): o += [x for x in res(i[1:], stack + (t,)) if x not in o]
+                    else:
+                        k = i.replace('minecraft:', '')
+                        if k in ids and ids[k] not in o: o.append(ids[k])
+            done[t] = o
+            return o
+        for t in raw: res(t)
+        out += js(reg) + vi(len(done))
+        for t, l in done.items():
+            out += js(t) + vi(len(l)) + b''.join(vi(x) for x in l)
+    open(OUT + '/tags.bin', 'wb').write(out)
+    print('tags.bin', len(out))

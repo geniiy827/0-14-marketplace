@@ -88,6 +88,59 @@ public final class Nbt {
         b.u8(0);
     }
 
+    /** Любой разобранный compound обратно в LE с корнем "" (для NBT предмета). */
+    @SuppressWarnings("unchecked")
+    public static byte[] writeLEAny(Map<String, Object> root) {
+        Buf b = new Buf();
+        b.u8(10); wstrLE(b, "");
+        for (Map.Entry<String, Object> e : root.entrySet()) {
+            int t = typeOf(e.getValue());
+            if (t == 0) continue;
+            b.u8(t); wstrLE(b, e.getKey()); payloadOut(b, t, e.getValue());
+        }
+        b.u8(0);
+        return b.bytes();
+    }
+
+    private static int typeOf(Object v) {
+        if (v instanceof Byte) return 1; if (v instanceof Short) return 2; if (v instanceof Integer) return 3; if (v instanceof Long) return 4;
+        if (v instanceof Float) return 5; if (v instanceof Double) return 6; if (v instanceof byte[]) return 7; if (v instanceof String) return 8;
+        if (v instanceof List) return 9; if (v instanceof Map) return 10; if (v instanceof int[]) return 11;
+        return 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void payloadOut(Buf b, int t, Object v) {
+        switch (t) {
+            case 1: b.u8((Byte) v); break;
+            case 2: b.li16((Short) v); break;
+            case 3: b.li32((Integer) v); break;
+            case 4: { long l = (Long) v; b.li32((int) l); b.li32((int) (l >> 32)); break; }
+            case 5: b.li32(Float.floatToIntBits((Float) v)); break;
+            case 6: { long l = Double.doubleToLongBits((Double) v); b.li32((int) l); b.li32((int) (l >> 32)); break; }
+            case 7: { byte[] a = (byte[]) v; b.li32(a.length); b.raw(a); break; }
+            case 8: wstrLE(b, (String) v); break;
+            case 9: {
+                List<Object> l = (List<Object>) v;
+                int et = l.isEmpty() ? 1 : typeOf(l.get(0));
+                b.u8(et); b.li32(l.size());
+                for (Object o : l) payloadOut(b, et, o);
+                break;
+            }
+            case 10: {
+                for (Map.Entry<String, Object> e : ((Map<String, Object>) v).entrySet()) {
+                    int ct = typeOf(e.getValue());
+                    if (ct == 0) continue;
+                    b.u8(ct); wstrLE(b, e.getKey()); payloadOut(b, ct, e.getValue());
+                }
+                b.u8(0);
+                break;
+            }
+            case 11: { int[] a = (int[]) v; b.li32(a.length); for (int x : a) b.li32(x); break; }
+            default: break;
+        }
+    }
+
     // ---------------- запись для Java (BE, сетевой NBT 1.20.1: корень с пустым именем) ----------------
     public static final class W {
         final JBuf o = new JBuf();

@@ -11,6 +11,7 @@ public final class Shapes {
     public static final int SOLID = 1, FENCE = 2, NETHER_FENCE = 3, PANE = 4, WALL = 5, GATE = 6;
     private static byte[] kind = new byte[0];
     private static int[] rMin = new int[0], rMax = new int[0];
+    private static byte[] insta = new byte[0];
 
     public interface Lookup { int state(int x, int y, int z); }
 
@@ -23,8 +24,12 @@ public final class Shapes {
             int[] a = new int[r], b = new int[r];
             for (int i = 0; i < r; i++) { a[i] = in.readInt(); b[i] = in.readInt(); in.readByte(); }
             kind = k; rMin = a; rMax = b;
+            try { int m = in.readInt(); byte[] ib = new byte[m]; in.readFully(ib); insta = ib; } catch (Exception ignored) {}
         }
     }
+
+    /** Блок ломается мгновенно (трава, цветы, факелы…): Java тогда шлёт только «начал ломать». */
+    public static boolean instant(int state) { return state > 0 && state < insta.length && insta[state] != 0; }
 
     public static int kind(int state) { return state >= 0 && state < kind.length ? kind[state] : 0; }
 

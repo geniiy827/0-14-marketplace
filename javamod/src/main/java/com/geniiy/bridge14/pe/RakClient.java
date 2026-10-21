@@ -318,7 +318,7 @@ public final class RakClient {
                     L.log("Сервер найден: " + s);
                     try { gameProtocol = Integer.parseInt(f[2].trim()); } catch (Exception ignored) {}
                     if (gameProtocol != 0 && gameProtocol != 45 && gameProtocol != 46)
-                        L.log("Внимание: у сервера протокол " + gameProtocol + " (версия " + (f.length > 3 ? f[3] : "?") + "). Бот сделан для 0.14.0/0.14.1, попробую всё равно");
+                        L.log("Сервер: протокол " + gameProtocol + ", версия " + (f.length > 3 ? f[3] : "?"));
                 }
                 pongSeen = motd;
             } catch (Exception e) { if (pongSeen == null) { pongSeen = "?"; L.log("Сервер ответил на пинг"); } }

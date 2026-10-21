@@ -5,13 +5,14 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 
 /**
- * Надписи сервера 0.14 на экране: popup (над хотбаром) и tip (выше).
- * Серверы выводят так монеты, ранг, онлайн и т.п. — в несколько строк, обновляя каждую секунду.
+ * Надписи сервера 0.14 на экране (popup и tip) — так серверы выводят монеты, онлайн, «нельзя ломать здесь» и т.п.
+ * В 0.14 текст начинается немного выше середины низа экрана и идёт вниз; каждая строка по центру,
+ * а «боковые меню» сервер делает пробелами в начале строк — поэтому пробелы сохраняем как есть.
  */
 public final class Hud {
     private static volatile String popup = "", tip = "";
     private static volatile long popupAt, tipAt;
-    private static final long SHOW = 2600, FADE = 500;
+    private static final long SHOW = 2200, FADE = 400;
 
     private Hud() {}
 
@@ -29,13 +30,18 @@ public final class Hud {
         TextRenderer tr = mc.textRenderer;
         int w = ctx.getScaledWindowWidth(), h = ctx.getScaledWindowHeight();
         long now = System.currentTimeMillis();
-        int bottom = h - 59 - (mc.player != null && !mc.player.isCreative() ? 14 : 0);
-        String p = popup;
-        if (!p.isEmpty() && now - popupAt < SHOW) {
-            bottom = drawBlock(ctx, tr, p, w / 2, bottom, alpha(now - popupAt)) - 4;
-        } else bottom -= 8;
-        String t = tip;
-        if (!t.isEmpty() && now - tipAt < SHOW) drawBlock(ctx, tr, t, w / 2, bottom, alpha(now - tipAt));
+        int anchor = h - 72;
+        String p = popup, t = tip;
+        boolean showP = !p.isEmpty() && now - popupAt < SHOW, showT = !t.isEmpty() && now - tipAt < SHOW;
+        ctx.getMatrices().push();
+        ctx.getMatrices().translate(0, 0, 200);
+        if (showT) {
+            int lines = t.split("\n", -1).length;
+            int top = showP ? anchor - lines * 10 - 2 : anchor;
+            drawBlock(ctx, tr, t, w / 2, top, alpha(now - tipAt));
+        }
+        if (showP) drawBlock(ctx, tr, p, w / 2, anchor, alpha(now - popupAt));
+        ctx.getMatrices().pop();
     }
 
     private static int alpha(long age) {
@@ -43,18 +49,13 @@ public final class Hud {
         return left >= FADE ? 255 : (int) Math.max(8, 255 * left / FADE);
     }
 
-    /** Рисует строки снизу вверх так, чтобы последняя оказалась на bottom. Возвращает верх блока. */
-    private static int drawBlock(DrawContext ctx, TextRenderer tr, String text, int cx, int bottom, int alpha) {
-        String[] lines = text.split("\n");
-        int y = bottom - lines.length * 10;
-        int top = y;
+    private static void drawBlock(DrawContext ctx, TextRenderer tr, String text, int cx, int top, int alpha) {
         int color = (alpha << 24) | 0xFFFFFF;
-        for (String line : lines) {
+        int y = top;
+        for (String line : text.split("\n", -1)) {
             int lw = tr.getWidth(line);
-            ctx.fill(cx - lw / 2 - 2, y - 1, cx + lw / 2 + 2, y + 9, (Math.min(alpha, 0x60)) << 24);
             ctx.drawTextWithShadow(tr, line, cx - lw / 2, y, color);
             y += 10;
         }
-        return top;
     }
 }

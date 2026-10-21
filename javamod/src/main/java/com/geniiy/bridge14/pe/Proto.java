@@ -16,7 +16,8 @@ public final class Proto {
             ENTITY_EVENT = 0xa4, MOB_EFFECT = 0xa5, UPDATE_ATTRIBUTES = 0xa6, MOB_EQUIPMENT = 0xa7, MOB_ARMOR_EQUIPMENT = 0xa8, INTERACT = 0xa9, USE_ITEM = 0xaa, PLAYER_ACTION = 0xab,
             SET_ENTITY_DATA = 0xad, SET_ENTITY_MOTION = 0xae, SET_HEALTH = 0xb0, SET_SPAWN_POSITION = 0xb1,
             ANIMATE = 0xb2, RESPAWN = 0xb3, DROP_ITEM = 0xb4, CONTAINER_OPEN = 0xb5, CONTAINER_CLOSE = 0xb6,
-            CONTAINER_SET_SLOT = 0xb7, CONTAINER_SET_DATA = 0xb8, CONTAINER_SET_CONTENT = 0xb9, ADVENTURE_SETTINGS = 0xbc, BLOCK_ENTITY_DATA = 0xbd,
+            CONTAINER_SET_SLOT = 0xb7, CONTAINER_SET_DATA = 0xb8, CONTAINER_SET_CONTENT = 0xb9, CRAFTING_DATA = 0xba, CRAFTING_EVENT = 0xbb, ADVENTURE_SETTINGS = 0xbc, BLOCK_ENTITY_DATA = 0xbd,
+            ADD_PAINTING = 0xa0, SET_ENTITY_LINK = 0xaf, MAP_ITEM_DATA = 0xc6, MAP_INFO_REQUEST = 0xc7, ITEM_FRAME_DROP = 0xca,
             FULL_CHUNK_DATA = 0xbf, SET_PLAYER_GAMETYPE = 0xc2, PLAYER_LIST = 0xc3,
             REQUEST_CHUNK_RADIUS = 0xc8, CHUNK_RADIUS_UPDATE = 0xc9;
 
@@ -68,34 +69,39 @@ public final class Proto {
 
     public static byte[] interact(int action, long target) { return pk(INTERACT).u8(action).i64(target).bytes(); }
 
-    public static byte[] useItem(int x, int y, int z, int face, float fx, float fy, float fz, float px, float py, float pz, int itemId, int count, int meta) {
+    /** UseItem; с протокола 70 (0.14.3) перед предметом идёт номер слота. */
+    public static byte[] useItem(int x, int y, int z, int face, float fx, float fy, float fz, float px, float py, float pz, int[] item, int protocol, int slot) {
         Buf b = pk(USE_ITEM).i32(x).i32(y).i32(z).u8(face).f32(fx).f32(fy).f32(fz).f32(px).f32(py).f32(pz);
-        slot(b, itemId, count, meta);
+        if (protocol >= 70) b.i32(slot);
+        slot(b, item);
         return b.bytes();
     }
 
-    public static byte[] mobEquipment(long eid, int itemId, int count, int meta, int slot, int selected) {
+    public static byte[] mobEquipment(long eid, int[] item, int slot, int selected) {
         Buf b = pk(MOB_EQUIPMENT).i64(eid);
-        slot(b, itemId, count, meta);
+        slot(b, item);
         return b.u8(slot).u8(selected).bytes();
     }
 
-    static void slot(Buf b, int id, int count, int meta) {
-        if (id == 0) { b.i16(0); return; }
-        b.i16(id).u8(count).i16(meta).li16(0);
+    /** Предмет: {id, count, meta, ref NBT}. */
+    public static void slot(Buf b, int[] it) {
+        if (it == null || it[0] == 0 || it[1] <= 0) { b.i16(0); return; }
+        b.i16(it[0]).u8(it[1]).i16(it[2]);
+        byte[] nbt = it.length > 3 ? com.geniiy.bridge14.proxy.ItemNbt.get(it[3]) : null;
+        if (nbt == null) b.li16(0); else { b.li16(nbt.length); b.raw(nbt); }
     }
 
     public static byte[] entityEvent(long eid, int event) { return pk(ENTITY_EVENT).i64(eid).u8(event).bytes(); }
 
-    public static byte[] dropItem(int itemId, int count, int meta) {
+    public static byte[] dropItem(int[] item) {
         Buf b = pk(DROP_ITEM).u8(0);
-        slot(b, itemId, count, meta);
+        slot(b, item);
         return b.bytes();
     }
 
-    public static byte[] containerSetSlot(int window, int slot, int itemId, int count, int meta) {
-        Buf b = pk(CONTAINER_SET_SLOT).u8(window).i16(slot).i16(0);
-        slot(b, itemId, count, meta);
+    public static byte[] containerSetSlot(int window, int slot, int hotbarSlot, int[] item) {
+        Buf b = pk(CONTAINER_SET_SLOT).u8(window).i16(slot).i16(hotbarSlot);
+        slot(b, item);
         return b.bytes();
     }
 
@@ -105,18 +111,37 @@ public final class Proto {
         return pk(BLOCK_ENTITY_DATA).i32(x).i32(y).i32(z).raw(leNbt).bytes();
     }
 
+    /** Крафт: 9 клеток сетки 3×3 (y*3+x) и результат. */
+    public static byte[] craftingEvent(int window, int type, UUID recipe, int[][] input, int[] output) {
+        Buf b = pk(CRAFTING_EVENT).u8(window).i32(type).i64(recipe.getMostSignificantBits()).i64(recipe.getLeastSignificantBits());
+        b.i32(input.length);
+        for (int[] it : input) slot(b, it);
+        b.i32(1);
+        slot(b, output);
+        return b.bytes();
+    }
+
+    public static byte[] mapInfoRequest(long mapId) { return pk(MAP_INFO_REQUEST).i64(mapId).bytes(); }
+
+    public static byte[] itemFrameDrop(int x, int y, int z, int[] item) {
+        Buf b = pk(ITEM_FRAME_DROP).i32(x).i32(y).i32(z);
+        slot(b, item);
+        return b.bytes();
+    }
+
     public static byte[] respawn(float x, float y, float z) { return pk(RESPAWN).f32(x).f32(y).f32(z).bytes(); }
 
     // ---------------- разбор ----------------
-    /** Читает предмет (slot). Возвращает {id, count, meta}. */
+    /** Читает предмет (slot). Возвращает {id, count, meta, ref NBT}. */
     public static int[] readSlot(Buf b) {
         int id = b.s16();
-        if (id <= 0) return new int[]{0, 0, 0};
+        if (id <= 0) return new int[]{0, 0, 0, 0};
         int cnt = b.u8();
         int meta = b.s16();
         int nbt = b.lu16();
-        if (nbt > 0) b.skip(nbt);
-        return new int[]{id, cnt, meta};
+        int ref = 0;
+        if (nbt > 0) ref = com.geniiy.bridge14.proxy.ItemNbt.ref(b.take(nbt));
+        return new int[]{id, cnt, meta, ref};
     }
 
     /** Пропускает метаданные сущности, вытаскивая имя (nametag), если есть. */
