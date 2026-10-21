@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -98,7 +99,7 @@ public final class Session {
 
     // состояние мира
     private long selfEid = -1;
-    private int gamemode, advFlags, sentGm = -1;
+    private int gamemode, advFlags;
     private double x, y, z; private float yaw, pitch;
     private int health = 20, food = 20; private float saturation = 5, xpBar; private int xpLevel;
     private boolean dead;
@@ -607,16 +608,33 @@ public final class Session {
         return c != null && c.received >= tpStart - 2000;
     }
 
+    /**
+     * Дальний телепорт (часто — переход в другой мир сервера). Раньше тут был respawn в «другой мир» Java,
+     * но тогда Java показывает экран загрузки мира и иногда на нём застревает. Теперь просто выгружаем старые чанки,
+     * переносим центр обзора, отдаём новые чанки и ставим игрока на место — без экрана загрузки.
+     */
     private void finishTeleport() {
         if (!tpPending) return;
         tpPending = false;
         long cutoff = tpStart - 2000;
-        Iterator<Map.Entry<Long, ChunkConv.Chunk>> it = chunks.entrySet().iterator();
-        while (it.hasNext()) { Map.Entry<Long, ChunkConv.Chunk> e = it.next(); if (e.getValue().received < cutoff) { dropFramesIn(e.getKey(), false); it.remove(); } }
-        worldB = !worldB;
-        send(C_RESPAWN, respawnPacket());
         x = tpX; y = tpY; z = tpZ; yaw = tpYaw; pitch = tpPitch;
-        afterWorldReset(true);
+        Iterator<Map.Entry<Long, ChunkConv.Chunk>> it = chunks.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Long, ChunkConv.Chunk> e = it.next();
+            if (e.getValue().received >= cutoff) continue;
+            long k = e.getKey();
+            dropFramesIn(k, true);
+            it.remove();
+            send(C_UNLOAD, new JBuf().i32((int) (k >> 32)).i32((int) k));
+        }
+        lastCx = (int) Math.floor(x) >> 4; lastCz = (int) Math.floor(z) >> 4;
+        send(C_VIEW_POS, new JBuf().varint(lastCx).varint(lastCz));
+        // сначала ближние чанки
+        List<Map.Entry<Long, ChunkConv.Chunk>> list = new ArrayList<>(chunks.entrySet());
+        list.sort(Comparator.comparingLong(e -> { int cx = (int) (e.getKey() >> 32), cz = (int) (long) e.getKey(); return (long) (cx - lastCx) * (cx - lastCx) + (long) (cz - lastCz) * (cz - lastCz); }));
+        for (Map.Entry<Long, ChunkConv.Chunk> c : list) sendChunk(c.getKey(), c.getValue());
+        for (Frame f : frames.values()) spawnFrame(f);
+        sendPosition();
         L.log("Переход: " + (int) x + " " + (int) y + " " + (int) z);
     }
 
@@ -820,7 +838,7 @@ public final class Session {
             }
             case Proto.SET_TIME: { time = b.i32(); if (joined) sendTime(); break; }
             case Proto.SET_SPAWN_POSITION: { spawnX = b.i32(); spawnY = b.i32(); spawnZ = b.i32(); if (joined) sendSpawn(); break; }
-            case Proto.ADVENTURE_SETTINGS: { advFlags = b.i32(); if (joined) { updateGm(); sendAbilities(); } break; }
+            case Proto.ADVENTURE_SETTINGS: { advFlags = b.i32(); if (joined) sendAbilities(); break; }
             case Proto.CRAFTING_DATA: { crafting.parse(b); L.log("Рецептов с сервера: " + crafting.size()); if (joined) sendRecipes(); break; }
             case Proto.SET_ENTITY_LINK: {
                 long from = b.i64(), to = b.i64(); int type = b.u8();
@@ -1079,7 +1097,7 @@ public final class Session {
             }
             case Proto.SET_PLAYER_GAMETYPE: {
                 gamemode = b.i32();
-                if (joined) { updateGm(); sendAbilities(); }
+                if (joined) { send(C_GAME_EVENT, new JBuf().u8(3).f32(gamemode)); sendAbilities(); }
                 break;
             }
             case Proto.PLAYER_LIST: {
@@ -1336,6 +1354,21 @@ public final class Session {
 
     // ======================= рамки и карты =======================
     private static int javaFrameDir(int meta) { return new int[]{5, 4, 3, 2}[meta & 3]; }
+    /** Рамка должна висеть на блоке: если сзади воздух, а с другой стороны есть блок — разворачиваем к нему спиной. */
+    private int attachedDir(int bx, int by, int bz, int dir) {
+        if (behindSolid(bx, by, bz, dir)) return dir;
+        int[] order = {dir ^ 1, 2, 3, 4, 5};   // сначала противоположная сторона (2<->3, 4<->5)
+        for (int d : order) if (d != dir && behindSolid(bx, by, bz, d)) return d;
+        return dir;
+    }
+
+    private boolean behindSolid(int bx, int by, int bz, int dir) {
+        int dx = dir == 4 ? 1 : dir == 5 ? -1 : 0, dz = dir == 2 ? 1 : dir == 3 ? -1 : 0; // блок за спиной рамки
+        if (!chunks.containsKey(ck((bx + dx) >> 4, (bz + dz) >> 4))) return true;          // не знаем — не трогаем
+        int st = stateAt(bx + dx, by, bz + dz);
+        return st != 0 && !Shapes.instant(st);
+    }
+
     private static int peFrameMeta(int javaDir) { switch (javaDir) { case 5: return 0; case 4: return 1; case 3: return 2; default: return 3; } }
 
     private void scanFrames(int cx, int cz, ChunkConv.Chunk c) {
@@ -1361,7 +1394,7 @@ public final class Session {
             meta = 0;
             if (c != null) for (int m = 0; m < 4; m++) if (Tables.block(199, m) == c.state[ChunkConv.idx(bx & 15, by, bz & 15)]) meta = m;
         }
-        int dir = javaFrameDir(meta);
+        int dir = attachedDir(bx, by, bz, javaFrameDir(meta));
         int[] item = null; int rot = 0;
         if (tile != null && tile.get("Item") instanceof Map) {
             Map<String, Object> im = (Map<String, Object>) tile.get("Item");
@@ -1454,7 +1487,7 @@ public final class Session {
         send(0x02, new JBuf().uuid(selfUuid).str(nick).varint(0));
         jState = 3;
         JBuf lg = new JBuf();
-        lg.i32(1).bool(false).u8(javaGm()).u8(255); sentGm = javaGm();
+        lg.i32(1).bool(false).u8(javaGm()).u8(255);
         lg.varint(2).str(WORLD_A).str(WORLD_B);
         lg.raw(Tables.CODEC);
         lg.str("minecraft:overworld").str(WORLD_A).i64(0);
@@ -1485,30 +1518,12 @@ public final class Session {
                 .bool(true).str(chat(name)));
     }
 
-    /**
-     * Режим для Java. PocketMine шлёт клиенту 0.14 только бит «творческий» (наблюдатель = 3 → 1),
-     * а наблюдателя/приключение показывает флагами AdventureSettings: 0x100 — сквозь стены, 0x01 — мир нельзя менять.
-     */
-    private int javaGm() {
-        if (gamemode == 3 || (advFlags & 0x100) != 0) return 3;
-        if (gamemode == 2) return 2;
-        if (gamemode == 1) return 1;
-        return (advFlags & 0x01) != 0 ? 2 : 0;
-    }
-
-    private void updateGm() {
-        int g = javaGm();
-        if (g == sentGm) return;
-        sentGm = g;
-        send(C_GAME_EVENT, new JBuf().u8(3).f32(g));
-        if (selfUuid != null) send(C_PLAYER_INFO, new JBuf().u8(0x04).varint(1).uuid(selfUuid).varint(g));
-        if (g == 3 && pick != null) pick = null;
-    }
+    /** Режим для Java — как присылает сервер. */
+    private int javaGm() { return gamemode >= 0 && gamemode <= 3 ? gamemode : 0; }
 
     private void sendAbilities() {
-        int g = javaGm();
-        boolean fly = g == 1 || g == 3 || (advFlags & 0x80) != 0;
-        int flags = (g == 1 ? (0x01 | 0x08) : 0) | (g == 3 ? (0x01 | 0x02) : 0) | (fly ? 0x04 : 0);
+        boolean fly = gamemode == 1 || (advFlags & 0x80) != 0;
+        int flags = (gamemode == 1 ? (0x01 | 0x08) : 0) | (fly ? 0x04 : 0);
         send(C_ABILITIES, new JBuf().u8(flags).f32(0.05f).f32(0.1f));
     }
 
