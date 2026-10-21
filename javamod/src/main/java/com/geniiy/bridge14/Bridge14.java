@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.gui.screen.GameMenuScreen;
@@ -59,8 +60,22 @@ public class Bridge14 implements ClientModInitializer {
         KeyBinding reach = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bridge14.reach", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "key.categories.bridge14"));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (reach.wasPressed()) if (active) ReachAround.toggle();
+            ReachAround.tick(client);
             // меню паузы в стиле 0.14
             if (active && client.currentScreen instanceof GameMenuScreen && client.world != null) client.setScreen(new PePauseScreen());
+        });
+
+        // обводка клетки, куда встанет блок в мобильном режиме строительства
+        WorldRenderEvents.AFTER_ENTITIES.register(ctx -> {
+            net.minecraft.util.math.BlockPos p = ReachAround.preview;
+            if (p == null || ctx.consumers() == null) return;
+            net.minecraft.util.math.Vec3d cam = ctx.camera().getPos();
+            net.minecraft.client.util.math.MatrixStack ms = ctx.matrixStack();
+            ms.push();
+            ms.translate(-cam.x, -cam.y, -cam.z);
+            net.minecraft.client.render.WorldRenderer.drawBox(ms, ctx.consumers().getBuffer(net.minecraft.client.render.RenderLayer.getLines()),
+                    new net.minecraft.util.math.Box(p).expand(0.002), 0f, 0f, 0f, 0.4f);
+            ms.pop();
         });
 
         // В режиме 0.14 в творческом инвентаре — только то, что есть в 0.14

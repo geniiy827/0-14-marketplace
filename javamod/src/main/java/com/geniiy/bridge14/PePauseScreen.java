@@ -26,8 +26,8 @@ public class PePauseScreen extends Screen {
         addDrawableChild(new PeStyle.Button(x, y, lw, 24, Text.literal("Вернуться к игре"), b -> client.setScreen(null)));
         addDrawableChild(new PeStyle.Button(x, y + 30, lw, 24, Text.literal("Настройки"), b -> client.setScreen(new OptionsScreen(this, client.options))));
         addDrawableChild(new PeStyle.Button(x, y + 60, lw, 24, Text.literal("Выйти в главное меню"), b -> quit()));
-        addDrawableChild(new PeStyle.Button(x, y + 90, lw, 20, Text.literal(ReachAround.enabled ? "Строительство с телефона: ВКЛ" : "Строительство с телефона: ВЫКЛ"),
-                b -> { ReachAround.toggle(); b.setMessage(Text.literal(ReachAround.enabled ? "Строительство с телефона: ВКЛ" : "Строительство с телефона: ВЫКЛ")); }));
+        addDrawableChild(new PeStyle.Button(x, y + 90, lw, 20, Text.literal(ReachAround.label()),
+                b -> { ReachAround.toggle(); b.setMessage(Text.literal(ReachAround.label())); }));
     }
 
     private void quit() {

@@ -221,7 +221,8 @@ for b in blocks:
     elif n.endswith('glass_pane') or n == 'iron_bars': k = 4
     elif n.endswith('_wall') and 'wall_' not in n and not n.endswith('sign_wall'): k = 5
     elif n.endswith('_fence_gate'): k = 6
-    if k in (2, 3, 4, 5): ranges.append((b['minStateId'], b['maxStateId'], k))
+    elif n.endswith('_stairs'): k = 7
+    if k in (2, 3, 4, 5, 7): ranges.append((b['minStateId'], b['maxStateId'], k))
     sh = shapes['blocks'].get(n)
     for sid in range(b['minStateId'], b['maxStateId'] + 1):
         if k:

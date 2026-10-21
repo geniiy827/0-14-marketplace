@@ -8,7 +8,7 @@ import java.io.InputStream;
  * а Java ждёт её в самом состоянии блока — без этого стена без соединений вообще не рисуется.
  */
 public final class Shapes {
-    public static final int SOLID = 1, FENCE = 2, NETHER_FENCE = 3, PANE = 4, WALL = 5, GATE = 6;
+    public static final int SOLID = 1, FENCE = 2, NETHER_FENCE = 3, PANE = 4, WALL = 5, GATE = 6, STAIRS = 7;
     private static byte[] kind = new byte[0];
     private static int[] rMin = new int[0], rMax = new int[0];
     private static byte[] insta = new byte[0];
@@ -33,7 +33,7 @@ public final class Shapes {
 
     public static int kind(int state) { return state >= 0 && state < kind.length ? kind[state] : 0; }
 
-    public static boolean connectable(int state) { int k = kind(state); return k >= FENCE && k <= WALL; }
+    public static boolean connectable(int state) { int k = kind(state); return (k >= FENCE && k <= WALL) || k == STAIRS; }
 
     private static int base(int state) {
         int lo = 0, hi = rMin.length - 1;
@@ -56,9 +56,40 @@ public final class Shapes {
         }
     }
 
+    // ступеньки: углы (inner/outer) как в Java StairsBlock.getStairShape; facing 0 север,1 юг,2 запад,3 восток; half 0 верх
+    private static final int[][] DIR = {{0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}};
+    private static final int[] CCW = {2, 3, 1, 0}, OPP = {1, 0, 3, 2};
+    private static int sFacing(int st) { int b = base(st); return b < 0 ? -1 : (st - b) / 20; }
+    private static int sHalf(int st) { int b = base(st); return b < 0 ? -1 : ((st - b) / 10) % 2; }
+
+    private static boolean differs(int facing, int half, int x, int y, int z, int d, Lookup w) {
+        int n = w.state(x + DIR[d][0], y, z + DIR[d][2]);
+        return kind(n) != STAIRS || sFacing(n) != facing || sHalf(n) != half;
+    }
+
+    private static int stairs(int st, int x, int y, int z, Lookup w) {
+        int b = base(st);
+        if (b < 0) return st;
+        int off = st - b, wl = off % 2, half = (off / 10) % 2, f = off / 20;
+        int shape = 0;
+        int front = w.state(x + DIR[f][0], y, z + DIR[f][2]);
+        int back = w.state(x - DIR[f][0], y, z - DIR[f][2]);
+        boolean done = false;
+        if (kind(front) == STAIRS && sHalf(front) == half) {
+            int d2 = sFacing(front);
+            if ((d2 < 2) != (f < 2) && differs(f, half, x, y, z, OPP[d2], w)) { shape = d2 == CCW[f] ? 3 : 4; done = true; }
+        }
+        if (!done && kind(back) == STAIRS && sHalf(back) == half) {
+            int d3 = sFacing(back);
+            if ((d3 < 2) != (f < 2) && differs(f, half, x, y, z, d3, w)) shape = d3 == CCW[f] ? 1 : 2;
+        }
+        return b + ((f * 2 + half) * 5 + shape) * 2 + wl;
+    }
+
     /** Правильное состояние для блока в (x,y,z) с учётом соседей; если блок не соединяемый — без изменений. */
     public static int fix(int state, int x, int y, int z, Lookup w) {
         int k = kind(state);
+        if (k == STAIRS) return stairs(state, x, y, z, w);
         if (k < FENCE || k > WALL) return state;
         int b = base(state);
         if (b < 0) return state;

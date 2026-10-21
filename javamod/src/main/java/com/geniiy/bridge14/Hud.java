@@ -30,19 +30,23 @@ public final class Hud {
         TextRenderer tr = mc.textRenderer;
         int w = ctx.getScaledWindowWidth(), h = ctx.getScaledWindowHeight();
         long now = System.currentTimeMillis();
-        int anchor = h - 72;
         String p = popup, t = tip;
         boolean showP = !p.isEmpty() && now - popupAt < SHOW, showT = !t.isEmpty() && now - tipAt < SHOW;
         ctx.getMatrices().push();
         ctx.getMatrices().translate(0, 0, 200);
+        int topP = h;
+        if (showP) { topP = top(h, p.split("\n", -1).length); drawBlock(ctx, tr, p, w / 2, topP, alpha(now - popupAt)); }
         if (showT) {
             int lines = t.split("\n", -1).length;
-            int top = showP ? anchor - lines * 10 - 2 : anchor;
-            drawBlock(ctx, tr, t, w / 2, top, alpha(now - tipAt));
+            int topT = top(h, lines);
+            if (showP && topT + lines * 10 > topP) topT = topP - lines * 10 - 2;
+            drawBlock(ctx, tr, t, w / 2, topT, alpha(now - tipAt));
         }
-        if (showP) drawBlock(ctx, tr, p, w / 2, anchor, alpha(now - popupAt));
         ctx.getMatrices().pop();
     }
+
+    /** Короткий текст — чуть выше хотбара (как в 0.14); длинный («меню» сервера) — целиком над сердечками, не заходя на хотбар. */
+    private static int top(int h, int lines) { return Math.min(h - 72, h - 52 - lines * 10); }
 
     private static int alpha(long age) {
         long left = SHOW - age;

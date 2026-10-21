@@ -50,6 +50,8 @@ public final class Session {
         public java.util.function.Supplier<byte[]> tags;
         /** Текст для списка серверов Java (только для отдельного сервера). */
         public String motd = "Сервер 0.14";
+        /** Мир с телефона: отдаём скин 64×32 (иначе телефон-хост может не показать игрока). */
+        public boolean skin32;
     }
 
     // ---- Java пакеты (1.20.1, протокол 763) ----
@@ -152,6 +154,7 @@ public final class Session {
     private final Set<Long> mapRequested = new HashSet<>();
     private final Map<Integer, byte[]> mapPackets = new HashMap<>();
     private int nextMapId = 1;
+    private int holoLogged, mapLogged;
 
     static final class Ent {
         long pe; int jid, jtype; boolean player; UUID uuid; String name = "";
@@ -190,7 +193,7 @@ public final class Session {
         RakClient r = rak; rak = null;
         if (r != null) r.close("Выход");
         if (!peStats.isEmpty()) {
-            StringBuilder sb = new StringBuilder("Пакеты 0.14 за сессию:");
+            StringBuilder sb = new StringBuilder("Отправлено движений: " + movesSent + ". Пакеты 0.14 за сессию:");
             for (Map.Entry<Integer, Integer> e : peStats.entrySet()) sb.append(String.format(" %02x×%d", e.getKey(), e.getValue()));
             L.log(sb.toString());
         }
@@ -241,7 +244,7 @@ public final class Session {
             }
             synchronized (this) {
                 if (tpPending && now - tpStart > 4000) finishTeleport();
-                if (awaitTp >= 0 && now - awaitTpSince > 3000) awaitTp = -1;
+                if (awaitTp >= 0 && now - awaitTpSince > 1000) awaitTp = -1;
                 if (pendingSign != null && now - pendingSignAt > 3000) pendingSign = null;
                 for (Iterator<Later> it = later.iterator(); it.hasNext(); ) { Later l = it.next(); if (l.at <= now) { it.remove(); l.r.run(); } }
                 flushAcks(now);
@@ -365,6 +368,7 @@ public final class Session {
                 int[] it = heldItem();
                 int target = peIdAt(p[0], p[1], p[2]);
                 peSend(Proto.useItem(p[0], p[1], p[2], face, cx, cy, cz, (float) x, (float) (y + 1.62), (float) z, it, peProtocol, held));
+                lastUseAt = System.currentTimeMillis();
                 int[] d = FACE[Math.min(5, Math.max(0, face))];
                 if (it[0] == 323) { // табличка: откроем редактор, когда сервер её поставит
                     pendingSign = new int[]{p[0] + d[0], p[1] + d[1], p[2] + d[2]};
@@ -386,7 +390,7 @@ public final class Session {
                 if (fr != null) {
                     if (mouse == 1) peSend(Proto.itemFrameDrop(fr.x, fr.y, fr.z, fr.item == null ? empty() : fr.item));
                     else if (mouse == 0) {
-                        int face = new int[]{3, 2, 5, 4}[Math.max(0, Math.min(3, peFrameMeta(fr.dir)))];
+                        int face = new int[]{5, 4, 3, 2}[Math.max(0, Math.min(3, peFrameMeta(fr.dir)))];
                         peSend(Proto.useItem(fr.x, fr.y, fr.z, face, 0.5f, 0.5f, 0.5f, (float) x, (float) (y + 1.62), (float) z, heldItem(), peProtocol, held));
                     }
                     break;
@@ -500,7 +504,10 @@ public final class Session {
         if (!changed && now - lastMoveSent < 1000) return;
         lastMoveSent = now; sentX = x; sentY = y; sentZ = z; sentYaw = yaw; sentPitch = pitch;
         peSend(Proto.movePlayer(selfEid, (float) x, (float) (y + 1.62), (float) z, yaw, yaw, pitch, 0, onGround));
+        movesSent++;
     }
+
+    private int movesSent; private long lastUseAt;
 
     /** Сервер прислал нам нашу же позицию. mode 1 — телепорт; mode 0 — обычно эхо (так делает мир, открытый на телефоне). */
     private void serverMove(double nx, double ny, double nz, float nyaw, float npitch, int mode) {
@@ -644,6 +651,7 @@ public final class Session {
         L.log("Протокол сервера " + serverProtocol + ", входим с " + peProtocol);
         peSelfUuid = UUID.nameUUIDFromBytes(("Bridge:" + peNick()).getBytes());
         byte[] skin = cfg.skin != null ? cfg.skin : DefaultSkin.make();
+        if (cfg.skin32 && skin.length == 16384) skin = java.util.Arrays.copyOf(skin, 8192);
         if (r != null) r.send(Proto.login(peProtocol, peNick(), rnd.nextLong(), peSelfUuid, cfg.host + ":" + cfg.port, skin,
                 cfg.slim ? "Standard_CustomSlim" : "Standard_Custom"));
     }
@@ -688,7 +696,7 @@ public final class Session {
 
     static long ck(int cx, int cz) { return ((long) cx << 32) ^ (cz & 0xffffffffL); }
 
-    private boolean isSelf(long e) { return e == selfEid || e == 0; }
+    private boolean isSelf(long e) { return e == selfEid || (e == 0 && !ents.containsKey(0L)); }
 
     private int jid(long pe) {
         if (isSelf(pe)) return 1;
@@ -816,6 +824,7 @@ public final class Session {
                 } else {
                     Ent en = ents.get(e);
                     if (en == null) break;
+                    if (en.hologram && Math.abs(px - en.x) + Math.abs(pz - en.z) < 2) break; // текст стоит на месте
                     en.x = px; en.y = py - en.eye + holoLift(en); en.z = pz; en.yaw = pyaw; en.pitch = pp;
                     if (joined) teleport(en);
                 }
@@ -833,7 +842,7 @@ public final class Session {
                 b.f32(); b.f32(); b.f32();
                 en.yaw = b.f32(); b.f32(); en.pitch = b.f32();
                 try { int[] hand = Proto.readSlot(b); en.gear = new int[5][]; en.gear[0] = hand; applyMeta(en, readMeta(b), false); } catch (Exception ignored) {}
-                if (en.hologram) { en.jtype = TEXT_DISPLAY_TYPE; en.uuid = UUID.randomUUID(); en.y += holoLift(en); }
+                if (en.hologram) { en.jtype = TEXT_DISPLAY_TYPE; en.uuid = UUID.randomUUID(); en.y += holoLift(en); if (holoLogged++ < 5) L.log("Плавающий текст (игрок) в " + en.x + " " + en.y + " " + en.z); }
                 en.jid = nextJavaId++;
                 addEnt(en);
                 break;
@@ -851,6 +860,7 @@ public final class Session {
                 if (en.hologram) {
                     en.jtype = TEXT_DISPLAY_TYPE;
                     en.y += holoLift(en);
+                    if (holoLogged++ < 5) L.log("Плавающий текст: тип " + type + " в " + en.x + " " + en.y + " " + en.z);
                 } else {
                     int jt = Tables.entity(type);
                     if (jt < 0) break;
@@ -901,6 +911,7 @@ public final class Session {
                     float px = b.f32(), py = b.f32(), pz = b.f32(), pyaw = b.f32(), hy = b.f32(), pp = b.f32();
                     Ent en = ents.get(e);
                     if (en == null) continue;
+                    if (en.hologram && Math.abs(px - en.x) + Math.abs(pz - en.z) < 2) continue;
                     en.x = px; en.y = py - en.eye + holoLift(en); en.z = pz; en.yaw = pyaw; en.pitch = pp;
                     if (joined) teleport(en);
                 }
@@ -1078,6 +1089,8 @@ public final class Session {
             case Proto.MOB_EQUIPMENT: {
                 long e = b.i64(); int[] it = Proto.readSlot(b); int slot = b.u8(), sel = b.u8();
                 if (isSelf(e)) {
+                    if (System.currentTimeMillis() - lastUseAt < 500)
+                        L.log("Сервер вернул предмет в руке после установки блока: в руке у сервера " + it[0] + ":" + it[2] + " x" + it[1] + ", у моста " + heldItem()[0] + ":" + heldItem()[2] + " x" + heldItem()[1] + " (слот " + slot + "/" + sel + ")");
                     if (sel < 9) {
                         held = sel;
                         if (slot >= 9 && slot - 9 < 36) hotbar[sel] = slot - 9;
@@ -1133,7 +1146,7 @@ public final class Session {
     private static float holoLift(Ent e) {
         if (!e.hologram) return 0;
         if (e.peType == 64) return 0.75f;
-        return e.height + 0.25f;
+        return 0.5f;
     }
 
     private static int paintingVariant(String t) {
@@ -1225,8 +1238,8 @@ public final class Session {
     }
 
     // ======================= рамки и карты =======================
-    private static int javaFrameDir(int meta) { return new int[]{3, 2, 4, 5}[meta & 3]; }
-    private static int peFrameMeta(int javaDir) { switch (javaDir) { case 3: return 0; case 2: return 1; case 4: return 2; default: return 3; } }
+    private static int javaFrameDir(int meta) { return new int[]{5, 4, 3, 2}[meta & 3]; }
+    private static int peFrameMeta(int javaDir) { switch (javaDir) { case 5: return 0; case 4: return 1; case 3: return 2; default: return 3; } }
 
     private void scanFrames(int cx, int cz, ChunkConv.Chunk c) {
         for (int i = 0; i < 32768; i++) {
@@ -1310,6 +1323,11 @@ public final class Session {
     }
 
     private void mapData(Buf b) {
+        if (mapLogged++ < 3) {
+            StringBuilder hx = new StringBuilder();
+            for (int i = b.pos; i < Math.min(b.len, b.pos + 48); i++) hx.append(String.format("%02x", b.b[i]));
+            L.log("Карта 0.14 (" + b.left() + " байт): " + hx);
+        }
         long peMap = b.i64();
         int upd = b.i32();
         b.skip(6); b.skip(3);
@@ -1465,6 +1483,8 @@ public final class Session {
     }
 
     private void holoMeta(JBuf m, String text) {
+        int lines = text.split("\n", -1).length;
+        m.u8(10).varint(26).f32(0).f32(-(lines - 1) * 0.25f).f32(0); // первая строка — в точке подписи, остальные ниже (как в 0.14)
         m.u8(14).varint(0).u8(3);                       // всегда лицом к камере
         m.u8(19).varint(3).f32(4f);                     // размеры для отсечения (иначе текст пропадает у края экрана)
         m.u8(20).varint(3).f32(3f);
@@ -1476,7 +1496,7 @@ public final class Session {
     private void sendMeta(Ent e) {
         if (e.hologram) {
             JBuf m = new JBuf().varint(e.jid);
-            m.u8(22).varint(5).str(chat(e.nametag));
+            holoMeta(m, e.nametag);
             m.u8(0xff);
             send(C_METADATA, m);
             return;
@@ -1519,8 +1539,8 @@ public final class Session {
             send(C_PASSENGERS, new JBuf().varint(e.jid).varint(1).varint(e.labelJid));
         }
         JBuf m = new JBuf().varint(e.labelJid);
-        m.u8(10).varint(26).f32(0).f32(0.75f).f32(0);
         holoMeta(m, e.nametag);
+        m.u8(10).varint(26).f32(0).f32(0.75f).f32(0);
         m.u8(0xff);
         send(C_METADATA, m);
     }
@@ -1848,7 +1868,7 @@ public final class Session {
             return;
         }
         // за край окна с предметом на курсоре
-        if (slot == -999 && (mode == 0 || mode == 5)) {
+        if (slot == -999 && mode == 0) {
             if (!isEmpty(cursorBefore)) {
                 int[] it = cursorBefore;
                 jCursor = jcur == null ? null : toPe(jcur, known);
@@ -1858,13 +1878,6 @@ public final class Session {
             sendWindow(win);
             return;
         }
-        // «тап» по предмету в сундуке, как на телефоне: сразу в инвентарь (магазины в мини-играх ждут именно этого)
-        if (win != 0 && !isCraftWindow(win) && (mode == 0 || mode == 1) && slot >= 0 && slot < javaContainerSize() && isEmpty(cursorBefore)) {
-            int[] ps = peOf(win, slot);
-            int[] it = truthAt(ps);
-            if (ps != null && !isEmpty(it)) { tapFromContainer(win, ps, it); return; }
-        }
-
         for (int i = 0; i < n; i++) {
             int j = slots[i];
             int[] pe = toPe(items[i], known);

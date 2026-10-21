@@ -216,6 +216,7 @@ public class BridgeScreen extends Screen {
         Session.Config sc = new Session.Config();
         sc.nick = nick; sc.host = r.host; sc.port = r.port; sc.chunkRadius = cfg.chunkRadius; sc.slim = cfg.slim;
         sc.tags = TagsBuilder::build;
+        sc.skin32 = r.lan;
         File sf = cfg.skinFile();
         if (sf != null) sc.skin = Proxy.loadSkin(sf);
         try {
