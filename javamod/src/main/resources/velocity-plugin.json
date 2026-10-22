@@ -1,0 +1,1 @@
+{"id":"bridge0_14","name":"Bridge0_14","version":"1.5.0","description":"Java/Bedrock players on an MCPE 0.14 server (bridge as a Velocity backend)","authors":["geniiy"],"dependencies":[{"id":"geyser","optional":true},{"id":"viaversion","optional":true}],"main":"com.geniiy.bridge14.server.VelocityPlugin"}

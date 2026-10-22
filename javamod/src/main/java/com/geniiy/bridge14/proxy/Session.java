@@ -53,6 +53,27 @@ public final class Session {
         public String motd = "Сервер 0.14";
         /** Мир с телефона: отдаём скин 64×32 (иначе телефон-хост может не показать игрока). */
         public boolean skin32;
+        /** Отдельный сервер / плагин: брать UUID из входа клиента (как у прокси), а не придумывать свой. */
+        public boolean useClientUuid;
+        /** Спросить у прокси (Velocity modern forwarding) настоящие данные игрока: UUID, свойства (скин). */
+        public boolean askProxyInfo;
+        /** Ключ Velocity (forwarding.secret) для проверки подписи; null — не проверять. */
+        public byte[] forwardingSecret;
+        /** Откуда взять скин игрока (например, Bedrock-скин из Geyser); null — только textures/файл. */
+        public SkinSource skins;
+        /** Подробный журнал пакетов от Java (для поиска ошибок). */
+        public boolean debug;
+    }
+
+    /** Скин RGBA 64×64 / 64×32 для сервера 0.14. */
+    public static final class Skin {
+        public final byte[] rgba; public final boolean slim; public final String from;
+        public Skin(byte[] rgba, boolean slim, String from) { this.rgba = rgba; this.slim = slim; this.from = from; }
+    }
+
+    public interface SkinSource {
+        /** name — ник на входе, uuid — UUID игрока (может быть null), props — свойства профиля [имя, значение, подпись]. */
+        Skin find(String name, UUID uuid, List<String[]> props);
     }
 
     // ---- Java пакеты (1.20.1, протокол 763) ----
@@ -96,6 +117,11 @@ public final class Session {
     private boolean peSpawned, joined;
     private String javaName;
     private UUID selfUuid, peSelfUuid;
+    // данные от прокси (Velocity/Bungee): UUID и свойства профиля (textures) — для скина
+    private UUID fwdUuid; private final List<String[]> fwdProps = new ArrayList<>(); private boolean fwdWaiting;
+    private byte[] mySkin; private boolean mySlim;
+    // еда/зелья: Java сама ест 1.6 с и ждёт, что сервер доест; сервер 0.14 доедает по EntityEvent 9
+    private long eatStart; private int[] eatItem; private int eatGen;
 
     // состояние мира
     private long selfEid = -1;
@@ -325,7 +351,8 @@ public final class Session {
     private void onJava(int id, JBuf b) {
         if (jState == 0) {
             if (id == 0x00) {
-                b.varint(); b.str(); b.u16();
+                b.varint(); String host = b.str(); b.u16();
+                parseLegacyForwarding(host);
                 int next = b.varint();
                 jState = next == 1 ? 1 : 2;
             }
@@ -344,17 +371,88 @@ public final class Session {
         if (jState == 2) {
             if (id == 0x00) { // login_start
                 javaName = b.str();
-                String nick = peNick();
-                selfUuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + nick).getBytes(StandardCharsets.UTF_8));
-                L.status("Подключаюсь к серверу 0.14…");
-                startPe();
+                UUID clientUuid = null;
+                try { if (b.left() >= 17 && b.bool()) clientUuid = b.uuid(); } catch (Exception ignored) {}
+                if (cfg.useClientUuid && fwdUuid == null && clientUuid != null) fwdUuid = clientUuid;
+                if (cfg.askProxyInfo) {
+                    // Velocity modern forwarding: прокси ответит данными игрока; обычный клиент — «не понял»
+                    fwdWaiting = true;
+                    send(0x04, new JBuf().varint(0x0B14).str("velocity:player_info").u8(1));
+                    final Session me = this;
+                    Thread t = new Thread(() -> { try { Thread.sleep(5000); } catch (InterruptedException ignored) {} synchronized (me) { if (fwdWaiting) { fwdWaiting = false; continueLogin(); } } }, "j-fwd-wait");
+                    t.setDaemon(true); t.start();
+                } else continueLogin();
+            } else if (id == 0x02) { // login plugin response
+                int msg = b.varint(); boolean ok = b.bool();
+                if (msg == 0x0B14 && fwdWaiting) {
+                    fwdWaiting = false;
+                    if (ok) try { readVelocityInfo(b); } catch (Exception e) { L.log("Velocity forwarding: " + e); }
+                    continueLogin();
+                }
             }
             return;
         }
         synchronized (this) { onPlay(id, b); }
     }
 
+    private synchronized void continueLogin() {
+        if (selfUuid != null) return;
+        String nick = peNick();
+        selfUuid = cfg.useClientUuid && fwdUuid != null ? fwdUuid
+                : UUID.nameUUIDFromBytes(("OfflinePlayer:" + nick).getBytes(StandardCharsets.UTF_8));
+        L.status("Подключаюсь к серверу 0.14…");
+        // скин может потребовать скачивания — не держим поток чтения
+        Thread t = new Thread(() -> {
+            Skin sk = null;
+            try { if (cfg.skins != null) sk = cfg.skins.find(javaName, fwdUuid, fwdProps); } catch (Throwable e) { L.log("Скин: " + e); }
+            if (sk == null) try { sk = Skins.fromProperties(fwdProps); } catch (Throwable e) { L.log("Скин (textures): " + e); }
+            if (sk != null) { mySkin = sk.rgba; mySlim = sk.slim; L.log("Скин игрока " + javaName + ": " + sk.from + (sk.slim ? " (тонкие руки)" : "")); }
+            else { mySkin = cfg.skin; mySlim = cfg.slim; }
+            synchronized (Session.this) { if (alive) startPe(); }
+        }, "j-skin");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** BungeeCord/Velocity legacy: host = "адрес\0ip\0uuid\0[свойства JSON]". */
+    private void parseLegacyForwarding(String host) {
+        if (host == null || host.indexOf('\0') < 0) return;
+        String[] p = host.split("\0", -1);
+        try {
+            if (p.length > 2 && p[2].length() == 32)
+                fwdUuid = UUID.fromString(p[2].replaceFirst("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5"));
+            if (p.length > 3) fwdProps.addAll(Skins.parsePropertiesJson(p[3]));
+        } catch (Exception e) { L.log("Legacy forwarding: " + e); }
+    }
+
+    /** Ответ Velocity на velocity:player_info: подпись(32) + версия, адрес, UUID, ник, свойства. */
+    private void readVelocityInfo(JBuf b) throws Exception {
+        int start = b.pos;
+        if (b.left() < 33) return;
+        byte[] sig = new byte[32];
+        for (int i = 0; i < 32; i++) sig[i] = (byte) b.u8();
+        int dataStart = b.pos;
+        if (cfg.forwardingSecret != null) {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new javax.crypto.spec.SecretKeySpec(cfg.forwardingSecret, "HmacSHA256"));
+            mac.update(b.b, dataStart, b.len - dataStart);
+            if (!java.security.MessageDigest.isEqual(sig, mac.doFinal())) { L.log("Velocity forwarding: подпись не сошлась (forwarding.secret другой?)"); return; }
+        }
+        b.varint(); b.str();
+        fwdUuid = b.uuid();
+        String name = b.str();
+        if (name != null && !name.isEmpty()) javaName = name;
+        int n = b.varint();
+        fwdProps.clear();
+        for (int i = 0; i < n && b.left() > 0; i++) {
+            String pn = b.str(), pv = b.str(); String ps = b.bool() ? b.str() : null;
+            fwdProps.add(new String[]{pn, pv, ps});
+        }
+    }
+
     private void onPlay(int id, JBuf b) {
+        if (cfg.debug && id != S_POS && id != S_POS_LOOK && id != S_LOOK && id != S_FLYING && id != S_KEEP_ALIVE)
+            L.log("[debug] Java → 0x" + Integer.toHexString(id) + " (" + b.left() + " байт)");
         switch (id) {
             case S_TELEPORT_CONFIRM: {
                 int tid = b.varint();
@@ -395,7 +493,7 @@ public final class Session {
                         ackNow(seq);
                         break;
                     }
-                    case 5: peSend(Proto.action(selfEid, 5, 0, 0, 0, 0)); ackNow(seq); break; // отпустить (лук, еда)
+                    case 5: eatItem = null; peSend(Proto.action(selfEid, 5, 0, 0, 0, 0)); ackNow(seq); break; // отпустить (лук, еда)
                     default: ackNow(seq); break;
                 }
                 break;
@@ -424,8 +522,10 @@ public final class Session {
             }
             case S_USE_ITEM: {
                 b.varint(); int seq = b.varint();
-                sendUse(0, 0, 0, 255, 0, 0, 0, heldItem());
+                int[] it = heldItem();
+                sendUse(0, 0, 0, 255, 0, 0, 0, it);
                 ackNow(seq);
+                if (consumable(it) && gamemode != 1 && (food < 20 || alwaysEdible(it))) startEating(it);
                 break;
             }
             case S_USE_ENTITY: {
@@ -448,7 +548,7 @@ public final class Session {
             }
             case S_HELD_SLOT: {
                 int s = b.i16();
-                if (s >= 0 && s < 9) { held = s; equipHeld(); }
+                if (s >= 0 && s < 9) { held = s; eatItem = null; equipHeld(); }
                 break;
             }
             case S_CREATIVE_SLOT: { int slot = b.i16(); int[] it = b.slot(); creativeSlot(slot, it); break; }
@@ -485,6 +585,31 @@ public final class Session {
             }
             default: break;
         }
+    }
+
+    // ---------------- еда и зелья ----------------
+    private static final java.util.Set<Integer> FOOD = new java.util.HashSet<>(java.util.Arrays.asList(
+            260, 282, 297, 319, 320, 322, 349, 350, 357, 360, 363, 364, 365, 366, 367, 375, 391, 392, 393, 394, 396, 400,
+            411, 412, 413, 423, 424, 457, 459, 460, 461, 462, 463, 466));
+
+    private static boolean consumable(int[] it) {
+        if (isEmpty(it)) return false;
+        return FOOD.contains(it[0]) || it[0] == 373 || (it[0] == 325 && it[2] == 1);   // еда, зелье, ведро молока
+    }
+
+    private static boolean alwaysEdible(int[] it) { return it[0] == 322 || it[0] == 466 || it[0] == 373 || it[0] == 325; }
+
+    private void startEating(int[] it) {
+        eatItem = it.clone(); eatStart = System.currentTimeMillis();
+        final int gen = ++eatGen;
+        later(1610, () -> {
+            if (gen != eatGen || eatItem == null || dead) return;
+            int[] now = heldItem();
+            if (isEmpty(now) || now[0] != eatItem[0]) { eatItem = null; return; }
+            eatItem = null;
+            peSend(Proto.entityEvent(selfEid, 9));          // сервер 0.14: «доел» — снимет предмет и даст сытость
+            send(C_ENTITY_STATUS, new JBuf().i32(1).u8(9)); // Java: использование закончено
+        });
     }
 
     static final int[][] FACE = {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}};
@@ -741,10 +866,11 @@ public final class Session {
         if (!retried) peProtocol = serverProtocol == 45 ? 45 : Proto.PROTOCOL;
         L.log("Протокол сервера " + serverProtocol + ", входим с " + peProtocol);
         peSelfUuid = UUID.nameUUIDFromBytes(("Bridge:" + peNick()).getBytes());
-        byte[] skin = cfg.skin != null ? cfg.skin : DefaultSkin.make();
+        byte[] skin = mySkin != null ? mySkin : cfg.skin != null ? cfg.skin : DefaultSkin.make();
+        boolean slim = mySkin != null ? mySlim : cfg.slim;
         if (cfg.skin32 && skin.length == 16384) skin = java.util.Arrays.copyOf(skin, 8192);
         if (r != null) r.send(Proto.login(peProtocol, peNick(), rnd.nextLong(), peSelfUuid, cfg.host + ":" + cfg.port, skin,
-                cfg.slim ? "Standard_CustomSlim" : "Standard_Custom"));
+                slim ? "Standard_CustomSlim" : "Standard_Custom"));
     }
 
     private void peClosed(String reason) {
@@ -1506,7 +1632,10 @@ public final class Session {
                 .str(chat("")).str(chat("")).varint(0));
         joined = true;
         if (cfg.skin != null) L.skin(selfUuid, cfg.skin, cfg.slim);
-        send(C_PLAYER_INFO, new JBuf().u8(0x1D).varint(1).uuid(selfUuid).str(trim16(nick)).varint(0).varint(javaGm()).u8(1).varint(0));
+        JBuf self = new JBuf().u8(0x1D).varint(1).uuid(selfUuid).str(trim16(nick));
+        self.varint(fwdProps.size());
+        for (String[] pr : fwdProps) { self.str(pr[0]).str(pr[1]).bool(pr[2] != null); if (pr[2] != null) self.str(pr[2]); }
+        send(C_PLAYER_INFO, self.varint(javaGm()).u8(1).varint(0));
         for (Map.Entry<UUID, String> e : tabList.entrySet()) sendInfo(e.getKey(), e.getValue(), true);
         afterWorldReset(true);
         L.status("В игре: " + cfg.host + ":" + cfg.port);

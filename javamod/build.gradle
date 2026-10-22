@@ -12,7 +12,11 @@ loom {
     mixin { defaultRefmapName = "bridge14-refmap.json" }
 }
 
+// заглушки API Velocity/Guice/slf4j: только для компиляции плагина, в jar не попадают
+sourceSets { stubs { java { srcDir 'stubs' } } }
+
 dependencies {
+    compileOnly sourceSets.stubs.output
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
@@ -43,6 +47,7 @@ tasks.register('serverJar', Jar) {
         include 'com/geniiy/bridge14/proxy/**'
         include 'com/geniiy/bridge14/server/**'
         include 'bridge14/**'
+        include 'velocity-plugin.json'
     }
     manifest { attributes('Main-Class': 'com.geniiy.bridge14.server.StandaloneServer') }
     dependsOn classes
