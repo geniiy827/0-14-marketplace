@@ -12,11 +12,9 @@ loom {
     mixin { defaultRefmapName = "bridge14-refmap.json" }
 }
 
-// заглушки API Velocity/Guice/slf4j: только для компиляции плагина, в jar не попадают
-sourceSets { stubs { java { srcDir 'stubs' } } }
-
 dependencies {
-    compileOnly sourceSets.stubs.output
+    // заглушки API Velocity/Guice/slf4j (исходники в stubs/): только для компиляции плагина, в jar не попадают
+    compileOnly files('libs/velocity-stubs.jar')
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"

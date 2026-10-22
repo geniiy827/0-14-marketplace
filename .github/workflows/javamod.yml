@@ -28,7 +28,20 @@ jobs:
           gradle-version: '8.7'
 
       - name: Build mod
-        run: gradle build exportCp --no-daemon --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle build exportCp --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Publish build log on failure
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: buildlog-${{ github.run_number }}
+          name: build log ${{ github.run_number }}
+          files: javamod/build.log
+          prerelease: true
+          make_latest: false
 
       - name: Pack classpath (for development)
         run: |
