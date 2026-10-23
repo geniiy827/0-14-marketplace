@@ -50,4 +50,16 @@ tasks.register('serverJar', Jar) {
     manifest { attributes('Main-Class': 'com.geniiy.bridge14.server.StandaloneServer') }
     dependsOn classes
 }
+tasks.register('botJar', Jar) {
+    archiveFileName = 'ClaudeBot014.jar'
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    from(sourceSets.main.output) {
+        include 'com/geniiy/bridge14/pe/**'
+        include 'com/geniiy/bridge14/proxy/**'
+        include 'com/geniiy/bridge14/bot/**'
+    }
+    manifest { attributes('Main-Class': 'com.geniiy.bridge14.bot.ClaudeBot') }
+    dependsOn classes
+}
 build.dependsOn serverJar
+build.dependsOn botJar

@@ -61,6 +61,7 @@ jobs:
         run: |
           cp build/libs/Bridge0_14-*[0-9].jar Bridge0_14-1.20.1.jar
           cp build/libs/Bridge0_14-server.jar Bridge0_14-server.jar
+          cp build/libs/ClaudeBot014.jar ClaudeBot014.jar
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -70,4 +71,6 @@ jobs:
           files: |
             javamod/Bridge0_14-1.20.1.jar
             javamod/Bridge0_14-server.jar
+            javamod/ClaudeBot014.jar
+            javamod/bot/run.bat
           make_latest: false
