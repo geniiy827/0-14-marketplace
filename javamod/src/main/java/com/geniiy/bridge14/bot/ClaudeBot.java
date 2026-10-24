@@ -73,7 +73,7 @@ public final class ClaudeBot {
         if (!retried) peProtocol = serverProtocol == 45 ? 45 : Proto.PROTOCOL;
         selfUuid = UUID.nameUUIDFromBytes(("ClaudeBot:" + nick).getBytes());
         log("RakNet ок, протокол сервера " + serverProtocol + ", входим с " + peProtocol);
-        rak.send(Proto.login(peProtocol, nick, new Random().nextLong(), selfUuid, host + ":" + port, DefaultSkin.make()));
+        rak.send(Proto.login(peProtocol, nick, new Random().nextLong(), selfUuid, host + ":" + port, ClaudeSkin.make()));
     }
 
     void send(byte[] pk) { RakClient r = rak; if (r != null && spawned) r.send(pk); }
@@ -227,6 +227,11 @@ public final class ClaudeBot {
                         later(200, () -> { if (blockAt(q[0], q[1], q[2]) > 0) send(Proto.removeBlock(selfEid, q[0], q[1], q[2])); });
                     }
                     setBlock(bx, by, bz, bid, fm & 15);
+                    long[] ow = orientWait.get(key(bx, by, bz));
+                    if (ow != null && bid == (int) ow[3]) {
+                        yawLearn.computeIfAbsent(orientGroup(bid), q -> new HashMap<>()).put((int) ow[2], fm & 15);
+                        orientWait.remove(key(bx, by, bz));
+                    }
                 }
                 break;
             }
@@ -301,6 +306,9 @@ public final class ClaudeBot {
                 if (src.equalsIgnoreCase(nick)) break;
                 if (password != null && src.isEmpty() && msg.contains("не зарегистрирован")) later(500, () -> send(Proto.text(nick, "/reg " + password)));
                 event(src.isEmpty() ? "[сервер] " + msg : "<" + src + "> " + msg);
+                if (sbAuto && src.isEmpty() && msg.contains("запомни")) later(2500, () -> event("[стройка] " + snapCmd(8, 9).replaceAll("\\(выше пола.*", "")));
+                if (sbAuto && src.isEmpty() && msg.contains("Строительство началось") && !building) later(100, () -> { if (!building && !snap.isEmpty()) event("[стройка] " + command("build")); });
+                if (building && src.isEmpty() && (msg.contains("Постройка совпала") || msg.contains("наблюдател"))) { building = false; flying = false; flyY = Double.NaN; scaffold.clear(); task = "раунд окончен"; }
                 if (bp && src.isEmpty() && (msg.contains("победа остаётся") || msg.contains("Вы покинули игру") || msg.contains("наблюдатель"))) { bp = false; path = null; walkUntil = 0; task = "игра окончена"; event("[игра] конец игры — режим Block Party выключен"); }
                 break;
             }
@@ -377,7 +385,7 @@ public final class ClaudeBot {
     List<int[]> path; int pathI; int[] goal; long stuckSince; double lastProgX, lastProgZ; int replans;
     String followName; long followReplan; boolean direct;
     // SpeedBuilders: запомненная постройка
-    final Map<Long, int[]> snap = new LinkedHashMap<>(); boolean building, allowFly = true; long buildNext; int buildDone, buildFail;
+    final Map<Long, int[]> snap = new LinkedHashMap<>(); boolean building, allowFly = true, sbAuto; long buildNext; int buildDone, buildFail;
     final Map<Long, Integer> buildTries = new HashMap<>();
     boolean bp, bpFlip, sneaking, sprinting, runMode; double[] bpGo, bpCenter; int bpId = -1, bpMeta = -1; long bpPlan, bpWander; int[] bpTarget; String bpLast = "";
     int[] digAt; long digStart, digNeed, digDoneAt; boolean digRetried;
@@ -385,10 +393,10 @@ public final class ClaudeBot {
     double walkDirX, walkDirZ; long walkUntil;
     String task = "ничего";
 
-    synchronized void stopAll() { building = false; flying = false; flyY = Double.NaN; path = null; goal = null; followName = null; digAt = null; attackTarget = 0; walkUntil = 0; task = "ничего"; }
+    synchronized void stopAll() { flyWay = null; building = false; flying = false; flyY = Double.NaN; path = null; goal = null; followName = null; digAt = null; attackTarget = 0; walkUntil = 0; task = "ничего"; }
 
     // ------------------------------------------------------------ тик 20 Гц
-    long lastMoveSent; double sentX, sentY, sentZ; float sentYaw, sentPitch;
+    long lastMoveSent, lastMovedAt; double sentX, sentY, sentZ; float sentYaw, sentPitch;
 
     void tickLoop() {
         long next = now();
@@ -402,6 +410,9 @@ public final class ClaudeBot {
             else next = now();
         }
     }
+
+    /** Для офлайн-тестов. */
+    synchronized void tickForTest() { spawned = true; tick(); }
 
     void tick() {
         long t = now();
@@ -524,6 +535,7 @@ public final class ClaudeBot {
 
         boolean changed = Math.abs(x - sentX) > 1e-3 || Math.abs(y - sentY) > 1e-3 || Math.abs(z - sentZ) > 1e-3
                 || Math.abs(yaw - sentYaw) > 0.5f || Math.abs(pitch - sentPitch) > 0.5f;
+        if (Math.abs(x - sentX) > 0.02 || Math.abs(z - sentZ) > 0.02 || Math.abs(y - sentY) > 0.02) lastMovedAt = t;
         if (changed || t - lastMoveSent > 1000) {
             lastMoveSent = t; sentX = x; sentY = y; sentZ = z; sentYaw = yaw; sentPitch = pitch;
             send(Proto.movePlayer(selfEid, (float) x, (float) (y + 1.62), (float) z, yaw, yaw, pitch, 0, onGround));
@@ -550,6 +562,7 @@ public final class ClaudeBot {
         for (int[] b : snap.values()) {
             int cur = blockAt(b[0], b[1], b[2]);
             if (cur < 0) continue;
+            if (cur == b[3] && oriented(b[3]) && !needsMeta(b[3])) continue;   // поворотный уже стоит — не ломаем (запасных нет)
             if (cur != b[3] || (needsMeta(b[3]) && metaAt(b[0], b[1], b[2]) != b[4])) {
                 // пол меняем, только если нам выдали такой блок (узор на полу — часть постройки)
                 if (b[1] <= snapFloor && findItem(b[3], b[4]) < 0) continue;
@@ -558,6 +571,26 @@ public final class ClaudeBot {
         }
         return todo;
     }
+
+    static final Set<Integer> STAIRS = new HashSet<>(Arrays.asList(53, 67, 108, 109, 114, 128, 134, 135, 136, 156, 163, 164, 180, 203));
+    static final Set<Integer> AXIS = new HashSet<>(Arrays.asList(17, 162, 170, 155, 216));
+    static final Set<Integer> FACING = new HashSet<>(Arrays.asList(86, 91, 61, 62, 54, 146, 130, 23, 125, 33, 29, 65));
+    /** Блок, у которого метадата — это поворот (ставится в зависимости от взгляда/грани). */
+    static boolean oriented(int id) { return STAIRS.contains(id) || AXIS.contains(id) || FACING.contains(id); }
+    final Map<Long, Integer> orientTry = new HashMap<>();
+    final Map<Long, long[]> orientWait = new HashMap<>();   // {время, ожидаемая мета, yawIdx, id}
+    final Map<String, Map<Integer, Integer>> yawLearn = new HashMap<>();   // группа -> (поворот взгляда -> мета, которую поставил сервер)
+    static String orientGroup(int id) { return STAIRS.contains(id) ? "stairs" : (id == 86 || id == 91) ? "pumpkin" : "f" + id; }
+    int yawFor(int id, int meta, int fallback) {
+        Map<Integer, Integer> m = yawLearn.get(orientGroup(id));
+        if (m != null) {
+            for (Map.Entry<Integer, Integer> e : m.entrySet()) if ((e.getValue() & 3) == (meta & 3)) return e.getKey();
+            // угадываем по выученному сдвигу: поворот на 90° меняет мету по кругу
+            if (!m.isEmpty()) { for (int k = 0; k < 4; k++) if (!m.containsKey(k)) return k; }
+        }
+        return fallback;
+    }
+    long scaffoldSince, stuckAt; double stuckX, stuckY, stuckZ; int stuckDone; int lastYawIdx; String why = ""; final List<int[]> scaffold = new ArrayList<>(); int equippedSlot = -1; long equippedAt; boolean secondPass; double flyLastY; long flyStuckAt;   // поставили поворотный блок: {время, ожидаемая мета}
 
     static boolean needsMeta(int id) { return id == 35 || id == 159 || id == 171 || id == 95 || id == 160; }
 
@@ -590,7 +623,8 @@ public final class ClaudeBot {
     }
 
     void buildTick(long t) {
-        if (t < buildNext) return;
+        if (followFlyWay(t)) { why = "лечу по пути " + flyWayI + "/" + (flyWay == null ? 0 : flyWay.size()); return; }
+        if (t < buildNext) { why = "ждём " + (buildNext - t); return; }
         buildNext = t + 110;
         if (buildSpot == null) {
             buildSpot = chooseSpot();
@@ -599,21 +633,50 @@ public final class ClaudeBot {
                 if (fx != buildSpot[0] || fz != buildSpot[2]) {
                     List<int[]> np = findPath(buildSpot, 1);
                     path = np != null && !np.isEmpty() ? np : new ArrayList<>(Collections.singletonList(buildSpot)); pathI = 0;
-                    buildNext = t + 200; return;
+                    buildNext = t + 200; why = "иду на место " + Arrays.toString(buildSpot); return;
                 }
             } else buildSpot = new int[]{(int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z)};
         }
-        if (path != null) return;                        // ещё идём на место
+        if (path != null) { why = "ещё иду, путь " + path.size(); return; }
+        // общий детектор застревания: если долго не двигаемся и ничего не ставим — отлетаем от центра постройки
+        if (Math.abs(x - stuckX) + Math.abs(y - stuckY) + Math.abs(z - stuckZ) > 0.3 || buildDone != stuckDone) { stuckX = x; stuckY = y; stuckZ = z; stuckDone = buildDone; stuckAt = t; }
+        else if (t - stuckAt > 1800) {
+            List<int[]> td = buildTodo();
+            double cx = 0, cz = 0; for (int[] q : td) { cx += q[0] + 0.5; cz += q[2] + 0.5; }
+            cx /= Math.max(1, td.size()); cz /= Math.max(1, td.size());
+            double dx = x - cx, dz = z - cz, hd = Math.hypot(dx, dz);
+            if (hd < 0.2) { double a = Math.random() * Math.PI * 2; dx = Math.cos(a); dz = Math.sin(a); hd = 1; }
+            flying = allowFly; flyY = Double.NaN;
+            walkDirX = dx / hd; walkDirZ = dz / hd; walkUntil = t + 600; stuckAt = t;
+            buildNext = t + 600; why = "застрял, отлетаю в сторону";
+            return;
+        }
         List<int[]> todo = buildTodo();
+        if (todo.isEmpty() && !scaffold.isEmpty()) { removeScaffoldStep(t); return; }
+        if (pickupAt != null) {                              // подобрать блок от сломанной опоры
+            double d = Math.hypot(pickupAt[0] + 0.5 - x, pickupAt[2] + 0.5 - z);
+            if (t - pickupSince > 1500 || d < 0.4) pickupAt = null;
+            else { flying = allowFly; flyY = pickupAt[1]; walkDirX = (pickupAt[0] + 0.5 - x) / Math.max(d, 0.01); walkDirZ = (pickupAt[2] + 0.5 - z) / Math.max(d, 0.01); walkUntil = t + 100; why = "подбираю блок"; return; }
+        }
         if (todo.isEmpty()) { building = false; flying = false; flyY = Double.NaN; task = "построил"; event("[стройка] готово: всё совпадает с образцом"); return; }
+        // сервер не прислал подтверждение поворота — считаем, что встал как надо
+        for (Iterator<Map.Entry<Long, long[]>> it = orientWait.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<Long, long[]> e = it.next();
+            if (t - e.getValue()[0] < 700) continue;
+            it.remove();
+            int[] b = snap.get(e.getKey());
+            if (b != null && blockAt(b[0], b[1], b[2]) == b[3] && metaAt(b[0], b[1], b[2]) == (b[4] ^ 15)) setBlock(b[0], b[1], b[2], b[3], b[4]);
+        }
         boolean any = false;
-        for (int[] b : todo) if (buildTries.getOrDefault(key(b[0], b[1], b[2]), 0) <= 8) { any = true; break; }
+        for (int[] b : todo) if (buildTries.getOrDefault(key(b[0], b[1], b[2]), 0) <= (oriented(b[3]) ? 14 : 8)) { any = true; break; }
+        if (!any && !secondPass) { secondPass = true; buildTries.clear(); orientTry.clear(); buildSpot = null; why = "второй заход"; return; }
         if (!any) { building = false; flying = false; flyY = Double.NaN; task = "стройка: больше не могу"; event("[стройка] осталось " + todo.size() + " блоков, поставить не получилось"); return; }
         // сначала нижние, потом ближние
         todo.sort(Comparator.<int[]>comparingInt(b -> b[1]).thenComparingDouble(b -> dist(b[0] + 0.5, b[1] - 1, b[2] + 0.5)));
+        int[] overlapFirst = null, farFirst = null;
         for (int[] b : todo) {
             long k = key(b[0], b[1], b[2]);
-            if (buildTries.getOrDefault(k, 0) > 8) continue;
+            if (buildTries.getOrDefault(k, 0) > (oriented(b[3]) ? 14 : 8)) continue;
             int cur = blockAt(b[0], b[1], b[2]);
             if (cur > 0 && !liquid(cur)) {                      // не тот блок — ломаем
                 if (dist(b[0] + 0.5, b[1] + 0.5 - 1.62, b[2] + 0.5) > 5) { moveNear(b); return; }
@@ -626,42 +689,239 @@ public final class ClaudeBot {
             }
             // опора
             int face = -1, nx = 0, ny = 0, nz = 0;
-            int[] order = {1, 2, 3, 4, 5, 0};
-            for (int f : order) {
-                int ax = b[0] - FACE[f][0], ay = b[1] - FACE[f][1], az = b[2] - FACE[f][2];
-                int nid = blockAt(ax, ay, az);
-                if (nid > 0 && solid(nid)) { face = f; nx = ax; ny = ay; nz = az; break; }
+            int ot = orientTry.getOrDefault(k, 0);
+            List<Integer> faces = new ArrayList<>();
+            for (int f : new int[]{1, 2, 3, 4, 5, 0}) {
+                int nid = blockAt(b[0] - FACE[f][0], b[1] - FACE[f][1], b[2] - FACE[f][2]);
+                if (nid > 0 && solid(nid)) faces.add(f);
             }
-            if (face < 0) continue;                              // пока не к чему приставить
+            if (faces.isEmpty()) {                               // висит в воздухе — ставим временную опору рядом
+                if (todoHasSupportable(todo)) continue;          // сначала то, что можно поставить сразу
+                int[] sc = scaffoldFor(b);
+                if (sc == null) continue;
+                int sslot = scaffoldItem(todo);
+                if (sslot < 0) continue;
+                b = new int[]{sc[0], sc[1], sc[2], inv[sslot][0], inv[sslot][2]};
+                k = key(b[0], b[1], b[2]);
+                faces.clear();
+                for (int f : new int[]{1, 2, 3, 4, 5, 0}) {
+                    int nid = blockAt(b[0] - FACE[f][0], b[1] - FACE[f][1], b[2] - FACE[f][2]);
+                    if (nid > 0 && solid(nid)) faces.add(f);
+                }
+                if (faces.isEmpty()) continue;
+                boolean known = false; for (int[] q : scaffold) if (q[0] == sc[0] && q[1] == sc[1] && q[2] == sc[2]) known = true;
+                if (!known) scaffold.add(new int[]{sc[0], sc[1], sc[2], 0});
+                why = "ставлю опору " + sc[0] + "," + sc[1] + "," + sc[2];
+            }
+            int pick = faces.get(0);
+            if (AXIS.contains(b[3])) {                           // ось бревна/сена = ось грани, по которой кликаем
+                int axis = (b[4] >> 2) & 3;                      // 0 Y, 1 X, 2 Z
+                int[] want = axis == 0 ? new int[]{1, 0} : axis == 1 ? new int[]{4, 5} : new int[]{2, 3};
+                List<Integer> good = new ArrayList<>();
+                for (int f : faces) if (f == want[0] || f == want[1]) good.add(f);
+                List<Integer> use = good.isEmpty() ? faces : good;
+                pick = use.get(ot % use.size());
+            } else if (STAIRS.contains(b[3]) && (b[4] & 4) != 0) { // перевёрнутые ступеньки — не сверху
+                for (int f : faces) if (f != 1) { pick = f; break; }
+            }
+            face = pick; nx = b[0] - FACE[face][0]; ny = b[1] - FACE[face][1]; nz = b[2] - FACE[face][2];
             int slot = findItem(b[3], b[4]);
             if (slot < 0) { if (missing.add(b[3] + ":" + b[4])) event("[стройка] нет блока " + name(b[3]) + ":" + b[4]); buildTries.merge(k, 9, Integer::sum); continue; }
             // не ставить блок в себя (по габаритам тела, а не по клетке)
             if (x - 0.3 < b[0] + 1 && x + 0.3 > b[0] && z - 0.3 < b[2] + 1 && z + 0.3 > b[2] && y < b[1] + 1 && y + 1.8 > b[1]) {
-                int fx = (int) Math.floor(x), fz = (int) Math.floor(z);
-                if (fx == b[0] && fz == b[2]) { stepAside(b); return; }
-                double cx = fx + 0.5 - x, cz = fz + 0.5 - z;      // отойти к центру своей клетки
-                walkDirX = cx * 3; walkDirZ = cz * 3; walkUntil = t + 120;
-                return;
+                if (overlapFirst == null) overlapFirst = b;          // мешаем сами себе — сначала поставим другие
+                continue;
             }
-            if (allowFly && b[1] > Math.floor(y + 0.01) + 2) { flying = true; flyY = b[1] - 1.0; }
-            else if (flying && b[1] < flyY - 1) flyY = Math.max(b[1] - 1.0, buildSpot != null ? buildSpot[1] : b[1] - 1.0);
-            if (flying && Math.abs(y - flyY) > 0.3) return;     // ещё летим на высоту
-            if (dist(b[0] + 0.5, b[1] + 0.5 - 1.62, b[2] + 0.5) > 4.5) { moveNear(b); return; }
+            double hdist = Math.hypot(b[0] + 0.5 - x, b[2] + 0.5 - z);
+            double reach = dist(b[0] + 0.5, b[1] + 0.5 - 1.62, b[2] + 0.5);
+            if (hdist > 2.6) {                                   // в стороне: ставим, только если и так дотягиваемся
+                if (reach > 3.8) { if (farFirst == null) farFirst = b; continue; }
+            } else if (reach > 3.8) {
+                if (!allowFly) { if (farFirst == null) farFirst = b; continue; }
+                flying = true; flyY = Math.max(b[1] - 1.0, groundBelow());   // рядом по горизонтали — меняем высоту
+                if (Math.abs(y - flyY) > 0.3) {
+                    why = "лечу на " + flyY;
+                    if (Math.abs(y - flyLastY) > 0.05) { flyLastY = y; flyStuckAt = t; }
+                    else if (t - flyStuckAt > 700) { flyY = y; flyStuckAt = t; if (farFirst == null) farFirst = b; continue; }
+                    return;
+                }
+                if (dist(b[0] + 0.5, b[1] + 0.5 - 1.62, b[2] + 0.5) > 3.8) { if (farFirst == null) farFirst = b; continue; }
+            }
             path = null; walkUntil = 0;
-            if (hotbar[held] != slot) { hotbar[held] = slot; equip(); }
+            if (t - lastMovedAt < 250) { why = "жду, пока сервер увидит, где я"; return; }
+            why = "ставлю " + b[0] + "," + b[1] + "," + b[2];
+            if (hotbar[held] != slot || slot != equippedSlot || t - equippedAt > 3000) {   // взять в руку (сервер мог переключить сам)
+                int hi = -1;
+                for (int i = 0; i < 9; i++) if (hotbar[i] == slot) { hi = i; break; }
+                if (hi < 0 && slot < 9) hi = slot;
+                if (hi >= 0) { held = hi; hotbar[hi] = slot; } else hotbar[held] = slot;
+                equip(); equippedSlot = slot; equippedAt = t;
+                buildNext = t + 150; why = "беру в руку слот " + slot; return;   // дать серверу переключить
+            }
             lookAt(nx + 0.5 + FACE[face][0] * 0.5, ny + 0.5 + FACE[face][1] * 0.5, nz + 0.5 + FACE[face][2] * 0.5);
+            float clickY = 0.5f + FACE[face][1] * 0.5f;
+            if (STAIRS.contains(b[3]) || FACING.contains(b[3])) {
+                int yi = yawFor(b[3], b[4], 0);
+                yaw = yi * 90f; lastYawIdx = yi;
+                if (STAIRS.contains(b[3]) && face != 0 && face != 1) clickY = (b[4] & 4) != 0 ? 0.8f : 0.2f;
+            }
             send(Proto.movePlayer(selfEid, (float) x, (float) (y + 1.62), (float) z, yaw, yaw, pitch, 0, onGround));
             send(Proto.animate(selfEid, 1));
-            send(Proto.useItem(nx, ny, nz, face, 0.5f + FACE[face][0] * 0.5f, 0.5f + FACE[face][1] * 0.5f, 0.5f + FACE[face][2] * 0.5f,
+            send(Proto.useItem(nx, ny, nz, face, 0.5f + FACE[face][0] * 0.5f, clickY, 0.5f + FACE[face][2] * 0.5f,
                     (float) x, (float) (y + 1.62), (float) z, inv[slot], peProtocol, held));
-            setBlock(b[0], b[1], b[2], b[3], b[4]);              // оптимистично; сервер поправит
+            if (oriented(b[3])) orientTry.merge(k, 1, Integer::sum);
+            setBlock(b[0], b[1], b[2], b[3], oriented(b[3]) ? (b[4] ^ 15) : b[4]);   // оптимистично; у поворотных ждём ответ сервера
+            if (oriented(b[3])) { buildNext = t + 450; orientWait.put(k, new long[]{t, b[4], lastYawIdx, b[3]}); }
             buildTries.merge(k, 1, Integer::sum);
             buildDone++;
             return;
         }
+        // ничего не поставили: если стоят опоры — уберём их (вернём блоки), потом продолжим
+        if (farFirst == null && overlapFirst == null && !scaffold.isEmpty()) { removeScaffoldStep(t); return; }
+        // ничего не поставили: либо всё далеко, либо мешаем сами себе
+        if (farFirst != null) { moveNear(farFirst); why = "всё рядом готово, лечу к " + farFirst[0] + "," + farFirst[1] + "," + farFirst[2]; return; }
+        if (overlapFirst != null) { stepAside(overlapFirst); why = "мешаю себе, отхожу"; return; }
+    }
+
+    /** Высота ног, если стоять на земле под нами. */
+    double groundBelow() {
+        int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
+        for (int yy = (int) Math.floor(y); yy > y - 12; yy--) { int id = blockAt(bx, yy - 1, bz); if (id != 0 && (id < 0 || solid(id))) return yy; }
+        return y - 12;
+    }
+
+    List<int[]> flyWay; int flyWayI; int[] flyWayTarget;
+    int[] pickupAt; long pickupSince;
+
+    void removeScaffoldStep(long t) {
+        int[] sc = scaffold.get(0);
+        if (blockAt(sc[0], sc[1], sc[2]) <= 0) { scaffold.remove(0); scaffoldSince = 0; return; }
+        if (scaffoldSince == 0) scaffoldSince = t;
+        if (t - scaffoldSince > 4000) { scaffold.remove(0); scaffoldSince = 0; return; }   // не вышло — оставляем как есть
+        if (dist(sc[0] + 0.5, sc[1] + 0.5 - 1.62, sc[2] + 0.5) > 4.5) { moveNear(sc); why = "иду ломать опору"; return; }
+        lookAt(sc[0] + 0.5, sc[1] + 0.5, sc[2] + 0.5);
+        send(Proto.action(selfEid, Proto.ACTION_START_BREAK, sc[0], sc[1], sc[2], 1));
+        send(Proto.removeBlock(selfEid, sc[0], sc[1], sc[2]));
+        setBlock(sc[0], sc[1], sc[2], 0, 0);
+        pickupAt = new int[]{sc[0], sc[1], sc[2]}; pickupSince = t;
+        buildTries.clear(); missing.clear();               // блок вернётся — можно снова пробовать недостающее
+        buildNext = t + 300; why = "ломаю опору";
+    }
+
+    boolean airCell(int cx, int cy, int cz) { return !solidAt(cx, cy, cz) && !solidAt(cx, cy + 1, cz); }
+
+    /** Поиск пути по воздуху (BFS по клеткам, где помещается тело) к месту, откуда дотягиваемся до блока. */
+    List<int[]> flyPath(int[] b) {
+        int sx = (int) Math.floor(x), sy = (int) Math.floor(y + 0.05), sz = (int) Math.floor(z);
+        int minY = snapFloor + 1, maxY = b[1] + 4;
+        for (int[] q : snap.values()) if (q[1] > snapFloor && q[3] != 0 && Math.abs(q[0] - b[0]) < 8 && Math.abs(q[2] - b[2]) < 8) maxY = Math.max(maxY, q[1] + 2);
+        ArrayDeque<int[]> open = new ArrayDeque<>();
+        Map<Long, Long> came = new HashMap<>();
+        long start = key(sx, sy, sz);
+        came.put(start, start); open.add(new int[]{sx, sy, sz});
+        int[][] dirs = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+        int n = 0;
+        while (!open.isEmpty() && n++ < 6000) {
+            int[] c = open.poll();
+            double ex = c[0] + 0.5 - (b[0] + 0.5), ey = c[1] + 1.62 - (b[1] + 0.5), ez = c[2] + 0.5 - (b[2] + 0.5);
+            boolean overlaps = c[0] == b[0] && c[2] == b[2] && (c[1] == b[1] || c[1] + 1 == b[1]);
+            if (!overlaps && Math.sqrt(ex * ex + ey * ey + ez * ez) <= 3.4) {
+                LinkedList<int[]> out = new LinkedList<>();
+                for (long k = key(c[0], c[1], c[2]); k != start; k = came.get(k)) out.addFirst(new int[]{kx(k), ky(k), kz(k)});
+                return out;
+            }
+            for (int[] d : dirs) {
+                int nx = c[0] + d[0], ny = c[1] + d[1], nz = c[2] + d[2];
+                if (ny < minY || ny > maxY || Math.abs(nx - b[0]) > 9 || Math.abs(nz - b[2]) > 9) continue;
+                long k = key(nx, ny, nz);
+                if (came.containsKey(k) || !airCell(nx, ny, nz)) continue;
+                came.put(k, key(c[0], c[1], c[2])); open.add(new int[]{nx, ny, nz});
+            }
+        }
+        return null;
+    }
+
+    /** Следовать воздушному пути; true — ещё летим. */
+    boolean followFlyWay(long t) {
+        if (flyWay == null) return false;
+        if (flyWayI >= flyWay.size()) { flyWay = null; flyWayTarget = null; return false; }
+        int[] w = flyWay.get(flyWayI);
+        double dx = w[0] + 0.5 - x, dz = w[2] + 0.5 - z, hd = Math.hypot(dx, dz);
+        flying = true; flyY = w[1];
+        if (hd < 0.2 && Math.abs(y - w[1]) < 0.25) { flyWayI++; return true; }
+        if (hd > 0.05) { walkDirX = dx / hd * Math.min(1, hd * 2.5); walkDirZ = dz / hd * Math.min(1, hd * 2.5); walkUntil = t + 100; }
+        if (Math.abs(x - flyLastX) + Math.abs(y - flyLastY2) + Math.abs(z - flyLastZ) > 0.05) { flyLastX = x; flyLastY2 = y; flyLastZ = z; flyWayStuck = t; }
+        else if (t - flyWayStuck > 1200) { flyWay = null; flyWayTarget = null; return false; }   // упёрлись — пересчитаем
+        return true;
+    }
+    double flyLastX, flyLastY2, flyLastZ; long flyWayStuck;
+
+    boolean hasSupport(int x0, int y0, int z0) {
+        for (int f = 0; f < 6; f++) { int nid = blockAt(x0 - FACE[f][0], y0 - FACE[f][1], z0 - FACE[f][2]); if (nid > 0 && solid(nid)) return true; }
+        return false;
+    }
+
+    /** Есть ли в списке блок, который можно поставить без опоры. */
+    boolean todoHasSupportable(List<int[]> todo) {
+        for (int[] q : todo) if (blockAt(q[0], q[1], q[2]) == 0 && hasSupport(q[0], q[1], q[2]) && buildTries.getOrDefault(key(q[0], q[1], q[2]), 0) <= 8 && findItem(q[3], q[4]) >= 0) return true;
+        return false;
+    }
+
+    /** Клетка рядом с висящим блоком, куда можно поставить временную опору. */
+    int[] scaffoldFor(int[] b) {
+        int[] best = null; int bestScore = Integer.MAX_VALUE;
+        for (int f = 0; f < 6; f++) {
+            int nx = b[0] + FACE[f][0], ny = b[1] + FACE[f][1], nz = b[2] + FACE[f][2];
+            if (blockAt(nx, ny, nz) != 0) continue;
+            int[] want = snap.get(key(nx, ny, nz));
+            if (want != null && want[3] != 0) continue;              // это часть постройки, а не место для опоры
+            if (!hasSupport(nx, ny, nz)) continue;
+            int score = f == 0 ? 0 : f == 1 ? 3 : 1;                 // лучше под блоком
+            if (score < bestScore) { bestScore = score; best = new int[]{nx, ny, nz}; }
+        }
+        if (best != null) return best;
+        // рядом опереться не на что — столбик снизу: следующий пустой блок над землёй
+        for (int yy = b[1] - 1; yy >= b[1] - 8; yy--) {
+            int id = blockAt(b[0], yy, b[2]);
+            if (id < 0) return null;
+            if (id > 0 && solid(id)) {
+                int ny = yy + 1;
+                if (ny >= b[1]) return null;
+                int[] want = snap.get(key(b[0], ny, b[2]));
+                if (want != null && want[3] != 0) return null;
+                return new int[]{b[0], ny, b[2]};
+            }
+        }
+        return null;
+    }
+
+    /** Слот с лишним блоком для опоры (которого больше, чем нужно постройке). */
+    int scaffoldItem(List<int[]> todo) {
+        Map<String, Integer> need = new HashMap<>();
+        for (int[] q : todo) need.merge(q[3] + ":" + (q[4] & 15), 1, Integer::sum);
+        int fallback = -1;
+        for (int i = 0; i < 36; i++) {
+            int[] it = inv[i];
+            if (it[0] <= 0 || it[0] > 255 || it[1] <= 0 || !solid(it[0])) continue;
+            int n = need.getOrDefault(it[0] + ":" + (it[2] & 15), 0);
+            if (it[1] > n) return i;                             // сначала лишние
+            if (fallback < 0) fallback = i;                      // иначе нужный: потом сломаем опору и подберём
+        }
+        return fallback;
     }
 
     void moveNear(int[] b) {
+        if (allowFly) {                                    // в режиме стройки: путь по воздуху вокруг постройки
+            if (flyWay != null && flyWayTarget != null && flyWayTarget[0] == b[0] && flyWayTarget[1] == b[1] && flyWayTarget[2] == b[2]) return;
+            List<int[]> w = flyPath(b);
+            flying = true;
+            if (w != null && !w.isEmpty()) { flyWay = w; flyWayI = 0; flyWayTarget = b; path = null; }
+            else {                                          // пути нет — по старинке: вверх и по прямой
+                double dx = b[0] + 0.5 - x, dz = b[2] + 0.5 - z, hd = Math.max(0.01, Math.hypot(dx, dz));
+                flyY = y + 1; walkDirX = dx / hd; walkDirZ = dz / hd; walkUntil = now() + 200;
+            }
+            return;
+        }
         if (path != null) return;
         List<int[]> np = findPath(new int[]{b[0], b[1], b[2]}, 3);
         if (np != null && !np.isEmpty()) { path = np; pathI = 0; }
@@ -790,8 +1050,10 @@ public final class ClaudeBot {
             return;
         }
         if (flying) {                                   // полёт (где сервер разрешает): без гравитации
-            if (dx != 0 && !collides(x + dx, y, z)) x += dx;
-            if (dz != 0 && !collides(x, y, z + dz)) z += dz;
+            boolean blocked = false;
+            if (dx != 0) { if (!collides(x + dx, y, z)) x += dx; else blocked = true; }
+            if (dz != 0) { if (!collides(x, y, z + dz)) z += dz; else blocked = true; }
+            if (blocked && !collides(x, y + 0.35, z)) { y += 0.35; if (!Double.isNaN(flyY) && flyY < y) flyY = y; return; }   // перелетаем препятствие
             if (!Double.isNaN(flyY)) { double d = Math.max(-0.35, Math.min(0.35, flyY - y)); if (!collides(x, y + d, z)) y += d; }
             vy = 0; onGround = false;
             return;
@@ -1077,11 +1339,59 @@ public final class ClaudeBot {
                     return "тапнул по " + name(blockAt(px, py, pz)) + signText(new int[]{px, py, pz});
                 }
                 case "fly": { if (a.length > 1 && a[1].equals("off")) { flying = false; flyY = Double.NaN; return "лечу вниз"; } flying = true; flyY = a.length > 1 ? Double.parseDouble(a[1]) : y + 2; return "лечу на высоту " + flyY; }
+                case "dbg": return "building=" + building + " why=" + why + " spot=" + Arrays.toString(buildSpot) + " path=" + (path == null ? "null" : path.size() + "@" + pathI) + " walk=" + (walkUntil - now()) + " fly=" + flying + " spawned=" + spawned + " dead=" + dead + " pos=" + fmt() + " ground=" + onGround + " inside=" + collides(x, y, z);
+                case "sb": { sbAuto = a.length < 2 || !a[1].equals("off"); return sbAuto ? "SpeedBuilders: автоигра включена" : "автоигра выключена"; }
+                case "give": {   // give <id> [meta] [кол-во] [слот] — в творческом режиме взять блок
+                    int id = Integer.parseInt(a[1]), meta = a.length > 2 ? Integer.parseInt(a[2]) : 0, cnt = a.length > 3 ? Integer.parseInt(a[3]) : 64;
+                    int sl = a.length > 4 ? Integer.parseInt(a[4]) : held;
+                    int[] it = {id, cnt, meta, 0};
+                    send(Proto.containerSetSlot(0, sl, sl, it));
+                    inv[sl] = it; hotbar[sl < 9 ? sl : held] = sl;
+                    if (sl < 9) { held = sl; }
+                    equip();
+                    return "взял " + itemName(it) + " в слот " + sl;
+                }
+                case "plan": {   // plan clear | plan box x1 y1 z1 x2 y2 z2 id [meta] | plan build
+                    if (a[1].equals("clear")) { snap.clear(); return "план очищен"; }
+                    if (a[1].equals("box")) {
+                        int x1 = Integer.parseInt(a[2]), y1 = Integer.parseInt(a[3]), z1 = Integer.parseInt(a[4]), x2 = Integer.parseInt(a[5]), y2 = Integer.parseInt(a[6]), z2 = Integer.parseInt(a[7]);
+                        int id = Integer.parseInt(a[8]), meta = a.length > 9 ? Integer.parseInt(a[9]) : 0; int n = 0;
+                        for (int xx = Math.min(x1, x2); xx <= Math.max(x1, x2); xx++) for (int yy = Math.min(y1, y2); yy <= Math.max(y1, y2); yy++) for (int zz = Math.min(z1, z2); zz <= Math.max(z1, z2); zz++) { snap.put(key(xx, yy, zz), new int[]{xx, yy, zz, id, meta}); n++; }
+                        snapFloor = Math.min(snapFloor == -999 ? 999 : snapFloor, Math.min(y1, y2) - 1);
+                        return "в плане +" + n + " (всего " + snap.size() + ")";
+                    }
+                    if (a[1].equals("build")) { snapFloor = -999; for (int[] q : snap.values()) snapFloor = snapFloor == -999 ? q[1] - 1 : Math.min(snapFloor, q[1] - 1); return command("build"); }
+                    return "plan clear|box|build";
+                }
+                case "house": {  // простой домик 5x5 перед собой
+                    int fx = (int) Math.floor(x), fy = (int) Math.floor(y + 0.01), fz = (int) Math.floor(z);
+                    double yr = Math.toRadians(yaw); int dxF = (int) Math.round(-Math.sin(yr)), dzF = (int) Math.round(Math.cos(yr));
+                    int ox = fx + dxF * 3 - 2, oz = fz + dzF * 3 - 2;
+                    snap.clear(); snapFloor = fy - 1;
+                    for (int dx = 0; dx < 5; dx++) for (int dz = 0; dz < 5; dz++) for (int dy = 0; dy <= 3; dy++) {
+                        boolean edge = dx == 0 || dx == 4 || dz == 0 || dz == 4, corner = (dx == 0 || dx == 4) && (dz == 0 || dz == 4);
+                        int id = 0;
+                        if (dy == 3) id = 5;
+                        else if (corner) id = 17;
+                        else if (edge) id = (dy == 1 && (dx == 2 || dz == 2)) ? 20 : 5;
+                        int bx = ox + dx, bz = oz + dz;
+                        // дверной проём со стороны бота
+                        boolean doorSide = (dzF != 0) ? (dz == (dzF > 0 ? 0 : 4) && dx == 2) : (dx == (dxF > 0 ? 0 : 4) && dz == 2);
+                        if (doorSide && dy <= 1) id = 0;
+                        if (id != 0) snap.put(key(bx, fy + dy, bz), new int[]{bx, fy + dy, bz, id, 0});
+                    }
+                    if (gamemode == 1) {
+                        int[][] items = {{5, 64}, {17, 16}, {20, 16}};
+                        for (int i = 0; i < items.length; i++) { int[] it = {items[i][0], items[i][1], 0, 0}; send(Proto.containerSetSlot(0, i, i, it)); inv[i] = it; hotbar[i] = i; }
+                    }
+                    stopAll(); buildTries.clear(); orientTry.clear(); missing.clear(); secondPass = false; equippedSlot = -1; scaffold.clear(); scaffoldSince = 0; buildSpot = null; building = true; task = "строю домик";
+                    return "строю домик 5x5 в " + ox + " " + fy + " " + oz + ", блоков " + snap.size();
+                }
                 case "snap": return snapCmd(a.length > 1 ? Integer.parseInt(a[1]) : 5, a.length > 2 ? Integer.parseInt(a[2]) : 7);
                 case "build": {
                     if (a.length > 1 && a[1].equals("off")) { building = false; flying = false; flyY = Double.NaN; return "стройка остановлена"; }
                     if (snap.isEmpty()) return "сначала snap";
-                    stopAll(); buildTries.clear(); missing.clear(); buildDone = 0; buildSpot = null; building = true; task = "строю"; 
+                    stopAll(); buildTries.clear(); orientTry.clear(); missing.clear(); secondPass = false; equippedSlot = -1; scaffold.clear(); scaffoldSince = 0; buildDone = 0; buildSpot = null; building = true; task = "строю"; 
                     return "строю, осталось " + buildTodo().size();
                 }
                 case "todo": {
