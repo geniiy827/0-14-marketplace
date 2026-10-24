@@ -388,7 +388,7 @@ public final class ClaudeBot {
     // SpeedBuilders: запомненная постройка
     final Map<Long, int[]> snap = new LinkedHashMap<>(); boolean building, allowFly = true, sbAuto; long buildNext; int buildDone, buildFail;
     final Map<Long, Integer> buildTries = new HashMap<>();
-    boolean bp, bpFlip, sneaking, sprinting, runMode; double[] bpGo, bpCenter; int bpId = -1, bpMeta = -1; long bpPlan, bpWander, bpRoundStart, bpLen, bpJumped; int[] bpTarget; String bpLast = "";
+    boolean bp, bpFlip, sneaking, sprinting, runMode; double[] bpGo, bpCenter; int bpId = -1, bpMeta = -1; boolean bpHold; long bpPlan, bpWander, bpRoundStart, bpLen, bpJumped; int[] bpTarget; String bpLast = "";
     int[] digAt; long digStart, digNeed, digDoneAt; boolean digRetried;
     long attackTarget; long lastAttack;
     double walkDirX, walkDirZ; long walkUntil;
@@ -527,7 +527,7 @@ public final class ClaudeBot {
             double left = Math.hypot(last[0] + 0.5 - x, last[2] + 0.5 - z);
             boolean flat = true;
             for (int i = pathI; i < Math.min(path.size(), pathI + 3); i++) if (path.get(i)[1] != (int) Math.floor(y + 0.01)) flat = false;
-            if (left > 3 && flat && onGround && !blockedAhead(mx, mz) && !collides(x, y + 1.0, z)) wantJump = true;
+            if (left > 3 && flat && onGround && !bpHold && !blockedAhead(mx, mz) && !collides(x, y + 1.0, z)) wantJump = true;
             if (!onGround && left > 1.5) speed = 0.32;
         }
         // смотреть по ходу движения, если ни на что не смотрим специально
@@ -949,8 +949,8 @@ public final class ClaudeBot {
     void bpRoundEnd(long t) {
         long len = t - bpRoundStart; bpRoundStart = 0;
         if (len < 1500 || len > 30000) return;
-        // раунды становятся короче: берём новое значение, с запасом 5%
-        bpLen = (long) (len * 0.95);
+        // раунды становятся короче (на 0.1-0.6 с): следующий считаем на 0.2 с короче
+        bpLen = len - 200;
         event("[игра] раунд длился " + String.format(java.util.Locale.ROOT, "%.1f", len / 1000.0) + " с");
     }
 
@@ -984,9 +984,11 @@ public final class ClaudeBot {
         String key = id + ":" + meta;
         if (!key.equals(bpLast)) { bpLast = key; bpTarget = null; event("[игра] нужен цвет: " + COLORS[meta]); bpRoundStart = t; bpJumped = 0; }
         // не успеваю добежать: прыгаю в последний момент, чтобы быть в воздухе, когда пол исчезнет
-        if (bpLen > 0 && bpRoundStart > 0 && onGround && bpJumped == 0 && !(blockAt(fx, fy, fz) == id && metaAt(fx, fy, fz) == meta)) {
+        bpHold = false;
+        if (bpLen > 0 && bpRoundStart > 0 && bpJumped == 0 && !(blockAt(fx, fy, fz) == id && metaAt(fx, fy, fz) == meta)) {
             long left = bpRoundStart + bpLen - t;
-            if (left <= 280 && left > -150) { vy = 0.42; bpJumped = t; event("[игра] не успеваю, прыгаю (осталось " + left + " мс)"); }
+            bpHold = left > 300 && left < 900;     // перед концом не прыгаем на бегу, чтобы прыжок был готов
+            if (onGround && left <= 300 && left > -250) { vy = 0.42; bpJumped = t; event("[игра] не успеваю, прыгаю (осталось " + left + " мс)"); }
         }
         // стою на нужном?
         if (blockAt(fx, fy, fz) == id && metaAt(fx, fy, fz) == meta) {
