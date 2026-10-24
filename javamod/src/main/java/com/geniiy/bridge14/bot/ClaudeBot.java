@@ -226,6 +226,7 @@ public final class ClaudeBot {
                         final int[] q = digAt.clone();
                         later(200, () -> { if (blockAt(q[0], q[1], q[2]) > 0) send(Proto.removeBlock(selfEid, q[0], q[1], q[2])); });
                     }
+                    if (bp && bid == 0 && bpRoundStart > 0 && blockAt(bx, by, bz) == 35) bpRoundEnd(System.currentTimeMillis());
                     setBlock(bx, by, bz, bid, fm & 15);
                     long[] ow = orientWait.get(key(bx, by, bz));
                     if (ow != null && bid == (int) ow[3]) {
@@ -387,7 +388,7 @@ public final class ClaudeBot {
     // SpeedBuilders: запомненная постройка
     final Map<Long, int[]> snap = new LinkedHashMap<>(); boolean building, allowFly = true, sbAuto; long buildNext; int buildDone, buildFail;
     final Map<Long, Integer> buildTries = new HashMap<>();
-    boolean bp, bpFlip, sneaking, sprinting, runMode; double[] bpGo, bpCenter; int bpId = -1, bpMeta = -1; long bpPlan, bpWander; int[] bpTarget; String bpLast = "";
+    boolean bp, bpFlip, sneaking, sprinting, runMode; double[] bpGo, bpCenter; int bpId = -1, bpMeta = -1; long bpPlan, bpWander, bpRoundStart, bpLen, bpJumped; int[] bpTarget; String bpLast = "";
     int[] digAt; long digStart, digNeed, digDoneAt; boolean digRetried;
     long attackTarget; long lastAttack;
     double walkDirX, walkDirZ; long walkUntil;
@@ -945,6 +946,14 @@ public final class ClaudeBot {
         return false;
     }
 
+    void bpRoundEnd(long t) {
+        long len = t - bpRoundStart; bpRoundStart = 0;
+        if (len < 1500 || len > 30000) return;
+        // раунды становятся короче: берём новое значение, с запасом 5%
+        bpLen = (long) (len * 0.95);
+        event("[игра] раунд длился " + String.format(java.util.Locale.ROOT, "%.1f", len / 1000.0) + " с");
+    }
+
     void bpTick(long t) {
         boolean tnt = false;
         for (Ent e : ents.values()) if (e.type == 65 && dist(e.x, e.y, e.z) < 5) tnt = true;
@@ -956,6 +965,7 @@ public final class ClaudeBot {
         else for (int[] it : inv) if (it[0] == 35 || it[0] == 159 || it[0] == 171) { want = it; break; }
         int fx = (int) Math.floor(x), fy = (int) Math.floor(y - 0.05), fz = (int) Math.floor(z);
         if (want == null) {
+            if (bpRoundStart > 0) bpRoundEnd(t);
             bpTarget = null;
             if (!bpLast.isEmpty()) { bpLast = ""; }
             // между раундами всё время бродим (за стояние на месте бьют), не уходя с пола
@@ -972,7 +982,12 @@ public final class ClaudeBot {
         }
         int id = want[0] == 171 ? 35 : want[0], meta = want[2] & 15;
         String key = id + ":" + meta;
-        if (!key.equals(bpLast)) { bpLast = key; bpTarget = null; event("[игра] нужен цвет: " + COLORS[meta]); }
+        if (!key.equals(bpLast)) { bpLast = key; bpTarget = null; event("[игра] нужен цвет: " + COLORS[meta]); bpRoundStart = t; bpJumped = 0; }
+        // не успеваю добежать: прыгаю в последний момент, чтобы быть в воздухе, когда пол исчезнет
+        if (bpLen > 0 && bpRoundStart > 0 && onGround && bpJumped == 0 && !(blockAt(fx, fy, fz) == id && metaAt(fx, fy, fz) == meta)) {
+            long left = bpRoundStart + bpLen - t;
+            if (left <= 280 && left > -150) { vy = 0.42; bpJumped = t; event("[игра] не успеваю, прыгаю (осталось " + left + " мс)"); }
+        }
         // стою на нужном?
         if (blockAt(fx, fy, fz) == id && metaAt(fx, fy, fz) == meta) {
             path = null;
@@ -1400,7 +1415,7 @@ public final class ClaudeBot {
                     return o.toString();
                 }
                 case "run": { runMode = a.length < 2 || !a[1].equals("off"); return runMode ? "бегаю" : "хожу шагом"; }
-                case "bp": { bp = a.length < 2 || !a[1].equals("off"); stopAll(); bpCenter = new double[]{x, z}; task = bp ? "играю в Block Party" : "ничего"; return bp ? "режим Block Party включён" : "выключен"; }
+                case "bp": { bp = a.length < 2 || !a[1].equals("off"); bpLen = 0; bpRoundStart = 0; stopAll(); bpCenter = new double[]{x, z}; task = bp ? "играю в Block Party" : "ничего"; return bp ? "режим Block Party включён" : "выключен"; }
                 case "quit": { RakClient rq = rak; rakGen++; if (rq != null) rq.close("quit"); later(500, () -> System.exit(3)); return "выхожу (код 3 — перезапуск)"; }
                 case "path": {
                     if (path == null) return "пути нет";
