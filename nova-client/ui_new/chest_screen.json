@@ -1,0 +1,208 @@
+/********************************************************
++*   (c) Mojang. All rights reserved                       *
++*   (c) Microsoft. All rights reserved.                   *
++*********************************************************/
+
+{
+  "namespace": "chest",
+
+  ////---------------------------------------------------------------------------
+  //// #slot region area
+  ////---------------------------------------------------------------------------
+
+  "chest_label": {
+    "type": "label",
+    "size": [ 1, 1 ],
+    "offset": [ 6, 0 ],
+    "anchor_from": "top_left",
+    "anchor_to": "top_left",
+    "alignment": "top_left",
+    "text": "container.chest",
+    "shadow": true,
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "layer": 2
+  },
+
+  "large_chest_label@chest_label": {
+    "text": "container.chestDouble"
+  },
+
+  "chest_grid_item@common.container_grid_item": {
+    "$item_collection_name": "container_items"
+  },
+
+  "small_chest_grid": {
+    "type": "grid",
+    "size": [ 144, 48 ],
+    "anchor_from": "top_left",
+    "anchor_to": "top_left",
+    "grid_dimensions": [ 9, 3 ],
+    "grid_item_template": "chest_grid_item",
+    "collection_name": "container_items"
+  },
+
+  "large_chest_grid": {
+    "type": "grid",
+    "size": [ 144, 96 ],
+    "anchor_from": "top_left",
+    "anchor_to": "top_left",
+    "grid_dimensions": [ 9, 6 ],
+    "grid_item_template": "chest_grid_item",
+    "collection_name": "container_items"
+  },
+
+  //// #endregion
+
+  ////---------------------------------------------------------------------------
+  //// #region chest area
+  ////---------------------------------------------------------------------------
+
+  "small_chest_panel_top_half": {
+    "type": "panel",
+    "size": [ "100%", "50%" ],
+    "offset": [ 0, 6 ],
+    "anchor_to": "top_left",
+    "anchor_from": "top_left",
+    "controls": [
+      { "@chest_label": { } },
+      {
+        "@small_chest_grid": {
+          "offset": [ 6, 8 ]
+        }
+      }
+    ]
+  },
+
+  "large_chest_panel_top_half": {
+    "type": "panel",
+    "size": [ "100%", 117 ],
+    "offset": [ 0, 6 ],
+    "anchor_to": "top_left",
+    "anchor_from": "top_left",
+    "controls": [
+      { "@large_chest_label": { } },
+      {
+        "@large_chest_grid": {
+          "offset": [ 6, 8 ]
+        }
+      }
+    ]
+  },
+
+  //// #endregion
+
+  ////---------------------------------------------------------------------------
+  //// #region screen
+  ////---------------------------------------------------------------------------
+
+  "small_chest_screen@common.inventory_screen_common": {
+    "controls": [
+      { "@common.container_gamepad_helpers": { } },
+      { "@common.screen_background": { } },
+      {
+        "@common.root_panel": {
+          "layer": 1,
+          "controls": [
+            { "@common.input_panel": { } },
+            { "@common.common_panel": { } },
+            {
+              "chest_panel": {
+                "type": "panel",
+                "layer": 5,
+                "controls": [
+                  { "@chest.small_chest_panel_top_half": { } },
+                  { "@common.inventory_panel_bottom_half_with_label": { } },
+                  { "hotbar_grid@common.hotbar_grid_template": { } },
+                  { "@common.inventory_take_progress_icon_button": { } }
+                ]
+              }
+            },
+            { "@common.inventory_selected_icon_button": { } }
+          ]
+        }
+      }
+    ]
+  },
+
+  "large_chest_screen@common.inventory_screen_common": {
+    "controls": [
+      { "@common.container_gamepad_helpers": { } },
+      { "@common.screen_background": { } },
+      {
+        // NOVA: landscape layout - double chest on the left, player inventory on the right
+        // (the stacked PC layout is taller than a phone screen in landscape)
+        "@common.root_panel": {
+          "size": [ 312, 122 ],
+          "layer": 1,
+          "controls": [
+            { "@common.input_panel": { } },
+            { "@common.common_panel": { } },
+            {
+              "chest_panel": {
+                "type": "panel",
+                "layer": 5,
+                "controls": [
+                  {
+                    "@chest.large_chest_label": {
+                      "offset": [ 7, 6 ]
+                    }
+                  },
+                  {
+                    "@chest.large_chest_grid": {
+                      "offset": [ 7, 17 ]
+                    }
+                  },
+                  {
+                    "divider": {
+                      "type": "image",
+                      "texture": "gui/newgui/newTouchScrollBox.png",
+                      "uv": [ 0, 0 ],
+                      "uv_size": [ 1, 1 ],
+                      "size": [ 1, 96 ],
+                      "anchor_from": "top_left",
+                      "anchor_to": "top_left",
+                      "offset": [ 156, 17 ],
+                      "layer": 2,
+                      "color": [ 0.4, 0.95, 0.88, 1.0 ],
+                      "alpha": 0.35
+                    }
+                  },
+                  {
+                    "inventory_label@common.section_heading_label": {
+                      "offset": [ 161, 6 ],
+                      "text": "container.inventory"
+                    }
+                  },
+                  {
+                    "inventory_grid": {
+                      "type": "grid",
+                      "size": [ 144, 48 ],
+                      "anchor_from": "top_left",
+                      "anchor_to": "top_left",
+                      "offset": [ 161, 17 ],
+                      "grid_dimensions": [ 9, 3 ],
+                      "grid_item_template": "common.grid_item_for_inventory",
+                      "collection_name": "inventory_items"
+                    }
+                  },
+                  {
+                    "hotbar_grid@common.hotbar_grid_template": {
+                      "anchor_from": "top_left",
+                      "anchor_to": "top_left",
+                      "offset": [ 161, 97 ]
+                    }
+                  },
+                  { "@common.inventory_take_progress_icon_button": { } }
+                ]
+              }
+            },
+            { "@common.inventory_selected_icon_button": { } }
+          ]
+        }
+      }
+    ]
+  }
+}
+
+// #endregion
+

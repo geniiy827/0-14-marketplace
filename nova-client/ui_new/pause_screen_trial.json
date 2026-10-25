@@ -1,0 +1,250 @@
+{
+  "namespace": "pauseTrial",
+
+  //---------------------------------------------------------------------------
+  // NOVA pause menu. Native patch routes the normal pause through this JSON
+  // screen (originally only used by the trial build).
+  // Java-style: title + vertical stack of wide buttons on a glass card.
+  //---------------------------------------------------------------------------
+
+  "anim_card_in": {
+    "anim_type": "offset",
+    "easing": "out_back",
+    "duration": 0.35,
+    "from": [ 0, 24 ],
+    "to": [ 0, 0 ]
+  },
+
+  "pause_button@common.button": {
+    "size": [ "100%", 22 ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "$button_text|default": "",
+    "controls": [
+      {
+        "default@common.button_state_default": {
+          "controls": [ { "@common.button_text": { "text": "$button_text" } } ]
+        }
+      },
+      {
+        "hover@common.button_state_hover": {
+          "controls": [ { "@common.button_text": { "text": "$button_text", "color": [ 1.0, 1.0, 1.0 ] } } ]
+        }
+      },
+      {
+        "pressed@common.button_state_pressed": {
+          "controls": [ { "@common.button_text": { "text": "$button_text", "color": [ 0.8, 1.0, 0.96 ], "alpha": 0.8 } } ]
+        }
+      }
+    ]
+  },
+
+  "resume_state@common-classic.button_state_default": {
+    "color": [ 0.31, 0.72, 0.74, 1.0 ],
+    "alpha": 1.0
+  },
+
+  "resume_state_hover@common-classic.button_state_default": {
+    "color": [ 0.36, 0.86, 0.8, 1.0 ],
+    "alpha": 1.0
+  },
+
+  "resume_state_pressed@common-classic.button_state_default": {
+    "color": [ 0.22, 0.55, 0.58, 1.0 ],
+    "alpha": 1.0
+  },
+
+  "quit_state_hover@common-classic.button_state_default": {
+    "color": [ 0.75, 0.28, 0.34, 1.0 ],
+    "alpha": 1.0
+  },
+
+  "quit_state_pressed@common-classic.button_state_default": {
+    "color": [ 0.5, 0.18, 0.22, 1.0 ],
+    "alpha": 1.0
+  },
+
+  "dim_background": {
+    "type": "image",
+    "texture": "gui/newgui/newTouchScrollBox.png",
+    "uv": [ 0, 0 ],
+    "uv_size": [ 1, 1 ],
+    "size": [ "100%", "100%" ],
+    "layer": 0,
+    "color": [ 0.05, 0.07, 0.15, 1.0 ],
+    "alpha": 0.38
+  },
+
+  "pause_screen@common.base_screen": {
+    "render_game_behind": true,
+    "button_mappings": [
+      {
+        "from_button_id": "button.menu_cancel",
+        "to_button_id": "button.menu_exit",
+        "mapping_type": "global"
+      },
+      {
+        "from_button_id": "button.menu_up",
+        "to_button_id": "button.menu_up",
+        "mapping_type": "global",
+        "scope": "view"
+      },
+      {
+        "from_button_id": "button.menu_down",
+        "to_button_id": "button.menu_down",
+        "mapping_type": "global",
+        "scope": "view"
+      },
+      {
+        "from_button_id": "button.menu_left",
+        "to_button_id": "button.menu_left",
+        "mapping_type": "global",
+        "scope": "view"
+      },
+      {
+        "from_button_id": "button.menu_right",
+        "to_button_id": "button.menu_right",
+        "mapping_type": "global",
+        "scope": "view"
+      }
+    ],
+    "controls": [
+      { "dim@pauseTrial.dim_background": { } },
+      {
+        // trial build only; draws nothing in the full game
+        "trialTime": {
+          "type": "custom",
+          "renderer": "trial_time_renderer",
+          "size": [ 0, 10 ],
+          "offset": [ -5, 5 ],
+          "layer": 2,
+          "anchor_from": "top_right",
+          "anchor_to": "top_right"
+        }
+      },
+      {
+        "watermark@common.nova_watermark": {
+          "anchor_from": "bottom_right",
+          "anchor_to": "bottom_right",
+          "offset": [ -4, -4 ],
+          "alignment": "bottom_right"
+        }
+      },
+      {
+        "button_panel": {
+          "type": "panel",
+          "size": [ 180, 118 ],
+          "offset": [ 0, 6 ],
+          "anchor_from": "center",
+          "anchor_to": "center",
+          "controls": [
+            {
+              "card": {
+                "type": "image",
+                "texture": "gui/newgui/NormalButtonStroke.png",
+                "nineslice_size": 4.0,
+                "uv": [ 0, 0 ],
+                "uv_size": [ 12, 12 ],
+                "size": [ "100%+16px", "100%+16px" ],
+                "anchor_from": "center",
+                "anchor_to": "center",
+                "layer": 0,
+                "color": [ 0.22, 0.26, 0.38, 1.0 ],
+                "alpha": 0.9,
+                "offset": "@pauseTrial.anim_card_in"
+              }
+            },
+            {
+              "game_menu": {
+                "type": "label",
+                "size": [ "100%", 10 ],
+                "offset": [ 0, 0 ],
+                "alignment": "center",
+                "layer": 2,
+                "text": "menu.game",
+                "shadow": true,
+                "color": [ 0.4, 0.95, 0.88 ],
+                "alpha": "@common.anim_fade_in",
+                "anchor_from": "top_middle",
+                "anchor_to": "top_middle"
+              }
+            },
+            {
+              "title_line@common.accent_line": {
+                "size": [ "60%", 1 ],
+                "anchor_from": "top_middle",
+                "anchor_to": "top_middle",
+                "offset": [ 0, 13 ],
+                "layer": 2
+              }
+            },
+            {
+              "returnToGame@pauseTrial.pause_button": {
+                "$pressed_button_name": "button.menu_continue",
+                "$button_text": "menu.returnToGame",
+                "size": [ "100%", 26 ],
+                "offset": [ 0, 20 ],
+                "controls": [
+                  {
+                    "default@pauseTrial.resume_state": {
+                      "controls": [ { "@common.button_text": { "text": "menu.returnToGame" } } ]
+                    }
+                  },
+                  {
+                    "hover@pauseTrial.resume_state_hover": {
+                      "controls": [ { "@common.button_text": { "text": "menu.returnToGame" } } ]
+                    }
+                  },
+                  {
+                    "pressed@pauseTrial.resume_state_pressed": {
+                      "controls": [ { "@common.button_text": { "text": "menu.returnToGame", "alpha": 0.8 } } ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "options@pauseTrial.pause_button": {
+                "$pressed_button_name": "button.menu_options",
+                "$button_text": "menu.options",
+                "offset": [ 0, 52 ]
+              }
+            },
+            {
+              "buyGame@pauseTrial.pause_button": {
+                "$pressed_button_name": "button.menu_buy_game",
+                "$button_text": "trial.pauseScreen.buyGame",
+                "offset": [ 0, 52 ],
+                "ignored": "$not_trial"
+              }
+            },
+            {
+              "quit@pauseTrial.pause_button": {
+                "$pressed_button_name": "button.menu_quit",
+                "$button_text": "pauseScreen.quit",
+                "offset": [ 0, 80 ],
+                "controls": [
+                  {
+                    "default@common.button_state_default": {
+                      "controls": [ { "@common.button_text": { "text": "pauseScreen.quit" } } ]
+                    }
+                  },
+                  {
+                    "hover@pauseTrial.quit_state_hover": {
+                      "controls": [ { "@common.button_text": { "text": "pauseScreen.quit" } } ]
+                    }
+                  },
+                  {
+                    "pressed@pauseTrial.quit_state_pressed": {
+                      "controls": [ { "@common.button_text": { "text": "pauseScreen.quit", "alpha": 0.8 } } ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

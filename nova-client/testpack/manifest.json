@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "header": {
+    "name": "NOVA Test Pack",
+    "description": "Ночная панорама, логотип NOVA, мятное солнце, свои сплэши",
+    "uuid": "6e6f7661-7465-7374-7061-636b00000001",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "author": "NOVA"
+  },
+  "icon": "pack_icon.png"
+}
