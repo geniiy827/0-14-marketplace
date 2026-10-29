@@ -51,3 +51,11 @@
 #define G_TESS_IN_WORLD_ORIG 0x6e9dd2
 #define G_TESS_IN_WORLD_SLOT 0x7cff30
 #define G_TESS_IN_WORLD_SYM "_ZN16BlockTessellator17tessellateInWorldER5BlockRK8BlockPoshb"
+#define G_TESS_APPEND_FUNC 0x42c2e0
+#define G_TESS_APPEND_ORIG 0x6e9e02
+#define G_TESS_APPEND_SLOT 0x7cff34
+#define G_TESS_APPEND_SYM "_ZN16BlockTessellator22appendTessellatedBlockERK9FullBlock"
+#define G_GUI_BLOCK_FUNC 0x42cf58
+#define G_GUI_BLOCK_ORIG 0x6e9e32
+#define G_GUI_BLOCK_SLOT 0x7cff38
+#define G_GUI_BLOCK_SYM "_ZN16BlockTessellator14renderGuiBlockERK9FullBlockRKN3mce10TexturePtrEff"

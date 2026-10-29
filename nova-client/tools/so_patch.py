@@ -105,6 +105,8 @@ GATES = [
     ('nametags', 0x46b068, '_ZN13LevelRenderer14renderNameTagsEf'),
     ('init_creative', 0x555104, '_ZN4Item17initCreativeItemsEv'),
     ('tess_in_world', 0x3ec3c8, '_ZN16BlockTessellator17tessellateInWorldER5BlockRK8BlockPoshb'),
+    ('tess_append', 0x42c2e0, '_ZN16BlockTessellator22appendTessellatedBlockERK9FullBlock'),
+    ('gui_block', 0x42cf58, '_ZN16BlockTessellator14renderGuiBlockERK9FullBlockRKN3mce10TexturePtrEff'),
 ]
 import re as _re
 _GATE_MOVED = {}

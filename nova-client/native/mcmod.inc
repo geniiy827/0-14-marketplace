@@ -193,13 +193,14 @@ void *Java_com_nova_client_ModBridge_nativeApiStr(void **env, void *cls, int op,
  *   ncubes, then per cube: x0 y0 z0 x1 y1 z1, 6 faces x (u0 v0 u1 v1) (u0 < 0: no face)
  * faces: 0 down, 1 up, 2 north (-z), 3 south (+z), 4 west (-x), 5 east (+x). UVs are atlas 0..1. */
 #define MB_MAX 64
+#define MB_CUBE 36   /* box 6, uv 24, rotation x y z (degrees), pivot x y z (block units) */
 typedef struct { float b[4]; unsigned short size[2]; void *filler; void *file; } TexSet;   /* TextureUVCoordinateSet */
 typedef struct {
     int id, kind, solid, light, lightblock, matfrom, layer;
     float hardness, resistance, box[6];
     TexSet tex[6];
     int ncubes;
-    float *cubes;                        /* ncubes * 30 */
+    float *cubes;                        /* ncubes * MB_CUBE */
     char name[64];
     void *block;
 } ModBlock;
@@ -250,10 +251,10 @@ int Java_com_nova_client_ModBridge_nativeDefineBlocks(void **env, void *cls, voi
         }
         p += 39;
         m->ncubes = (int)d[p++];
-        if (m->ncubes < 0 || p + m->ncubes * 30 > n) break;
-        m->cubes = m->ncubes ? f_new(m->ncubes * 30 * 4) : 0;
-        for (int k = 0; k < m->ncubes * 30; k++) m->cubes[k] = (float)d[p + k];
-        p += m->ncubes * 30;
+        if (m->ncubes < 0 || p + m->ncubes * MB_CUBE > n) break;
+        m->cubes = m->ncubes ? f_new(m->ncubes * MB_CUBE * 4) : 0;
+        for (int k = 0; k < m->ncubes * MB_CUBE; k++) m->cubes[k] = (float)d[p + k];
+        p += m->ncubes * MB_CUBE;
         int k = 0;
         while (*np && *np != '\x1f' && k < 63) m->name[k++] = *np++;
         m->name[k] = 0;
@@ -308,7 +309,7 @@ static void mcmod_register_blocks(void) {
         mblock_of[m->id] = m;
         m->block = b;
         /* 0.14.3: +48 render layer (3 opaque, 8 alpha-tested like glass), +52 block shape (0 cube), +56 flags: keep */
-        *(int *)(b + 48) = (m->kind == 1 || m->layer == 3) ? 8 : 3;
+        *(int *)(b + 48) = (m->kind == 1 || m->layer == 3) ? 4 : 3;   /* 4 = alpha-tested (fancy leaves); 8 = glass (sorted, broke models) */
         *(int *)(b + 52) = 0;
         if (m->kind != 1 && (m->box[0] > 0 || m->box[1] > 0 || m->box[2] > 0 || m->box[3] < 1 || m->box[4] < 1 || m->box[5] < 1)) {
             MVec3 lo = {m->box[0], m->box[1], m->box[2]}, hi = {m->box[3], m->box[4], m->box[5]};
@@ -343,9 +344,29 @@ static void h_init_creative(void) {
         if (mblocks[i].block && mf_add_creative) mf_add_creative((short)mblocks[i].id, 0);
 }
 
+/* ---- model drawing: shared by the world (chunks), the inventory icon and the item in hand ---- */
+static void (*mf_tess_begin)(void *t, int n);
+static void (*mf_tess_addoff)(void *t, float x, float y, float z);
+static void (*mf_tess_draw)(void *t, void *mat, void *tex);
+static void *mf_tess_instance;
+
+/* rotation of one cube: Blockbench order (three.js 'ZYX': x first, then y, then z) about the pivot */
+typedef struct { float m[9], o[3]; int on; } MRot;
+static void mb_rot_setup(MRot *r, const float *c) {
+    float rx = c[30] * 0.01745329f, ry = c[31] * 0.01745329f, rz = c[32] * 0.01745329f;
+    r->on = rx != 0 || ry != 0 || rz != 0;
+    if (!r->on) return;
+    float cx = cosf(rx), sx = sinf(rx), cy = cosf(ry), sy = sinf(ry), cz = cosf(rz), sz = sinf(rz);
+    /* M = Rz * Ry * Rx */
+    r->m[0] = cz * cy; r->m[1] = cz * sy * sx - sz * cx; r->m[2] = cz * sy * cx + sz * sx;
+    r->m[3] = sz * cy; r->m[4] = sz * sy * sx + cz * cx; r->m[5] = sz * sy * cx - cz * sx;
+    r->m[6] = -sy;     r->m[7] = cy * sx;                r->m[8] = cy * cx;
+    r->o[0] = c[33]; r->o[1] = c[34]; r->o[2] = c[35];
+}
+
 /* one model face; (u0, v0) is the top-left of the face image */
-static void mb_face(void *t, int face, float *c, float *uv, float px, float py, float pz) {
-    float x0 = c[0] + px, y0 = c[1] + py, z0 = c[2] + pz, x1 = c[3] + px, y1 = c[4] + py, z1 = c[5] + pz;
+static void mb_face(void *t, int face, const float *c, const MRot *r, const float *uv, float px, float py, float pz, float bright, float alpha) {
+    float x0 = c[0], y0 = c[1], z0 = c[2], x1 = c[3], y1 = c[4], z1 = c[5];
     float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
     float q[4][3];
     static const float shade[6] = {0.5f, 1.0f, 0.8f, 0.8f, 0.6f, 0.6f};
@@ -359,11 +380,37 @@ static void mb_face(void *t, int face, float *c, float *uv, float px, float py, 
     default: V(0, x1, y1, z1); V(1, x1, y1, z0); V(2, x1, y0, z0); V(3, x1, y0, z1); break; /* east */
     }
     #undef V
+    if (r && r->on) {
+        for (int k = 0; k < 4; k++) {
+            float a = q[k][0] - r->o[0], b = q[k][1] - r->o[1], d = q[k][2] - r->o[2];
+            q[k][0] = r->m[0] * a + r->m[1] * b + r->m[2] * d + r->o[0];
+            q[k][1] = r->m[3] * a + r->m[4] * b + r->m[5] * d + r->o[1];
+            q[k][2] = r->m[6] * a + r->m[7] * b + r->m[8] * d + r->o[2];
+        }
+    }
     float uvs[4][2] = {{u0, v0}, {u1, v0}, {u1, v1}, {u0, v1}};
-    float s = shade[face];
-    mf_tess_color(t, s, s, s, 1.f);
-    for (int k = 0; k < 4; k++) mf_tess_vertex(t, q[k][0], q[k][1], q[k][2], uvs[k][0], uvs[k][1]);
-    for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0], q[k][1], q[k][2], uvs[k][0], uvs[k][1]);   /* back side */
+    float s = shade[face] * bright;
+    mf_tess_color(t, s, s, s, alpha);
+    for (int k = 0; k < 4; k++) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
+    for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);   /* back side */
+}
+
+static void mb_emit(void *t, ModBlock *m, float px, float py, float pz, float bright, float alpha) {
+    for (int i = 0; i < m->ncubes; i++) {
+        const float *c = m->cubes + i * MB_CUBE;
+        MRot r;
+        mb_rot_setup(&r, c);
+        for (int f = 0; f < 6; f++) {
+            const float *uv = c + 6 + f * 4;
+            if (uv[0] < 0) continue;
+            mb_face(t, f, c, &r, uv, px, py, pz, bright, alpha);
+        }
+    }
+}
+
+static ModBlock *mb_model_of_id(int id) {
+    ModBlock *m = (id > 0 && id < 256) ? mblock_of[id] : 0;
+    return m && m->kind == 1 && m->block && m->ncubes ? m : 0;
 }
 
 static int (*o_tess)(void *bt, void *block, MPos *pos, unsigned char data, int b);
@@ -374,15 +421,37 @@ static int h_tess(void *bt, void *block, MPos *pos, unsigned char data, int b) {
     if (!t || !mf_tess_color || !mf_tess_vertex || !mf_bt_light || !mf_touv || !mf_tex1) return o_tess(bt, block, pos, data, b);
     { unsigned char lc[8] = {0}; float luv[2] = {0, 0};     /* same light setup as the start of tessellateInWorld */
       mf_bt_light(lc, bt, pos); mf_touv(luv, lc); mf_tex1(bt, luv); }
-    for (int i = 0; i < m->ncubes; i++) {
-        float *c = m->cubes + i * 30;
-        for (int f = 0; f < 6; f++) {
-            float *uv = c + 6 + f * 4;
-            if (uv[0] < 0) continue;
-            mb_face(t, f, c, uv, (float)pos->x, (float)pos->y, (float)pos->z);
-        }
-    }
+    mb_emit(t, m, (float)pos->x, (float)pos->y, (float)pos->z, 1.f, 1.f);
     return 1;
+}
+
+/* item in hand / dropped item mesh: like the anvil branch of appendTessellatedBlock */
+static void (*o_append)(void *bt, unsigned char *fb);
+static void h_append(void *bt, unsigned char *fb) {
+    ModBlock *m = fb ? mb_model_of_id(fb[0]) : 0;
+    void *t = *(void **)((char *)bt + 0x2cc);
+    if (!m || !t || !mf_tess_addoff) { o_append(bt, fb); return; }
+    char *b = bt;
+    b[1] = 1; b[0x28] = 1;
+    mf_tess_addoff(t, -0.5f, -0.5f, -0.5f);
+    mb_emit(t, m, 0, 0, 0, 1.f, 1.f);
+    mf_tess_addoff(t, 0.5f, 0.5f, 0.5f);
+    b[0x28] = 0; b[1] = 0;
+}
+
+/* inventory icon: like the anvil branch of renderGuiBlock (begin, tessellate at 0..1, draw with the bt material) */
+static void (*o_gui)(void *bt, unsigned char *fb, void *tex, float bright, float alpha);
+static void h_gui(void *bt, unsigned char *fb, void *tex, float bright, float alpha) {
+    ModBlock *m = fb ? mb_model_of_id(fb[0]) : 0;
+    void *t = *(void **)((char *)bt + 0x2cc);
+    if (!m || !t || !mf_tess_begin || !mf_tess_draw || !mf_tess_instance) { o_gui(bt, fb, tex, bright, alpha); return; }
+    char *b = bt;
+    char keep = b[1];
+    b[0x28] = 1; b[1] = 0;
+    mf_tess_begin(t, m->ncubes * 48);
+    mb_emit(t, m, 0, 0, 0, bright, alpha);
+    mf_tess_draw(mf_tess_instance, b + 0x2c0, tex);
+    b[1] = keep; b[0x28] = 0;
 }
 
 /* world join / leave and ticks from the client loop (no game hooks) */
@@ -438,7 +507,13 @@ static void mcmod_init(void *mc, u32 base) {
     S(mf_bt_light, "_ZN16BlockTessellator13getLightColorERK8BlockPos");
     S(mf_touv, "_Z4toUV14BrightnessPair");
     S(mf_tex1, "_ZN16BlockTessellator5_tex1ERK4Vec2");
+    S(mf_tess_begin, "_ZN11Tessellator5beginEi");
+    S(mf_tess_addoff, "_ZN11Tessellator9addOffsetEfff");
+    S(mf_tess_draw, "_ZN11Tessellator4drawERKN3mce11MaterialPtrERKNS0_10TexturePtrE");
+    S(mf_tess_instance, "_ZN11Tessellator8instanceE");
     #undef S
     GATE(INIT_CREATIVE, h_init_creative, o_init_creative);
     GATE(TESS_IN_WORLD, h_tess, o_tess);
+    GATE(TESS_APPEND, h_append, o_append);
+    GATE(GUI_BLOCK, h_gui, o_gui);
 }

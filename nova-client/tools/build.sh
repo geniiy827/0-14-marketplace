@@ -29,4 +29,5 @@ apksigner sign --ks keys/nova.jks --ks-pass file:keys/pass.txt --ks-key-alias no
 rm -f $APK.idsig
 apksigner verify --min-sdk-version 17 $APK 2>/dev/null && echo SIGNED-OK
 rm -f out/unsigned.apk out/aligned.apk
+for d in mcmod/examples/*/; do n=$(basename $d); rm -f out/$n.mcmod; (cd $d && zip -qr ../../../out/$n.mcmod .); done
 echo "APK $W/$APK ($(($(date +%s)-T0))s)"

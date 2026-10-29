@@ -135,11 +135,18 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   IntroView не закончится (`nativeIntroDone` → custom-контрол `nova_title_gate` прячет соседа, флаг видимости UIControl+0x30 бит 2;
   parent weak_ptr +0x38, children vector<shared_ptr> +0x40, имя +0xc).
 
+- alpha9: слой 4 (как листва fancy) для модельных/прозрачных: слой 8 (стекло) сортируется по граням и ломал модели
+  (пропадающие куски, «шипы»). Полоса атласа начинается с y=272 (flowing_water/lava до 272 — затирали рубиновый блок).
+  Кубы моделей: 36 чисел (бокс 6, uv 24, поворот xyz°, центр xyz), порядок как в Blockbench (three.js 'ZYX': X, потом Y, потом Z).
+  3D в инвентаре/руке: гейты `renderGuiBlock` (как ветка наковальни: begin, кубы в 0..1, draw(Tessellator::instance, bt+0x2c0, tex))
+  и `appendTessellatedBlock` (bt[1]=1, bt+0x28=1, addOffset(-.5), кубы, addOffset(.5)). Свет: проверять ночью.
+  Интро: introDone() вызывается, когда плоский логотип встал на место, а сам IntroView уходит через 0.15 с.
+
 ## 6a. Инструменты (экономия лимита)
 `nova` (= `python3 tools/nova.py`, индекс .so кешируется в `.cache/`, ~8 с один раз):
 `nova s REGEX` символы · `nova d СИМВОЛ|АДРЕС [N]` дизасм с именами вызовов/GOT/строк · `nova dg СИМВОЛ RE` только нужные
 строки · `nova callers X` · `nova refs X` (в т.ч. через GOT) · `nova vt Block` слоты vtable (индекс как patch_slot) ·
-`nova at АДРЕС` · `nova str ТЕКСТ` · `nova crash [файл]` расшифровка отчёта · `nova build` тихая сборка (версия в `VERSION`).
+`nova at АДРЕС` · `nova str ТЕКСТ` · `nova crash [файл]` расшифровка отчёта · `nova build` тихая сборка (версия в `VERSION`, моды из `mcmod/examples/*` пакуются в `out/*.mcmod`).
 Репозиторий: `tools/sync_repo.sh` копирует исходники в `geniiy827/0-14-marketplace/nova-client` (ветка nova-client).
 
 ## 7. Что сделано раньше (кратко, работает у пользователя)

@@ -38,6 +38,7 @@ import java.util.Map;
 final class ModBlocks {
     static final String TAG = "NOVA.blocks";
     static final int FIRST_ID = 210, LAST_ID = 242;
+    static final int CUBE = 36;   // box 6, uv 24, rotation 3 (degrees), pivot 3 (block units) - native MB_CUBE
     static final int STRIP_Y = 256, ATLAS_W = 512, ATLAS_H = 512;
 
     /** an image to draw into the atlas strip (base atlas pixels) */
@@ -57,7 +58,7 @@ final class ModBlocks {
     private JSONObject layout;
     private int baseW = 512, baseH = 256;
     private final Map<String, int[]> packed = new HashMap<String, int[]>();      // image key -> x, y, w, h
-    private int shelfX, shelfY = STRIP_Y, shelfH;
+    private int shelfX, shelfY = STRIP_Y + 16, shelfH;   // flowing water/lava tiles reach y 272
 
     ModBlocks(Context c, ModRuntime rt) {
         this.ctx = c;
@@ -264,16 +265,18 @@ final class ModBlocks {
         }
         if (rects.isEmpty()) throw new Exception("у модели нет текстуры (укажите texture: \"...\")");
         JSONArray els = j.getJSONArray("elements");
-        int rotated = 0;
         for (int i = 0; i < els.length(); i++) {
             JSONObject e = els.getJSONObject(i);
             if (!e.optString("type", "cube").equals("cube")) continue;
             if (e.optBoolean("visibility", true) == false) continue;
             JSONArray fr = e.getJSONArray("from"), to = e.getJSONArray("to");
-            JSONArray rot = e.optJSONArray("rotation");
-            if (rot != null && (rot.optDouble(0) != 0 || rot.optDouble(1) != 0 || rot.optDouble(2) != 0)) rotated++;
+            JSONArray rot = e.optJSONArray("rotation"), org = e.optJSONArray("origin");
             double off = centered ? 8 : 0;
-            float[] c = new float[30];
+            float[] c = new float[CUBE];
+            if (rot != null) {                                   // any angle, Blockbench order, about "origin"
+                c[30] = (float) rot.optDouble(0); c[31] = (float) rot.optDouble(1); c[32] = (float) rot.optDouble(2);
+                if (org != null) { c[33] = (float) ((org.optDouble(0) + off) / 16); c[34] = (float) (org.optDouble(1) / 16); c[35] = (float) ((org.optDouble(2) + off) / 16); }
+            }
             c[0] = (float) ((fr.getDouble(0) + off) / 16); c[1] = (float) (fr.getDouble(1) / 16); c[2] = (float) ((fr.getDouble(2) + off) / 16);
             c[3] = (float) ((to.getDouble(0) + off) / 16); c[4] = (float) (to.getDouble(1) / 16); c[5] = (float) ((to.getDouble(2) + off) / 16);
             JSONObject faces = e.optJSONObject("faces");
@@ -288,7 +291,6 @@ final class ModBlocks {
             }
             out.add(c);
         }
-        if (rotated > 0) Log.w(TAG, rotated + " rotated cube(s): rotation is ignored");
     }
 
     /** Bedrock geometry (.geo.json): box UV or per-face UV */
@@ -309,7 +311,12 @@ final class ModBlocks {
                 JSONArray o = cu.getJSONArray("origin"), s = cu.getJSONArray("size");
                 double w = s.getDouble(0), h = s.getDouble(1), d = s.getDouble(2);
                 double x0 = -(o.getDouble(0) + w) + 8, y0 = o.getDouble(1), z0 = o.getDouble(2) + 8;
-                float[] c = new float[30];
+                float[] c = new float[CUBE];
+                JSONArray rot = cu.optJSONArray("rotation"), pv = cu.optJSONArray("pivot");
+                if (rot != null) {                               // geo x is mirrored: rotations about y and z flip
+                    c[30] = (float) rot.optDouble(0); c[31] = (float) -rot.optDouble(1); c[32] = (float) -rot.optDouble(2);
+                    if (pv != null) { c[33] = (float) ((-pv.optDouble(0) + 8) / 16); c[34] = (float) (pv.optDouble(1) / 16); c[35] = (float) ((pv.optDouble(2) + 8) / 16); }
+                }
                 c[0] = (float) (x0 / 16); c[1] = (float) (y0 / 16); c[2] = (float) (z0 / 16);
                 c[3] = (float) ((x0 + w) / 16); c[4] = (float) ((y0 + h) / 16); c[5] = (float) ((z0 + d) / 16);
                 Object uv = cu.opt("uv");

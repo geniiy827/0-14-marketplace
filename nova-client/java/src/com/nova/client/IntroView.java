@@ -80,6 +80,8 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
 
     private final Activity act;
     private volatile boolean done;
+    private boolean titleShown;
+    private float shownAt;
 
     // ---- sound -------------------------------------------------------------------
     static final int S_RC_IN = 0, S_RC_SHINE = 1, S_WHOOSH = 2, S_HIT = 3, S_SHINE = 4, S_RISE = 5;
@@ -272,7 +274,10 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
             if (handT >= 0) drawFlat(t);
         }
         drawParticles(t);
-        if (handT >= 0 && t > handT + XFADE + Math.max(MOVE, BG_DELAY + BG_D) + 0.05f) finish();
+        // the menu title appears while the flat title still covers it, and the intro leaves a few frames later:
+        // no frame with neither of them
+        if (handT >= 0 && t > handT + XFADE + MOVE && !titleShown) { titleShown = true; introDone(); shownAt = t; }
+        if (handT >= 0 && titleShown && t > shownAt + 0.15f && t > handT + XFADE + Math.max(MOVE, BG_DELAY + BG_D) + 0.05f) finish();
     }
 
     private boolean gameReady(float t) {

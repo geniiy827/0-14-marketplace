@@ -31,7 +31,7 @@ block table {
     sound: "wood"
 }
 
-// 5. Модельный блок: Blockbench (Bedrock Block), светится
+// 5. Модельный блок: Blockbench (Bedrock Block), светится, абажур повёрнут на 45°
 block lamp {
     name: {ru: "Лампа", en: "Lamp"}
     model: "models/lamp.bbmodel"
