@@ -54,12 +54,15 @@ public final class ModRuntime {
     public final Map<String, Double> customIds = new HashMap<String, Double>();
 
     /** block declarations of every parsed mod: {Mod, name, props map, line} */
-    public List<Object[]> blockDecls() {
+    public List<Object[]> blockDecls() { return decls("block"); }
+
+    /** declarations of one kind ("block", "item") of every parsed mod: {Mod, name, props map, line} */
+    public List<Object[]> decls(String kind) {
         List<Object[]> out = new ArrayList<Object[]>();
         for (Mod m : mods) {
             if (m.prog == null) continue;
             for (Decl d : m.prog.decls) {
-                if (!d.kind.equals("block")) continue;
+                if (!d.kind.equals(kind)) continue;
                 try {
                     Object v = d.props.eval(m.in, m.in.globals);
                     out.add(new Object[]{m, d.name, v, d.line});
@@ -146,8 +149,10 @@ public final class ModRuntime {
             };
         } else if (impl.startsWith("java:")) {
             final String j = impl.substring(5);
+            final boolean lib = j.equals("Lib");
             fn = new Callable() {
                 public Object call(Interp in, List<Object> args, int line) {
+                    if (lib) return Lib.call(name, check(name, ps, args, line), line);
                     return java(j, in, check(name, ps, args, line), line);
                 }
             };
@@ -400,9 +405,9 @@ public final class ModRuntime {
             m.in.globals.vars.clear();
             for (Decl d : m.prog.decls) {
                 Double id = customIds.get(m.id + ":" + d.name);
-                if (d.kind.equals("block") && id != null) { m.in.globals.vars.put(d.name, id); continue; }
+                if ((d.kind.equals("block") || d.kind.equals("item")) && id != null) { m.in.globals.vars.put(d.name, id); continue; }
                 m.in.globals.vars.put(d.name, m.id + ":" + d.name);
-                if (!d.kind.equals("block"))
+                if (!d.kind.equals("block") && !d.kind.equals("item"))
                     report(m, new ScriptError("'" + d.kind + "' появится в следующих версиях", d.line));
             }
             for (OverrideDecl o : m.prog.overrides) {

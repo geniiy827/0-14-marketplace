@@ -3,3 +3,11 @@ world.join	-	no	wip	Игрок вошёл в мир
 world.leave	-	no	wip	Игрок вышел из мира
 tick	-	no	wip	20 раз в секунду, пока игрок в мире. Удобнее: every 20 ticks { }
 chat	$text	yes	wip	Игрок отправил сообщение или команду (e.text). e.cancel() — не отправлять
+player.jump	-	yes	wip	Игрок прыгает. e.cancel() — не прыгать
+player.sneak	sneaking	no	wip	Игрок присел или встал: e.sneaking = 1 / 0
+block.use	x,y,z,face,block,data,item,itemData	yes	wip	Игрок тапнул по блоку (предметом в руке или рукой: item = 0). e.cancel() — ничего не делать
+block.break	x,y,z,block,data,item	yes	wip	Игрок сломал блок. e.cancel() — блок останется
+item.use	item,itemData	yes	wip	Игрок использует предмет в воздухе (еда, лук, ведро...). e.cancel() — отменить
+entity.attack	target,type,item	yes	wip	Игрок ударил сущность (e.target — её номер, e.type — тип). e.cancel() — без удара
+entity.use	target,type,item	yes	wip	Игрок тапнул по сущности (сесть в лодку, покормить...). e.cancel() — отменить
+action	item	no	wip	Нажата своя кнопка действия (ui.action или action у предмета мода); e.item — предмет в руке

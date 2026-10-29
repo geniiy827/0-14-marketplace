@@ -28,6 +28,8 @@ final class AtlasBuilder {
 
     private ModBlocks extras;                // mod block textures: a strip under the block atlas
 
+    private java.util.List<ModBlocks.Extra> itemExtras;   // mod item textures: free rows of the item atlas
+    void setItemExtras(java.util.List<ModBlocks.Extra> l) { itemExtras = l == null || l.isEmpty() ? null : l; }
     void setBlockExtras(ModBlocks mb) { extras = mb != null && mb.hasAtlasStrip() ? mb : null; }
 
     AtlasBuilder(EntityRegistry files, boolean useNew) {
@@ -96,10 +98,13 @@ final class AtlasBuilder {
             }
         }
         ModBlocks mb = layout.equals("blocks") ? extras : null;
+        java.util.List<ModBlocks.Extra> ex = mb != null ? mb.extras : layout.equals("items") ? itemExtras : null;
+        if (ex != null) for (ModBlocks.Extra e : ex)            // HD mod textures raise the atlas scale
+            if (e.w > 0) scale = Math.max(scale, Math.min(8, (e.bm.getWidth() + e.w - 1) / e.w));
         int AW = W * scale, AH = (mb != null ? H * ModBlocks.ATLAS_H / ModBlocks.STRIP_Y : H) * scale;
         int[] out = new int[AW * AH];
-        if (mb != null) {
-            for (ModBlocks.Extra e : mb.extras) {
+        if (ex != null) {
+            for (ModBlocks.Extra e : ex) {
                 int ew = e.w * scale, eh = e.h * scale;
                 Bitmap bm = ew == e.bm.getWidth() && eh == e.bm.getHeight() ? e.bm : Bitmap.createScaledBitmap(e.bm, ew, eh, false);
                 int[] row = new int[ew];

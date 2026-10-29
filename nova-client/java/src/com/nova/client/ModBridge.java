@@ -22,6 +22,9 @@ public final class ModBridge {
 
     /** mod blocks of this run (atlas strip, lang lines); null until load() */
     static volatile ModBlocks blocks;
+    /** mod items of this run (atlas strip, lang lines); null until load() */
+    static volatile ModItems items;
+    static native int nativeDefineItems(double[] data, String names, String actions);
 
     /** libnova -> scripts (game thread). 1 = cancel the game action */
     public static int event(int ev, String text, double[] args) {
@@ -82,8 +85,15 @@ public final class ModBridge {
                     try { nativeDefineBlocks(mb.data, mb.names); } catch (Throwable t) { Log.e(TAG, "native blocks", t); }
                 }
                 blocks = mb;
+                ModItems mi = new ModItems(c, rt);
+                mi.prepare(dirs);
+                if (mi.count > 0) {
+                    try { nativeDefineItems(mi.data, mi.names, mi.actions); } catch (Throwable t) { Log.e(TAG, "native items", t); }
+                }
+                items = mi;
             } else {
                 rt.customIds.putAll(blocks.ids());
+                if (items != null) rt.customIds.putAll(items.ids);
             }
             runtime = rt;
             Log.i(TAG, n + " mod(s) loaded");

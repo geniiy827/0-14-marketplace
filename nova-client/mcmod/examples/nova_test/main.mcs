@@ -1,0 +1,130 @@
+// NOVA Test - всё, что умеют моды сейчас, в одном моде
+// Команды: /help
+
+// ---------------- блоки ----------------
+block ruby_block {
+    name: {ru: "Рубиновый блок", en: "Ruby Block"}
+    texture: "textures/ruby_block.png"
+    hardness: 3
+    sound: "metal"
+}
+
+block crate {
+    name: {ru: "Ящик", en: "Crate"}
+    textures: {up: "planks", down: "planks", side: "log:0"}
+    hardness: 2
+    sound: "wood"
+}
+
+block stone_plate {
+    name: {ru: "Каменная плита", en: "Stone Plate"}
+    texture: "stonebrick"
+    box: [0, 0, 0, 16, 4, 16]
+}
+
+block table {
+    name: {ru: "Стол", en: "Table"}
+    model: "models/table.bbmodel"          // столкновения - по кубам модели: под столом можно пройти маленьким
+    sound: "wood"
+}
+
+block lamp {
+    name: {ru: "Лампа", en: "Lamp"}
+    model: "models/lamp.bbmodel"           // абажур повёрнут на 45 градусов прямо в Blockbench
+    light: 15
+    sound: "metal"
+}
+
+// ---------------- предметы ----------------
+item ruby {
+    name: {ru: "Рубин", en: "Ruby"}
+    texture: "textures/ruby.png"           // 32x32, size "hd": обычный размер, но детальнее
+}
+
+item big_sword {
+    name: {ru: "Большой меч", en: "Big Sword"}
+    texture: "textures/big_sword.png"      // 32x32, size "pixel": в руке в 2 раза больше обычного меча
+    size: "pixel"
+    hand: "tool"                           // держать как оружие
+    durability: 500
+}
+
+item wand {
+    name: {ru: "Жезл строителя", en: "Builder Wand"}
+    texture: "textures/wand.png"
+    hand: "tool"
+    action: "Построить"                    // своя кнопка действия, пока жезл в руке
+}
+
+// ---------------- события ----------------
+on world.join(e) {
+    chat("§b[NOVA Test]§r блоки и предметы - в творческом инвентаре. Команды: /help")
+}
+
+// жезл: кнопка "Построить" ставит рубиновый блок туда, куда смотришь
+on action(e) {
+    if e.item != wand { return }
+    var t = player.target()
+    if t.kind != 0 { ui.tip("Посмотри на блок"); return }
+    var d = [[0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]][t.face]
+    world.setBlock(t.x + d[0], t.y + d[1], t.z + d[2], ruby_block)
+}
+
+// рубином по камню - камень становится рубиновым блоком
+on block.use(e) {
+    if e.item == ruby and e.block == 1 {
+        world.setBlock(e.x, e.y, e.z, ruby_block)
+        e.cancel()
+    }
+}
+
+// большой меч уменьшает мобов при ударе
+on entity.attack(e) {
+    if e.item == big_sword {
+        entity.setScale(e.target, math.max(0.25, entity.scale(e.target) * 0.7))
+    }
+}
+
+on player.sneak(e) {
+    if e.sneaking == 1 and player.item() == wand { ui.tip("Смотришь на: {player.target().kind == 0 ? "блок" : "что-то другое"}") }
+}
+
+// ---------------- команды ----------------
+on chat(e) {
+    var parts = e.text.trim().split(" ")
+    var cmd = parts[0]
+    var arg = len(parts) > 1 ? parts[1].num() : null
+    if not cmd.starts("/") { return }
+
+    if cmd == "/help" {
+        chat("§e/size 0.1  /px 2  /size (сброс)  /mobs 0.5  /blocks  /math")
+    } else if cmd == "/size" {
+        player.setScale(arg == null ? 1 : arg)
+        ui.tip("Размер: {math.roundTo(player.scale(), 3)}")
+    } else if cmd == "/px" {
+        var px = arg == null ? 2 : arg
+        player.setScale(px / 16 / 1.8)            // рост игрока - 1.8 блока
+        ui.tip("Рост: {px} пикс.")
+    } else if cmd == "/mobs" {
+        var n = 0
+        for id in entity.list(16) {
+            entity.setScale(id, arg == null ? 1 : arg)
+            n += 1
+        }
+        ui.tip("Мобов изменено: {n}")
+    } else if cmd == "/blocks" {
+        var p = player.pos()
+        var x = math.floor(p.x) + 2
+        var y = math.floor(p.y)
+        var z = math.floor(p.z)
+        var list = [ruby_block, crate, stone_plate, table, lamp]
+        for i in 0..len(list) - 1 { world.setBlock(x + i, y, z, list[i]) }
+    } else if cmd == "/math" {
+        var v = vec.fromAngles(player.yaw(), player.pitch())
+        chat("взгляд {math.roundTo(v.x, 2)} {math.roundTo(v.y, 2)} {math.roundTo(v.z, 2)}, шум {math.roundTo(math.noise(player.x() / 10, player.z() / 10), 3)}")
+        chat("2^10 = {math.pow(2, 10)}, атан2(1,1) = {math.atan2(1, 1)}, случайное 1..6: {math.randInt(1, 6)}")
+    } else {
+        return
+    }
+    e.cancel()
+}

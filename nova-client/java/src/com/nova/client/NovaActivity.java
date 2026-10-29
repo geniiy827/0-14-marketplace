@@ -360,6 +360,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         }
         ModBridge.load(this);
         if (atlases != null) atlases.setBlockExtras(ModBridge.blocks);
+        if (atlases != null && ModBridge.items != null && ModBridge.items.hasAtlasStrip()) atlases.setItemExtras(ModBridge.items.extras);
         // the block atlas is taller with mod textures: break/step particles must use the same scale
         if (nativeOk && atlases != null && ModBridge.blocks != null && ModBridge.blocks.hasAtlasStrip()) {
             try { nativeTerrainHeight(ModBlocks.ATLAS_H); } catch (Throwable t) { Log.w(TAG, "particles", t); }
@@ -459,13 +460,19 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
                 byte[] m = mb.terrainMeta(super.getFileDataBytes(path));
                 if (m != null) return m;
             }
-            if (np0.startsWith("loc/") && np0.endsWith(".lang") && !mb.lang.isEmpty()) {
+        }
+        // mod block and item names in every language file
+        if (np0 != null && np0.startsWith("loc/") && np0.endsWith(".lang")) {
+            ModItems mi = ModBridge.items;
+            boolean hb = mb != null && !mb.lang.isEmpty(), hi = mi != null && !mi.lang.isEmpty();
+            if (hb || hi) {
                 byte[] base = override(path) != null ? readOverride(path) : super.getFileDataBytes(path);
                 if (base != null) {
-                    byte[] add = mb.langLines();
-                    byte[] all = new byte[base.length + add.length];
+                    byte[] a1 = hb ? mb.langLines() : new byte[0], a2 = hi ? mi.langLines() : new byte[0];
+                    byte[] all = new byte[base.length + a1.length + a2.length];
                     System.arraycopy(base, 0, all, 0, base.length);
-                    System.arraycopy(add, 0, all, base.length, add.length);
+                    System.arraycopy(a1, 0, all, base.length, a1.length);
+                    System.arraycopy(a2, 0, all, base.length + a1.length, a2.length);
                     return all;
                 }
             }

@@ -117,6 +117,7 @@ static void h_jump(void *e) {
     float s = sc_of(e);
     float *mo = (float *)((char *)e + 0x2c);
     float x0 = mo[0], z0 = mo[2];
+    if (e == mm_player() && mm_fire(EV_PLAYER_JUMP, 0, 0, 0)) return;     /* mod cancelled the jump */
     o_jump(e);
     if (s == 1.f) return;
     mo[1] *= s;                               /* jump impulse; the sprint boost is added on top of x/z */

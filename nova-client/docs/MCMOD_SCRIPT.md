@@ -62,6 +62,10 @@ on world.join(e) { ... }          // вошёл в мир
 on block.break(e) {               // e.x e.y e.z e.block e.data e.item
     if e.block == 1 { e.cancel() }   // отменить действие игры
 }
+on player.jump(e) { }             // прыжок (e.cancel() — не прыгать)
+on player.sneak(e) { }            // e.sneaking = 1 / 0
+on block.use(e) { }               // тап по блоку: e.x e.y e.z e.face e.block e.item
+on entity.attack(e) { }           // удар: e.target (номер сущности), e.type, e.item
 on chat(e) {                      // e.text — что написал игрок (команды тоже)
     if e.text == "/heal" { player.setHealth(20); e.cancel() }
 }
@@ -147,6 +151,35 @@ block shelf {
 
 Общие поля: `name`, `hardness`, `resistance`, `light` (0..15), `sound`, `transparent` (true — прозрачные части
 текстуры), `id` (свой номер 1..255, по умолчанию выдаётся сам из 210..242 и запоминается).
+
+## Свои предметы
+
+```
+item ruby {
+    name: {ru: "Рубин", en: "Ruby"}
+    texture: "textures/ruby.png"      // квадратная картинка любого размера (16, 32, 64...)
+}
+
+item big_sword {
+    texture: "textures/big_sword.png"
+    size: "pixel"                      // 32x32 -> в руке в 2 раза больше обычного предмета
+    hand: "tool"                       // держать как оружие/инструмент
+    durability: 500
+}
+
+item wand {
+    texture: "textures/wand.png"
+    action: "Построить"                // своя кнопка действия, пока предмет в руке -> on action(e)
+}
+```
+
+`size`: `"hd"` (по умолчанию) — обычный размер, лишние пиксели дают детальность; `"pixel"` — каждый пиксель
+как у обычного предмета, большая картинка = большой предмет в руке. Текстура может быть и предметом игры (`"apple"`).
+Ещё: `stack` (1..64), `category` (`"tools"`, `"items"`). Имя предмета — его номер: `if e.item == wand { ... }`.
+
+## Своя кнопка действия
+
+`ui.action("Сесть")` — показать кнопку (как у лодки), `ui.action("")` — убрать. Нажатие — событие `on action(e)`.
 
 ## Блоки и предметы
 

@@ -112,6 +112,11 @@ GATES = [
     ('mob_jump', 0x4cfc7c, '_ZN3Mob14jumpFromGroundEv'),
     ('setup_pos', 0x43a064, '_ZN11MobRenderer13setupPositionER6EntityRK4Vec3R6Matrix'),
     ('chat_send', 0x314db8, '_ZN10ChatScreen15sendChatMessageEv'),
+    ('can_interact', 0x386204, '_ZNK21MinecraftInputHandler11canInteractEv'),
+    ('interact_text', 0x386268, '_ZNK21MinecraftInputHandler15getInteractTextEv'),
+    ('interact_press', 0x343fb4, '_ZN15MinecraftClient25handleInteractButtonPressEv'),
+    ('render_item', 0x485d1c, '_ZN18ItemInHandRenderer10renderItemER6EntityRK12ItemInstancef'),
+    ('render_obj', 0x444450, '_ZN18ItemInHandRenderer13_renderObjectERK10RenderCallb'),
 ]
 import re as _re
 _GATE_MOVED = {}
@@ -182,7 +187,7 @@ def write_cave(buf):
         p_type, p_off, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags = struct.unpack_from('<7I', buf, o)
         if p_type == 1 and p_flags & 1:
             new_end = CAVE0 + CAVE_SIZE * len(GATES)
-            assert p_off == 0 and p_vaddr == 0 and p_filesz == p_memsz <= CAVE0 and new_end < 0x6ea000
+            assert p_off == 0 and p_vaddr == 0 and p_filesz == p_memsz <= CAVE0 and new_end <= 0x6ea160   # up to the RW segment's file offset: 31 gates
             struct.pack_into('<II', buf, o + 16, new_end, new_end)
             print('text segment: filesz %#x -> %#x' % (p_filesz, new_end))
     # header for libnova

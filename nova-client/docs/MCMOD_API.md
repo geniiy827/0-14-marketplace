@@ -60,6 +60,33 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `math.cos(deg:num)` | num | работает | Косинус угла в градусах |
 | `math.dist(x1:num, y1:num, z1:num, x2:num, y2:num, z2:num)` | num | работает | Расстояние между двумя точками |
 | `math.pi()` | num | работает | Число пи |
+| `math.tan(deg:num)` | num | работает | Тангенс угла в градусах |
+| `math.asin(x:num)` | num | работает | Арксинус (градусы) |
+| `math.acos(x:num)` | num | работает | Арккосинус (градусы) |
+| `math.atan(x:num)` | num | работает | Арктангенс (градусы) |
+| `math.atan2(y:num, x:num)` | num | работает | Угол точки (x, y) в градусах, -180..180 |
+| `math.pow(x:num, p:num)` | num | работает | x в степени p |
+| `math.exp(x:num)` | num | работает | e в степени x |
+| `math.log(x:num, base:num=null)` | num | работает | Логарифм: натуральный или по основанию base |
+| `math.sign(x:num)` | num | работает | Знак: -1, 0 или 1 |
+| `math.mod(x:num, m:num)` | num | работает | Остаток всегда 0..m (в отличие от %, который бывает отрицательным) |
+| `math.lerp(a:num, b:num, t:num)` | num | работает | Плавный переход от a к b (t = 0..1) |
+| `math.map(x:num, a1:num, b1:num, a2:num, b2:num)` | num | работает | Перевод x из диапазона a1..b1 в a2..b2 |
+| `math.roundTo(x:num, digits:num)` | num | работает | Округлить до digits знаков после запятой |
+| `math.snap(x:num, step:num)` | num | работает | Округлить к ближайшему кратному step |
+| `math.hypot(x:num, y:num)` | num | работает | Длина вектора (x, y) |
+| `math.rad(deg:num)` | num | работает | Градусы → радианы |
+| `math.deg(rad:num)` | num | работает | Радианы → градусы |
+| `math.angleDiff(a:num, b:num)` | num | работает | Кратчайшая разница углов b - a, -180..180 |
+| `math.rand(a:num, b:num)` | num | работает | Случайное дробное от a до b |
+| `math.randInt(a:num, b:num)` | num | работает | Случайное целое от a до b включительно |
+| `math.chance(p:num)` | bool | работает | true с вероятностью p (0..1) |
+| `math.sum(list:any)` | num | работает | Сумма чисел списка |
+| `math.avg(list:any)` | num | работает | Среднее чисел списка |
+| `math.minOf(list:any)` | num | работает | Наименьшее в списке |
+| `math.maxOf(list:any)` | num | работает | Наибольшее в списке |
+| `math.e()` | num | работает | Число e |
+| `math.noise(x:num, y:num=0, z:num=0)` | num | работает | Плавный шум (Perlin) -1..1: для ландшафта, колебаний, случайных но плавных значений |
 
 ## player
 
@@ -75,6 +102,11 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `player.id()` | num | в работе | Номер сущности игрока (для entity.*) |
 | `player.scale()` | num | в работе | Размер игрока (1 = обычный) |
 | `player.setScale(s:num)` | - | в работе | Изменить размер игрока: 0.0625 = 2 пикселя... 16 = великан. Камера и физика тоже |
+| `player.sneaking()` | bool | в работе | Игрок сидит (шифт) |
+| `player.onGround()` | bool | в работе | Игрок стоит на земле |
+| `player.item()` | num | в работе | Номер предмета в руке (0 — пусто) |
+| `player.itemData()` | num | в работе | Данные (aux) предмета в руке |
+| `player.target()` | map | в работе | Куда смотрит игрок: kind 0 — блок (x y z face), 1 — сущность (entity), -1 — ничего |
 
 ## ui
 
@@ -83,6 +115,27 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `ui.tip(text:any)` | - | в работе | Надпись над хотбаром на пару секунд |
 | `ui.popup(title:any, text:any="")` | - | в работе | Всплывающее сообщение игры (заголовок + текст) |
 | `ui.toast(title:any, text:any="")` | - | в работе | Уведомление NOVA сверху экрана |
+| `ui.action(text:str)` | - | в работе | Показать свою кнопку действия (как «Сесть» у лодки) с этой подписью; "" — убрать. Нажатие — событие action |
+
+## vec
+
+| функция | возвращает | статус | описание |
+|---|---|---|---|
+| `vec.new(x:num=0, y:num=0, z:num=0)` | any | работает | Новый вектор {x, y, z} |
+| `vec.add(a:any, b:any)` | any | работает | a + b |
+| `vec.sub(a:any, b:any)` | any | работает | a - b |
+| `vec.mul(a:any, k:num)` | any | работает | Вектор, умноженный на число |
+| `vec.dot(a:any, b:any)` | num | работает | Скалярное произведение |
+| `vec.cross(a:any, b:any)` | any | работает | Векторное произведение |
+| `vec.len(a:any)` | num | работает | Длина |
+| `vec.norm(a:any)` | any | работает | Вектор длины 1 (то же направление) |
+| `vec.dist(a:any, b:any)` | num | работает | Расстояние между точками |
+| `vec.lerp(a:any, b:any, t:num)` | any | работает | Точка между a и b (t = 0..1) |
+| `vec.floor(a:any)` | any | работает | Округлить вниз (координаты блока) |
+| `vec.rotY(a:any, deg:num)` | any | работает | Повернуть вокруг вертикали на deg градусов |
+| `vec.fromAngles(yaw:num, pitch:num)` | any | работает | Направление по углам (как взгляд игрока) |
+| `vec.yaw(a:any)` | num | работает | Горизонтальный угол направления (как player.yaw) |
+| `vec.pitch(a:any)` | num | работает | Вертикальный угол направления (как player.pitch) |
 
 ## world
 
@@ -104,3 +157,11 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `on world.leave(e)` | - | - | в работе | Игрок вышел из мира |
 | `on tick(e)` | - | - | в работе | 20 раз в секунду, пока игрок в мире. Удобнее: every 20 ticks { } |
 | `on chat(e)` | $text | да | в работе | Игрок отправил сообщение или команду (e.text). e.cancel() — не отправлять |
+| `on player.jump(e)` | - | да | в работе | Игрок прыгает. e.cancel() — не прыгать |
+| `on player.sneak(e)` | sneaking | - | в работе | Игрок присел или встал: e.sneaking = 1 / 0 |
+| `on block.use(e)` | x,y,z,face,block,data,item,itemData | да | в работе | Игрок тапнул по блоку (предметом в руке или рукой: item = 0). e.cancel() — ничего не делать |
+| `on block.break(e)` | x,y,z,block,data,item | да | в работе | Игрок сломал блок. e.cancel() — блок останется |
+| `on item.use(e)` | item,itemData | да | в работе | Игрок использует предмет в воздухе (еда, лук, ведро...). e.cancel() — отменить |
+| `on entity.attack(e)` | target,type,item | да | в работе | Игрок ударил сущность (e.target — её номер, e.type — тип). e.cancel() — без удара |
+| `on entity.use(e)` | target,type,item | да | в работе | Игрок тапнул по сущности (сесть в лодку, покормить...). e.cancel() — отменить |
+| `on action(e)` | item | - | в работе | Нажата своя кнопка действия (ui.action или action у предмета мода); e.item — предмет в руке |

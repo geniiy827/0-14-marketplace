@@ -3,3 +3,4 @@ chat.send	text:any	-	native:CHAT	wip	Сообщение в чат (видно т
 ui.tip	text:any	-	native:TIP	wip	Надпись над хотбаром на пару секунд
 ui.popup	title:any, text:any=""	-	native:POPUP	wip	Всплывающее сообщение игры (заголовок + текст)
 ui.toast	title:any, text:any=""	-	java:ui.toast	wip	Уведомление NOVA сверху экрана
+ui.action	text:str	-	native:UI_ACTION	wip	Показать свою кнопку действия (как «Сесть» у лодки) с этой подписью; "" — убрать. Нажатие — событие action

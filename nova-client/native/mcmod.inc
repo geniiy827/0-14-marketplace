@@ -29,6 +29,8 @@ static void *(*mf_item_lookup)(void *str, int b);
 static void *(*mf_block_lookup)(void *str, int b);
 
 static int sc_op(int op, const double *a, int n, double *out);
+static int ev_op(int op, const double *a, int n, char *s, double *out);
+static void ev_frame(void);
 static char *mm_player(void) { return g_client ? *(char **)((char *)g_client + 0x120) : 0; }
 static void *mm_region(void *pl) { return pl ? *(void **)((char *)pl + 0x16c) : 0; }
 
@@ -177,7 +179,8 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     static char s[2048];
     jstr_copy(env, jstr, s, sizeof s);
     double out[72];
-    int r = (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
+    int r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
+        : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
         ? sc_op(op, a, n, out) : mm_op(op, a, n, s, out);
     if (r < 0) return 0;
     void *arr = ((void *(*)(void *, int))f[182])(env, r);
@@ -374,10 +377,12 @@ static void mcmod_register_blocks(void) {
     LOG("mcmod: %d block(s) registered", done);
 }
 
+static void mcmod_register_items(void);
 static void (*o_init_creative)(void);
 static void h_init_creative(void) {
     o_init_creative();
     mcmod_register_blocks();
+    mcmod_register_items();
     for (int i = 0; i < mblock_count; i++)
         if (mblocks[i].block && mf_add_creative) mf_add_creative((short)mblocks[i].id, 0);
 }
@@ -436,9 +441,9 @@ static void mb_quad(float q[4][3], int face, const float *c, const MRot *r, floa
 static void mb_put(void *t, float q[4][3], const float *uv, float shade, float alpha, float px, float py, float pz, int outer_only) {
     float uvs[4][2] = {{uv[0], uv[1]}, {uv[2], uv[1]}, {uv[2], uv[3]}, {uv[0], uv[3]}};
     mf_tess_color(t, shade, shade, shade, alpha);
-    if (!outer_only)                                          /* q order faces inward; reversed = outward (CCW) */
-        for (int k = 0; k < 4; k++) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
-    for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
+    /* hand (one_side): only the q-order winding - the reversed one is lit black there (zebra / black face) */
+    for (int k = 0; k < 4; k++) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
+    if (!outer_only) for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
 }
 
 /* mode 0: world, 1: item in hand (tiny inset: touching cubes do not flicker), 2: inventory icon
@@ -551,6 +556,7 @@ static long mm_t0, mm_ticks;
 static void sc_frame(void);
 static void mcmod_frame(void *client) {
     sc_frame();
+    if (mm_ok) ev_frame();
     if (!mblocks_done && mblock_count) mcmod_register_blocks();   /* in case initCreativeItems ran before the definitions */
     if (!mm_ok) return;
     char *pl = *(char **)((char *)client + 0x120);

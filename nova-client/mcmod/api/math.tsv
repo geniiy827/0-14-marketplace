@@ -11,3 +11,30 @@ math.sin	deg:num	num	java:math.sin	ok	Синус угла в градусах
 math.cos	deg:num	num	java:math.cos	ok	Косинус угла в градусах
 math.dist	x1:num, y1:num, z1:num, x2:num, y2:num, z2:num	num	java:math.dist	ok	Расстояние между двумя точками
 math.pi	-	num	java:math.pi	ok	Число пи
+math.tan	deg:num	num	java:Lib	ok	Тангенс угла в градусах
+math.asin	x:num	num	java:Lib	ok	Арксинус (градусы)
+math.acos	x:num	num	java:Lib	ok	Арккосинус (градусы)
+math.atan	x:num	num	java:Lib	ok	Арктангенс (градусы)
+math.atan2	y:num, x:num	num	java:Lib	ok	Угол точки (x, y) в градусах, -180..180
+math.pow	x:num, p:num	num	java:Lib	ok	x в степени p
+math.exp	x:num	num	java:Lib	ok	e в степени x
+math.log	x:num, base:num=null	num	java:Lib	ok	Логарифм: натуральный или по основанию base
+math.sign	x:num	num	java:Lib	ok	Знак: -1, 0 или 1
+math.mod	x:num, m:num	num	java:Lib	ok	Остаток всегда 0..m (в отличие от %, который бывает отрицательным)
+math.lerp	a:num, b:num, t:num	num	java:Lib	ok	Плавный переход от a к b (t = 0..1)
+math.map	x:num, a1:num, b1:num, a2:num, b2:num	num	java:Lib	ok	Перевод x из диапазона a1..b1 в a2..b2
+math.roundTo	x:num, digits:num	num	java:Lib	ok	Округлить до digits знаков после запятой
+math.snap	x:num, step:num	num	java:Lib	ok	Округлить к ближайшему кратному step
+math.hypot	x:num, y:num	num	java:Lib	ok	Длина вектора (x, y)
+math.rad	deg:num	num	java:Lib	ok	Градусы → радианы
+math.deg	rad:num	num	java:Lib	ok	Радианы → градусы
+math.angleDiff	a:num, b:num	num	java:Lib	ok	Кратчайшая разница углов b - a, -180..180
+math.rand	a:num, b:num	num	java:Lib	ok	Случайное дробное от a до b
+math.randInt	a:num, b:num	num	java:Lib	ok	Случайное целое от a до b включительно
+math.chance	p:num	bool	java:Lib	ok	true с вероятностью p (0..1)
+math.sum	list:any	num	java:Lib	ok	Сумма чисел списка
+math.avg	list:any	num	java:Lib	ok	Среднее чисел списка
+math.minOf	list:any	num	java:Lib	ok	Наименьшее в списке
+math.maxOf	list:any	num	java:Lib	ok	Наибольшее в списке
+math.e	-	num	java:Lib	ok	Число e
+math.noise	x:num, y:num=0, z:num=0	num	java:Lib	ok	Плавный шум (Perlin) -1..1: для ландшафта, колебаний, случайных но плавных значений

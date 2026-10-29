@@ -9,3 +9,8 @@ player.look	-	vec	script	wip	Направление взгляда (единич
 player.id	-	num	native:PLAYER_ID	wip	Номер сущности игрока (для entity.*)
 player.scale	-	num	script	wip	Размер игрока (1 = обычный)
 player.setScale	s:num	-	script	wip	Изменить размер игрока: 0.0625 = 2 пикселя... 16 = великан. Камера и физика тоже
+player.sneaking	-	bool	native:PLAYER_STATE#0	wip	Игрок сидит (шифт)
+player.onGround	-	bool	native:PLAYER_STATE#1	wip	Игрок стоит на земле
+player.item	-	num	native:PLAYER_STATE#2	wip	Номер предмета в руке (0 — пусто)
+player.itemData	-	num	native:PLAYER_STATE#3	wip	Данные (aux) предмета в руке
+player.target	-	map	native:PLAYER_TARGET:kind,x,y,z,face,entity	wip	Куда смотрит игрок: kind 0 — блок (x y z face), 1 — сущность (entity), -1 — ничего

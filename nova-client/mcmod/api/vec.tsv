@@ -1,0 +1,16 @@
+# vec.* — векторы {x, y, z} (позиции, направления, скорости)
+vec.new	x:num=0, y:num=0, z:num=0	any	java:Lib	ok	Новый вектор {x, y, z}
+vec.add	a:any, b:any	any	java:Lib	ok	a + b
+vec.sub	a:any, b:any	any	java:Lib	ok	a - b
+vec.mul	a:any, k:num	any	java:Lib	ok	Вектор, умноженный на число
+vec.dot	a:any, b:any	num	java:Lib	ok	Скалярное произведение
+vec.cross	a:any, b:any	any	java:Lib	ok	Векторное произведение
+vec.len	a:any	num	java:Lib	ok	Длина
+vec.norm	a:any	any	java:Lib	ok	Вектор длины 1 (то же направление)
+vec.dist	a:any, b:any	num	java:Lib	ok	Расстояние между точками
+vec.lerp	a:any, b:any, t:num	any	java:Lib	ok	Точка между a и b (t = 0..1)
+vec.floor	a:any	any	java:Lib	ok	Округлить вниз (координаты блока)
+vec.rotY	a:any, deg:num	any	java:Lib	ok	Повернуть вокруг вертикали на deg градусов
+vec.fromAngles	yaw:num, pitch:num	any	java:Lib	ok	Направление по углам (как взгляд игрока)
+vec.yaw	a:any	num	java:Lib	ok	Горизонтальный угол направления (как player.yaw)
+vec.pitch	a:any	num	java:Lib	ok	Вертикальный угол направления (как player.pitch)
