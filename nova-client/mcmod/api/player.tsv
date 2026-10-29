@@ -6,3 +6,6 @@ player.pos	-	vec	native:PLAYER_POS	wip	Позиция {x, y, z}
 player.yaw	-	num	native:PLAYER_POS#3	wip	Поворот головы по горизонтали (градусы)
 player.pitch	-	num	native:PLAYER_POS#4	wip	Наклон головы (градусы, вниз = +)
 player.look	-	vec	script	wip	Направление взгляда (единичный вектор {x, y, z})
+player.id	-	num	native:PLAYER_ID	wip	Номер сущности игрока (для entity.*)
+player.scale	-	num	script	wip	Размер игрока (1 = обычный)
+player.setScale	s:num	-	script	wip	Изменить размер игрока: 0.0625 = 2 пикселя... 16 = великан. Камера и физика тоже

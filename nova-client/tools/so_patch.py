@@ -107,6 +107,11 @@ GATES = [
     ('tess_in_world', 0x3ec3c8, '_ZN16BlockTessellator17tessellateInWorldER5BlockRK8BlockPoshb'),
     ('tess_append', 0x42c2e0, '_ZN16BlockTessellator22appendTessellatedBlockERK9FullBlock'),
     ('gui_block', 0x42cf58, '_ZN16BlockTessellator14renderGuiBlockERK9FullBlockRKN3mce10TexturePtrEff'),
+    ('mob_travel', 0x4ca4d8, '_ZN3Mob6travelEff'),
+    ('entity_move', 0x4e60d8, '_ZN6Entity4moveERK4Vec3'),
+    ('mob_jump', 0x4cfc7c, '_ZN3Mob14jumpFromGroundEv'),
+    ('setup_pos', 0x43a064, '_ZN11MobRenderer13setupPositionER6EntityRK4Vec3R6Matrix'),
+    ('chat_send', 0x314db8, '_ZN10ChatScreen15sendChatMessageEv'),
 ]
 import re as _re
 _GATE_MOVED = {}

@@ -28,6 +28,7 @@ static void (*mf_settime)(void *lvl, int t);
 static void *(*mf_item_lookup)(void *str, int b);
 static void *(*mf_block_lookup)(void *str, int b);
 
+static int sc_op(int op, const double *a, int n, double *out);
 static char *mm_player(void) { return g_client ? *(char **)((char *)g_client + 0x120) : 0; }
 static void *mm_region(void *pl) { return pl ? *(void **)((char *)pl + 0x16c) : 0; }
 
@@ -175,8 +176,9 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     }
     static char s[2048];
     jstr_copy(env, jstr, s, sizeof s);
-    double out[8];
-    int r = mm_op(op, a, n, s, out);
+    double out[72];
+    int r = (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
+        ? sc_op(op, a, n, out) : mm_op(op, a, n, s, out);
     if (r < 0) return 0;
     void *arr = ((void *(*)(void *, int))f[182])(env, r);
     if (arr && r) ((void (*)(void *, void *, int, int, const double *))f[214])(env, arr, 0, r, out);
@@ -431,10 +433,11 @@ static void mb_quad(float q[4][3], int face, const float *c, const MRot *r, floa
 }
 
 /* both windings: the world draws back faces culled, so each side shows once */
-static void mb_put(void *t, float q[4][3], const float *uv, float shade, float alpha, float px, float py, float pz) {
+static void mb_put(void *t, float q[4][3], const float *uv, float shade, float alpha, float px, float py, float pz, int outer_only) {
     float uvs[4][2] = {{uv[0], uv[1]}, {uv[2], uv[1]}, {uv[2], uv[3]}, {uv[0], uv[3]}};
     mf_tess_color(t, shade, shade, shade, alpha);
-    for (int k = 0; k < 4; k++) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
+    if (!outer_only)                                          /* q order faces inward; reversed = outward (CCW) */
+        for (int k = 0; k < 4; k++) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
     for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
 }
 
@@ -452,7 +455,7 @@ static void mb_emit(void *t, ModBlock *m, float px, float py, float pz, float br
                 if (uv[0] < 0) continue;
                 float q[4][3];
                 mb_quad(q, f, c, &r, inset);
-                mb_put(t, q, uv, mb_shade[f] * bright, alpha, px, py, pz);
+                mb_put(t, q, uv, mb_shade[f] * bright, alpha, px, py, pz, mode == 1);   /* hand: no culling there, two windings striped */
             }
         }
         return;
@@ -493,7 +496,7 @@ static void mb_emit(void *t, ModBlock *m, float px, float py, float pz, float br
         while (j >= 0 && key[order[j]] > key[v]) { order[j + 1] = order[j]; j--; }
         order[j + 1] = v;
     }
-    for (int i = 0; i < n; i++) mb_put(t, qs[order[i]], quv[order[i]], qsh[order[i]], alpha, px, py, pz);
+    for (int i = 0; i < n; i++) mb_put(t, qs[order[i]], quv[order[i]], qsh[order[i]], alpha, px, py, pz, 0);
 }
 
 static ModBlock *mb_model_of_id(int id) {
@@ -545,7 +548,9 @@ static void h_gui(void *bt, unsigned char *fb, void *tex, float bright, float al
 /* world join / leave and ticks from the client loop (no game hooks) */
 static char *mm_last_pl;
 static long mm_t0, mm_ticks;
+static void sc_frame(void);
 static void mcmod_frame(void *client) {
+    sc_frame();
     if (!mblocks_done && mblock_count) mcmod_register_blocks();   /* in case initCreativeItems ran before the definitions */
     if (!mm_ok) return;
     char *pl = *(char **)((char *)client + 0x120);

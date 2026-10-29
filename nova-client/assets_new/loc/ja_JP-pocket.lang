@@ -3292,4 +3292,4 @@ nova.toast.crash=ゲームがクラッシュしました	#
 nova.shaders.title=シェーダー	#
 nova.mods.none=MODがありません	#
 nova.toast.mods=ワールドに入るとMODが動きます	#
-nova.version=NOVA alpha10	#
+nova.version=NOVA alpha11	#

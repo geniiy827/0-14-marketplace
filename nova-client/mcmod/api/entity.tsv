@@ -1,0 +1,6 @@
+# entity.* — мобы и другие сущности рядом с игроком (номер сущности = её постоянный id)
+entity.list	radius:num=16	list	native:ENTITY_LIST	wip	Номера сущностей в радиусе от игрока (без самого игрока, до 64)
+entity.type	e:num	num	native:ENTITY_INFO#0	wip	Тип сущности (номер как в игре: 12 свинья, 32 зомби...), null если нет
+entity.pos	e:num	vec	native:ENTITY_INFO:x,y,z	wip	Позиция (ноги)
+entity.scale	e:num	num	native:ENTITY_SCALE	wip	Размер (1 = обычный)
+entity.setScale	e:num, s:num	-	native:ENTITY_SET_SCALE	wip	Изменить размер (0.05..16): хитбокс, глаза, шаг, прыжок, скорость, модель — всё вместе

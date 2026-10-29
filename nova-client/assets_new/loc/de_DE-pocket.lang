@@ -3292,4 +3292,4 @@ nova.toast.crash=NOVA: Das Spiel ist abgestürzt	#
 nova.shaders.title=Shader	#
 nova.mods.none=Noch keine Mods. Importiere eine .mcmod-Datei im Tab Import	#
 nova.toast.mods=Mods starten beim Betreten einer Welt	#
-nova.version=NOVA alpha10	#
+nova.version=NOVA alpha11	#

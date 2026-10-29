@@ -28,3 +28,11 @@ fn __world_fill(x1, y1, z1, x2, y2, z2, block, data = 0) {
     return n
 }
 
+
+fn __player_scale() {
+    return entity.scale(player.id())
+}
+
+fn __player_setScale(s) {
+    entity.setScale(player.id(), s)
+}

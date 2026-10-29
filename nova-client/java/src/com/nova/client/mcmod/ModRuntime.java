@@ -227,6 +227,11 @@ public final class ModRuntime {
             return r[idx];
         }
         if (ret.equals("-")) return null;
+        if (ret.equals("list")) {
+            List<Object> l = new ArrayList<Object>();
+            for (double v : r) l.add(v);
+            return l;
+        }
         if (r.length == 0) return null;                       // entity / block entity not found
         if (ret.equals("bool")) return r[0] != 0;
         if (ret.equals("id")) return r[0] < 0 ? null : (Object) r[0];
