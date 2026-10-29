@@ -17,13 +17,9 @@ public class RestartActivity extends Activity {
     protected void onCreate(Bundle b) {
         NovaUi.fullscreen(this);
         super.onCreate(b);
+        // plain black: the game's intro (IntroView) is the loading screen
         FrameLayout root = new FrameLayout(this);
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setGravity(Gravity.CENTER);
-        col.addView(new McKit.Text(this, "N O V A", McKit.ACCENT).center(), new LinearLayout.LayoutParams(-1, -2));
-        col.addView(new McKit.Text(this, "Применяем наборы ресурсов...", McKit.WHITE).center(), new LinearLayout.LayoutParams(-1, -2));
-        root.addView(col, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+        root.setBackgroundColor(0xff000000);
         setContentView(root);
         new Handler().postDelayed(new Runnable() {
             public void run() {
@@ -36,6 +32,6 @@ public class RestartActivity extends Activity {
                     public void run() { android.os.Process.killProcess(android.os.Process.myPid()); }
                 }, 400);
             }
-        }, 900);
+        }, 500);
     }
 }

@@ -1,0 +1,25 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:ghast",
+      "textures": {
+        "default": "ghast.png",
+        "ghast_shooting": "ghast_shooting.tga"
+      },
+      "geometry": {
+        "default": "geometry.ghast"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/ghast.png": "ghast.png",
+          "images/mob/ghast_shooting.tga": "ghast_shooting.tga"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

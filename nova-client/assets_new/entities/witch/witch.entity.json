@@ -1,0 +1,31 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:witch",
+      "textures": {
+        "default": "witch.png"
+      },
+      "geometry": {
+        "default": "geometry.villager.witch"
+      },
+      "animations": {
+        "legs": "animation.villager.legs",
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "legs",
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/witch.png": "witch.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

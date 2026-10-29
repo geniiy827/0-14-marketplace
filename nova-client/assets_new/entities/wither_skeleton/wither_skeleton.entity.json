@@ -1,0 +1,31 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:wither_skeleton",
+      "textures": {
+        "default": "wither_skeleton.png"
+      },
+      "geometry": {
+        "default": "geometry.skeleton"
+      },
+      "animations": {
+        "legs": "animation.humanoid.legs",
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "legs",
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/wither_skeleton.png": "wither_skeleton.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

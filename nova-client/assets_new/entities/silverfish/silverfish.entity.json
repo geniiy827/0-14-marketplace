@@ -1,0 +1,41 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:silverfish",
+      "textures": {
+        "default": "silverfish.png"
+      },
+      "geometry": {
+        "default": "geometry.silverfish"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/silverfish.png": "silverfish.png"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "SilverfishModel",
+            "geometry": "geometry.silverfish",
+            "when": null,
+            "parts": {
+              "bodyPart_0": 220,
+              "bodyPart_1": 380,
+              "bodyPart_2": 540,
+              "bodyPart_3": 700,
+              "bodyPart_4": 860,
+              "bodyPart_5": 1020,
+              "bodyPart_6": 1180,
+              "bodyLayer_0": 1340,
+              "bodyLayer_1": 1500,
+              "bodyLayer_2": 1660
+            }
+          }
+        ]
+      }
+    }
+  }
+}

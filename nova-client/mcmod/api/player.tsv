@@ -1,0 +1,8 @@
+# player.* — локальный игрок (только чтение, без хуков игры)
+player.x	-	num	native:PLAYER_POS#0	wip	Координата X (ноги)
+player.y	-	num	native:PLAYER_POS#1	wip	Координата Y (ноги)
+player.z	-	num	native:PLAYER_POS#2	wip	Координата Z (ноги)
+player.pos	-	vec	native:PLAYER_POS	wip	Позиция {x, y, z}
+player.yaw	-	num	native:PLAYER_POS#3	wip	Поворот головы по горизонтали (градусы)
+player.pitch	-	num	native:PLAYER_POS#4	wip	Наклон головы (градусы, вниз = +)
+player.look	-	vec	script	wip	Направление взгляда (единичный вектор {x, y, z})

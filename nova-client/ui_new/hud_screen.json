@@ -723,6 +723,19 @@
       { "curor_rend@cursor_renderer": { } },
       { "debug_overlay_rend@debug_overlay_renderer": { } },
       {
+        // NOVA: paper doll (live player). libnova sizes/places it from the
+        // NOVA settings and hides it when the option is off.
+        "nova_doll": {
+          "type": "custom",
+          "renderer": "live_player_renderer",
+          "size": [ 24, 36 ],
+          "offset": [ 4, 4 ],
+          "anchor_from": "top_left",
+          "anchor_to": "top_left",
+          "layer": 1
+        }
+      },
+      {
         "progress_rend@progress_indicator_renderer": {
           "offset": [ "50%", "50%" ]
         }

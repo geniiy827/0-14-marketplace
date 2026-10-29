@@ -1,0 +1,33 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:creeper",
+      "textures": {
+        "default": "creeper.png",
+        "creeper_armor": "creeper_armor.png"
+      },
+      "geometry": {
+        "default": "geometry.creeper"
+      },
+      "animations": {
+        "legs": "animation.creeper.legs",
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "legs",
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/creeper.png": "creeper.png",
+          "images/mob/creeper_armor.png": "creeper_armor.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:rabbit",
+      "textures": {
+        "default": "brown.png",
+        "white": "white.png",
+        "blackrabbit": "blackrabbit.png",
+        "gold": "gold.png",
+        "salt": "salt.png",
+        "white_splotched": "white_splotched.png",
+        "toast": "toast.png"
+      },
+      "geometry": {
+        "default": "geometry.rabbit"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/rabbit/brown.png": "brown.png",
+          "images/mob/rabbit/white.png": "white.png",
+          "images/mob/rabbit/blackrabbit.png": "blackrabbit.png",
+          "images/mob/rabbit/gold.png": "gold.png",
+          "images/mob/rabbit/salt.png": "salt.png",
+          "images/mob/rabbit/white_splotched.png": "white_splotched.png",
+          "images/mob/rabbit/toast.png": "toast.png"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "RabbitModel",
+            "geometry": "geometry.rabbit",
+            "when": null,
+            "parts": {
+              "rearFootLeft": 180,
+              "rearFootRight": 340,
+              "haunchLeft": 500,
+              "haunchRight": 660,
+              "body": 820,
+              "frontLegLeft": 980,
+              "frontLegRight": 1140,
+              "head": 1300,
+              "earRight": 1460,
+              "earLeft": 1620,
+              "tail": 1780,
+              "nose": 1940
+            }
+          }
+        ]
+      }
+    }
+  }
+}

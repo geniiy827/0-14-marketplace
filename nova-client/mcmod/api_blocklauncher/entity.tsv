@@ -1,0 +1,44 @@
+# entity.* — любая сущность по id (мобы, предметы, стрелы, игрок). id приходит из событий, world.spawn, world.entities()
+entity.exists	id:num	bool	native:ENT_EXISTS	wip	Существует ли сущность
+entity.type	id:num	num	native:ENT_TYPE	wip	Номер типа (10 курица, 32 зомби, 64 предмет ...)
+entity.typeName	id:num	str	nativestr:ENT_TYPE_NAME	wip	Имя типа ("zombie", "pig" ...)
+entity.x	id:num	num	native:ENT_POS#0	wip	X
+entity.y	id:num	num	native:ENT_POS#1	wip	Y
+entity.z	id:num	num	native:ENT_POS#2	wip	Z
+entity.pos	id:num	vec	native:ENT_POS	wip	Позиция {x, y, z}
+entity.setPos	id:num, x:num, y:num, z:num	-	native:ENT_SET_POS	wip	Переместить
+entity.move	id:num, dx:num, dy:num, dz:num	-	native:ENT_MOVE	wip	Сдвинуть на dx, dy, dz
+entity.vel	id:num	vec	native:ENT_VEL	wip	Скорость {x, y, z}
+entity.setVel	id:num, vx:num, vy:num, vz:num	-	native:ENT_SET_VEL	wip	Задать скорость (подбросить, оттолкнуть)
+entity.yaw	id:num	num	native:ENT_POS#3	wip	Поворот
+entity.pitch	id:num	num	native:ENT_POS#4	wip	Наклон
+entity.setRot	id:num, yaw:num, pitch:num	-	native:ENT_SET_ROT	wip	Повернуть
+entity.health	id:num	num	native:ENT_HEALTH#0	wip	Здоровье
+entity.maxHealth	id:num	num	native:ENT_HEALTH#1	wip	Максимум здоровья
+entity.setHealth	id:num, hp:num	-	native:ENT_SET_HEALTH	wip	Задать здоровье
+entity.setMaxHealth	id:num, hp:num	-	native:ENT_SET_MAXHEALTH	wip	Задать максимум здоровья
+entity.remove	id:num	-	native:ENT_REMOVE	wip	Удалить сущность
+entity.nameTag	id:num	str	nativestr:ENT_NAME	wip	Табличка с именем
+entity.setNameTag	id:num, name:str	-	native:ENT_SET_NAME	wip	Задать табличку с именем
+entity.setFire	id:num, seconds:num	-	native:ENT_FIRE	wip	Поджечь на N секунд
+entity.ride	rider:num, mount:any	-	native:ENT_RIDE	wip	Посадить rider на mount (mount = null: слезть)
+entity.riding	id:num	id	native:ENT_RIDING#0	wip	На ком сидит (id или null)
+entity.rider	id:num	id	native:ENT_RIDING#1	wip	Кто сидит сверху (id или null)
+entity.target	id:num	id	native:ENT_TARGET	wip	Цель моба (id или null)
+entity.setTarget	id:num, target:any	-	native:ENT_SET_TARGET	wip	Натравить моба на цель (null = сбросить)
+entity.isSneaking	id:num	bool	native:ENT_SNEAK	wip	Крадётся ли
+entity.setSneaking	id:num, on:bool	-	native:ENT_SET_SNEAK	wip	Заставить красться
+entity.age	id:num	num	native:ENT_AGE	wip	Возраст животного (<0 детёныш)
+entity.setAge	id:num, age:num	-	native:ENT_SET_AGE	wip	Задать возраст (-24000 детёныш)
+entity.isBaby	id:num	bool	native:ENT_BABY	wip	Зомби-ребёнок?
+entity.setBaby	id:num, on:bool	-	native:ENT_SET_BABY	wip	Сделать зомби ребёнком
+entity.addEffect	id:num, effect:num, seconds:num, level:num=0, ambient:bool=false, particles:bool=true	-	native:ENT_ADD_EFFECT	wip	Наложить эффект (номер: 1 скорость, 5 сила, 10 регенерация ...)
+entity.removeEffect	id:num, effect:num	-	native:ENT_REMOVE_EFFECT	wip	Снять эффект
+entity.clearEffects	id:num	-	native:ENT_CLEAR_EFFECTS	wip	Снять все эффекты
+entity.carriedItem	id:num	map	native:ENT_CARRIED:id,data,count	wip	Предмет в руке моба {id, data, count}
+entity.setCarriedItem	id:num, item:item, count:num=1, data:num=0	-	native:ENT_SET_CARRIED	wip	Дать мобу предмет в руку
+entity.armor	id:num, slot:num	map	native:ENT_ARMOR:id,data,count	wip	Броня моба в слоте 0..3
+entity.setArmor	id:num, slot:num, item:item, data:num=0	-	native:ENT_SET_ARMOR	wip	Надеть броню на моба
+entity.itemOf	id:num	map	native:ENT_ITEM:id,data,count	wip	Что лежит в сущности-предмете {id, data, count}
+entity.setSize	id:num, width:num, height:num	-	native:ENT_SET_SIZE	wip	Размер хитбокса
+entity.setCamera	id:num	-	native:ENT_CAMERA	wip	Смотреть глазами этой сущности (player.id() - вернуть)

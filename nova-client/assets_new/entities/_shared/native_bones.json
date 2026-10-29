@@ -1,0 +1,310 @@
+{
+  "geometry.bat": [
+    "head",
+    "rightEar",
+    "leftEar",
+    "body",
+    "rightWing",
+    "rightWingTip",
+    "leftWing",
+    "leftWingTip"
+  ],
+  "geometry.cow": [
+    "body",
+    "head",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3"
+  ],
+  "geometry.creeper": [
+    "body",
+    "head",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3"
+  ],
+  "geometry.creeper.charged": [
+    "body",
+    "head",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3"
+  ],
+  "geometry.enderman": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.ghast": [
+    "body"
+  ],
+  "geometry.humanoid.armor1": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.humanoid.armor2": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.irongolem": [
+    "body",
+    "head",
+    "arm0",
+    "arm1",
+    "leg0",
+    "leg1"
+  ],
+  "geometry.ocelot": [
+    "head",
+    "body",
+    "tail1",
+    "tail2",
+    "backLegL",
+    "backLegR",
+    "frontLegL",
+    "frontLegR"
+  ],
+  "geometry.pig": [
+    "body",
+    "head",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3"
+  ],
+  "geometry.pigzombie": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.pigzombie.baby": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.quadruped": [
+    "body",
+    "head",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3"
+  ],
+  "geometry.sheep": [
+    "body",
+    "head",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3"
+  ],
+  "geometry.sheep.sheared": [
+    "body",
+    "head",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3"
+  ],
+  "geometry.skeleton": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.snowgolem": [
+    "head",
+    "arm1",
+    "arm2",
+    "piece1",
+    "piece2"
+  ],
+  "geometry.spider": [
+    "head",
+    "body0",
+    "body1",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3",
+    "leg4",
+    "leg5",
+    "leg6",
+    "leg7"
+  ],
+  "geometry.squid": [
+    "body",
+    "tentacle1",
+    "tentacle2",
+    "tentacle3",
+    "tentacle4",
+    "tentacle5",
+    "tentacle6",
+    "tentacle7",
+    "tentacle8"
+  ],
+  "geometry.villager": [
+    "head",
+    "nose",
+    "body",
+    "arms",
+    "leg0",
+    "leg1"
+  ],
+  "geometry.villager.witch": [
+    "head",
+    "nose",
+    "body",
+    "arms",
+    "leg0",
+    "leg1",
+    "hat",
+    "hat2",
+    "hat3",
+    "hat4"
+  ],
+  "geometry.wolf": [
+    "head",
+    "body",
+    "upperBody",
+    "leg0",
+    "leg1",
+    "leg2",
+    "leg3",
+    "tail"
+  ],
+  "geometry.zombie": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.zombie.villager": [
+    "body",
+    "head",
+    "hat",
+    "rightArm",
+    "leftArm",
+    "rightLeg",
+    "leftLeg"
+  ],
+  "geometry.chicken": [
+    "beak",
+    "body",
+    "comb",
+    "head",
+    "leg0",
+    "leg1",
+    "wing0",
+    "wing1"
+  ],
+  "geometry.rabbit": [
+    "body",
+    "earLeft",
+    "earRight",
+    "frontLegLeft",
+    "frontLegRight",
+    "haunchLeft",
+    "haunchRight",
+    "head",
+    "nose",
+    "rearFootLeft",
+    "rearFootRight",
+    "tail"
+  ],
+  "geometry.blaze": [
+    "head",
+    "upperBodyParts0",
+    "upperBodyParts1",
+    "upperBodyParts10",
+    "upperBodyParts11",
+    "upperBodyParts2",
+    "upperBodyParts3",
+    "upperBodyParts4",
+    "upperBodyParts5",
+    "upperBodyParts6",
+    "upperBodyParts7",
+    "upperBodyParts8",
+    "upperBodyParts9"
+  ],
+  "geometry.slime": [
+    "cube",
+    "eye0",
+    "eye1",
+    "mouth"
+  ],
+  "geometry.slime.armor": [
+    "cube",
+    "eye0",
+    "eye1",
+    "mouth"
+  ],
+  "geometry.magma_cube": [
+    "bodyCube_0",
+    "bodyCube_1",
+    "bodyCube_2",
+    "bodyCube_3",
+    "bodyCube_4",
+    "bodyCube_5",
+    "bodyCube_6",
+    "bodyCube_7",
+    "insideCube"
+  ],
+  "geometry.silverfish": [
+    "bodyLayer_0",
+    "bodyLayer_1",
+    "bodyLayer_2",
+    "bodyPart_0",
+    "bodyPart_1",
+    "bodyPart_2",
+    "bodyPart_3",
+    "bodyPart_4",
+    "bodyPart_5",
+    "bodyPart_6"
+  ],
+  "geometry.boat": [
+    "back",
+    "bottom",
+    "front",
+    "left",
+    "right"
+  ],
+  "geometry.minecart": [
+    "back",
+    "bottom",
+    "front",
+    "left",
+    "right"
+  ]
+}

@@ -1,0 +1,8 @@
+# базовые функции (без группы)
+print	value:any	-	java:print	ok	Пишет значение в чат (для отладки) и в лог
+str	value:any	str	java:str	ok	Превращает значение в строку
+num	value:any	num	java:num	ok	Превращает строку в число (null, если не число)
+int	value:num	num	java:int	ok	Отбрасывает дробную часть
+len	value:any	num	java:len	ok	Длина строки, списка или таблицы
+type	value:any	str	java:type	ok	Тип значения: number string bool list map fn null
+random	a:any=null, b:any=null	num	java:random	ok	random() дробное 0..1; random(a, b) целое от a до b включительно (если a и b целые); random(n) целое 0..n

@@ -1,0 +1,21 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:fishing_hook",
+      "textures": {
+        "default": "fishhook.png"
+      },
+      "geometry": {},
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/entity/fishhook.png": "fishhook.png"
+        },
+        "model": "native",
+        "rebuild": []
+      }
+    }
+  }
+}

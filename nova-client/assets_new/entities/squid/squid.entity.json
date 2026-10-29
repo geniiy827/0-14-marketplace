@@ -1,0 +1,23 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:squid",
+      "textures": {
+        "default": "squid.png"
+      },
+      "geometry": {
+        "default": "geometry.squid"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/squid.png": "squid.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

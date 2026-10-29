@@ -1,0 +1,52 @@
+// language test
+var count = 0
+var names = ["a", "b", "c"]
+var cfg = {
+    power: 2,
+    msg: "hi"
+}
+
+fn greet(who, excl = "!") {
+    return "Привет, {who}{excl}"
+}
+
+on world.join(e) {
+    chat(greet("Steve"))
+    chat("pos {player.x()} {player.y()} {player.z()} hp {player.health()}/{player.maxHealth()}")
+    chat("look {player.look()}")
+    var s = 0
+    for i in 1..10 { s += i }
+    chat("sum {s}, names {names.join("-")}, len {len(names)}, cfg {cfg}")
+    if s > 50 and not false { chat("big") } else { chat("small") }
+    var i = 0
+    while true {
+        i += 1
+        if i == 3 { continue }
+        if i > 5 { break }
+    }
+    chat("i={i} day={world.day()} {"a,b,c".split(",")} {math.round(2.6)} {10 % 3} {type(cfg)} \{literal\}")
+    world.setBlock(1, 2, 3, "stone")
+    player.give("diamond", 3)
+    world.fill(0, 0, 0, 1, 1, 1, 1)
+}
+
+every 20 ticks {
+    count += 1
+    chat("tick {count}")
+}
+
+on block.break(e) {
+    chat("break {e.x},{e.y},{e.z} block {e.block} item {e.item}")
+    if e.item == 278 { e.cancel() }
+}
+
+on chat(e) {
+    if e.text.starts("/heal") {
+        player.heal(4)
+        e.cancel()
+    }
+}
+
+override chat.send(text) {
+    original("§b> " + text)
+}

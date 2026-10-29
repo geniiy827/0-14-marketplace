@@ -1,0 +1,3 @@
+# game.* — игра в целом
+game.leave	-	-	native:GAME_LEAVE	wip	Выйти из мира в меню
+game.setSpeed	ticksPerSecond:num	-	native:GAME_SPEED	wip	Скорость игры (20 = обычная)

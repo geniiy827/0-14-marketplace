@@ -38,7 +38,7 @@ public final class PackManager {
     private PackManager() { }
 
     public static final long MAX_PACK_BYTES = 128L * 1024 * 1024;
-    private static final Pattern UUID_RE = Pattern.compile("[A-Za-z0-9-]{8,64}");
+    private static final Pattern UUID_RE = Pattern.compile("[A-Za-z0-9_-]{4,64}");
 
     public static final class PackException extends Exception {
         public PackException(String msg) { super(msg); }
@@ -50,6 +50,8 @@ public final class PackManager {
         public long size;
         public File dir;
         public boolean enabled;
+        public boolean mod;                  // .mcmod (mod.json) instead of a resource pack
+        public String main = "main.mcs";
 
         public String versionString() { return version[0] + "." + version[1] + "." + version[2]; }
         public File icon() { return new File(dir, "pack_icon.png"); }
@@ -143,7 +145,8 @@ public final class PackManager {
 
     private static Pack load(File dir) {
         try {
-            Pack p = parseManifest(readText(new File(dir, "manifest.json")));
+            File mj = new File(dir, "mod.json");
+            Pack p = mj.isFile() ? parseModJson(readText(mj)) : parseManifest(readText(new File(dir, "manifest.json")));
             p.dir = dir;
             JSONObject meta = new JSONObject(readText(new File(dir, "nova_meta.json")));
             p.source = meta.optString("source", "user");
@@ -176,6 +179,31 @@ public final class PackManager {
             return p;
         } catch (org.json.JSONException e) {
             throw new PackException("Ошибка в manifest.json: " + e.getMessage());
+        }
+    }
+
+    /** mod.json of a .mcmod: {"id", "name", "version": "1.0.0", "author", "description", "main"} */
+    static Pack parseModJson(String json) throws PackException {
+        try {
+            JSONObject m = new JSONObject(json);
+            Pack p = new Pack();
+            p.mod = true;
+            String id = m.optString("id", "").trim().toLowerCase(java.util.Locale.US);
+            if (!id.matches("[a-z0-9_-]{2,48}"))
+                throw new PackException("В mod.json нужен \"id\": латиница, цифры, _ или - (2-48 символов)");
+            p.uuid = "mod-" + id;
+            p.name = m.optString("name", id).trim();
+            if (p.name.isEmpty()) p.name = id;
+            p.description = m.optString("description", "");
+            p.author = m.optString("author", "");
+            p.main = m.optString("main", "main.mcs");
+            String[] v = m.optString("version", "1.0.0").split("\\.");
+            for (int i = 0; i < 3 && i < v.length; i++) {
+                try { p.version[i] = Integer.parseInt(v[i].replaceAll("[^0-9]", "")); } catch (Exception ignored) { }
+            }
+            return p;
+        } catch (org.json.JSONException e) {
+            throw new PackException("Ошибка в mod.json: " + e.getMessage());
         }
     }
 
@@ -224,14 +252,17 @@ public final class PackManager {
             zip = new ZipFile(tmp);
         } catch (IOException e) {
             tmp.delete();
-            throw new PackException("Это не набор ресурсов .mcres (файл не является архивом)");
+            throw new PackException("Файл не является архивом .mcres / .mcmod");
         }
         File dir = null;
         try {
             ZipEntry me = zip.getEntry("manifest.json");
-            if (me == null) throw new PackException("В архиве нет manifest.json");
-            String manifestText = new String(readAll(zip.getInputStream(me)), "UTF-8");
-            Pack p = parseManifest(manifestText);
+            ZipEntry mm = zip.getEntry("mod.json");
+            if (me == null && mm == null) throw new PackException("В архиве нет manifest.json (набор ресурсов) или mod.json (мод)");
+            boolean isMod = mm != null;
+            String manifestText = new String(readAll(zip.getInputStream(isMod ? mm : me)), "UTF-8");
+            Pack p = isMod ? parseModJson(manifestText) : parseManifest(manifestText);
+            if (isMod && zip.getEntry(p.main) == null) throw new PackException("В моде нет файла " + p.main);
 
             dir = new File(packsDir(c), p.uuid);
             boolean wasEnabled = enabledOrder(c).contains(p.uuid);
@@ -246,12 +277,12 @@ public final class PackManager {
                 ZipEntry e = en.nextElement();
                 if (e.isDirectory()) continue;
                 String name = e.getName().replace('\\', '/');
-                if (name.equals("manifest.json")) continue;
-                if (name.equals("pack_icon.png")) {
+                if (name.equals(isMod ? "mod.json" : "manifest.json")) continue;
+                if (name.equals("pack_icon.png") || (isMod && name.equals("icon.png"))) {
                     copy(zip.getInputStream(e), new File(dir, "pack_icon.png"));
                     continue;
                 }
-                if (name.startsWith("assets/")) name = name.substring(7);
+                if (!isMod && name.startsWith("assets/")) name = name.substring(7);
                 if (name.isEmpty() || name.startsWith("/") || name.contains("../") || name.startsWith("..")) continue;
                 File target = new File(files, name);
                 if (!target.getCanonicalPath().startsWith(canonFiles)) continue; // zip-slip guard
@@ -261,7 +292,7 @@ public final class PackManager {
             }
             if (count == 0) throw new PackException("В наборе нет ни одного файла ресурсов (папка assets/ пуста)");
 
-            writeText(new File(dir, "manifest.json"), manifestText);
+            writeText(new File(dir, isMod ? "mod.json" : "manifest.json"), manifestText);
             JSONObject meta = new JSONObject();
             meta.put("source", source);
             meta.put("sha1", sha1);
@@ -301,7 +332,8 @@ public final class PackManager {
         List<String> order = enabledOrder(c);
         for (int i = order.size() - 1; i >= 0; i--) {  // lowest priority first, higher ones overwrite
             File files = new File(new File(packsDir(c), order.get(i)), "files");
-            if (files.isDirectory()) addTree(idx, files, "");
+            // mods (mod.json) are run by ModRuntime, they are not resource overrides
+            if (files.isDirectory() && !new File(new File(packsDir(c), order.get(i)), "mod.json").isFile()) addTree(idx, files, "");
         }
         return idx;
     }

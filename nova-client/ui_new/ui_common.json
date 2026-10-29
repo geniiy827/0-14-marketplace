@@ -332,6 +332,16 @@
     "to": 1
   },
 
+  // NOVA: toast slot (libnova draws the Bedrock-style toast here)
+  "nova_toast": {
+    "type": "custom",
+    "renderer": "debug_overlay_renderer",
+    "size": [ "100%", 40 ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "layer": 100
+  },
+
   "nova_watermark": {
     "type": "label",
     "localize": false,

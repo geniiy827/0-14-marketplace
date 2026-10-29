@@ -1,0 +1,20 @@
+# item.* и block.* — свойства предметов и блоков
+item.id	name:str	num	native:ITEM_ID	wip	Номер предмета или блока по имени ("diamond_sword"), -1 если нет
+item.name	item:item, data:num=0	str	nativestr:ITEM_NAME	wip	Название предмета на языке игры
+item.isValid	item:num	bool	native:ITEM_INFO#0	wip	Есть ли предмет с таким номером
+item.maxStack	item:item	num	native:ITEM_INFO#1	wip	Сколько влезает в стак
+item.maxDamage	item:item	num	native:ITEM_INFO#2	wip	Прочность
+item.setMaxDamage	item:item, value:num	-	native:ITEM_SET_DAMAGE	wip	Задать прочность
+item.setHandEquipped	item:item, on:bool	-	native:ITEM_SET_HAND	wip	Держать в руке как инструмент
+block.destroyTime	block:block	num	native:BLOCK_INFO#0	wip	Время ломания
+block.setDestroyTime	block:block, value:num	-	native:BLOCK_SET:0	wip	Задать время ломания
+block.explosionResistance	block:block	num	native:BLOCK_INFO#1	wip	Взрывоустойчивость
+block.setExplosionResistance	block:block, value:num	-	native:BLOCK_SET:1	wip	Задать взрывоустойчивость
+block.friction	block:block	num	native:BLOCK_INFO#2	wip	Скользкость (0.6 обычный, 0.98 лёд)
+block.setFriction	block:block, value:num	-	native:BLOCK_SET:2	wip	Задать скользкость
+block.lightLevel	block:block	num	native:BLOCK_INFO#3	wip	Свечение 0..15
+block.setLightLevel	block:block, value:num	-	native:BLOCK_SET:3	wip	Задать свечение (как у факела = 14)
+block.lightOpacity	block:block	num	native:BLOCK_INFO#4	wip	Сколько света задерживает 0..15
+block.setLightOpacity	block:block, value:num	-	native:BLOCK_SET:4	wip	Задать задержку света
+block.renderLayer	block:block	num	native:BLOCK_INFO#5	wip	Слой отрисовки
+block.setRenderLayer	block:block, value:num	-	native:BLOCK_SET:5	wip	Задать слой отрисовки

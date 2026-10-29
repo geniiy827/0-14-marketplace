@@ -1,0 +1,29 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:ocelot",
+      "textures": {
+        "default": "ocelot.png",
+        "blackcat": "blackcat.png",
+        "red": "red.png",
+        "siamese": "siamese.png"
+      },
+      "geometry": {
+        "default": "geometry.ocelot"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/cat/ocelot.png": "ocelot.png",
+          "images/mob/cat/blackcat.png": "blackcat.png",
+          "images/mob/cat/red.png": "red.png",
+          "images/mob/cat/siamese.png": "siamese.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

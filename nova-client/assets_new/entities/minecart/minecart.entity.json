@@ -1,0 +1,36 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:minecart",
+      "textures": {
+        "default": "minecart.png"
+      },
+      "geometry": {
+        "default": "geometry.minecart"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/entity/minecart.png": "minecart.png"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "MinecartModel",
+            "geometry": "geometry.minecart",
+            "when": null,
+            "parts": {
+              "bottom": 180,
+              "back": 340,
+              "front": 500,
+              "right": 660,
+              "left": 820
+            }
+          }
+        ]
+      }
+    }
+  }
+}

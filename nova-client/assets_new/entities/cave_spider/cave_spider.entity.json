@@ -1,0 +1,29 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:cave_spider",
+      "textures": {
+        "default": "cave_spider.tga"
+      },
+      "geometry": {
+        "default": "geometry.spider"
+      },
+      "animations": {
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/cave_spider.tga": "cave_spider.tga"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

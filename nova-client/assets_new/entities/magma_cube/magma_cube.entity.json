@@ -1,0 +1,40 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:magma_cube",
+      "textures": {
+        "default": "magmacube.tga"
+      },
+      "geometry": {
+        "default": "geometry.magma_cube"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/magmacube.tga": "magmacube.tga"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "LavaSlimeModel",
+            "geometry": "geometry.magma_cube",
+            "when": null,
+            "parts": {
+              "bodyCube_0": 180,
+              "bodyCube_1": 340,
+              "bodyCube_2": 500,
+              "bodyCube_3": 660,
+              "bodyCube_4": 820,
+              "bodyCube_5": 980,
+              "bodyCube_6": 1140,
+              "bodyCube_7": 1300,
+              "insideCube": 1460
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+// NOVA Blocks - тестовый мод: свои блоки
+// Все блоки есть в творческом инвентаре (раздел «Декор»).
+
+// 1. Классический блок со своей текстурой из мода
+block ruby_block {
+    name: {ru: "Рубиновый блок", en: "Ruby Block"}
+    texture: "textures/ruby_block.png"
+    hardness: 3
+    sound: "metal"
+}
+
+// 2. Классический блок из текстур игры, у каждой стороны своя
+block crate {
+    name: {ru: "Ящик", en: "Crate"}
+    textures: {up: "planks", down: "planks", side: "log:0"}
+    hardness: 2
+    sound: "wood"
+}
+
+// 3. Классический блок не на весь куб (box в пикселях 0..16) - плита из камня
+block stone_plate {
+    name: {ru: "Каменная плита", en: "Stone Plate"}
+    texture: "stonebrick"
+    box: [0, 0, 0, 16, 4, 16]
+}
+
+// 4. Модельный блок: Blockbench (.bbmodel, Java Block), много кубов, развёртка текстуры
+block table {
+    name: {ru: "Стол", en: "Table"}
+    model: "models/table.bbmodel"
+    sound: "wood"
+}
+
+// 5. Модельный блок: Blockbench (Bedrock Block), светится
+block lamp {
+    name: {ru: "Лампа", en: "Lamp"}
+    model: "models/lamp.bbmodel"
+    light: 15
+    sound: "metal"
+}
+
+on world.join(e) {
+    ui.tip("§bNOVA Blocks§r: блоки поставлены рядом с тобой")
+    chat("Блоки мода: ruby_block={ruby_block}, crate={crate}, stone_plate={stone_plate}, table={table}, lamp={lamp}")
+    // ставим все 5 блоков в ряд в 3 блоках от игрока (по оси X)
+    var x = math.floor(player.x()) + 3
+    var y = math.floor(player.y())
+    var z = math.floor(player.z())
+    var list = [ruby_block, crate, stone_plate, table, lamp]
+    for i in 0..4 {
+        world.setBlock(x, y, z + i * 2, list[i])
+    }
+}

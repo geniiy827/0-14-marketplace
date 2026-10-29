@@ -1,0 +1,29 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:enderman",
+      "textures": {
+        "default": "enderman.tga"
+      },
+      "geometry": {
+        "default": "geometry.enderman"
+      },
+      "animations": {
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/enderman.tga": "enderman.tga"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

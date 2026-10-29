@@ -1,0 +1,202 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.enderman",
+        "texture_width": 64,
+        "texture_height": 32
+      },
+      "bones": [
+        {
+          "name": "body",
+          "pivot": [
+            0.0,
+            38.0,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -4.0,
+                26.0,
+                -2.0
+              ],
+              "size": [
+                8,
+                12,
+                4
+              ],
+              "uv": [
+                32,
+                16
+              ]
+            }
+          ]
+        },
+        {
+          "name": "head",
+          "pivot": [
+            0.0,
+            24.0,
+            0.0
+          ],
+          "material": "emissive",
+          "cubes": [
+            {
+              "origin": [
+                -4.0,
+                24.0,
+                -4.0
+              ],
+              "size": [
+                8,
+                8,
+                8
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hat",
+          "pivot": [
+            0.0,
+            38.0,
+            0.0
+          ],
+          "never_render": true,
+          "material": "alpha",
+          "cubes": [
+            {
+              "origin": [
+                -4.0,
+                38.0,
+                -4.0
+              ],
+              "size": [
+                8,
+                8,
+                8
+              ],
+              "uv": [
+                0,
+                16
+              ],
+              "inflate": -0.5
+            }
+          ]
+        },
+        {
+          "name": "rightArm",
+          "pivot": [
+            -3.0,
+            36.0,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -4.0,
+                8.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                30,
+                2
+              ],
+              "uv": [
+                56,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leftArm",
+          "pivot": [
+            5.0,
+            36.0,
+            0.0
+          ],
+          "mirror": true,
+          "cubes": [
+            {
+              "origin": [
+                4.0,
+                8.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                30,
+                2
+              ],
+              "uv": [
+                56,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rightLeg",
+          "pivot": [
+            -2.0,
+            26.0,
+            0.0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -3.0,
+                -4.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                30,
+                2
+              ],
+              "uv": [
+                56,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leftLeg",
+          "pivot": [
+            2.0,
+            26.0,
+            0.0
+          ],
+          "mirror": true,
+          "cubes": [
+            {
+              "origin": [
+                1.0,
+                -4.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                30,
+                2
+              ],
+              "uv": [
+                56,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

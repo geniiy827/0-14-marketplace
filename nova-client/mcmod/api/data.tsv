@@ -1,0 +1,4 @@
+# data.* — сохранение данных мода (между запусками игры)
+data.save	key:str, value:any	-	java:data.save	ok	Сохранить значение (числа, строки, списки, таблицы)
+data.load	key:str, default:any=null	any	java:data.load	ok	Прочитать значение (или default, если нет)
+data.remove	key:str	-	java:data.remove	ok	Удалить значение

@@ -1,0 +1,41 @@
+# world.* — мир, где стоит игрок (по мотивам Level.* из ModPE)
+world.block	x:num, y:num, z:num	num	native:WORLD_BLOCK#0	wip	Номер блока в точке
+world.data	x:num, y:num, z:num	num	native:WORLD_BLOCK#1	wip	Данные блока (вариант, поворот)
+world.setBlock	x:num, y:num, z:num, block:block, data:num=0	-	native:WORLD_SET_BLOCK	wip	Поставить блок (имя "stone" или номер; 0/"air" = убрать)
+world.destroy	x:num, y:num, z:num, drop:bool=true	-	native:WORLD_DESTROY	wip	Сломать блок как игрок (частицы, звук; drop = выпадает ли предмет)
+world.fill	x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, block:block, data:num=0	num	script	wip	Заполнить область блоком (до 32768 блоков), вернёт сколько поставлено
+world.explode	x:num, y:num, z:num, power:num=3, fire:bool=false	-	native:WORLD_EXPLODE	wip	Взрыв (power 4 = TNT)
+world.time	-	num	native:WORLD_TIME	wip	Время мира в тиках (24000 = сутки)
+world.setTime	ticks:num	-	native:WORLD_SET_TIME	wip	Задать время (0 рассвет, 6000 полдень, 12000 закат, 18000 полночь)
+world.day	-	num	script	wip	Номер текущих суток
+world.rain	-	num	native:WORLD_WEATHER#0	wip	Сила дождя 0..1
+world.setRain	level:num	-	native:WORLD_SET_RAIN	wip	Дождь 0..1 (0 = ясно)
+world.lightning	-	num	native:WORLD_WEATHER#1	wip	Сила грозы 0..1
+world.setLightning	level:num	-	native:WORLD_SET_LIGHTNING	wip	Гроза 0..1
+world.sound	x:num, y:num, z:num, name:str, volume:num=1, pitch:num=1	-	native:WORLD_SOUND	wip	Звук игры по имени, например "random.explode"
+world.particle	type:num, x:num, y:num, z:num, vx:num=0, vy:num=0, vz:num=0, data:num=0	-	native:WORLD_PARTICLE	wip	Частица по номеру типа
+world.spawn	mob:any, x:num, y:num, z:num	id	native:WORLD_SPAWN	wip	Призвать моба/сущность по имени ("zombie") или номеру типа; вернёт id
+world.dropItem	x:num, y:num, z:num, item:item, count:num=1, data:num=0	id	native:WORLD_DROP	wip	Выбросить предмет на землю; вернёт id сущности-предмета
+world.brightness	x:num, y:num, z:num	num	native:WORLD_LIGHT#0	wip	Освещённость 0..15
+world.canSeeSky	x:num, y:num, z:num	bool	native:WORLD_LIGHT#1	wip	Видно ли небо из точки
+world.biome	x:num, z:num	num	native:WORLD_BIOME#0	wip	Номер биома
+world.biomeName	x:num, z:num	str	nativestr:WORLD_BIOME_NAME	wip	Название биома
+world.setBiome	x:num, z:num, biome:num	-	native:WORLD_SET_BIOME	wip	Сменить биом в столбце
+world.biomeIdToName	biome:num	str	nativestr:BIOME_NAME	wip	Название биома по номеру
+world.grassColor	x:num, z:num	num	native:WORLD_BIOME#1	wip	Цвет травы (0xRRGGBB)
+world.setGrassColor	x:num, z:num, color:num	-	native:WORLD_SET_GRASS	wip	Задать цвет травы
+world.difficulty	-	num	native:WORLD_MODE#0	wip	Сложность 0..3
+world.setDifficulty	level:num	-	native:WORLD_SET_DIFFICULTY	wip	Задать сложность 0..3
+world.gameMode	-	num	native:WORLD_MODE#1	wip	Режим 0 выживание, 1 творческий
+world.setGameMode	mode:num	-	native:WORLD_SET_GAMEMODE	wip	Сменить режим игры
+world.setSpawn	x:num, y:num, z:num	-	native:WORLD_SET_SPAWN	wip	Точка возрождения мира
+world.isRemote	-	bool	native:WORLD_MODE#2	wip	true, если это чужой сервер (часть функций там не работает)
+world.signText	x:num, y:num, z:num, line:num	str	nativestr:SIGN_TEXT	wip	Строка таблички (0..3)
+world.setSignText	x:num, y:num, z:num, line:num, text:str	-	native:SIGN_SET	wip	Записать строку таблички
+world.chestItem	x:num, y:num, z:num, slot:num	map	native:CHEST_GET:id,data,count	wip	Предмет в слоте сундука {id, data, count}
+world.setChestItem	x:num, y:num, z:num, slot:num, item:item, count:num=1, data:num=0	-	native:CHEST_SET	wip	Положить предмет в слот сундука
+world.furnaceItem	x:num, y:num, z:num, slot:num	map	native:FURNACE_GET:id,data,count	wip	Предмет в слоте печки (0 сырьё, 1 топливо, 2 результат)
+world.setFurnaceItem	x:num, y:num, z:num, slot:num, item:item, count:num=1, data:num=0	-	native:FURNACE_SET	wip	Положить предмет в слот печки
+world.spawnerType	x:num, y:num, z:num	num	native:SPAWNER_GET	wip	Какой моб в спавнере
+world.setSpawnerType	x:num, y:num, z:num, type:num	-	native:SPAWNER_SET	wip	Сменить моба в спавнере
+world.entities	-	list	java:world.entities	wip	Список id всех сущностей рядом (загруженных)

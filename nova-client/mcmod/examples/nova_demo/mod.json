@@ -1,0 +1,8 @@
+{
+  "id": "nova_demo",
+  "name": "NOVA Demo",
+  "version": "1.0.0",
+  "author": "RCodeStudio",
+  "description": "Пример мода на McMod Script: команды, взрывная кирка, счётчик",
+  "main": "main.mcs"
+}

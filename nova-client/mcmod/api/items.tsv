@@ -1,0 +1,2 @@
+# item.* — номера предметов и блоков
+item.id	name:str	num	native:ITEM_ID	wip	Номер предмета/блока по имени ("stone", "diamond_sword" или свой блок мода), -1 если нет

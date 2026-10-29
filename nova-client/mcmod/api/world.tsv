@@ -1,0 +1,8 @@
+# world.* — мир, где стоит игрок
+world.block	x:num, y:num, z:num	num	native:WORLD_BLOCK#0	wip	Номер блока в точке
+world.data	x:num, y:num, z:num	num	native:WORLD_BLOCK#1	wip	Данные блока
+world.setBlock	x:num, y:num, z:num, block:block, data:num=0	-	native:WORLD_SET_BLOCK	wip	Поставить блок (имя, номер или свой блок мода; 0 = убрать)
+world.fill	x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, block:block, data:num=0	num	script	wip	Заполнить область блоком (до 32768 блоков)
+world.time	-	num	native:WORLD_TIME	wip	Время мира в тиках (24000 = сутки)
+world.setTime	ticks:num	-	native:WORLD_SET_TIME	wip	Задать время
+world.day	-	num	script	wip	Номер текущих суток

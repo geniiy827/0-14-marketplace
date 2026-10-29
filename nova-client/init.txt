@@ -1,0 +1,1044 @@
+
+=== MinecraftClient::init()
+    _ZN15MinecraftClient4initEv  @0x353278 size 4180 thumb
+  00353278: push.w   {r4, r5, r6, r7, r8, sb, sl, fp, lr}
+  0035327c: subw     sp, sp, #0xb14
+  00353280: ldr.w    sl, [pc, #0xb30]  ; =0x4075e4
+  00353284: add      r4, sp, #0x74
+  00353286: ldr.w    r2, [pc, #0xb30]  ; =0xffffd148
+  0035328a: mov      r6, r0
+  0035328c: add      sl, pc
+  0035328e: str      r4, [sp, #0x34]
+  00353290: ldr.w    r3, [pc, #0xb28]  ; =0xffffd070
+  00353294: ldr.w    r2, [sl, r2]
+  00353298: str      r2, [sp, #0x58]
+  0035329a: ldr      r2, [r2]
+  0035329c: str.w    r2, [sp, #0xb0c]
+  003532a0: ldr.w    r3, [sl, r3]
+  003532a4: ldr      r0, [r3]
+  003532a6: str      r3, [sp, #0x48]
+  003532a8: ldr      r3, [r0]
+  003532aa: ldr      r3, [r3, #0x78]
+  003532ac: blx      r3
+  003532ae: mov      r1, r0
+  003532b0: add      r0, sp, #0x74
+  003532b2: blx      #0x29df74  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt
+  003532b6: add.w    r1, r6, #0x48
+  003532ba: add      r0, sp, #0x74
+  003532bc: blx      #0x29e040  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::append(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt
+  003532c0: add      r0, sp, #0x74
+  003532c2: bl       #0x483a98  ; File::createFolder(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  003532c6: ldr      r5, [sp, #0x48]
+  003532c8: ldr      r0, [r5]
+  003532ca: ldr      r3, [r0]
+  003532cc: ldr      r3, [r3, #0x78]
+  003532ce: blx      r3
+  003532d0: bl       #0x45cdf8  ; DebugLog::createLog(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  003532d4: bl       #0x495cd8  ; I18n::loadLanguages()
+  003532d8: mov.w    r0, #0x128
+  003532dc: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  003532e0: add      r1, sp, #0x74
+  003532e2: mov      r5, r0
+  003532e4: bl       #0x3e9c40  ; Options::Options(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  003532e8: ldr.w    r4, [r6, #0x138]
+  003532ec: str.w    r5, [r6, #0x138]
+  003532f0: cbz      r4, #0x353302
+  003532f2: mov      r0, r4
+  003532f4: bl       #0x38c464  ; Options::~Options()
+  003532f8: mov      r0, r4
+  003532fa: blx      #0x29df38  ; operator delete(void*)@plt
+  003532fe: ldr.w    r5, [r6, #0x138]
+  00353302: mov      r0, r6
+  00353304: bl       #0x2e1ed4  ; MinecraftClient::getHoloInput() const
+  00353308: ldr      r3, [r0]
+  0035330a: ldr      r3, [r3, #0x40]
+  0035330c: blx      r3
+  0035330e: strb.w   r0, [r5, #0x4c]
+  00353312: mov      r0, r6
+  00353314: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  00353318: mov      r4, r0
+  0035331a: movs     r0, #0x9c
+  0035331c: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353320: mov      r1, r4
+  00353322: mov      r5, r0
+  00353324: bl       #0x48a57c  ; SoundEngine::SoundEngine(Options&)
+  00353328: ldr.w    r0, [r6, #0x13c]
+  0035332c: str.w    r5, [r6, #0x13c]
+  00353330: cbz      r0, #0x35333c
+  00353332: ldr      r3, [r0]
+  00353334: ldr      r3, [r3, #4]
+  00353336: blx      r3
+  00353338: ldr.w    r5, [r6, #0x13c]
+  0035333c: movs     r0, #0x58
+  0035333e: add.w    r4, r6, #0x4c
+  00353342: str      r4, [sp, #0x54]
+  00353344: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353348: str      r5, [sp]
+  0035334a: mov.w    r8, #0
+  0035334e: ldr      r5, [sp, #0x54]
+  00353350: mov.w    sb, #0
+  00353354: ldr.w    r3, [pc, #0xa68]  ; =0x409d40
+  00353358: add.w    r1, r6, #0x14
+  0035335c: add.w    r2, r6, #0x18
+  00353360: strd     r8, sb, [sp, #0x10]
+  00353364: add      r3, pc
+  00353366: str      r5, [sp, #8]
+  00353368: add.w    r3, r3, #0x790
+  0035336c: str      r3, [sp, #4]
+  0035336e: add.w    r3, r6, #0x10
+  00353372: mov      r4, r0
+  00353374: bl       #0x4bff94  ; Minecraft::Minecraft(GameCallbacks&, SkinInfoFactory&, Vibration&, SoundPlayer&, Whitelist const&, std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::chrono::duration<long long, std::ratio<1ll, 1ll> >)
+  00353378: ldr      r5, [r6, #0x60]
+  0035337a: str      r4, [r6, #0x60]
+  0035337c: cbz      r5, #0x35338a
+  0035337e: mov      r0, r5
+  00353380: bl       #0x4c0180  ; Minecraft::~Minecraft()
+  00353384: mov      r0, r5
+  00353386: blx      #0x29df38  ; operator delete(void*)@plt
+  0035338a: mov      r0, r6
+  0035338c: add.w    ip, sp, #0x78
+  00353390: add      r7, sp, #0x94
+  00353392: str.w    ip, [sp, #0x4c]
+  00353396: bl       #0x30a734  ; MinecraftClient::setupRenderer()
+  0035339a: ldr.w    r1, [pc, #0xa28]  ; =0x34ab52
+  0035339e: mov      r2, r7
+  003533a0: add      r0, sp, #0x78
+  003533a2: add      r1, pc
+  003533a4: blx      #0x29e2e0  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(char const*, std::allocator<char> const&)@plt
+  003533a8: add      r1, sp, #0x78
+  003533aa: mov      r0, r7
+  003533ac: blx      #0x29df74  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt
+  003533b0: ldr.w    r1, [pc, #0xa14]  ; =0x350d24
+  003533b4: movs     r2, #0xc
+  003533b6: mov      r0, r7
+  003533b8: add      r1, pc
+  003533ba: blx      #0x29e058  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::append(char const*, unsigned int)@plt
+  003533be: movs     r0, #0x40
+  003533c0: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  003533c4: mov      r4, r0
+  003533c6: cbz      r0, #0x3533d0
+  003533c8: mov      r1, r7
+  003533ca: movs     r2, #0
+  003533cc: bl       #0x489c74  ; TextureAtlas::TextureAtlas(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, TextureFile)
+  003533d0: movs     r0, #0x14
+  003533d2: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  003533d6: cbz      r0, #0x3533ec
+  003533d8: ldr.w    r2, [pc, #0x9f0]  ; =0xffffda14
+  003533dc: movs     r3, #1
+  003533de: str      r3, [r0, #4]
+  003533e0: str      r3, [r0, #8]
+  003533e2: ldr.w    r3, [sl, r2]
+  003533e6: str      r4, [r0, #0xc]
+  003533e8: adds     r3, #8
+  003533ea: str      r3, [r0]
+  003533ec: ldr.w    r3, [r6, #0x170]
+  003533f0: str.w    r4, [r6, #0x16c]
+  003533f4: str.w    r0, [r6, #0x170]
+  003533f8: cbz      r3, #0x353400
+  003533fa: mov      r0, r3
+  003533fc: bl       #0x2bd98c  ; std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()
+  00353400: ldr      r0, [r7]
+  00353402: add.w    sb, sp, #0x88
+  00353406: subs     r0, #0xc
+  00353408: mov      r1, sb
+  0035340a: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  0035340e: add      r1, sp, #0x78
+  00353410: mov      r0, r7
+  00353412: blx      #0x29df74  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt
+  00353416: ldr.w    r1, [pc, #0x9b8]  ; =0x350cce
+  0035341a: movs     r2, #0xa
+  0035341c: mov      r0, r7
+  0035341e: add      r1, pc
+  00353420: blx      #0x29e058  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::append(char const*, unsigned int)@plt
+  00353424: movs     r0, #0x40
+  00353426: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  0035342a: mov      r4, r0
+  0035342c: cbz      r0, #0x353436
+  0035342e: mov      r1, r7
+  00353430: movs     r2, #1
+  00353432: bl       #0x489c74  ; TextureAtlas::TextureAtlas(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, TextureFile)
+  00353436: movs     r0, #0x14
+  00353438: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  0035343c: str      r0, [sp, #0x30]
+  0035343e: cbz      r0, #0x353454
+  00353440: ldr.w    r2, [pc, #0x988]  ; =0xffffda14
+  00353444: movs     r3, #1
+  00353446: str      r3, [r0, #4]
+  00353448: str      r3, [r0, #8]
+  0035344a: ldr.w    r3, [sl, r2]
+  0035344e: str      r4, [r0, #0xc]
+  00353450: adds     r3, #8
+  00353452: str      r3, [r0]
+  00353454: ldr      r0, [r7]
+  00353456: mov      r1, sb
+  00353458: subs     r0, #0xc
+  0035345a: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  0035345e: ldr.w    r2, [r6, #0x16c]
+  00353462: ldr.w    r3, [r6, #0x170]
+  00353466: stm.w    r7, {r2, r3}
+  0035346a: cbz      r3, #0x353488
+  0035346c: adds     r3, #4
+  0035346e: dmb      sy
+  00353472: ldrex    ip, [r3]
+  00353476: add.w    ip, ip, #1
+  0035347a: strex    lr, ip, [r3]
+  0035347e: cmp.w    lr, #0
+  00353482: bne      #0x353472
+  00353484: dmb      sy
+  00353488: mov      r0, r7
+  0035348a: bl       #0x59cf48  ; Block::setTextureAtlas(std::shared_ptr<TextureAtlas>)
+  0035348e: ldr      r0, [r7, #4]
+  00353490: cbz      r0, #0x353496
+  00353492: bl       #0x2bd98c  ; std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()
+  00353496: str      r4, [r7]
+  00353498: ldr      r4, [sp, #0x30]
+  0035349a: str      r4, [r7, #4]
+  0035349c: cbz      r4, #0x3534b8
+  0035349e: adds     r3, r4, #4
+  003534a0: dmb      sy
+  003534a4: ldrex    r5, [r3]
+  003534a8: adds     r5, #1
+  003534aa: strex    ip, r5, [r3]
+  003534ae: cmp.w    ip, #0
+  003534b2: bne      #0x3534a4
+  003534b4: dmb      sy
+  003534b8: mov      r0, r7
+  003534ba: bl       #0x517b2c  ; Item::setTextureAtlas(std::shared_ptr<TextureAtlas>)
+  003534be: ldr      r0, [r7, #4]
+  003534c0: cbz      r0, #0x3534c6
+  003534c2: bl       #0x2bd98c  ; std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()
+  003534c6: movs     r0, #0x4c
+  003534c8: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  003534cc: mov      r5, r0
+  003534ce: bl       #0x2d73c4  ; mce::TextureGroup::TextureGroup()
+  003534d2: ldr      r4, [r6, #0x78]
+  003534d4: str      r5, [r6, #0x78]
+  003534d6: cbz      r4, #0x3534e4
+  003534d8: mov      r0, r4
+  003534da: bl       #0x308690  ; mce::TextureGroup::~TextureGroup()
+  003534de: mov      r0, r4
+  003534e0: blx      #0x29df38  ; operator delete(void*)@plt
+  003534e4: add.w    fp, sp, #0x84
+  003534e8: add      r1, sp, #0x74
+  003534ea: mov      r0, fp
+  003534ec: blx      #0x29df74  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt
+  003534f0: ldr.w    r1, [pc, #0x8e0]  ; =0x350c00
+  003534f4: movs     r2, #0xd
+  003534f6: mov      r0, fp
+  003534f8: add      r1, pc
+  003534fa: blx      #0x29e058  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::append(char const*, unsigned int)@plt
+  003534fe: mov      r0, r6
+  00353500: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  00353504: bl       #0x38ea38  ; Options::getDevResetClientId() const
+  00353508: ldr.w    r1, [pc, #0x8cc]  ; =0x34ce5e
+  0035350c: ldr.w    r0, [fp]
+  00353510: movs     r2, #0
+  00353512: add      r1, pc
+  00353514: movs     r3, #0
+  00353516: strd     r2, r3, [sb]
+  0035351a: blx      #0x29ebb0  ; fopen@plt
+  0035351e: mov      r4, r0
+  00353520: cbz      r0, #0x353544
+  00353522: ldr.w    r1, [pc, #0x8b8]  ; =0x350be0
+  00353526: mov      r2, sb
+  00353528: add      r1, pc
+  0035352a: blx      #0x29ede4  ; fscanf@plt
+  0035352e: mov      r0, r4
+  00353530: blx      #0x29ebc8  ; fclose@plt
+  00353534: ldrd     r2, r3, [sb]
+  00353538: orrs.w   lr, r2, r3
+  0035353c: itt      ne
+  0035353e: movne    r4, r2
+  00353540: movne    r1, r3
+  00353542: bne      #0x35360c
+  00353544: ldr.w    r1, [pc, #0x898]  ; =0x34bb14
+  00353548: ldr.w    r0, [fp]
+  0035354c: add      r1, pc
+  0035354e: blx      #0x29ebb0  ; fopen@plt
+  00353552: str      r0, [sp, #0x50]
+  00353554: cmp      r0, #0
+  00353556: beq      #0x353604
+  00353558: bl       #0x2afc64  ; getRawTimeS()
+  0035355c: mov.w    r5, #0x3e8
+  00353560: add.w    r4, sp, #0xa60
+  00353564: movs     r1, #0
+  00353566: strb.w   r1, [r7, #0x9c8]
+  0035356a: movs     r1, #0
+  0035356c: str      r1, [r4]
+  0035356e: movw     lr, #0x8965
+  00353572: ldr      r4, [sp, #0x50]
+  00353574: movt     lr, #0x6c07
+  00353578: mov      r2, r7
+  0035357a: movs     r3, #1
+  0035357c: mul      r5, r5, r0
+  00353580: mov      r1, r5
+  00353582: str      r5, [r7]
+  00353584: str      r5, [r7, #4]
+  00353586: eor.w    r1, r1, r1, lsr #30
+  0035358a: adds     r2, #4
+  0035358c: mla      r1, lr, r1, r3
+  00353590: adds     r3, #1
+  00353592: cmp.w    r3, #0x270
+  00353596: str      r1, [r2, #4]
+  00353598: bne      #0x353586
+  0035359a: mov      r0, r7
+  0035359c: str.w    r3, [r7, #0x9c4]
+  003535a0: str      r4, [sp, #0x50]
+  003535a2: bl       #0x2dfdfc  ; Random::genrand_int32()
+  003535a6: uxtb     r5, r5
+  003535a8: mov      r8, r0
+  003535aa: mov      r0, r7
+  003535ac: bl       #0x2dfdfc  ; Random::genrand_int32()
+  003535b0: lsr.w    lr, r8, #1
+  003535b4: lsl.w    lr, lr, #0x10
+  003535b8: str.w    lr, [sp, #0x44]
+  003535bc: lsrs     r1, r0, #1
+  003535be: mov      r2, r1
+  003535c0: asrs     r3, r1, #0x1f
+  003535c2: strd     r2, r3, [sp, #0x38]
+  003535c6: lsls     r1, r1, #8
+  003535c8: ldr      r3, [sp, #0x3c]
+  003535ca: str      r1, [sp, #0x18]
+  003535cc: movs     r1, #0
+  003535ce: str      r1, [sp, #0x40]
+  003535d0: lsls     r3, r3, #8
+  003535d2: ldr.w    r1, [pc, #0x810]  ; =0x350b28
+  003535d6: orr.w    r0, r3, r0, lsr #25
+  003535da: str      r0, [sp, #0x1c]
+  003535dc: ldrd     r2, r3, [sp, #0x18]
+  003535e0: add      r1, pc
+  003535e2: ldr      r0, [sp, #0x50]
+  003535e4: adds     r2, r2, r5
+  003535e6: ldrd     r4, r5, [sp, #0x40]
+  003535ea: adc      r3, r3, #0
+  003535ee: orrs     r2, r4
+  003535f0: orrs     r3, r5
+  003535f2: strd     r2, r3, [sp, #0x38]
+  003535f6: strd     r2, r3, [sb]
+  003535fa: blx      #0x29ebbc  ; fprintf@plt
+  003535fe: ldr      r0, [sp, #0x50]
+  00353600: blx      #0x29ebc8  ; fclose@plt
+  00353604: ldr.w    r4, [sb]
+  00353608: ldr.w    r1, [sb, #4]
+  0035360c: ldr.w    r0, [fp]
+  00353610: mov      r5, r6
+  00353612: mov      r2, r4
+  00353614: mov      r3, r1
+  00353616: subs     r0, #0xc
+  00353618: strd     r2, r3, [r5, #0x1b0]!
+  0035361c: mov      r1, r7
+  0035361e: str      r5, [sp, #0x40]
+  00353620: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353624: movs     r0, #0xc
+  00353626: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  0035362a: mov      r5, r0
+  0035362c: bl       #0x45ce08  ; OculusPlatformMessagePump::OculusPlatformMessagePump()
+  00353630: ldr.w    r4, [r6, #0x14c]
+  00353634: str.w    r5, [r6, #0x14c]
+  00353638: cbz      r4, #0x353648
+  0035363a: ldr      r0, [r4]
+  0035363c: cbz      r0, #0x353642
+  0035363e: blx      #0x29df38  ; operator delete(void*)@plt
+  00353642: mov      r0, r4
+  00353644: blx      #0x29df38  ; operator delete(void*)@plt
+  00353648: movs     r0, #0x64
+  0035364a: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  0035364e: mov      r1, r6
+  00353650: mov      r4, r0
+  00353652: bl       #0x45f500  ; GameStore::GameStore(MinecraftClient&)
+  00353656: ldr.w    r0, [r6, #0x150]
+  0035365a: str.w    r4, [r6, #0x150]
+  0035365e: cbz      r0, #0x35366a
+  00353660: ldr      r3, [r0]
+  00353662: ldr      r3, [r3, #4]
+  00353664: blx      r3
+  00353666: ldr.w    r4, [r6, #0x150]
+  0035366a: movs     r0, #4
+  0035366c: movs     r3, #0
+  0035366e: str.w    r3, [sp, #0xa7c]
+  00353672: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353676: addw     r8, sp, #0xa74
+  0035367a: ldr.w    r5, [pc, #0x76c]  ; =0xfffdbc05
+  0035367e: ldr.w    r2, [pc, #0x76c]  ; =0xfff7a853
+  00353682: mov      r1, r8
+  00353684: add      r5, pc
+  00353686: add      r2, pc
+  00353688: mov      r3, r0
+  0035368a: mov      r0, r4
+  0035368c: str      r6, [r3]
+  0035368e: str.w    r3, [sp, #0xa74]
+  00353692: str.w    r5, [sp, #0xa80]
+  00353696: str.w    r2, [sp, #0xa7c]
+  0035369a: bl       #0x45f790  ; GameStore::registerLicenseChangeCallback(std::function<void ()>)
+  0035369e: ldr.w    r3, [sp, #0xa7c]
+  003536a2: cbz      r3, #0x3536ac
+  003536a4: mov      r0, r8
+  003536a6: mov      r1, r8
+  003536a8: movs     r2, #3
+  003536aa: blx      r3
+  003536ac: mov      r0, r6
+  003536ae: bl       #0x2e1ff4  ; MinecraftClient::reloadShaders()
+  003536b2: movs     r0, #0x30
+  003536b4: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  003536b8: mov      r5, r0
+  003536ba: bl       #0x41ee14  ; GeometryGroup::GeometryGroup()
+  003536be: ldr.w    r4, [r6, #0x154]
+  003536c2: str.w    r5, [r6, #0x154]
+  003536c6: cbz      r4, #0x3536d4
+  003536c8: mov      r0, r4
+  003536ca: bl       #0x3d1584  ; GeometryGroup::~GeometryGroup()
+  003536ce: mov      r0, r4
+  003536d0: blx      #0x29df38  ; operator delete(void*)@plt
+  003536d4: mov      r0, r6
+  003536d6: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  003536da: ldr.w    r3, [r6, #0x154]
+  003536de: ldr      r4, [r6, #0x78]
+  003536e0: add      r1, sp, #0x74
+  003536e2: str      r3, [sp, #0x38]
+  003536e4: ldr.w    r3, [r6, #0x150]
+  003536e8: str      r4, [sp, #0x50]
+  003536ea: str      r3, [sp, #0x28]
+  003536ec: mov      ip, r0
+  003536ee: mov      r0, r7
+  003536f0: str.w    ip, [sp, #0x2c]
+  003536f4: blx      #0x29df74  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt
+  003536f8: ldr.w    r1, [pc, #0x6f4]  ; =0x350a10
+  003536fc: movs     r2, #0xa
+  003536fe: mov      r0, r7
+  00353700: add      r1, pc
+  00353702: blx      #0x29e058  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::append(char const*, unsigned int)@plt
+  00353706: ldr.w    lr, [sp, #0x40]
+  0035370a: movs     r0, #0x68
+  0035370c: ldrd     r4, r5, [lr]
+  00353710: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353714: ldr      r1, [sp, #0x50]
+  00353716: ldr.w    ip, [sp, #0x2c]
+  0035371a: strd     r4, r5, [sp, #8]
+  0035371e: str      r1, [sp]
+  00353720: ldr      r2, [sp, #0x38]
+  00353722: mov      r1, ip
+  00353724: ldr      r3, [sp, #0x28]
+  00353726: str      r7, [sp, #4]
+  00353728: str      r0, [sp, #0x5c]
+  0035372a: bl       #0x41ef0c  ; SkinRepository::SkinRepository(Options&, GeometryGroup&, GameStore&, mce::TextureGroup&, std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, unsigned long long)
+  0035372e: ldr      r4, [sp, #0x5c]
+  00353730: ldr.w    r0, [r6, #0x158]
+  00353734: str.w    r4, [r6, #0x158]
+  00353738: cbz      r0, #0x353740
+  0035373a: ldr      r3, [r0]
+  0035373c: ldr      r3, [r3, #4]
+  0035373e: blx      r3
+  00353740: ldr      r0, [r7]
+  00353742: mov      r1, sb
+  00353744: subs     r0, #0xc
+  00353746: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  0035374a: ldr.w    r3, [pc, #0x6a8]  ; =0xffffda18
+  0035374e: ldr.w    r2, [r6, #0x158]
+  00353752: mov      r0, r6
+  00353754: ldr.w    r3, [sl, r3]
+  00353758: str      r2, [r3]
+  0035375a: bl       #0x2e1ed4  ; MinecraftClient::getHoloInput() const
+  0035375e: mov      r4, r0
+  00353760: mov      r0, r6
+  00353762: ldr      r3, [r4]
+  00353764: ldr      r5, [r3, #8]
+  00353766: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  0035376a: mov      r1, r0
+  0035376c: mov      r0, r4
+  0035376e: blx      r5
+  00353770: mov      r0, r6
+  00353772: ldr      r4, [r6, #0x60]
+  00353774: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  00353778: mov      r1, r0
+  0035377a: mov      r0, r7
+  0035377c: bl       #0x38d788  ; Options::getUsername() const
+  00353780: mov      r0, r4
+  00353782: mov      r1, r7
+  00353784: bl       #0x4fb454  ; Minecraft::init(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  00353788: ldr      r0, [r7]
+  0035378a: mov      r1, sb
+  0035378c: subs     r0, #0xc
+  0035378e: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353792: mov      r0, r6
+  00353794: bl       #0x2e2354  ; MinecraftClient::setupStartMenuScreenCommandParser()
+  00353798: movs     r0, #0x70
+  0035379a: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  0035379e: mov      r5, r0
+  003537a0: bl       #0x48a264  ; Social::UserManager::UserManager()
+  003537a4: ldr.w    r4, [r6, #0x15c]
+  003537a8: str.w    r5, [r6, #0x15c]
+  003537ac: cbz      r4, #0x3537ba
+  003537ae: mov      r0, r4
+  003537b0: bl       #0x489fb4  ; Social::UserManager::~UserManager()
+  003537b4: mov      r0, r4
+  003537b6: blx      #0x29df38  ; operator delete(void*)@plt
+  003537ba: mov      r0, r6
+  003537bc: bl       #0x2e35fc  ; MinecraftClient::getUserManager() const
+  003537c0: mov      r5, r0
+  003537c2: movs     r0, #4
+  003537c4: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  003537c8: mov      r1, r5
+  003537ca: add      r2, sp, #0x74
+  003537cc: mov      r4, r0
+  003537ce: bl       #0x309000  ; MinecraftTelemetry::MinecraftTelemetry(Social::UserManager&, std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  003537d2: ldr.w    r5, [r6, #0x1e4]
+  003537d6: str.w    r4, [r6, #0x1e4]
+  003537da: cbz      r5, #0x3537ee
+  003537dc: ldr      r0, [r5]
+  003537de: cbz      r0, #0x3537e4
+  003537e0: bl       #0x308d64
+  003537e4: movs     r3, #0
+  003537e6: mov      r0, r5
+  003537e8: str      r3, [r5]
+  003537ea: blx      #0x29df38  ; operator delete(void*)@plt
+  003537ee: ldr      r0, [r6, #0x60]
+  003537f0: bl       #0x4c08f4  ; Minecraft::getRakNetInstance()
+  003537f4: mov      r1, r0
+  003537f6: mov      r0, r6
+  003537f8: str      r1, [sp, #0x24]
+  003537fa: bl       #0x2e35fc  ; MinecraftClient::getUserManager() const
+  003537fe: mov      ip, r0
+  00353800: mov      r0, r6
+  00353802: str.w    ip, [sp, #0x2c]
+  00353806: bl       #0x2e36e8  ; MinecraftClient::getTelemetry() const
+  0035380a: movs     r3, #0
+  0035380c: str.w    r3, [sp, #0xa7c]
+  00353810: mov      r5, r0
+  00353812: movs     r0, #4
+  00353814: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353818: ldr.w    r2, [pc, #0x5dc]  ; =0xffff0e25
+  0035381c: ldr.w    r3, [pc, #0x5dc]  ; =0xfff7a6ef
+  00353820: add      r2, pc
+  00353822: add      r3, pc
+  00353824: mov      r4, r0
+  00353826: mov.w    r0, #0x148
+  0035382a: str      r6, [r4]
+  0035382c: str.w    r4, [sp, #0xa74]
+  00353830: str.w    r2, [sp, #0xa80]
+  00353834: str.w    r3, [sp, #0xa7c]
+  00353838: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  0035383c: ldr.w    ip, [sp, #0x2c]
+  00353840: mov      r3, r5
+  00353842: ldr      r1, [sp, #0x24]
+  00353844: str.w    r8, [sp]
+  00353848: mov      r2, ip
+  0035384a: mov      r4, r0
+  0035384c: bl       #0x48a0e8  ; Social::Multiplayer::Multiplayer(RakNetInstance&, Social::UserManager&, MinecraftTelemetry&, std::function<void (std::basic_string<char, std::char_traits<char>, std::allocator<char> >)>)
+  00353850: ldr.w    r3, [sp, #0xa7c]
+  00353854: cbz      r3, #0x35385e
+  00353856: mov      r0, r8
+  00353858: mov      r1, r8
+  0035385a: movs     r2, #3
+  0035385c: blx      r3
+  0035385e: ldr.w    r5, [r6, #0x160]
+  00353862: str.w    r4, [r6, #0x160]
+  00353866: cbz      r5, #0x353874
+  00353868: mov      r0, r5
+  0035386a: bl       #0x321058  ; Social::Multiplayer::~Multiplayer()
+  0035386e: mov      r0, r5
+  00353870: blx      #0x29df38  ; operator delete(void*)@plt
+  00353874: ldr      r0, [r6, #0x60]
+  00353876: bl       #0x4c08f4  ; Minecraft::getRakNetInstance()
+  0035387a: ldr.w    r3, [r6, #0x160]
+  0035387e: movs     r2, #0
+  00353880: ldr.w    r5, [pc, #0x57c]  ; =0xfff90221
+  00353884: add      r5, pc
+  00353886: str.w    r3, [r0, #0x9c]
+  0035388a: movs     r0, #4
+  0035388c: ldr.w    r4, [r6, #0x15c]
+  00353890: str.w    r2, [sp, #0xa7c]
+  00353894: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353898: ldr.w    r2, [pc, #0x568]  ; =0xfff7a6ab
+  0035389c: mov      r1, r8
+  0035389e: add      r2, pc
+  003538a0: mov      r3, r0
+  003538a2: mov      r0, r4
+  003538a4: str      r6, [r3]
+  003538a6: str.w    r3, [sp, #0xa74]
+  003538aa: str.w    r5, [sp, #0xa80]
+  003538ae: str.w    r2, [sp, #0xa7c]
+  003538b2: bl       #0x47caa4  ; Social::UserManager::registerSignInHandler(std::function<void ()>)
+  003538b6: ldr.w    r3, [sp, #0xa7c]
+  003538ba: cbz      r3, #0x3538c4
+  003538bc: mov      r0, r8
+  003538be: mov      r1, r8
+  003538c0: movs     r2, #3
+  003538c2: blx      r3
+  003538c4: movs     r0, #4
+  003538c6: movs     r3, #0
+  003538c8: ldr.w    r4, [r6, #0x15c]
+  003538cc: str.w    r3, [sp, #0xa7c]
+  003538d0: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  003538d4: ldr.w    r5, [pc, #0x530]  ; =0xfff901d3
+  003538d8: mov      r1, r8
+  003538da: ldr.w    r2, [pc, #0x530]  ; =0xfff7a6a1
+  003538de: add      r5, pc
+  003538e0: add      r2, pc
+  003538e2: mov      r3, r0
+  003538e4: mov      r0, r4
+  003538e6: str      r6, [r3]
+  003538e8: str.w    r3, [sp, #0xa74]
+  003538ec: str.w    r5, [sp, #0xa80]
+  003538f0: str.w    r2, [sp, #0xa7c]
+  003538f4: bl       #0x47ca6c  ; Social::UserManager::registerSignOutHandler(std::function<void ()>)
+  003538f8: ldr.w    r3, [sp, #0xa7c]
+  003538fc: cbz      r3, #0x353906
+  003538fe: mov      r0, r8
+  00353900: mov      r1, r8
+  00353902: movs     r2, #3
+  00353904: blx      r3
+  00353906: mov      r0, r6
+  00353908: add      r5, sp, #0x7c
+  0035390a: str      r5, [sp, #0x38]
+  0035390c: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  00353910: mov      r1, r0
+  00353912: mov      r0, r7
+  00353914: bl       #0x38d01c  ; Options::getLanguage() const
+  00353918: mov      r0, r7
+  0035391a: bl       #0x4541e8  ; I18n::chooseLanguage(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  0035391e: ldr      r0, [r7]
+  00353920: mov      r1, sb
+  00353922: subs     r0, #0xc
+  00353924: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353928: mov      r0, r8
+  0035392a: bl       #0x4bf73c  ; md5::init()
+  0035392e: movs     r2, #8
+  00353930: mov      r0, r8
+  00353932: ldr      r1, [sp, #0x40]
+  00353934: bl       #0x4bf76c  ; md5::update(void const*, unsigned int)
+  00353938: ldr.w    ip, [sp, #0x48]
+  0035393c: add      r0, sp, #0x7c
+  0035393e: ldr.w    r1, [ip]
+  00353942: ldr      r3, [r1]
+  00353944: ldr.w    r3, [r3, #0x114]
+  00353948: blx      r3
+  0035394a: ldr      r1, [sp, #0x7c]
+  0035394c: mov      r0, r8
+  0035394e: ldr      r2, [r1, #-0xc]
+  00353952: bl       #0x4bf76c  ; md5::update(void const*, unsigned int)
+  00353956: mov      r0, r6
+  00353958: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  0035395c: mov      r1, r0
+  0035395e: mov      r0, sb
+  00353960: bl       #0x38d788  ; Options::getUsername() const
+  00353964: mov      r0, r6
+  00353966: ldr.w    r4, [sb]
+  0035396a: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  0035396e: mov      r1, r0
+  00353970: mov      r0, r7
+  00353972: bl       #0x38d788  ; Options::getUsername() const
+  00353976: ldr      r3, [r7]
+  00353978: mov      r1, r4
+  0035397a: mov      r0, r8
+  0035397c: add      r4, sp, #0x60
+  0035397e: ldr      r2, [r3, #-0xc]
+  00353982: bl       #0x4bf76c  ; md5::update(void const*, unsigned int)
+  00353986: ldr      r0, [r7]
+  00353988: mov      r1, fp
+  0035398a: subs     r0, #0xc
+  0035398c: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353990: ldr.w    r0, [sb]
+  00353994: mov      r1, r7
+  00353996: subs     r0, #0xc
+  00353998: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  0035399c: mov      r0, r4
+  0035399e: mov      r1, r8
+  003539a0: bl       #0x4bf8d8  ; md5::getUUID()
+  003539a4: ldm.w    r4, {r0, r1, r2, r3}
+  003539a8: add.w    r4, r6, #0x1b8
+  003539ac: stm.w    r4, {r0, r1, r2, r3}
+  003539b0: mov      r1, r4
+  003539b2: mov      r0, r7
+  003539b4: bl       #0x2b0374  ; mce::UUID::toString() const
+  003539b8: ldr      r0, [r7]
+  003539ba: mov      r1, sb
+  003539bc: subs     r0, #0xc
+  003539be: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  003539c2: bl       #0x2d6e48  ; mce::RenderMaterial::initContext()
+  003539c6: ldr.w    r3, [pc, #0x448]  ; =0xffffd698
+  003539ca: ldr.w    r0, [sl, r3]
+  003539ce: bl       #0x44fb34  ; Tessellator::init()
+  003539d2: ldr      r0, [r6, #0x60]
+  003539d4: bl       #0x4c09cc  ; Minecraft::getUser()
+  003539d8: mov      r4, r0
+  003539da: mov      r0, r6
+  003539dc: bl       #0x2e1b88  ; MinecraftClient::getOptions()
+  003539e0: mov      r1, r0
+  003539e2: mov      r0, sb
+  003539e4: bl       #0x38d788  ; Options::getUsername() const
+  003539e8: mov      r0, r7
+  003539ea: mov      r1, sb
+  003539ec: bl       #0x514c6c  ; Player::filterValidUserName(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  003539f0: mov      r0, r4
+  003539f2: mov      r1, r7
+  003539f4: blx      #0x29df98  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::assign(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)@plt
+  003539f8: ldr      r0, [r7]
+  003539fa: mov      r1, fp
+  003539fc: subs     r0, #0xc
+  003539fe: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353a02: ldr.w    r0, [sb]
+  00353a06: mov      r1, r7
+  00353a08: subs     r0, #0xc
+  00353a0a: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353a0e: movs     r0, #0x1c
+  00353a10: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353a14: add      r1, sp, #0x74
+  00353a16: mov      r5, r0
+  00353a18: bl       #0x2e0cac  ; ExternalServerFile::ExternalServerFile(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+  00353a1c: ldr      r4, [r6, #0x74]
+  00353a1e: mov      r0, r5
+  00353a20: str      r5, [r6, #0x74]
+  00353a22: cbz      r4, #0x353a42
+  00353a24: ldr      r0, [r4, #0x18]
+  00353a26: mov      r1, r7
+  00353a28: subs     r0, #0xc
+  00353a2a: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353a2e: mov      r0, r4
+  00353a30: bl       #0x30a0f8  ; std::_Hashtable<int, std::pair<int const, std::unique_ptr<ExternalServer, std::default_delete<ExternalServer> > >, std::allocator<std::pair<int const, std::unique_ptr<ExternalServer, std::default_delete<ExternalServer> > > >, std::__detail::_Select1st, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true> >::clear()
+  00353a34: ldr      r0, [r4]
+  00353a36: blx      #0x29df38  ; operator delete(void*)@plt
+  00353a3a: mov      r0, r4
+  00353a3c: blx      #0x29df38  ; operator delete(void*)@plt
+  00353a40: ldr      r0, [r6, #0x74]
+  00353a42: bl       #0x321824  ; ExternalServerFile::load()
+  00353a46: ldr      r3, [pc, #0x3cc]  ; =0xffffda1c
+  00353a48: ldr      r5, [r6, #0x78]
+  00353a4a: mov      r0, r7
+  00353a4c: movs     r1, #0
+  00353a4e: ldr.w    r2, [r6, #0x16c]
+  00353a52: ldr.w    r4, [sl, r3]
+  00353a56: mov      r3, r5
+  00353a58: str      r5, [r4]
+  00353a5a: bl       #0x4512a4  ; TickingTextureFactory::createDynamicTexture(TickingTextureType, TextureAtlas const&, mce::TextureGroup&)
+  00353a5e: mov      r0, r5
+  00353a60: mov      r1, r7
+  00353a62: bl       #0x3088b4  ; mce::TextureGroup::addTickingTexture(std::unique_ptr<TickingTexture, std::default_delete<TickingTexture> >)
+  00353a66: ldr      r0, [r7]
+  00353a68: cbz      r0, #0x353a70
+  00353a6a: ldr      r3, [r0]
+  00353a6c: ldr      r3, [r3, #4]
+  00353a6e: blx      r3
+  00353a70: ldr      r5, [r6, #0x78]
+  00353a72: mov      r0, r7
+  00353a74: movs     r1, #1
+  00353a76: ldr.w    r2, [r6, #0x16c]
+  00353a7a: ldr      r3, [r4]
+  00353a7c: bl       #0x4512a4  ; TickingTextureFactory::createDynamicTexture(TickingTextureType, TextureAtlas const&, mce::TextureGroup&)
+  00353a80: mov      r0, r5
+  00353a82: mov      r1, r7
+  00353a84: bl       #0x3088b4  ; mce::TextureGroup::addTickingTexture(std::unique_ptr<TickingTexture, std::default_delete<TickingTexture> >)
+  00353a88: ldr      r0, [r7]
+  00353a8a: cbz      r0, #0x353a92
+  00353a8c: ldr      r3, [r0]
+  00353a8e: ldr      r3, [r3, #4]
+  00353a90: blx      r3
+  00353a92: ldr      r5, [r6, #0x78]
+  00353a94: mov      r0, r7
+  00353a96: movs     r1, #2
+  00353a98: ldr.w    r2, [r6, #0x16c]
+  00353a9c: ldr      r3, [r4]
+  00353a9e: bl       #0x4512a4  ; TickingTextureFactory::createDynamicTexture(TickingTextureType, TextureAtlas const&, mce::TextureGroup&)
+  00353aa2: mov      r0, r5
+  00353aa4: mov      r1, r7
+  00353aa6: bl       #0x3088b4  ; mce::TextureGroup::addTickingTexture(std::unique_ptr<TickingTexture, std::default_delete<TickingTexture> >)
+  00353aaa: ldr      r0, [r7]
+  00353aac: cbz      r0, #0x353ab4
+  00353aae: ldr      r3, [r0]
+  00353ab0: ldr      r3, [r3, #4]
+  00353ab2: blx      r3
+  00353ab4: ldr      r5, [r6, #0x78]
+  00353ab6: mov      r0, r7
+  00353ab8: movs     r1, #3
+  00353aba: ldr.w    r2, [r6, #0x16c]
+  00353abe: ldr      r3, [r4]
+  00353ac0: bl       #0x4512a4  ; TickingTextureFactory::createDynamicTexture(TickingTextureType, TextureAtlas const&, mce::TextureGroup&)
+  00353ac4: mov      r0, r5
+  00353ac6: mov      r1, r7
+  00353ac8: bl       #0x3088b4  ; mce::TextureGroup::addTickingTexture(std::unique_ptr<TickingTexture, std::default_delete<TickingTexture> >)
+  00353acc: ldr      r0, [r7]
+  00353ace: cbz      r0, #0x353ad6
+  00353ad0: ldr      r3, [r0]
+  00353ad2: ldr      r3, [r3, #4]
+  00353ad4: blx      r3
+  00353ad6: ldr      r5, [r6, #0x78]
+  00353ad8: mov      r0, r7
+  00353ada: movs     r1, #4
+  00353adc: ldr.w    r2, [r6, #0x16c]
+  00353ae0: ldr      r3, [r4]
+  00353ae2: bl       #0x4512a4  ; TickingTextureFactory::createDynamicTexture(TickingTextureType, TextureAtlas const&, mce::TextureGroup&)
+  00353ae6: mov      r0, r5
+  00353ae8: mov      r1, r7
+  00353aea: bl       #0x3088b4  ; mce::TextureGroup::addTickingTexture(std::unique_ptr<TickingTexture, std::default_delete<TickingTexture> >)
+  00353aee: ldr      r0, [r7]
+  00353af0: cbz      r0, #0x353af8
+  00353af2: ldr      r3, [r0]
+  00353af4: ldr      r3, [r3, #4]
+  00353af6: blx      r3
+  00353af8: ldr      r5, [r6, #0x78]
+  00353afa: mov      r0, r7
+  00353afc: movs     r1, #5
+  00353afe: ldr.w    r2, [r6, #0x16c]
+  00353b02: ldr      r3, [r4]
+  00353b04: bl       #0x4512a4  ; TickingTextureFactory::createDynamicTexture(TickingTextureType, TextureAtlas const&, mce::TextureGroup&)
+  00353b08: mov      r0, r5
+  00353b0a: mov      r1, r7
+  00353b0c: bl       #0x3088b4  ; mce::TextureGroup::addTickingTexture(std::unique_ptr<TickingTexture, std::default_delete<TickingTexture> >)
+  00353b10: ldr      r0, [r7]
+  00353b12: cbz      r0, #0x353b1a
+  00353b14: ldr      r3, [r0]
+  00353b16: ldr      r3, [r3, #4]
+  00353b18: blx      r3
+  00353b1a: ldr      r3, [r4]
+  00353b1c: mov      r0, r7
+  00353b1e: ldr      r4, [r6, #0x78]
+  00353b20: movs     r1, #6
+  00353b22: ldr.w    r2, [r6, #0x16c]
+  00353b26: bl       #0x4512a4  ; TickingTextureFactory::createDynamicTexture(TickingTextureType, TextureAtlas const&, mce::TextureGroup&)
+  00353b2a: mov      r1, r7
+  00353b2c: mov      r0, r4
+  00353b2e: bl       #0x3088b4  ; mce::TextureGroup::addTickingTexture(std::unique_ptr<TickingTexture, std::default_delete<TickingTexture> >)
+  00353b32: ldr      r0, [r7]
+  00353b34: cbz      r0, #0x353b3c
+  00353b36: ldr      r3, [r0]
+  00353b38: ldr      r3, [r3, #4]
+  00353b3a: blx      r3
+  00353b3c: ldr      r4, [r6, #0x78]
+  00353b3e: mov      r0, r7
+  00353b40: movs     r1, #0
+  00353b42: bl       #0x2d7538  ; mce::TextureGroup::getInternalNameFor(DynamicTexture)
+  00353b46: movs     r2, #0x10
+  00353b48: mov      r3, r2
+  00353b4a: mov      r0, r4
+  00353b4c: mov      r1, r7
+  00353b4e: bl       #0x317a68  ; mce::TextureGroup::addEmptyTexture(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, int)
+  00353b52: ldr      r0, [r7]
+  00353b54: mov      r1, sb
+  00353b56: subs     r0, #0xc
+  00353b58: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353b5c: ldr      r4, [r6, #0x78]
+  00353b5e: mov      r0, r7
+  00353b60: movs     r1, #1
+  00353b62: bl       #0x2d7538  ; mce::TextureGroup::getInternalNameFor(DynamicTexture)
+  00353b66: movs     r2, #0x40
+  00353b68: mov      r3, r2
+  00353b6a: mov      r0, r4
+  00353b6c: mov      r1, r7
+  00353b6e: bl       #0x317a68  ; mce::TextureGroup::addEmptyTexture(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, int)
+  00353b72: ldr      r0, [r7]
+  00353b74: mov      r1, sb
+  00353b76: subs     r0, #0xc
+  00353b78: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353b7c: ldr      r4, [r6, #0x78]
+  00353b7e: mov      r0, r7
+  00353b80: movs     r1, #2
+  00353b82: bl       #0x2d7538  ; mce::TextureGroup::getInternalNameFor(DynamicTexture)
+  00353b86: mov      r1, r7
+  00353b88: mov      r0, r4
+  00353b8a: movs     r2, #0x10
+  00353b8c: mov.w    r3, #0x100
+  00353b90: bl       #0x317a68  ; mce::TextureGroup::addEmptyTexture(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, int, int)
+  00353b94: ldr      r0, [r7]
+  00353b96: mov      r1, sb
+  00353b98: subs     r0, #0xc
+  00353b9a: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353b9e: ldr.w    r0, [r6, #0x158]
+  00353ba2: bl       #0x395be8  ; SkinRepository::hasValidCustomSkin() const
+  00353ba6: cmp      r0, #0
+  00353ba8: bne.w    #0x3541d4
+  00353bac: ldr      r5, [r6, #0x78]
+  00353bae: addw     r4, sp, #0xa64
+  00353bb2: ldr      r1, [pc, #0x264]  ; =0x350564
+  00353bb4: mov      r2, fp
+  00353bb6: mov      r0, r7
+  00353bb8: add      r1, pc
+  00353bba: blx      #0x29e2e0  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(char const*, std::allocator<char> const&)@plt
+  00353bbe: mov      r0, r5
+  00353bc0: mov      r2, r4
+  00353bc2: mov      r1, r7
+  00353bc4: movs     r3, #0
+  00353bc6: str.w    r3, [sp, #0xa6c]
+  00353bca: bl       #0x351a20  ; mce::TextureGroup::loadList(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::function<void ()>)
+  00353bce: ldr.w    r3, [sp, #0xa6c]
+  00353bd2: cbz      r3, #0x353bdc
+  00353bd4: mov      r0, r4
+  00353bd6: mov      r1, r4
+  00353bd8: movs     r2, #3
+  00353bda: blx      r3
+  00353bdc: ldr      r0, [r7]
+  00353bde: mov      r1, sb
+  00353be0: subs     r0, #0xc
+  00353be2: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353be6: ldr      r5, [r6, #0x78]
+  00353be8: ldr      r1, [pc, #0x230]  ; =0x35053e
+  00353bea: mov      r2, fp
+  00353bec: mov      r0, r7
+  00353bee: add      r1, pc
+  00353bf0: blx      #0x29e2e0  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(char const*, std::allocator<char> const&)@plt
+  00353bf4: mov      r0, r5
+  00353bf6: mov      r1, r7
+  00353bf8: mov      r2, r4
+  00353bfa: movs     r3, #0
+  00353bfc: str.w    r3, [sp, #0xa6c]
+  00353c00: bl       #0x351a20  ; mce::TextureGroup::loadList(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::function<void ()>)
+  00353c04: ldr.w    r3, [sp, #0xa6c]
+  00353c08: cbz      r3, #0x353c12
+  00353c0a: mov      r0, r4
+  00353c0c: mov      r1, r4
+  00353c0e: movs     r2, #3
+  00353c10: blx      r3
+  00353c12: ldr      r0, [r7]
+  00353c14: mov      r1, sb
+  00353c16: subs     r0, #0xc
+  00353c18: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353c1c: ldr      r1, [pc, #0x200]  ; =0x35051e
+  00353c1e: mov      r2, fp
+  00353c20: mov      r0, r7
+  00353c22: add      r1, pc
+  00353c24: ldr      r5, [r6, #0x78]
+  00353c26: blx      #0x29e2e0  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(char const*, std::allocator<char> const&)@plt
+  00353c2a: movs     r0, #4
+  00353c2c: movs     r3, #0
+  00353c2e: str.w    r3, [sp, #0xa6c]
+  00353c32: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353c36: ldr.w    lr, [pc, #0x1ec]  ; =0xfffc2593
+  00353c3a: mov      r1, r7
+  00353c3c: mov      r2, r4
+  00353c3e: add      lr, pc
+  00353c40: mov      r3, r0
+  00353c42: mov      r0, r5
+  00353c44: ldr      r5, [pc, #0x1e0]  ; =0xfff7a371
+  00353c46: str      r6, [r3]
+  00353c48: add      r5, pc
+  00353c4a: str.w    r3, [sp, #0xa64]
+  00353c4e: str.w    lr, [sp, #0xa70]
+  00353c52: str.w    r5, [sp, #0xa6c]
+  00353c56: bl       #0x351a20  ; mce::TextureGroup::loadList(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::function<void ()>)
+  00353c5a: ldr.w    r3, [sp, #0xa6c]
+  00353c5e: cbz      r3, #0x353c68
+  00353c60: mov      r0, r4
+  00353c62: mov      r1, r4
+  00353c64: movs     r2, #3
+  00353c66: blx      r3
+  00353c68: ldr      r0, [r7]
+  00353c6a: mov      r1, sb
+  00353c6c: subs     r0, #0xc
+  00353c6e: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353c72: movs     r0, #0x18
+  00353c74: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353c78: mov      r5, r0
+  00353c7a: bl       #0x2e4bec  ; UIDefRepository::UIDefRepository()
+  00353c7e: ldr.w    r0, [r6, #0x134]
+  00353c82: str.w    r5, [r6, #0x134]
+  00353c86: cbz      r0, #0x353c90
+  00353c88: bl       #0x308c38
+  00353c8c: ldr.w    r5, [r6, #0x134]
+  00353c90: ldr      r1, [pc, #0x198]  ; =0x350416
+  00353c92: mov      r2, fp
+  00353c94: mov      r0, r7
+  00353c96: add      r1, pc
+  00353c98: blx      #0x29e2e0  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(char const*, std::allocator<char> const&)@plt
+  00353c9c: movs     r0, #1
+  00353c9e: movs     r3, #0
+  00353ca0: str.w    r3, [sp, #0xa6c]
+  00353ca4: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353ca8: ldr.w    lr, [pc, #0x184]  ; =0xfff77cab
+  00353cac: ldr      r3, [pc, #0x184]  ; =0xfff7a33d
+  00353cae: mov      r1, r7
+  00353cb0: mov      r2, r4
+  00353cb2: add      lr, pc
+  00353cb4: add      r3, pc
+  00353cb6: str.w    lr, [sp, #0xa70]
+  00353cba: str.w    r3, [sp, #0xa6c]
+  00353cbe: str.w    r0, [sp, #0xa64]
+  00353cc2: mov      r0, r5
+  00353cc4: bl       #0x352278  ; UIDefRepository::loadDefsList(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::function<std::basic_string<char, std::char_traits<char>, std::allocator<char> > (std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)>)
+  00353cc8: ldr.w    r3, [sp, #0xa6c]
+  00353ccc: cbz      r3, #0x353cd6
+  00353cce: mov      r0, r4
+  00353cd0: mov      r1, r4
+  00353cd2: movs     r2, #3
+  00353cd4: blx      r3
+  00353cd6: ldr      r0, [r7]
+  00353cd8: mov      r1, sb
+  00353cda: subs     r0, #0xc
+  00353cdc: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353ce0: bl       #0x2f2cfc  ; ScreenRenderer::singleton()
+  00353ce4: ldr      r1, [r6, #0x78]
+  00353ce6: bl       #0x329e78  ; ScreenRenderer::reloadResources(mce::TextureGroup&)
+  00353cea: ldr      r0, [r6, #0x78]
+  00353cec: bl       #0x44a81c  ; ItemRenderer::createSingleton(mce::TextureGroup&)
+  00353cf0: ldr      r0, [r6, #0x78]
+  00353cf2: bl       #0x3906b8  ; Particle::initStaticResources(mce::TextureGroup&)
+  00353cf6: mov.w    r0, #0x270
+  00353cfa: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353cfe: mov      r1, r6
+  00353d00: mov      r5, r0
+  00353d02: bl       #0x32c188  ; GuiData::GuiData(MinecraftClient&)
+  00353d06: ldr.w    r0, [r6, #0x130]
+  00353d0a: str.w    r5, [r6, #0x130]
+  00353d0e: cbz      r0, #0x353d16
+  00353d10: ldr      r3, [r0]
+  00353d12: ldr      r3, [r3, #4]
+  00353d14: blx      r3
+  00353d16: movs     r0, #0x40
+  00353d18: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353d1c: mov      r1, r6
+  00353d1e: mov      r8, r0
+  00353d20: bl       #0x2f1fb8  ; MobEffectsLayout::MobEffectsLayout(MinecraftClient&)
+  00353d24: ldr.w    r5, [r6, #0x148]
+  00353d28: str.w    r8, [r6, #0x148]
+  00353d2c: cbz      r5, #0x353d3c
+  00353d2e: ldr      r0, [r5, #0x14]
+  00353d30: cbz      r0, #0x353d36
+  00353d32: blx      #0x29df38  ; operator delete(void*)@plt
+  00353d36: mov      r0, r5
+  00353d38: blx      #0x29df38  ; operator delete(void*)@plt
+  00353d3c: ldr      r1, [pc, #0xf8]  ; =0x35040a
+  00353d3e: mov      r2, sb
+  00353d40: mov      r0, r7
+  00353d42: ldr.w    r8, [r6, #0x78]
+  00353d46: add      r1, pc
+  00353d48: blx      #0x29e2e0  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(char const*, std::allocator<char> const&)@plt
+  00353d4c: mov.w    r0, #0xa80
+  00353d50: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353d54: mov      r1, r7
+  00353d56: mov      r2, r8
+  00353d58: mov      r5, r0
+  00353d5a: bl       #0x316b74  ; Font::Font(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, mce::TextureGroup*)
+  00353d5e: ldr      r0, [r7]
+  00353d60: mov      r1, fp
+  00353d62: subs     r0, #0xc
+  00353d64: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353d68: ldr      r0, [r6, #0x7c]
+  00353d6a: str      r5, [r6, #0x7c]
+  00353d6c: cbz      r0, #0x353d74
+  00353d6e: ldr      r3, [r0]
+  00353d70: ldr      r3, [r3, #4]
+  00353d72: blx      r3
+  00353d74: ldr      r1, [pc, #0xc4]  ; =0x3503e6
+  00353d76: mov      r2, sb
+  00353d78: mov      r0, r7
+  00353d7a: ldr.w    r8, [r6, #0x78]
+  00353d7e: add      r1, pc
+  00353d80: blx      #0x29e2e0  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string(char const*, std::allocator<char> const&)@plt
+  00353d84: mov.w    r0, #0xa80
+  00353d88: blx      #0x29dfe0  ; operator new(unsigned int)@plt
+  00353d8c: mov      r1, r7
+  00353d8e: mov      r2, r8
+  00353d90: mov      r5, r0
+  00353d92: bl       #0x316b74  ; Font::Font(std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, mce::TextureGroup*)
+  00353d96: ldr      r0, [r7]
+  00353d98: mov      r1, fp
+  00353d9a: subs     r0, #0xc
+  00353d9c: blx      #0x29e04c  ; std::basic_string<char, std::char_traits<char>, std::allocator<char> >::_Rep::_M_dispose(std::allocator<char> const&)@plt
+  00353da0: ldr.w    r0, [r6, #0x80]
+  00353da4: str.w    r5, [r6, #0x80]
+  00353da8: cmp      r0, #0
+  00353daa: beq      #0x353e40
+  00353dac: ldr      r3, [r0]
+  00353dae: ldr      r3, [r3, #4]
+  00353db0: blx      r3
+  00353db2: b        #0x353e40
+  00353db4: strb     r4, [r4, #0x17]
+  00353db6: lsls     r0, r0, #1
+  00353db8: bne      #0x353e4c

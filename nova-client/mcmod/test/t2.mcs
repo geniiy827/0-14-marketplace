@@ -1,0 +1,7 @@
+on world.join(e) {
+    chat("t2 start")
+    var x = undefined_thing + 1
+}
+on tick(e) {
+    while true { }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "nova_blocks",
+  "name": "NOVA Blocks (тест)",
+  "version": "1.0.0",
+  "author": "RCodeStudio",
+  "description": "Тест своих блоков: обычные и модельные (Blockbench)",
+  "main": "main.mcs"
+}

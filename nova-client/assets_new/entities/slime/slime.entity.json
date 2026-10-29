@@ -1,0 +1,52 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:slime",
+      "textures": {
+        "default": "slime.png"
+      },
+      "geometry": {
+        "default": "geometry.slime"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/slime.png": "slime.png"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "SlimeModel",
+            "geometry": "geometry.slime",
+            "when": [
+              248,
+              16
+            ],
+            "parts": {
+              "cube": 180,
+              "eye0": 344,
+              "eye1": 504,
+              "mouth": 664
+            }
+          },
+          {
+            "class": "SlimeModel",
+            "geometry": "geometry.slime.armor",
+            "when": [
+              248,
+              0
+            ],
+            "parts": {
+              "cube": 180,
+              "eye0": 344,
+              "eye1": 504,
+              "mouth": 664
+            }
+          }
+        ]
+      }
+    }
+  }
+}

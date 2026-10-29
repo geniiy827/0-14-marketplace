@@ -902,7 +902,7 @@
           "controls": [
             {
               "@common.button_text": {
-                "text": "Классический", "localize": false
+                "text": "selectWorld.newWorld"
               }
             }
           ]
@@ -913,7 +913,7 @@
           "controls": [
             {
               "@common.button_text": {
-                "text": "Классический", "localize": false,
+                "text": "selectWorld.newWorld",
                 "color": [ 0.4, 0.95, 0.88 ]
               }
             }
@@ -925,7 +925,7 @@
           "controls": [
             {
               "@common.button_text": {
-                "text": "Классический", "localize": false,
+                "text": "selectWorld.newWorld",
                 "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
@@ -934,49 +934,6 @@
         }
       }
     ]
-  },
-
-  // opens the NOVA create-world screen (Java) through launchUri("nova://create_world")
-  "nova_create_world_button@common.hyperlink_button": {
-    "size": "$bottom_button_size",
-    "anchor_to": "bottom_left",
-    "anchor_from": "bottom_left",
-    "layer": 10,
-    "property_bag": {
-      "#hyperlink": "nova://create_world"
-    },
-    "controls": [
-      {
-        "default@play.nova_create_state": {
-          "controls": [ { "@common.button_text": { "text": "selectWorld.newWorld" } } ]
-        }
-      },
-      {
-        "hover@play.nova_create_state_hover": {
-          "controls": [ { "@common.button_text": { "text": "selectWorld.newWorld" } } ]
-        }
-      },
-      {
-        "pressed@play.nova_create_state_pressed": {
-          "controls": [ { "@common.button_text": { "text": "selectWorld.newWorld", "alpha": 0.8 } } ]
-        }
-      }
-    ]
-  },
-
-  "nova_create_state@common-classic.button_state_default": {
-    "color": [ 0.31, 0.72, 0.74, 1.0 ],
-    "alpha": 1.0
-  },
-
-  "nova_create_state_hover@common-classic.button_state_default": {
-    "color": [ 0.45, 0.9, 0.86, 1.0 ],
-    "alpha": 1.0
-  },
-
-  "nova_create_state_pressed@common-classic.button_state_default": {
-    "color": [ 0.22, 0.55, 0.58, 1.0 ],
-    "alpha": 1.0
   },
 
   "import_world_button@common.button": {
@@ -1055,15 +1012,9 @@
       }
     ],
 
-    // NOVA: [Новый мир (NOVA, advanced settings)] [Классический (stock screen)] [Назад]
     "controls": [
-      { "nova_create_world_button@nova_create_world_button": { } },
-      {
-        "create_world_button@create_world_button": {
-          "anchor_to": "bottom_middle",
-          "anchor_from": "bottom_middle"
-        }
-      },
+      { "create_world_button@create_world_button": { } },
+      { "import_world_button@$import_world": { } },
       {
         "back_button@back_button": {
           "size": "$bottom_button_size"
@@ -1618,7 +1569,7 @@
     "$realms_tab": true,
     "$no_realms_tab": false,
     "$tab_size": [ "33.33%+1px", 24 ],
-    "$bottom_button_size": [ "33%-1px", "100%" ],
+    "$bottom_button_size": [ "50%-1px", "100%" ],
 
     "variables": [
       {
@@ -1689,6 +1640,7 @@
       }
     ],
     "controls": [
+      { "nova_toast@common.nova_toast": { } },
       {
         "main_control@$main_panel": { }
       }

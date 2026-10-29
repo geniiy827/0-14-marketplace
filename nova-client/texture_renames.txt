@@ -1,0 +1,6 @@
+assets/images/terrain-atlas.tga>assets/images/old_terrain-atlas.tga
+assets/images/terrain-atlas_mip0.tga>assets/images/old_terrain-atlas_mip0.tga
+assets/images/terrain-atlas_mip1.tga>assets/images/old_terrain-atlas_mip1.tga
+assets/images/terrain-atlas_mip2.tga>assets/images/old_terrain-atlas_mip2.tga
+assets/images/terrain-atlas_mip3.tga>assets/images/old_terrain-atlas_mip3.tga
+assets/images/items-opaque.tga>assets/images/old_items-opaque.tga

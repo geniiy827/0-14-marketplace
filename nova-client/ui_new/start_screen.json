@@ -207,7 +207,7 @@
     "offset": [ 0, "9%" ],
     "anchor_from": "top_middle",
     "anchor_to": "top_middle",
-    "size": [ "100%", "12.5%x" ],
+    "size": [ "100%", "14.56%x" ],
     "controls": [
       {
         "title_image": {
@@ -215,15 +215,16 @@
           "layer": 1,
           "anchor_from": "top_middle",
           "anchor_to": "top_middle",
+          "size": [ "40%", "100%" ],
           "texture": "gui/title.png",
           "uv": [ 0, 0 ],
-          "uv_size": [ 512, 64 ],
-          "offset": "@start.anim_title_drop"
+          "uv_size": [ 1024, 373 ],
+          "offset": "@start.anim_title_float_down"
         }
       },
       {
         "title_underline@common.accent_line": {
-          "size": [ "46%", 1 ],
+          "size": [ "40%", 1 ],
           "anchor_from": "bottom_middle",
           "anchor_to": "top_middle",
           "offset": [ 0, 4 ],
@@ -232,7 +233,7 @@
       },
       {
         "@splash_text": {
-          "offset": [ "-28%", "-6.5%x" ]
+          "offset": [ "-31%", "-6.5%x" ]
         }
       }
     ]
@@ -918,6 +919,7 @@
       }
     ],
     "controls": [
+      { "nova_toast@common.nova_toast": { } },
       {
         "@$title_panel": { }
       },

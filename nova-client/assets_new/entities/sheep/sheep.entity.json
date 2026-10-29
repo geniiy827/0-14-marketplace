@@ -1,0 +1,29 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:sheep",
+      "textures": {
+        "default": "sheep.tga"
+      },
+      "geometry": {
+        "default": "geometry.sheep"
+      },
+      "animations": {
+        "walk": "animation.quadruped.walk"
+      },
+      "scripts": {
+        "animate": [
+          "walk"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/sheep.tga": "sheep.tga"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

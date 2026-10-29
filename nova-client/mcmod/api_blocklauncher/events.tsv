@@ -1,0 +1,20 @@
+# события: on <имя>(e) { ... }   e.cancel() отменяет действие игры (если отмена = yes). $поле = строка
+world.join	-	no	wip	Игрок вошёл в мир (после загрузки мода)
+world.leave	-	no	wip	Игрок вышел из мира
+tick	-	no	wip	Каждый игровой тик (20 раз в секунду). Удобнее: every 20 ticks { }
+block.break	x, y, z, block, data, item, side	yes	wip	Игрок сломал блок
+block.startBreak	x, y, z, side, block, data	yes	wip	Игрок начал ломать блок
+block.breaking	x, y, z, side, progress	yes	wip	Игрок продолжает ломать (progress 0..1), каждый тик
+item.use	x, y, z, side, block, data, item, itemData	yes	wip	Игрок нажал предметом по блоку (ставит блок, открывает дверь, использует предмет)
+player.attack	target, type	yes	wip	Игрок бьёт сущность (target = id, type = номер типа)
+chat	$text	yes	wip	Игрок отправил сообщение (команды тоже: e.text начинается с "/")
+chat.receive	$sender, $text	yes	wip	Пришло сообщение в чат (от сервера или игрока)
+entity.add	id, type	no	wip	Появилась сущность
+entity.remove	id, type	no	wip	Сущность исчезла
+entity.hurt	id, attacker, damage	yes	wip	Сущность получает урон (attacker = id или -1)
+entity.death	id, attacker	no	wip	Сущность умерла (attacker = id или -1)
+explode	x, y, z, power, fire, source	yes	wip	Взрыв (source = id того, кто взорвался, или -1)
+player.eat	hunger, saturation	no	wip	Игрок поел
+player.xp	amount	yes	wip	Игрок получает очки опыта
+player.levelUp	levels	yes	wip	У игрока меняется уровень
+projectile.hit	id, hitType, x, y, z, side, hx, hy, hz, target	no	wip	Снаряд попал (hitType 0 блок, 1 сущность; target = id сущности)

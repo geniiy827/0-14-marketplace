@@ -1,0 +1,47 @@
+# player.* — локальный игрок (по мотивам Player.* из ModPE)
+player.id	-	id	native:PLAYER_ID	wip	id игрока как сущности (для entity.*)
+player.name	-	str	nativestr:PLAYER_NAME	wip	Имя игрока
+player.x	-	num	native:PLAYER_POS#0	wip	Координата X (ноги)
+player.y	-	num	native:PLAYER_POS#1	wip	Координата Y (ноги)
+player.z	-	num	native:PLAYER_POS#2	wip	Координата Z (ноги)
+player.pos	-	vec	native:PLAYER_POS	wip	Позиция {x, y, z}
+player.yaw	-	num	native:PLAYER_POS#3	wip	Поворот головы по горизонтали (градусы)
+player.pitch	-	num	native:PLAYER_POS#4	wip	Наклон головы (градусы, вниз = +)
+player.look	-	vec	script	wip	Направление взгляда (единичный вектор {x, y, z})
+player.teleport	x:num, y:num, z:num	-	native:PLAYER_TELEPORT	wip	Телепорт (координаты ног)
+player.health	-	num	native:PLAYER_HEALTH#0	wip	Здоровье (полусердечки, 20 = полное)
+player.maxHealth	-	num	native:PLAYER_HEALTH#1	wip	Максимум здоровья
+player.setHealth	hp:num	-	native:PLAYER_SET_HEALTH	wip	Задать здоровье
+player.heal	hp:num	-	script	wip	Добавить здоровья (не больше максимума)
+player.hunger	-	num	native:PLAYER_ATTR#0	wip	Голод 0..20
+player.setHunger	value:num	-	native:PLAYER_SET_ATTR:0	wip	Задать голод
+player.saturation	-	num	native:PLAYER_ATTR#1	wip	Насыщение
+player.setSaturation	value:num	-	native:PLAYER_SET_ATTR:1	wip	Задать насыщение
+player.exhaustion	-	num	native:PLAYER_ATTR#2	wip	Усталость
+player.setExhaustion	value:num	-	native:PLAYER_SET_ATTR:2	wip	Задать усталость
+player.level	-	num	native:PLAYER_ATTR#3	wip	Уровень опыта
+player.setLevel	value:num	-	native:PLAYER_SET_ATTR:3	wip	Задать уровень опыта
+player.xp	-	num	native:PLAYER_ATTR#4	wip	Прогресс опыта до след. уровня (0..1)
+player.setXp	value:num	-	native:PLAYER_SET_ATTR:4	wip	Задать прогресс опыта
+player.addXp	amount:num	-	native:PLAYER_ADD_XP	wip	Добавить очки опыта
+player.score	-	num	native:PLAYER_SCORE	wip	Счёт игрока
+player.isFlying	-	bool	native:PLAYER_FLY#0	wip	Летит ли
+player.setFlying	on:bool	-	native:PLAYER_SET_FLY:0	wip	Включить/выключить полёт
+player.canFly	-	bool	native:PLAYER_FLY#1	wip	Разрешён ли полёт
+player.setCanFly	on:bool	-	native:PLAYER_SET_FLY:1	wip	Разрешить полёт (и в выживании)
+player.dimension	-	num	native:PLAYER_DIM	wip	Измерение: 0 обычный мир, 1 ад
+player.give	item:item, count:num=1, data:num=0	-	native:PLAYER_GIVE	wip	Дать предмет (имя "diamond" или номер)
+player.take	item:item, count:num=1, data:num=0	-	native:PLAYER_TAKE	wip	Забрать предметы из инвентаря
+player.item	-	num	native:PLAYER_ITEM#0	wip	Номер предмета в руке (0 = пусто)
+player.itemData	-	num	native:PLAYER_ITEM#1	wip	Данные (damage) предмета в руке
+player.itemCount	-	num	native:PLAYER_ITEM#2	wip	Количество предметов в руке
+player.slot	slot:num	map	native:PLAYER_SLOT:id,data,count	wip	Предмет в слоте инвентаря {id, data, count}
+player.setSlot	slot:num, item:item, count:num=1, data:num=0	-	native:PLAYER_SET_SLOT	wip	Положить предмет в слот
+player.clearSlot	slot:num	-	native:PLAYER_CLEAR_SLOT	wip	Очистить слот
+player.selectedSlot	-	num	native:PLAYER_SEL#0	wip	Выбранный слот хотбара
+player.selectSlot	slot:num	-	native:PLAYER_SELECT	wip	Выбрать слот хотбара
+player.armor	slot:num	map	script	wip	Броня в слоте (0 шлем, 1 нагрудник, 2 поножи, 3 ботинки) {id, data, count}
+player.setArmor	slot:num, item:item, data:num=0	-	script	wip	Надеть броню
+player.pointedBlock	-	map	native:PLAYER_POINTED:x,y,z,side,block,data	wip	Блок под прицелом {x, y, z, side, block, data} или null
+player.pointedEntity	-	id	native:PLAYER_POINTED_ENT	wip	id сущности под прицелом или null
+player.pointedVec	-	vec	native:PLAYER_POINTED_VEC	wip	Точка, куда смотрит прицел

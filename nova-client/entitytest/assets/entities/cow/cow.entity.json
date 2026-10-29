@@ -1,0 +1,32 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:cow",
+      "textures": {
+        "default": "cow.png"
+      },
+      "geometry": {
+        "default": "geometry.cow"
+      },
+      "animations": {
+        "walk": "animation.quadruped.walk",
+        "look_at_target": "animation.common.look_at_target",
+        "crown": "animation.nova_test.crown"
+      },
+      "scripts": {
+        "animate": [
+          "walk",
+          "look_at_target",
+          "crown"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/cow.png": "cow.png"
+        },
+        "model": "json"
+      }
+    }
+  }
+}
