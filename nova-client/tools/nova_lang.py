@@ -84,6 +84,11 @@ T['en_US'][_ii] = 'A resource pack or mod from this device'
 _if = K.index('nova.packs.import.file')
 T['ru_RU'][_if] = 'Выбрать файл'
 T['en_US'][_if] = 'Choose a .mcres / .mcmod file...'
+# start screen version label (ui_new/start_screen.json "version"): from the VERSION file
+_vf = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'VERSION')
+_ver = 'NOVA ' + (open(_vf).read().strip() if os.path.exists(_vf) else 'dev')
+K.append('nova.version')
+for _l in T: T[_l].append(_ver)
 T['es_MX'] = T['es_ES']; T['fr_CA'] = T['fr_FR']; T['pt_PT'] = T['pt_BR']
 
 def main(d):

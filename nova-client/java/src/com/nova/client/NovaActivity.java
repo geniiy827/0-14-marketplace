@@ -58,6 +58,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
 
     static native int nativeLoadAnimations(byte[] blob);
     static native int nativeInfo(int what);
+    static native void nativeIntroDone();
     static native int nativeLoadFaceUv(byte[] blob);
     static native int nativeSetDataDir(String dir);
     static native int nativeOpenNova(int kind, String a, String b);

@@ -225,7 +225,7 @@ def main():
     elif c == 'build':
         r = subprocess.run(['sh', os.path.join(W, 'tools/build.sh')], capture_output=True, text=True)
         log = r.stdout + r.stderr; open(os.path.join(W, 'out/build.log'), 'w').write(log)
-        errs = [l for l in log.splitlines() if re.search(r'error|Error|Traceback|FAIL|not empty|AssertionError', l) and 'errors: 0' not in l and 'pre-existing' not in l]
+        errs = [l for l in log.splitlines() if re.search(r'^ERR|error|Error|Traceback|FAIL|not empty|AssertionError', l) and 'errors: 0' not in l and 'pre-existing' not in l]
         print('\n'.join(errs[-15:]))
         print('\n'.join(l for l in log.splitlines() if l.startswith('APK ') or 'SIGNED-OK' in l) or 'BUILD FAILED (out/build.log)')
     else: print(__doc__)

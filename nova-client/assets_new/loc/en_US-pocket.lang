@@ -3292,3 +3292,4 @@ nova.toast.crash=NOVA: the game crashed	#
 nova.shaders.title=Shaders	#
 nova.mods.none=No mods yet. Import a .mcmod file on the Import tab	#
 nova.toast.mods=Mods will start when you enter a world	#
+nova.version=NOVA alpha8	#

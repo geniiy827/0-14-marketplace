@@ -129,6 +129,12 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Вылет при входе в мир всё ещё не объяснён (в alpha6 блоки вообще не регистрировались!) → нужен `NOVA-crash.txt`
   (`nova crash файл`). С alpha7 отчёт ещё и копируется в буфер обмена.
 
+- alpha8: вылет при входе был в `world.setBlock` — `BlockSource::setBlockAndData(int,int,int,BlockID,uchar,int)` берёт
+  BlockID ПО УКАЗАТЕЛЮ (нетривиальный тип; так же у всех функций с BlockID/FullBlock по значению). fault 0xd2 = id 210.
+- Главный экран: метка версии = ключ `nova.version` (из файла `VERSION`, nova_lang.py); `title_image` скрыт, пока
+  IntroView не закончится (`nativeIntroDone` → custom-контрол `nova_title_gate` прячет соседа, флаг видимости UIControl+0x30 бит 2;
+  parent weak_ptr +0x38, children vector<shared_ptr> +0x40, имя +0xc).
+
 ## 6a. Инструменты (экономия лимита)
 `nova` (= `python3 tools/nova.py`, индекс .so кешируется в `.cache/`, ~8 с один раз):
 `nova s REGEX` символы · `nova d СИМВОЛ|АДРЕС [N]` дизасм с именами вызовов/GOT/строк · `nova dg СИМВОЛ RE` только нужные

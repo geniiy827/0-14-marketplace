@@ -362,6 +362,8 @@ int Java_com_nova_client_NovaActivity_nativeStatus(void *env, void *cls) {
 }
 
 static int menu_seen;                    /* a menu screen was drawn: the intro may hand over */
+static volatile int intro_done;          /* IntroView finished: the menu title (title_image) may show */
+void Java_com_nova_client_NovaActivity_nativeIntroDone(void *env, void *cls) { intro_done = 1; }
 int Java_com_nova_client_NovaActivity_nativeInfo(void *env, void *cls, int what) {
     switch (what) {
     case 0: return status;
@@ -942,11 +944,24 @@ static const char *FACING[4] = {"south (Towards positive Z)", "west (Towards neg
 static int ifloor(float v) { int i = (int)v; return (v < i) ? i - 1 : i; }
 
 static void draw_toast(void *client);
+/* start screen: keep the sibling "title_image" hidden until the intro has handed over (no double title) */
+static void title_gate(char *cc) {
+    char *parent = *(char **)(cc + 0x38);                    /* weak_ptr<UIControl> mParent */
+    if (!parent) return;
+    char **it = *(char ***)(parent + 0x40), **end = *(char ***)(parent + 0x44);   /* vector<shared_ptr<UIControl>> */
+    for (; it && it < end; it += 2) {
+        char *ch = it[0];
+        if (!ch || !streq(sdata(ch + 0xc), "title_image")) continue;
+        int vis = (ch[0x30] >> 2) & 1, want = intro_done ? 1 : 0;
+        if (vis != want) ch[0x30] = (char)((ch[0x30] & ~4) | (want << 2));
+    }
+}
 static void h_dbg_render(void *self, void *client, void **ctrl, int pass) {
     o_dbg_render(self, client, ctrl, pass);
     if (pass != 0) return;
-    if (menus_ok) draw_toast(client);
     char *cc = ctrl ? *(char **)ctrl : 0;
+    if (cc && streq(sdata(cc + 0xc), "nova_title_gate")) { menu_seen = 1; title_gate(cc); return; }
+    if (menus_ok) draw_toast(client);
     if (cc && streq(sdata(cc + 0xc), "nova_toast")) { menu_seen = 1; return; }   /* menu screens: toast only */
     struct timespec_ ts;
     clock_gettime(1, &ts);

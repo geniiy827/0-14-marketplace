@@ -68,6 +68,7 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
             current = v;
         } catch (Throwable t) {
             Log.e(TAG, "intro failed to start", t);
+            introDone();
         }
     }
 
@@ -132,9 +133,14 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
         return !done;                 // the menu below is not clickable during the intro
     }
 
+    static void introDone() {
+        try { if (NovaActivity.nativeOk) NovaActivity.nativeIntroDone(); } catch (Throwable ignored) { }
+    }
+
     private void finish() {
         if (done) return;
         done = true;
+        introDone();
         act.runOnUiThread(new Runnable() {
             public void run() {
                 try {

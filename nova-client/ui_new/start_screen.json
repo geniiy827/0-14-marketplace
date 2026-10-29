@@ -48,13 +48,7 @@
     "layer": 2,
     "offset": [ -3, 0 ],
     "color": [ 0.4, 0.95, 0.88 ],
-    "text": "#version",
-    "bindings": [
-      {
-        "binding_name": "#version",
-        "binding_condition": "visible"
-      }
-    ]
+    "text": "nova.version"
   },
 
   // Bottom info bar: dark strip + breathing accent line + copyright/version
@@ -106,13 +100,13 @@
     "anim_type": "offset",
     "easing": "out_back",
     "duration": 0.6,
-    "from": [ -84, 4 ],
+    "from": [ -73, 4 ],
     "to": [ 4, 4 ]
   },
 
   "client_badge": {
     "type": "panel",
-    "size": [ 84, 15 ],
+    "size": [ 73, 15 ],
     "anchor_from": "top_left",
     "anchor_to": "top_left",
     "controls": [
@@ -123,7 +117,7 @@
           "nineslice_size": 4.0,
           "uv": [ 0, 0 ],
           "uv_size": [ 12, 12 ],
-          "size": [ 84, 15 ],
+          "size": [ 73, 15 ],
           "layer": 3,
           "anchor_from": "top_left",
           "anchor_to": "top_left",
@@ -222,6 +216,7 @@
           "offset": "@start.anim_title_float_down"
         }
       },
+      { "nova_title_gate@common.nova_toast": { "size": [ 1, 1 ], "layer": 0, "anchor_from": "top_left", "anchor_to": "top_left" } },
       {
         "title_underline@common.accent_line": {
           "size": [ "40%", 1 ],

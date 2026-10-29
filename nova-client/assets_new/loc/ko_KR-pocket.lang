@@ -3292,3 +3292,4 @@ nova.toast.crash=게임이 충돌했습니다	#
 nova.shaders.title=셰이더	#
 nova.mods.none=모드가 없습니다	#
 nova.toast.mods=월드에 들어가면 모드가 시작됩니다	#
+nova.version=NOVA alpha8	#

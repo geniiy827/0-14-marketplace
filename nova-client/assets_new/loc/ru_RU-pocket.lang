@@ -3292,3 +3292,4 @@ nova.toast.crash=Игра вылетела: отчёт скопирован (в�
 nova.shaders.title=Шейдеры	#
 nova.mods.none=Модов нет. Импортируйте файл мода на вкладке «Импорт»	#
 nova.toast.mods=Моды заработают при входе в мир	#
+nova.version=NOVA alpha8	#

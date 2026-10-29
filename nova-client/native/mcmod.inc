@@ -21,7 +21,7 @@ static void (*mf_gd_tip)(void *gd, void *str);
 static void (*mf_gd_popup)(void *gd, void *a, void *b);
 static unsigned char (*mf_getblock)(void *bs, int x, int y, int z);
 static unsigned char (*mf_getdata)(void *bs, int x, int y, int z);
-static int (*mf_setblock)(void *bs, int x, int y, int z, MBlockID id, unsigned char data, int flags);
+static int (*mf_setblock)(void *bs, int x, int y, int z, const MBlockID *id, unsigned char data, int flags);   /* BlockID goes by pointer (non-trivial type) */
 static void *(*mf_getlevel)(void *bs);
 static int (*mf_gettime)(void *lvl);
 static void (*mf_settime)(void *lvl, int t);
@@ -153,7 +153,7 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
     case OP_WORLD_SET_BLOCK: {
         if (!mf_setblock || FL(1) < 0 || FL(1) > 127) return 0;
         MBlockID id = {(unsigned char)(int)A(3)};
-        mf_setblock(bs, FL(0), FL(1), FL(2), id, (unsigned char)(int)A(4), 3);
+        mf_setblock(bs, FL(0), FL(1), FL(2), &id, (unsigned char)(int)A(4), 3);
         return 0;
     }
     case OP_WORLD_TIME: out[0] = lvl && mf_gettime ? mf_gettime(lvl) : 0; return 1;
