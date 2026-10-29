@@ -59,6 +59,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     static native int nativeLoadAnimations(byte[] blob);
     static native int nativeInfo(int what);
     static native void nativeIntroDone();
+    static native int nativeTerrainHeight(int h);
     static native int nativeLoadFaceUv(byte[] blob);
     static native int nativeSetDataDir(String dir);
     static native int nativeOpenNova(int kind, String a, String b);
@@ -359,6 +360,10 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         }
         ModBridge.load(this);
         if (atlases != null) atlases.setBlockExtras(ModBridge.blocks);
+        // the block atlas is taller with mod textures: break/step particles must use the same scale
+        if (nativeOk && atlases != null && ModBridge.blocks != null && ModBridge.blocks.hasAtlasStrip()) {
+            try { nativeTerrainHeight(ModBlocks.ATLAS_H); } catch (Throwable t) { Log.w(TAG, "particles", t); }
+        }
         super.onCreate(state);
         // targetSdk 24: storage is a runtime permission; worlds live in games/com.mojang on external storage
         try {

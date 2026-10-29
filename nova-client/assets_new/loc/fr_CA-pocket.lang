@@ -3292,4 +3292,4 @@ nova.toast.crash=NOVA : le jeu a planté	#
 nova.shaders.title=Shaders	#
 nova.mods.none=Aucun mod. Importez un fichier .mcmod dans Importer	#
 nova.toast.mods=Les mods démarrent en entrant dans un monde	#
-nova.version=NOVA alpha9	#
+nova.version=NOVA alpha10	#

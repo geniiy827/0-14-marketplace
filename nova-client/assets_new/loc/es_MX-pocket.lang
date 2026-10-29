@@ -3292,4 +3292,4 @@ nova.toast.crash=NOVA: el juego se cerró	#
 nova.shaders.title=Shaders	#
 nova.mods.none=No hay mods. Importa un archivo .mcmod en Importar	#
 nova.toast.mods=Los mods se activan al entrar en un mundo	#
-nova.version=NOVA alpha9	#
+nova.version=NOVA alpha10	#

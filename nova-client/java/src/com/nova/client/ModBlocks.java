@@ -133,7 +133,8 @@ final class ModBlocks {
             for (int i = 0; i < 6; i++) box[i] = clamp(num(b.get(i)) / 16.0, 0, 1);
         }
         boolean full = box[0] == 0 && box[1] == 0 && box[2] == 0 && box[3] == 1 && box[4] == 1 && box[5] == 1;
-        boolean solid = !model && !transparent && full;
+        Object colDecl = p.get("collision");
+        boolean solid = !model && !transparent && full && (colDecl == null || "full".equals(colDecl));
         o.add((double) id);
         o.add(model ? 1.0 : 0.0);
         o.add(solid ? 1.0 : 0.0);
@@ -179,6 +180,56 @@ final class ModBlocks {
         for (int f = 0; f < 6; f++) for (int k = 0; k < 4; k++) o.add(faces[f] == null ? -1.0 : faces[f][k]);
         o.add((double) cubes.size());
         for (float[] c : cubes) for (float v : c) o.add((double) v);
+        // collision: list of boxes (block units 0..1) + selection box (their union)
+        List<double[]> col = new ArrayList<double[]>();
+        Object cv = p.get("collision");
+        if ("none".equals(cv)) { /* walk through */ }
+        else if ("full".equals(cv)) col.add(new double[]{0, 0, 0, 1, 1, 1});
+        else if (cv instanceof List) {
+            for (Object bo : (List<?>) cv) {
+                if (!(bo instanceof List) || ((List<?>) bo).size() != 6) throw new Exception("collision: нужен список боксов [[x0, y0, z0, x1, y1, z1], ...] в пикселях 0..16");
+                List<?> b = (List<?>) bo;
+                double[] q = new double[6];
+                for (int i = 0; i < 6; i++) q[i] = clamp(num(b.get(i)) / 16.0, 0, 1);
+                col.add(order(q));
+            }
+        } else if (model) {                                       // default for models: every cube (rotated -> its bounds)
+            for (float[] c : cubes) col.add(cubeBounds(c));
+        } else col.add(box.clone());
+        double[] sel = null;
+        for (double[] q : col) sel = union(sel, q);
+        if (sel == null) for (float[] c : cubes) sel = union(sel, cubeBounds(c));
+        if (sel == null) sel = box.clone();
+        o.add((double) col.size());
+        for (double[] q : col) for (double v : q) o.add(v);
+        for (double v : sel) o.add(v);
+    }
+
+    private static double[] order(double[] q) {
+        return new double[]{Math.min(q[0], q[3]), Math.min(q[1], q[4]), Math.min(q[2], q[5]), Math.max(q[0], q[3]), Math.max(q[1], q[4]), Math.max(q[2], q[5])};
+    }
+
+    private static double[] union(double[] a, double[] b) {
+        if (a == null) return b.clone();
+        return new double[]{Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2]), Math.max(a[3], b[3]), Math.max(a[4], b[4]), Math.max(a[5], b[5])};
+    }
+
+    /** bounds of a (rotated) model cube, clamped to the block */
+    private static double[] cubeBounds(float[] c) {
+        double rx = Math.toRadians(c[30]), ry = Math.toRadians(c[31]), rz = Math.toRadians(c[32]);
+        double cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry), cz = Math.cos(rz), sz = Math.sin(rz);
+        double[] m = {cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx,
+                      sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx,
+                      -sy, cy * sx, cy * cx};
+        double[] r = null;
+        for (int k = 0; k < 8; k++) {
+            double x = (k & 1) != 0 ? c[3] : c[0], y = (k & 2) != 0 ? c[4] : c[1], z = (k & 4) != 0 ? c[5] : c[2];
+            double a = x - c[33], b = y - c[34], d = z - c[35];
+            double X = m[0] * a + m[1] * b + m[2] * d + c[33], Y = m[3] * a + m[4] * b + m[5] * d + c[34], Z = m[6] * a + m[7] * b + m[8] * d + c[35];
+            r = union(r, new double[]{X, Y, Z, X, Y, Z});
+        }
+        for (int i = 0; i < 6; i++) r[i] = clamp(r[i], 0, 1);
+        return r;
     }
 
     /** UV rect (atlas 0..1) of a texture reference, cropped to nothing: whole tile / image */
