@@ -31,6 +31,7 @@ static void *(*mf_block_lookup)(void *str, int b);
 static int sc_op(int op, const double *a, int n, double *out);
 static int ev_op(int op, const double *a, int n, char *s, double *out);
 static void ev_frame(void);
+static void mi_report(void);
 static char *mm_player(void) { return g_client ? *(char **)((char *)g_client + 0x120) : 0; }
 static void *mm_region(void *pl) { return pl ? *(void **)((char *)pl + 0x16c) : 0; }
 
@@ -378,13 +379,26 @@ static void mcmod_register_blocks(void) {
 }
 
 static void mcmod_register_items(void);
+static char **mf_creative_list;               /* std::vector<ItemInstance>: begin, end, cap */
 static void (*o_init_creative)(void);
 static void h_init_creative(void) {
     o_init_creative();
+    char **list = mf_creative_list;
+    int before = list ? (int)((list[1] - list[0]) / 20) : 0;
     mcmod_register_blocks();
-    mcmod_register_items();
     for (int i = 0; i < mblock_count; i++)
         if (mblocks[i].block && mf_add_creative) mf_add_creative((short)mblocks[i].id, 0);
+    mcmod_register_items();
+    /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
+    if (list) {
+        int total = (int)((list[1] - list[0]) / 20), k = total - before;
+        if (k > 0 && before > 0) {
+            char *b = list[0], *tmp = f_new(k * 20);
+            memcpy(tmp, b + before * 20, k * 20);
+            memmove(b + k * 20, b, before * 20);
+            memcpy(b, tmp, k * 20);
+        }
+    }
 }
 
 /* ---- model drawing: shared by the world (chunks), the inventory icon and the item in hand ---- */
@@ -438,12 +452,22 @@ static void mb_quad(float q[4][3], int face, const float *c, const MRot *r, floa
 }
 
 /* both windings: the world draws back faces culled, so each side shows once */
-static void mb_put(void *t, float q[4][3], const float *uv, float shade, float alpha, float px, float py, float pz, int outer_only) {
+static void (*mf_tess_normal)(void *t, float x, float y, float z);
+static void mb_put(void *t, float q[4][3], const float *uv, float shade, float alpha, float px, float py, float pz, int hand) {
     float uvs[4][2] = {{uv[0], uv[1]}, {uv[2], uv[1]}, {uv[2], uv[3]}, {uv[0], uv[3]}};
     mf_tess_color(t, shade, shade, shade, alpha);
-    /* hand (one_side): only the q-order winding - the reversed one is lit black there (zebra / black face) */
+    if (hand) {
+        /* the hand mesh is lit by normals: give each face its real outward normal, one (outer, CCW) winding */
+        float ax = q[1][0] - q[0][0], ay = q[1][1] - q[0][1], az = q[1][2] - q[0][2];
+        float bx = q[3][0] - q[0][0], by = q[3][1] - q[0][1], bz = q[3][2] - q[0][2];
+        float nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;   /* q order points inward */
+        float l = sqrtf(nx * nx + ny * ny + nz * nz);
+        if (l > 0 && mf_tess_normal) mf_tess_normal(t, -nx / l, -ny / l, -nz / l);
+        for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
+        return;
+    }
     for (int k = 0; k < 4; k++) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
-    if (!outer_only) for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
+    for (int k = 3; k >= 0; k--) mf_tess_vertex(t, q[k][0] + px, q[k][1] + py, q[k][2] + pz, uvs[k][0], uvs[k][1]);
 }
 
 /* mode 0: world, 1: item in hand (tiny inset: touching cubes do not flicker), 2: inventory icon
@@ -565,6 +589,7 @@ static void mcmod_frame(void *client) {
         mm_t0 = now_ms();
         mm_ticks = 0;
         mm_fire(EV_WORLD_JOIN, 0, 0, 0);
+        mi_report();
     } else if (!pl && mm_last_pl) {
         mm_last_pl = 0;
         mm_fire(EV_WORLD_LEAVE, 0, 0, 0);
@@ -607,6 +632,8 @@ static void mcmod_init(void *mc, u32 base) {
     S(mf_touv, "_Z4toUV14BrightnessPair");
     S(mf_tex1, "_ZN16BlockTessellator5_tex1ERK4Vec2");
     S(mf_tess_begin, "_ZN11Tessellator5beginEi");
+    S(mf_creative_list, "_ZN4Item13mCreativeListE");
+    S(mf_tess_normal, "_ZN11Tessellator6normalEfff");
     S(mf_add_aabb, "_ZN5Block7addAABBERK4AABBPS1_RSt6vectorIS0_SaIS0_EE");
     S(mf_tess_addoff, "_ZN11Tessellator9addOffsetEfff");
     S(mf_tess_draw, "_ZN11Tessellator4drawERKN3mce11MaterialPtrERKNS0_10TexturePtrE");

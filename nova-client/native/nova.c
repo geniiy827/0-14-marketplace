@@ -24,6 +24,7 @@ int mprotect(void *, size_t, int);
 void *malloc(size_t);
 void *memset(void *, int, size_t);
 int memcmp(const void *, const void *, size_t);
+void *memcpy(void *, const void *, size_t); void *memmove(void *, const void *, size_t);
 float sinf(float), cosf(float), sqrtf(float), floorf(float), ceilf(float), fmodf(float, float), powf(float, float);
 int __android_log_print(int, const char *, const char *, ...);
 int snprintf(char *, size_t, const char *, ...);
@@ -1031,7 +1032,12 @@ static void h_doll_render(void *self, void *client, void **ctrl, int pass) {
             pos[1] = top + S * 0.32f;               /* head top is ~0.3 block above the eyes */
         }
     }
+    /* the doll draws the same player model as the 3rd-person view: keep the bone poses of the world frame,
+       or the head jumps between the two poses every frame */
+    static float keep[PCAP][6];
+    for (int i = 0; i < PCAP; i++) if (parts[i].part) memcpy(keep[i], parts[i].part, 24);
     o_doll_render(self, client, ctrl, pass);
+    for (int i = 0; i < PCAP; i++) if (parts[i].part) memcpy(parts[i].part, keep[i], 24);
 }
 
 static int patch_slot(u32 vt, int idx, void *fn, void **orig) {

@@ -1110,6 +1110,54 @@
     ]
   },
 
+  // NOVA: desktop creative scrollbar - wide track you can hit, thumb sized by the engine to the tab's length,
+  // no hidden touch box (it fought with the dragged box and threw it back to the top)
+  "scroller_desktop@common.scroll": {
+    "layer": 4,
+    "anchor_to": "top_right",
+    "anchor_from": "top_right",
+    "size": "$bar_size",
+    "offset": "$bar_offset",
+    "content_panel": "$content",
+    "scrollbar_box": "box",
+    "clips_children": true,
+    "controls": [
+      {
+        "track": {
+          "type": "image",
+          "layer": 1,
+          "size": [ "100%", "100%" ],
+          "nineslice_size": 2.0,
+          "texture": "gui/newgui/Indent.png",
+          "uv": [ 0, 0 ],
+          "uv_size": [ 5, 5 ],
+          "color": [ 0.3, 0.34, 0.46, 1.0 ]
+        }
+      },
+      {
+        "box@common.scroll_box": {
+          "anchor_to": "top_right",
+          "anchor_from": "top_right",
+          "allow_clipping": true,
+          "controls": [
+            {
+              "thumb": {
+                "type": "image",
+                "layer": 1,
+                "size": [ "100%-2px", "100%-2px" ],
+                "nineslice_size": 4.0,
+                "texture": "gui/newgui/NormalButtonStroke.png",
+                "uv": [ 0, 0 ],
+                "uv_size": [ 12, 12 ],
+                "color": [ 0.4, 0.95, 0.88, 1.0 ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+
   "scroll_content_indent": {
     "type": "image",
     "layer": 1,
@@ -1158,11 +1206,9 @@
     "clips_children": true,
     "controls": [
       {
-        "$panel_name@crafting.scroller": {
-          "$bar_size": [ "7px", "100%-4px" ],
-          "$bar_offset": [ -3, 1 ],
-          "$bar_visible": true,
-          "$touch_bar_visible": false
+        "$panel_name@crafting.scroller_desktop": {
+          "$bar_size": [ 12, "100%-2px" ],
+          "$bar_offset": [ -1, 1 ]
         }
       },
       {

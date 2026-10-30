@@ -12,12 +12,14 @@ python3 -I tools/gen_intro_mesh.py intro/title.bbmodel assets_new/nova/intro
 [ -f assets_new/nova/intro/sfx/hit.ogg ] || python3 -I tools/gen_intro_sfx.py assets_new/nova/intro/sfx
 python3 -W ignore -I tools/gen_textures.py /home/claude/apk/x/assets /home/claude/jt/j/textures assets_new
 python3 -I tools/gen_mcmod.py
+[ -f res_new/drawable/iconx.png ] || python3 -I tools/gen_icon.py
 sh tools/build_java.sh
 python3 -I tools/so_patch.py /home/claude/apk/x/lib/armeabi-v7a/libminecraftpe.so libminecraftpe.patched.so
 sh native/build.sh
 args="AndroidManifest.xml=AndroidManifest.nova.xml classes2.dex=java/build/classes2.dex"
 for f in $(cd assets_new && find . -type f | sed 's#^./##'); do args="$args assets/$f=assets_new/$f"; done
 for f in ui_new/*.json; do b=$(basename $f); cmp -s $f ui_orig/$b || args="$args assets/ui/$b=$f"; done
+for f in $(cd res_new && find . -type f | sed 's#^./##'); do args="$args res/$f=res_new/$f"; done
 args="$args lib/armeabi-v7a/libminecraftpe.so=libminecraftpe.patched.so lib/armeabi-v7a/libnova.so=native/libnova.so"
 python3 -I tools/build_apk.py /home/claude/apk/mcpe.apk out/unsigned.apk $args $(cat entity_renames.txt texture_renames.txt)
 zipalign -p -f 4 out/unsigned.apk out/aligned.apk

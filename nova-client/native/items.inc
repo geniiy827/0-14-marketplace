@@ -16,7 +16,7 @@ typedef struct {
     void *item;
 } ModItem;
 static ModItem mitems[MI_MAX];
-static int mitem_count, mitems_done;
+static int mitem_count, mitems_done, mitem_registered;
 static ModItem *mitem_of[512];
 
 static void (*mi_ctor)(void *it, void *name, short id);
@@ -85,6 +85,7 @@ static void mcmod_register_items(void) {
         if (mf_add_creative) mf_add_creative((short)m->id, 0);
         done++;
     }
+    mitem_registered = done;
     LOG("mcmod: %d item(s) registered", done);
 }
 
@@ -134,4 +135,24 @@ static void items_init(void *mc, u32 base) {
     #undef S
     GATE(RENDER_ITEM, h_render_item, o_render_item);
     GATE(RENDER_OBJ, h_render_obj, o_render_obj);
+}
+
+/* on world join: say so when mod items could not be registered (no logcat on the phone) */
+static void mi_report(void) {
+    if (!mitem_count || mitem_registered == mitem_count || !g_client || !mf_gd_msg) return;
+    void *gd = *(void **)((char *)g_client + 0x130);
+    if (!gd) return;
+    char msg[160];
+    const char *a = "\xc2\xa7" "c[NOVA] mod items: ";
+    int n = 0;
+    while (a[n]) { msg[n] = a[n]; n++; }
+    msg[n++] = '0' + (mitem_registered / 10) % 10; msg[n++] = '0' + mitem_registered % 10; msg[n++] = '/';
+    msg[n++] = '0' + (mitem_count / 10) % 10; msg[n++] = '0' + mitem_count % 10;
+    const char *why = mitems_done ? " (id taken / no ctor)" : " (initCreativeItems not reached)";
+    while (*why && n < 150) msg[n++] = *why++;
+    msg[n] = 0;
+    u32 st[1];
+    gstr(st, msg);
+    mf_gd_msg(gd, st);
+    f_strdtor(st);
 }
