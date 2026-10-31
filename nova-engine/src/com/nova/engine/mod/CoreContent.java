@@ -33,7 +33,9 @@ public final class CoreContent implements NovaMod {
         for (int d = 1; d < 4; d++) leaves.data(d, r.tex("leaves:" + d));
         r.block(20, "glass").tex(r.tex("glass")).cutout();
         r.block(21, "lapis_ore").tex(r.tex("lapis_ore"));
-        r.block(24, "sandstone").tex(r.tex("sandstone:0"), r.tex("sandstone:0"), r.tex("sandstone:1"));
+        r.block(24, "sandstone").tex(r.tex("sandstone:0"), r.tex("sandstone:4"), r.tex("sandstone:3"))
+                .data(1, r.tex("sandstone:0"), r.tex("sandstone:0"), r.tex("sandstone:1"))
+                .data(2, r.tex("sandstone:0"), r.tex("sandstone:0"), r.tex("sandstone:2"));
         r.block(31, "tallgrass").tex(r.tex("tallgrass:0")).tint(G).cross()
                 .data(1, r.tex("tallgrass:0")).data(2, r.tex("tallgrass:2"));
         r.block(32, "deadbush").tex(r.tex("tallgrass:1")).cross();
@@ -50,19 +52,19 @@ public final class CoreContent implements NovaMod {
         r.block(78, "snow_layer").tex(r.tex("snow")).height(0.125f).notSolid();
         r.block(79, "ice").tex(r.tex("ice")).translucent();
         r.block(80, "snow").tex(r.tex("snow"));
-        r.block(81, "cactus").tex(r.tex("cactus:1"), r.tex("cactus:2"), r.tex("cactus:0")).cutout();
+        r.block(81, "cactus").tex(r.tex("cactus:0"), r.tex("cactus:2"), r.tex("cactus:1")).cutout().inset(1f / 16f);
         r.block(82, "clay").tex(r.tex("clay"));
         r.block(83, "reeds").tex(r.tex("reeds")).cross();
         r.block(89, "glowstone").tex(r.tex("glowstone")).light(15);
         r.block(98, "stonebrick").tex(r.tex("stonebrick:0"));
         r.block(103, "melon").tex(r.tex("melon:1"), r.tex("melon:1"), r.tex("melon:0"));
-        r.block(155, "quartz_block").tex(r.tex("quartz_block:0"));
+        r.block(155, "quartz_block").tex(r.tex("quartz_block:1"), r.tex("quartz_block:1"), r.tex("quartz_block:0"));
         // used by the 0.14.3 generator
         r.block(110, "mycelium").tex(r.tex("mycelium:1"), r.tex("dirt"), r.tex("mycelium:0"));
         Blocks.Def sc = r.block(159, "stained_hardened_clay").tex(r.tex("stained_clay:0"));
         for (int d = 1; d < 16; d++) sc.data(d, r.tex("stained_clay:" + d));
         r.block(172, "hardened_clay").tex(r.tex("hardened_clay"));
-        r.block(243, "podzol").tex(r.tex("dirt:1"), r.tex("dirt"), r.tex("dirt"));
+        r.block(243, "podzol").tex(r.tex("dirt:1"), r.tex("dirt"), r.tex("dirt:2"));
     }
 
     /** hotbar of the beta */

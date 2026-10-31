@@ -69,6 +69,15 @@ public final class Hud {
         font = tex(fbm, false);
     }
 
+    /** a texture from the assets (0 when missing) */
+    public int loadTex(AssetManager am, String path) {
+        if (am == null) return 0;
+        try {
+            Bitmap b = BitmapFactory.decodeStream(am.open(path));
+            return b == null ? 0 : tex(b, false);
+        } catch (Exception e) { return 0; }
+    }
+
     static int tex(Bitmap b, boolean linear) {
         int[] t = new int[1];
         GLES30.glGenTextures(1, t, 0);

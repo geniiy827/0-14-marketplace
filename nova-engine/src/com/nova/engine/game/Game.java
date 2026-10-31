@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine 0.0.2 beta 2";
+    public static final String VERSION = "NOVA Engine beta4";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -49,7 +49,7 @@ public final class Game implements GLSurfaceView.Renderer {
     private float density = 3;
     private long lastNs, tickAcc;
     private int radius = 6;
-    private int slot;
+    private int slot, guiTex;
     private final int[] hotbar = CoreContent.HOTBAR.clone();
     private final float[] proj = new float[16], view = new float[16], mvp = new float[16], look = new float[3];
     private static final float[] SKY = {0.53f, 0.71f, 0.98f};
@@ -71,6 +71,7 @@ public final class Game implements GLSurfaceView.Renderer {
             atlas.upload();
             wr.init();
             hud.init(atlas.gameAssets);
+            guiTex = hud.loadTex(atlas.gameAssets, "images/gui/gui.png");
             if (world == null) {
                 world = new World(System.currentTimeMillis());
                 // spawn: first dry land along a spiral from 0,0
@@ -255,17 +256,28 @@ public final class Game implements GLSurfaceView.Renderer {
         // crosshair
         hud.rect(width / 2f - d * 8, height / 2f - d, d * 16, d * 2, 0xC0FFFFFF);
         hud.rect(width / 2f - d, height / 2f - d * 8, d * 2, d * 16, 0xC0FFFFFF);
-        // hotbar
+        // hotbar: gui.png of 0.14 (bar 182x22 at 0,0; selection 24x24 at 0,22; a slot is 20 px)
+        float u = c.slot / 20f;
+        if (guiTex != 0) {
+            float g = 1f / 256f;
+            hud.image(guiTex, c.barX - u, c.barY - u, 182 * u, 22 * u, 0, 0, 182 * g, 22 * g, 0xFFFFFFFF);
+        }
         for (int i = 0; i < 9; i++) {
             float x = c.barX + i * c.slot, y = c.barY;
-            hud.rect(x, y, c.slot, c.slot, i == slot ? 0xE0FFFFFF : 0x90000000);
-            hud.rect(x + d * 2, y + d * 2, c.slot - d * 4, c.slot - d * 4, 0xC0303038);
+            if (guiTex == 0) {
+                hud.rect(x, y, c.slot, c.slot, i == slot ? 0xE0FFFFFF : 0x90000000);
+                hud.rect(x + d * 2, y + d * 2, c.slot - d * 4, c.slot - d * 4, 0xC0303038);
+            }
             int id = hotbar[i];
             int s = Blocks.tex[id][Blocks.kind[id] == Blocks.CROSS ? 2 : 1] * 4;
             float[] uv = atlas.slotUv;
             int tint = Blocks.tint[id][1];
             if (tint < 0) tint = tint == Blocks.TINT_FOLIAGE ? 0x59AE30 : tint == Blocks.TINT_WATER ? 0x3F76E4 : 0x79C05A;
-            hud.image(atlas.texture, x + d * 6, y + d * 6, c.slot - d * 12, c.slot - d * 12, uv[s], uv[s + 1], uv[s + 2], uv[s + 3], 0xFF000000 | tint);
+            hud.image(atlas.texture, x + 2 * u, y + 2 * u, 16 * u, 16 * u, uv[s], uv[s + 1], uv[s + 2], uv[s + 3], 0xFF000000 | tint);
+        }
+        if (guiTex != 0) {
+            float g = 1f / 256f;
+            hud.image(guiTex, c.barX + slot * c.slot - 2 * u, c.barY - 2 * u, 24 * u, 24 * u, 0, 22 * g, 24 * g, 46 * g, 0xFFFFFFFF);
         }
         // buttons
         button(c.jumpX, c.jumpY, c.btn, "^", c.jump);

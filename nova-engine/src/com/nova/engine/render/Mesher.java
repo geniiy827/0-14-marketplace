@@ -77,7 +77,8 @@ public final class Mesher {
                 for (int f = 0; f < 6; f++) {
                     int[] n = NORMAL[f];
                     int nb = get(x + n[0], wy + n[1], z + n[2]);
-                    if (!visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1)) continue;
+                    boolean ins = f >= 2 && Blocks.inset[id] > 0;
+                    if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1)) continue;
                     face(id, f, x, y, z, k == Blocks.LIQUID ? (Blocks.kind[get(x, wy + 1, z)] == Blocks.LIQUID ? 1f : 0.875f) : 1f);
                 }
             }
@@ -122,6 +123,7 @@ public final class Mesher {
         Buf out = Blocks.layer[id] == Blocks.TRANSLUCENT ? water : solid;
         int[] cr = CORNERS[f], n = NORMAL[f];
         int wy = by + y;
+        float ins = f >= 2 ? Blocks.inset[id] : 0;
         // per-vertex AO
         int[] ao = new int[4];
         for (int v = 0; v < 4; v++) {
@@ -147,6 +149,7 @@ public final class Mesher {
         for (int i = 0; i < 4; i++) {
             int v = (start + i) & 3;
             float px = x + cr[v * 3], py = y + cr[v * 3 + 1], pz = z + cr[v * 3 + 2];
+            if (ins > 0) { px -= n[0] * ins; pz -= n[2] * ins; }
             if (liquid && cr[v * 3 + 1] == 1) py = y + top;
             else if (bh < 1 && cr[v * 3 + 1] == 1) py = y + bh;
             float l = SHADE[f] * AO[ao[v]];

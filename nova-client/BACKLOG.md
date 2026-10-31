@@ -5,6 +5,33 @@
 
 ## NOVA Engine (свой движок на Java) — главное направление, план: docs/ENGINE_PLAN.md
 - [ ] этап 1: прототип — мир 0.14 из LevelDB, текстуры из установленной игры, ходьба, блоки (GLES 3.0, Java 8 + dx)
+- [?] beta3: генератор из 0.14.3 (world/Generator, Noises, Layers, McRandom, Biomes). Точно по дизасму: MT Random,
+  ImprovedNoise/PerlinNoise/SimplexNoise (float, тот же порядок операций), getHeights (3x3 смешивание биомов,
+  весы из +0x3c), prepareHeights, buildSurfaceAtDefault/_placeBedrock, оверрайды ExtremeHills/Taiga/MutatedSavanna.
+  Слои биомов = цепочка getDefaultLayers (как Java 1.9 GenLayer, проверены init/initRandom/nextRandom, списки
+  BiomeInit: в medium 3 plains, Voronoi во float). Глубины/температуры биомов взяты как в Java 1.9 — не сверены
+  с Biome::initBiomes (0x5bdf28). Сверить с оригиналом по сиду (скрин одного места в 0.14.3 и в движке).
+- [ ] генератор дальше: LargeCaveFeature (LargeFeature::apply 0x5ebfc4, Random потока после buildSurfaces),
+  RandomLevelSource::postProcess 0x644680 + BiomeDecorator (деревья, руды, цветы, трава), MesaBiome 0x59d208,
+  SwampBiome 0x59d7c0. Сейчас пещеры/руды/растения — временные.
+- [?] beta4: «полупиксели» — причина: отступ в полтекселя в Atlas (16 текселей в 15). Убран. Песчаник/кварц/подзол
+  по newtex_map (sandstone: 0 верх, 1 резной, 2 гладкий, 3 бок, 4 низ). Кактус: бока внутрь на 1/16 (Blocks.inset).
+  HUD: хотбар из gui.png 0.14 (бар 182x22 @0,0; выделение 24x24 @0,22).
+- [ ] ДЕКОРАТОР (следующий шаг). Уже разобрано:
+  postProcess 0x644680: Random(levelSeed) -> a=(r>>2)*2+1, b=(r>>2)*2+1; seed = levelSeed ^ (cx*a + cz*b) (координаты
+  чанка); озёра/данжи/структуры/лёд до декора; декор = biome vtable[14] decorate(src, rnd, chunkMin, flag=0, FLT_MAX).
+  BiomeDecorator::decorate 0x599778 порядок: decorateOres (vtable[0]); +0xec x(песок +8) / +0xf0 (глина +4) / +0xe8
+  (гравий +0xc) в getTopSolidBlock(x+r&15, z+r&15); деревья: t=+0xcc float; r%10==0 -> count=(int)(nextFloat*t),
+  трава=как у plains; t<1 -> (t>nextFloat); иначе (int)t + max(0, r%10-7); дерево = biome vtable[4] getTreeFeature,
+  позиция _getRandomTreePosition (x,z = 1+r%14, y=heightmap), после дерева TallGrassFeature(31,1).place(..,23,3);
+  +0xf4 большие грибы(+0x48); цветы +0xd0 (y=r%(heightmap+32), getRandomFlowerTypeAndData, placeFlower если там
+  НЕ воздух); трава +0xd4 (y=_getRandomHeight = r%(heightmap*2), getGrassFeature); +0xd8 сухие кусты(+0x64);
+  +0xc8 кувшинки(+0x54, опуск. по пустоте); +0xdc грибы (r&3==0 коричн. на heightmap, r&7==0 красн.); ещё r&3, r&7;
+  тростник +0xe0 (+0x4c) и ещё 10; тыква r&31==0 (_getRandomSurfacePosition, +0x58); кактус +0xe4 (+0x50);
+  если +0xf8: 50 водных родников y=r%(r%120+8), 20 лавовых y=r%(r%(r%112+8)+8); FoliageColor::buildGrassColor.
+  Значения по умолчанию: деревья 0, песок 3, трава 1, гравий 1, глина 1, цветы 2. Дуб: высота r%3+5, листва как в Java.
+  Осталось: значения по биомам (конструкторы *Biome), фичи (Tree/_prepareSpawn/_placeTrunk, Birch, Spruce, Pine,
+  Ore+decorateOres, Sand, Clay, TallGrass, Flower, Reeds, Cactus, DeadBush...), getTreeFeature биомов.
 
 ## Моды: блоки
 - [?] alpha10: иконка модельного блока в инвентаре — рисуются только грани к камере, от дальних к ближним

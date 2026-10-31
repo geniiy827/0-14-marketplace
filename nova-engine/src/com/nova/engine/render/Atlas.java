@@ -86,8 +86,8 @@ public final class Atlas {
                 JSONArray list = e.getJSONArray("uvs");
                 JSONArray u = list.getJSONArray(Math.min(index, list.length() - 1));
                 float w = (float) u.getDouble(4), h = (float) u.getDouble(5);
-                // half a texel inside: no bleeding from neighbours
-                float iu = 0.5f / width, iv = 0.5f / height;
+                // exact tile edges (an inset squeezes 16 texels into 15 -> uneven half pixels); a hair inside only
+                float iu = 1f / (width * 512f), iv = 1f / (height * 512f);
                 r = new float[]{(float) u.getDouble(0) / w + iu, (float) u.getDouble(1) / h + iv,
                                 (float) u.getDouble(2) / w - iu, (float) u.getDouble(3) / h - iv};
                 if (name.startsWith("still_") || name.startsWith("flowing_")) {   // animated strips: first frame

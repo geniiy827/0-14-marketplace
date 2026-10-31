@@ -10,6 +10,8 @@ public final class Blocks {
 
     /** render kinds */
     public static final int CUBE = 0, CROSS = 1, LIQUID = 2;
+    /** side faces pulled in by this much (cactus 1/16); such faces are never culled */
+    public static final float[] inset = new float[MAX];
     /** layers */
     public static final int OPAQUE = 0, CUTOUT = 1, TRANSLUCENT = 2;
 
@@ -76,6 +78,7 @@ public final class Blocks {
         }
         public Def tint(int rgb) { for (int f = 0; f < 6; f++) tint[id][f] = rgb; return this; }
         public Def tintTop(int rgb) { tint[id][1] = rgb; return this; }
+        public Def inset(float v) { inset[id] = v; opaque[id] = false; return this; }
         public Def cutout() { layer[id] = CUTOUT; opaque[id] = false; return this; }
         public Def translucent() { layer[id] = TRANSLUCENT; opaque[id] = false; return this; }
         public Def selfFaces() { selfFaces[id] = true; return this; }

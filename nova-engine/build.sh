@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 AJ=/usr/lib/android-sdk/platforms/android-23/android.jar
 V=$(cat VERSION 2>/dev/null || echo beta1)
 OUT=out/NOVA-Engine-$V.apk
+sed -i "s/\"NOVA Engine [^\"]*\"/\"NOVA Engine $V\"/" src/com/nova/engine/game/Game.java
 rm -rf build && mkdir -p build/classes out
 javac --release 8 -Xlint:-options -encoding UTF-8 -d build/classes -cp $AJ $(find src -name '*.java') 2>&1 | grep -v -e JAVA_TOOL -e '^Note:' || true
 ls build/classes/com/nova/engine/EngineActivity.class >/dev/null
