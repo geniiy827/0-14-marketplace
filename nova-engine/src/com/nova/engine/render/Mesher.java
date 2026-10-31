@@ -75,13 +75,15 @@ public final class Mesher {
                 data = c.data[Chunk.idx(x, wy, z)] & 15;
                 biome = c.biome[z * 16 + x] & 255;
                 if (k == Blocks.CROSS) { cross(id, x, y, z); continue; }
+                int above = get(x, wy + 1, z);
+                snowy = id == 2 && (above == 78 || above == 80) && Blocks.grassSnowSide >= 0;
                 for (int f = 0; f < 6; f++) {
                     int[] n = NORMAL[f];
                     int nb = get(x + n[0], wy + n[1], z + n[2]);
                     boolean ins = f >= 2 && Blocks.inset[id] > 0;
                     if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1)) continue;
                     face(id, f, x, y, z, k == Blocks.LIQUID ? (Blocks.kind[get(x, wy + 1, z)] == Blocks.LIQUID ? 1f : 0.875f) : 1f);
-                    if (f >= 2 && Blocks.sideOverlay[id] >= 0) { overlay = true; face(id, f, x, y, z, 1f); overlay = false; }
+                    if (f >= 2 && Blocks.sideOverlay[id] >= 0 && !snowy) { overlay = true; face(id, f, x, y, z, 1f); overlay = false; }
                 }
             }
         }
@@ -115,12 +117,12 @@ public final class Mesher {
         return b != 0 && Blocks.opaque[b];
     }
 
-    private boolean overlay;
+    private boolean overlay, snowy;
 
     private void face(int id, int f, int x, int y, int z, float top) {
-        int s = (overlay ? Blocks.sideOverlay[id] : Blocks.texFor(id, data, f)) * 4;
+        int s = (overlay ? Blocks.sideOverlay[id] : snowy && f >= 2 ? Blocks.grassSnowSide : Blocks.texFor(id, data, f)) * 4;
         float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
-        int tint = overlay ? tintOfValue(Blocks.sideOverlayTint[id], id) : tintOf(id, f);
+        int tint = overlay ? tintOfValue(Blocks.sideOverlayTint[id], id) : snowy && f >= 2 ? 0xFFFFFF : tintOf(id, f);
         float bh = Blocks.height[id];
         float tr = ((tint >> 16) & 255) / 255f, tg = ((tint >> 8) & 255) / 255f, tb = (tint & 255) / 255f;
         boolean liquid = Blocks.kind[id] == Blocks.LIQUID;

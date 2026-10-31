@@ -62,7 +62,11 @@ public final class CoreContent implements NovaMod {
         r.block(155, "quartz_block").tex(r.tex("quartz_block:1"), r.tex("quartz_block:1"), r.tex("quartz_block:0"));
         r.block(39, "brown_mushroom").tex(r.tex("mushroom_brown")).cross();
         r.block(40, "red_mushroom").tex(r.tex("mushroom_red")).cross();
-        r.block(86, "pumpkin").tex(r.tex("pumpkin:0"), r.tex("pumpkin:0"), r.tex("pumpkin:1"));
+        // pumpkin: the carved face on the side given by data (0 south, 1 west, 2 north, 3 east)
+        Blocks.Def pk = r.block(86, "pumpkin").tex(r.tex("pumpkin:0"), r.tex("pumpkin:0"), r.tex("pumpkin:1"));
+        int[] faceOf = {3, 4, 2, 5};
+        for (int d = 0; d < 4; d++) pk.data(d, r.tex("pumpkin:0"), r.tex("pumpkin:0"), r.tex("pumpkin:1")).dataFace(d, faceOf[d], r.tex("pumpkin:2"));
+        Blocks.grassSnowSide = r.tex("grass:1");
         r.block(111, "waterlily").tex(r.tex("waterlily:0")).tint(F).cutout().height(1f / 64f).notSolid();
         // used by the 0.14.3 generator
         r.block(110, "mycelium").tex(r.tex("mycelium:1"), r.tex("dirt"), r.tex("mycelium:0"));

@@ -34,6 +34,12 @@ public final class World {
     /** true = unknown (not generated yet): treated as solid for physics */
     public boolean loaded(int x, int z) { return ready(x >> 4, z >> 4) != null; }
 
+    public void set(int x, int y, int z, int id, int data) {
+        set(x, y, z, id);
+        Chunk c = ready(x >> 4, z >> 4);
+        if (c != null && y >= 0 && y < Chunk.H) c.data[Chunk.idx(x & 15, y, z & 15)] = (byte) data;
+    }
+
     public void set(int x, int y, int z, int id) {
         if (y < 0 || y >= Chunk.H) return;
         Chunk c = ready(x >> 4, z >> 4);

@@ -23,6 +23,16 @@
   Трава на боках блока: свой оверлей (атлас: nova_grass_side + nova_grass_side_overlay, красится биомом).
   Управление: тап = поставить, удержание = ломать (повтор 250 мс). Кнопки и прицел из gui.png / icons.png.
   Инструменты: engine/tools/publish.sh (сборка+пуш+проверка), GitHub Actions nova-engine.yml -> релиз engine-latest.
+- [?] beta6: управление 0.14 из кода (MinecraftBindingFactory::onConfigChanged: px/мм = 3+(H/96-3)*0.5, шаг 16 мм,
+  кнопка 20 мм, прыжок 20 мм справа, полёт: вверх/вниз = прыжок -/+0.85J x0.8; глифы gui.png 26x26, масштаб 0.85,
+  цвета ButtonColors (1,1,1,.498)/(.753..), BUTTONS_TRANSPARENCY 0.65), центр крестовины = присед, двойной тап прыжка =
+  полёт; тап = поставить, удержание = ломать ПОД ПАЛЬЦЕМ (useFreeformPickDirection); кольцо прогресса у пальца
+  (ui_invert_overlay: 1-dst), подсветка блока (ui3D selection_overlay: DestColor/SourceColor, цвет 0.65, offset 5).
+  Не перенесено: пауза/чат (их прямоугольники не разобраны), точная геометрия кольца (меши GuiData +0xcc).
+  Вода: туман под водой 0..10 блоков (LevelRenderer::_setupFog), цвет пока Java (DEFAULT_UNDERWATER_COLOR не найден),
+  поверхность воды видна снизу. Цвета травы/листвы: FoliageColor (углы из static init через эмуляцию
+  work/tools/emu_init.py + unicorn), Mesa/Swamp как в коде. Снежный бок травы. Тыква с лицом по data.
+- [ ] FoliageColor::buildGrassColor (смешивание по столбцам гауссом + шум), Swamp шум, roofed.
 - [ ] ДЕКОРАТОР дальше (approx в Decorator.java): Birch/Spruce/Pine/Jungle/Fancy/Swamp/Savanna/Roof/Mega деревья,
   Sand/Clay, TallGrass, FlowerFeature + getRandomFlowerTypeAndData, Reeds, Cactus, DeadBush, Waterlily, Pumpkin
   (_getRandomSurfacePosition), HugeMushroom, Spring; оверрайды decorate (Forest/Plains/Taiga/Jungle/Desert/

@@ -29,6 +29,8 @@ public final class Blocks {
     public static final int[][] tint = new int[MAX][6];
     /** second, tinted layer over the side faces (grass side overlay): atlas slot or -1, and its tint */
     public static final int[] sideOverlay = new int[MAX], sideOverlayTint = new int[MAX];
+    /** grass side under snow (grass:1, not tinted, no overlay); -1 = none */
+    public static int grassSnowSide = -1;
     /** draw faces against the same block (leaves) */
     public static final boolean[] selfFaces = new boolean[MAX];
     public static final int[] light = new int[MAX];
@@ -92,6 +94,9 @@ public final class Blocks {
         public Def height(float h) { height[id] = h; opaque[id] = false; return this; }
         /** textures for one data value: all six faces */
         public Def data(int d, int all) { return data(d, all, all, all); }
+        /** one face of a data variant (after data(d, ...)) */
+        public Def dataFace(int d, int face, int tex) { texData[id][d][face] = tex; return this; }
+
         public Def data(int d, int top, int bottom, int side) {
             if (texData[id] == null || texData[id].length <= d) {
                 int[][] n = new int[Math.max(d + 1, 4)][];

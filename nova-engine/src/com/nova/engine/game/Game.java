@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta5";
+    public static final String VERSION = "NOVA Engine beta6";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -139,31 +139,100 @@ public final class Game implements GLSurfaceView.Renderer {
     }
 
     // ------------------------------------------------------------------ input
+    private final float[] touchXY = new float[32], pickDir = new float[3];
+    private final Raycast pick = new Raycast();
+    /** block under the interacting finger (highlight), valid when hl */
+    private boolean hl;
+    private int hlX, hlY, hlZ;
+
+    /** direction through a screen point (MCPE touch picks under the finger: useFreeformPickDirection) */
+    private void screenDir(float sx, float sy, float[] out) {
+        float tanY = (float) Math.tan(Math.toRadians(70 / 2.0)), tanX = tanY * width / (float) height;
+        float nx = (sx / width * 2 - 1) * tanX, ny = (1 - sy / height * 2) * tanY;
+        double ry = Math.toRadians(player.yaw), rp = Math.toRadians(player.pitch);
+        float fx = (float) (Math.sin(ry) * Math.cos(rp)), fy = (float) -Math.sin(rp), fz = (float) (-Math.cos(ry) * Math.cos(rp));
+        float rx = (float) Math.cos(ry), rz = (float) Math.sin(ry);                       // right
+        float ux = (float) (Math.sin(ry) * Math.sin(rp)), uy = (float) Math.cos(rp), uz = (float) (-Math.cos(ry) * Math.sin(rp));   // up
+        float dx = fx + rx * nx + ux * ny, dy = fy + uy * ny, dz = fz + rz * nx + uz * ny;
+        float l = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        out[0] = dx / l; out[1] = dy / l; out[2] = dz / l;
+    }
+
+    private boolean pickAt(float sx, float sy) {
+        screenDir(sx, sy, pickDir);
+        pick.cast(world, player.ex(1), player.ey(1), player.ez(1), pickDir[0], pickDir[1], pickDir[2], 6);
+        return pick.hit;
+    }
+
     private void input() {
         Controls c = controls;
+        c.flying = player.flying;
         c.poll();
         float sens = 0.25f / density * 1.6f;
         player.yaw += c.takeLookX() * sens;
         player.pitch = Math.max(-90, Math.min(90, player.pitch + c.takeLookY() * sens));
-        player.moveF = c.joyY; player.moveS = c.joyX;
-        player.jump = c.jump; player.sneak = c.down;
+        player.moveF = c.moveF; player.moveS = c.moveS;
+        player.jump = player.flying ? c.ascend : c.jump;
+        player.sneak = player.flying ? c.descend : c.sneak;
         if (c.takeFly() > 0) { player.flying = !player.flying; player.my = 0; }
         int s = c.takeSlot();
         if (s >= 0) slot = s;
         player.look(look);
-        double ex = player.ex(1), ey = player.ey(1), ez = player.ez(1);
-        ray.cast(world, ex, ey, ez, look[0], look[1], look[2], 6);
-        int br = c.takeBreaks(), pl = c.takePlaces();
-        if (ray.hit && br > 0 && world.get(ray.x, ray.y, ray.z) != 7) world.set(ray.x, ray.y, ray.z, 0);
-        if (ray.hit && pl > 0) {
-            int nx = ray.nx(), ny = ray.ny(), nz = ray.nz();
+        int br = c.takeBreaks(touchXY);
+        for (int i = 0; i < br && i < 16; i++) {
+            if (pickAt(touchXY[i * 2], touchXY[i * 2 + 1]) && world.get(pick.x, pick.y, pick.z) != 7) world.set(pick.x, pick.y, pick.z, 0);
+        }
+        int pl = c.takePlaces(touchXY);
+        for (int i = 0; i < pl && i < 16; i++) {
+            if (!pickAt(touchXY[i * 2], touchXY[i * 2 + 1])) continue;
+            int nx = pick.nx(), ny = pick.ny(), nz = pick.nz();
             int id = hotbar[slot];
             int cur = world.get(nx, ny, nz);
             boolean intoPlayer = Blocks.solid[id] && nx >= Math.floor(player.x - Player.W / 2) && nx <= Math.floor(player.x + Player.W / 2)
                     && nz >= Math.floor(player.z - Player.W / 2) && nz <= Math.floor(player.z + Player.W / 2)
                     && ny >= Math.floor(player.y) && ny <= Math.floor(player.y + Player.H);
-            if ((cur == 0 || Blocks.kind[cur] == Blocks.LIQUID) && !intoPlayer) world.set(nx, ny, nz, id);
+            if ((cur == 0 || Blocks.kind[cur] == Blocks.LIQUID) && !intoPlayer) world.set(nx, ny, nz, id, id == 86 ? pumpkinFacing() : 0);
         }
+        hl = c.interactId >= 0 && pickAt(c.interactX, c.interactY);
+        if (hl) { hlX = pick.x; hlY = pick.y; hlZ = pick.z; }
+        ray.hit = hl; ray.x = hlX; ray.y = hlY; ray.z = hlZ;
+    }
+
+    // ------------------------------------------------------------------ selection (LevelRenderer::renderHitSelect)
+    private final int[] hlVerts = new int[6 * 4 * 6];
+    private static final int[][] CUBE = {
+            {0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1}, {0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0},
+            {1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0}, {0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1},
+            {0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0}, {1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1}};
+
+    private void drawHighlight() {
+        int id = world.get(hlX, hlY, hlZ);
+        if (id == 0) return;
+        int data = world.data(hlX, hlY, hlZ), n = 0;
+        int col = 166 | 166 << 8 | 166 << 16 | 255 << 24;             // shader colour 0.65
+        boolean cross = Blocks.kind[id] == Blocks.CROSS;
+        float hgt = Blocks.height[id];
+        for (int f = 0; f < 6; f++) {
+            int sl = Blocks.texFor(id, data, f) * 4;
+            float[] uv = atlas.slotUv;
+            float u0 = uv[sl], v0 = uv[sl + 1], u1 = uv[sl + 2], v1 = uv[sl + 3];
+            float[] tu = f >= 2 ? new float[]{u0, u1, u1, u0} : new float[]{u0, u0, u1, u1};
+            float[] tv = f >= 2 ? new float[]{v1, v1, v0, v0} : new float[]{v0, v1, v1, v0};
+            for (int v = 0; v < 4; v++) {
+                float px = CUBE[f][v * 3], py = CUBE[f][v * 3 + 1] * hgt, pz = CUBE[f][v * 3 + 2];
+                if (cross) { px = 0.15f + px * 0.7f; pz = 0.15f + pz * 0.7f; }
+                hlVerts[n++] = Float.floatToRawIntBits(px); hlVerts[n++] = Float.floatToRawIntBits(py); hlVerts[n++] = Float.floatToRawIntBits(pz);
+                hlVerts[n++] = Float.floatToRawIntBits(tu[v]); hlVerts[n++] = Float.floatToRawIntBits(tv[v]);
+                hlVerts[n++] = col;
+            }
+        }
+        wr.drawOverlay(mvp, atlas.texture, hlVerts, n, hlX, hlY, hlZ);
+    }
+
+    /** pumpkin faces the player (data 0 south .. 3 east) */
+    private int pumpkinFacing() {
+        int d = (int) Math.floor((player.yaw * 4f / 360f) + 0.5f) & 3;
+        return (d + 2) & 3;
     }
 
     // ------------------------------------------------------------------ chunk streaming
@@ -275,10 +344,11 @@ public final class Game implements GLSurfaceView.Renderer {
     // ------------------------------------------------------------------ render
     private void render(float a) {
         boolean underwater = Blocks.kind[world.get((int) Math.floor(player.x), (int) Math.floor(player.ey(a)), (int) Math.floor(player.z))] == Blocks.LIQUID;
-        float[] fog = underwater ? new float[]{0.1f, 0.2f, 0.55f} : SKY;
+        // LevelRenderer::_setupFog: under water the fog goes from 0 to 10 blocks, colour = underwater colour * (0.35 + 0.65 * brightness)
+        float[] fog = underwater ? new float[]{0.02f, 0.02f, 0.2f} : SKY;
         GLES30.glClearColor(fog[0], fog[1], fog[2], 1);
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT | GLES30.GL_DEPTH_BUFFER_BIT);
-        float far = underwater ? 18 : radius * 16;
+        float far = underwater ? 10 : radius * 16;
         Matrix.perspectiveM(proj, 0, 70, (float) width / height, 0.05f, radius * 16 + 64);
         Matrix.setIdentityM(view, 0);
         Matrix.rotateM(view, 0, player.pitch, 1, 0, 0);
@@ -289,7 +359,9 @@ public final class Game implements GLSurfaceView.Renderer {
         GLES30.glEnable(GLES30.GL_DEPTH_TEST);
         GLES30.glDepthFunc(GLES30.GL_LEQUAL);
         GLES30.glEnable(GLES30.GL_CULL_FACE);
-        wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, far);
+        if (underwater) wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, 0f, 10f);
+        else wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, far);
+        if (hl) drawHighlight();
         drawHud();
     }
 
@@ -298,13 +370,7 @@ public final class Game implements GLSurfaceView.Renderer {
         hud.begin(width, height);
         float d = density;
         // crosshair
-        if (iconsTex != 0) {      // icons.png crosshair (15x15 at 0,0)
-            float cs = 15 * d * 1.4f, g = 1f / 256f;
-            hud.image(iconsTex, width / 2f - cs / 2, height / 2f - cs / 2, cs, cs, 0, 0, 15 * g, 15 * g, 0xE0FFFFFF);
-        } else {
-            hud.rect(width / 2f - d * 8, height / 2f - d, d * 16, d * 2, 0xC0FFFFFF);
-            hud.rect(width / 2f - d, height / 2f - d * 8, d * 2, d * 16, 0xC0FFFFFF);
-        }
+        // no crosshair in touch mode (0.14 picks under the finger)
         // hotbar: gui.png of 0.14 (bar 182x22 at 0,0; selection 24x24 at 0,22; a slot is 20 px)
         float u = c.slot / 20f;
         if (guiTex != 0) {
@@ -328,21 +394,19 @@ public final class Game implements GLSurfaceView.Renderer {
             float g = 1f / 256f;
             hud.image(guiTex, c.barX + slot * c.slot - 2 * u, c.barY - 2 * u, 24 * u, 24 * u, 0, 22 * g, 24 * g, 46 * g, 0xFFFFFFFF);
         }
-        // buttons: icons of gui.png (0.14 touch controls)
+        // touch controls of 0.14 (Controls): glyphs of gui.png, colours of ButtonColors x BUTTONS_TRANSPARENCY
         if (guiTex != 0) {
-            guiButton(c.jumpX, c.jumpY, c.btn, 108, 111, 18, 18, c.jump);
-            if (player.flying) guiButton(c.downX, c.downY, c.btn, 82, 135, 18, 18, c.down);
-            else guiButton(c.downX, c.downY, c.btn, 108, 137, 18, 18, c.down);
-            guiButton(c.flyX, c.flyY, c.btn, 56, 139, 18, 18, player.flying);
-        } else {
-            button(c.jumpX, c.jumpY, c.btn, "^", c.jump);
-            button(c.downX, c.downY, c.btn, player.flying ? "v" : "~", c.down);
-            button(c.flyX, c.flyY, c.btn, player.flying ? "FLY" : "fly", player.flying);
+            glyph(c.up, 0, 107, c.pUp);
+            glyph(c.left, 26, 107, c.pLeft);
+            glyph(c.right, 78, 107, c.pRight);
+            glyph(c.down, 52, 107, c.pDown);
+            if (c.movingForward) { glyph(c.upLeft, 0, 133, c.pUpLeft); glyph(c.upRight, 26, 133, c.pUpRight); }
+            glyph(c.sneakR, 104, 133, c.sneak);
+            if (player.flying) { glyph(c.ascendR, 52, 133, c.ascend); glyph(c.descendR, 78, 133, c.descend); }
+            else glyph(c.jumpR, 104, 107, c.jump);
         }
-        if (c.joyActive) {
-            hud.rect(c.joyCX - c.joyR, c.joyCY - c.joyR, c.joyR * 2, c.joyR * 2, 0x30FFFFFF);
-            hud.rect(c.joyCX + c.joyX * c.joyR - d * 18, c.joyCY - c.joyY * c.joyR - d * 18, d * 36, d * 36, 0x80FFFFFF);
-        }
+        // hold progress at the finger (HudProgressRenderer: ring + growing disc, ui_invert_overlay)
+        if (c.interactId >= 0 && c.holdProgress > 0) progressRing(c.interactX, c.interactY, c.holdProgress);
         // info
         float ts = 8 * d;
         hud.text(VERSION, d * 6, d * 6, ts, 0xFF66F2E0);
@@ -352,6 +416,20 @@ public final class Game implements GLSurfaceView.Renderer {
         if (ray.hit) hud.text(Blocks.name[world.get(ray.x, ray.y, ray.z)] + "", width / 2f + d * 12, height / 2f + d * 6, ts, 0xFFFFFFFF);
         if (error != null) hud.text(error, d * 6, height / 2f, ts, 0xFFFF6060);
         hud.end();
+    }
+
+    private void glyph(float[] r, int u, int v, boolean pressed) {
+        float cx = (r[0] + r[2]) / 2, cy = (r[1] + r[3]) / 2;
+        float hw = (r[2] - r[0]) * Controls.GLYPH_SCALE / 2, hh = (r[3] - r[1]) * Controls.GLYPH_SCALE / 2;
+        float g = 1f / 256f;
+        int a = Math.round(Controls.ALPHA * 255), cc = pressed ? Math.round(Controls.PRESSED * 255) : 255;
+        hud.image(guiTex, cx - hw, cy - hh, hw * 2, hh * 2, u * g, v * g, (u + 26) * g, (v + 26) * g, a << 24 | cc << 16 | cc << 8 | cc);
+    }
+
+    private void progressRing(float x, float y, float p) {
+        float rOut = 7f * density * 3.5f / 2f, rIn = rOut * 0.6f * (0.5f + 0.5f * p);
+        hud.invertCircle(x, y, rOut, rOut * 0.8f);
+        hud.invertCircle(x, y, rIn, 0);
     }
 
     /** a gui.png icon (u,v,w,h in pixels) scaled into the button square; darker while pressed / active */

@@ -180,6 +180,26 @@ public final class Hud {
         quads = 0;
     }
 
+    /** white ring (inner > 0) or disc drawn with ui_invert_overlay blending (1 - dst): inverts what is under it */
+    public void invertCircle(float cx, float cy, float outer, float inner) {
+        flush();
+        curTex = white;
+        GLES30.glBlendFunc(GLES30.GL_ONE_MINUS_DST_COLOR, GLES30.GL_ONE_MINUS_SRC_COLOR);
+        int n = 32;
+        for (int i = 0; i < n; i++) {
+            double a0 = i * Math.PI * 2 / n, a1 = (i + 1) * Math.PI * 2 / n;
+            float ox0 = cx + (float) Math.cos(a0) * outer, oy0 = cy + (float) Math.sin(a0) * outer;
+            float ox1 = cx + (float) Math.cos(a1) * outer, oy1 = cy + (float) Math.sin(a1) * outer;
+            float ix0 = cx + (float) Math.cos(a0) * inner, iy0 = cy + (float) Math.sin(a0) * inner;
+            float ix1 = cx + (float) Math.cos(a1) * inner, iy1 = cy + (float) Math.sin(a1) * inner;
+            put(ix0, iy0, 0, 0, 1, 1, 1, 1); put(ox0, oy0, 0, 0, 1, 1, 1, 1); put(ox1, oy1, 0, 0, 1, 1, 1, 1);
+            put(ix0, iy0, 0, 0, 1, 1, 1, 1); put(ox1, oy1, 0, 0, 1, 1, 1, 1); put(ix1, iy1, 0, 0, 1, 1, 1, 1);
+            quads++;
+        }
+        flush();
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA);
+    }
+
     public void end() {
         flush();
         GLES30.glDisable(GLES30.GL_BLEND);

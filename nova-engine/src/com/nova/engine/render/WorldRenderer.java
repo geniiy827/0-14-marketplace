@@ -18,13 +18,13 @@ public final class WorldRenderer {
             "uniform mat4 uMvp; uniform vec3 uOrigin; uniform vec3 uCam;\n" +
             "out vec2 vUv; out vec4 vCol; out float vDist;\n" +
             "void main(){ vec3 p = aPos + uOrigin; gl_Position = uMvp * vec4(p, 1.0);\n" +
-            " vUv = aUv; vCol = aCol; vDist = length(p.xz - uCam.xz); }\n";
+            " vUv = aUv; vCol = aCol; vDist = length(p - uCam); }\n";
     static final String FS =
             "#version 300 es\nprecision mediump float;\n" +
-            "uniform sampler2D uTex; uniform vec3 uFog; uniform vec2 uFogRange; uniform float uAlphaCut;\n" +
+            "uniform sampler2D uTex; uniform vec3 uFog; uniform vec2 uFogRange; uniform float uAlphaCut; uniform float uFlat;\n" +
             "in vec2 vUv; in vec4 vCol; in float vDist; out vec4 o;\n" +
             "void main(){ vec4 t = texture(uTex, vUv); if (t.a < uAlphaCut) discard;\n" +
-            " vec4 c = t * vCol; float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n" +
+            " vec4 c = mix(t * vCol, vCol, uFlat); float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n" +
             " o = vec4(mix(c.rgb, uFog, f), c.a); }\n";
 
     public static final class Section {
@@ -33,7 +33,7 @@ public final class WorldRenderer {
         public volatile boolean building;
     }
 
-    private int prog, uMvp, uOrigin, uCam, uTex, uFog, uFogRange, uAlphaCut;
+    private int prog, uMvp, uOrigin, uCam, uTex, uFog, uFogRange, uAlphaCut, uFlat;
     private int indexBuf, maxQuads;
     public final Map<Long, Section> sections = new HashMap<Long, Section>();
     public int drawnSections;
@@ -47,6 +47,7 @@ public final class WorldRenderer {
         uFog = GLES30.glGetUniformLocation(prog, "uFog");
         uFogRange = GLES30.glGetUniformLocation(prog, "uFogRange");
         uAlphaCut = GLES30.glGetUniformLocation(prog, "uAlphaCut");
+        uFlat = GLES30.glGetUniformLocation(prog, "uFlat");
         maxQuads = 1 << 16;
         IntBuffer ib = Gl.ints(maxQuads * 6);
         for (int q = 0; q < maxQuads; q++) {
@@ -105,12 +106,16 @@ public final class WorldRenderer {
     }
 
     public void draw(float[] mvp, float camX, float camY, float camZ, float[] look, int atlasTex, float[] fog, float fogEnd) {
+        draw(mvp, camX, camY, camZ, look, atlasTex, fog, fogEnd * 0.6f, fogEnd);
+    }
+
+    public void draw(float[] mvp, float camX, float camY, float camZ, float[] look, int atlasTex, float[] fog, float fogStart, float fogEnd) {
         GLES30.glUseProgram(prog);
         GLES30.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
         GLES30.glUniform3f(uCam, camX, camY, camZ);
         GLES30.glUniform1i(uTex, 0);
         GLES30.glUniform3f(uFog, fog[0], fog[1], fog[2]);
-        GLES30.glUniform2f(uFogRange, fogEnd * 0.6f, fogEnd);
+        GLES30.glUniform2f(uFogRange, fogStart, Math.max(fogEnd, fogStart + 0.01f));
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0);
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlasTex);
         GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, indexBuf);
@@ -120,6 +125,7 @@ public final class WorldRenderer {
         drawnSections = 0;
         // solid + cutout
         GLES30.glUniform1f(uAlphaCut, 0.5f);
+        GLES30.glUniform1f(uFlat, 0f);
         GLES30.glDisable(GLES30.GL_BLEND);
         GLES30.glDepthMask(true);
         for (Map.Entry<Long, Section> e : sections.entrySet()) {
@@ -133,11 +139,50 @@ public final class WorldRenderer {
         GLES30.glEnable(GLES30.GL_BLEND);
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA);
         GLES30.glDepthMask(false);
+        GLES30.glDisable(GLES30.GL_CULL_FACE);           // the water surface is seen from below too
         for (Map.Entry<Long, Section> e : sections.entrySet()) {
             Section s = e.getValue();
             if (s.waterVerts == 0 || !visible(e.getKey(), camX, camY, camZ, look, fogEnd)) continue;
             bindAndDraw(e.getKey(), s.waterVbo, s.waterVerts);
         }
+        GLES30.glEnable(GLES30.GL_CULL_FACE);
+        GLES30.glDepthMask(true);
+        GLES30.glDisable(GLES30.GL_BLEND);
+    }
+
+    private int overlayVbo;
+
+    /**
+     * LevelRenderer::renderHitSelect: the selected block drawn again with shader colour 0.65 (additive),
+     * so it lights up. verts: Mesher vertex format, positions relative to (bx, by, bz).
+     */
+    public void drawOverlay(float[] mvp, int atlasTex, int[] verts, int count, int bx, int by, int bz) {
+        if (count == 0) return;
+        if (overlayVbo == 0) overlayVbo = Gl.buffer();
+        GLES30.glUseProgram(prog);
+        GLES30.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
+        GLES30.glUniform1f(uAlphaCut, 0.5f);
+        GLES30.glUniform2f(uFogRange, 1e6f, 2e6f);
+        GLES30.glUniform1f(uFlat, 1f);
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE0);
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlasTex);
+        GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, indexBuf);
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, overlayVbo);
+        java.nio.IntBuffer b = java.nio.ByteBuffer.allocateDirect(count * 4).order(java.nio.ByteOrder.nativeOrder()).asIntBuffer();
+        b.put(verts, 0, count).position(0);
+        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, count * 4, b, GLES30.GL_DYNAMIC_DRAW);
+        GLES30.glUniform3f(uOrigin, bx, by, bz);
+        GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 24, 0);
+        GLES30.glVertexAttribPointer(1, 2, GLES30.GL_FLOAT, false, 24, 12);
+        GLES30.glVertexAttribPointer(2, 4, GLES30.GL_UNSIGNED_BYTE, true, 24, 20);
+        GLES30.glEnable(GLES30.GL_BLEND);
+        GLES30.glBlendFunc(GLES30.GL_DST_COLOR, GLES30.GL_SRC_COLOR);    // ui3D.material selection_overlay
+        GLES30.glDepthMask(false);
+        GLES30.glEnable(GLES30.GL_POLYGON_OFFSET_FILL);
+        GLES30.glPolygonOffset(-5f, -5f);                                // polygonOffsetLevel 5
+        GLES30.glDrawElements(GLES30.GL_TRIANGLES, count / 24 * 6, GLES30.GL_UNSIGNED_INT, 0);
+        GLES30.glDisable(GLES30.GL_POLYGON_OFFSET_FILL);
+        GLES30.glUniform1f(uFlat, 0f);
         GLES30.glDepthMask(true);
         GLES30.glDisable(GLES30.GL_BLEND);
     }

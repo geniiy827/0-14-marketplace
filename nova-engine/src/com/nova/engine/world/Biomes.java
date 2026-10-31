@@ -110,6 +110,43 @@ public final class Biomes {
         m(167, 39, "Mesa Plateau M", 0.45f, 0.3f, 2.0f);
     }
 
+    /** FoliageColor corners (TL, TR, BL, BR as r g b), set by the static init of the original (read in emulation) */
+    static final float[] GRASS_C = {0.2784f, 0.8157f, 0.2000f, 0.4235f, 0.7059f, 0.5765f, 0.7490f, 0.7137f, 0.3333f, 0.5020f, 0.7059f, 0.5922f};
+    static final float[] FOLIAGE_C = {0.1020f, 0.7490f, 0.0000f, 0.2941f, 0.6588f, 0.4588f, 0.6824f, 0.6431f, 0.1647f, 0.3765f, 0.6314f, 0.4824f};
+
+    /** downfall (Biome +0x50); same values as the Java edition of the time */
+    public static final float[] RAIN = new float[256];
+    static {
+        java.util.Arrays.fill(RAIN, 0.5f);
+        float[][] r = {{1, .4f}, {2, 0}, {3, .3f}, {4, .8f}, {5, .8f}, {6, .9f}, {8, 0}, {14, 1}, {15, 1}, {16, .4f}, {17, 0},
+                {18, .8f}, {19, .8f}, {20, .3f}, {21, .9f}, {22, .9f}, {23, .8f}, {25, .3f}, {26, .3f}, {27, .6f}, {28, .6f},
+                {29, .8f}, {30, .4f}, {31, .4f}, {32, .8f}, {33, .8f}, {34, .3f}, {35, 0}, {36, 0}, {37, 0}, {38, 0}, {39, 0}};
+        for (float[] e : r) RAIN[(int) e[0]] = e[1];
+        for (int i = 128; i < 256; i++) if (EXISTS[i]) for (int b = 0; b < 128; b++) if (MUTATION[b] == i) RAIN[i] = RAIN[b];
+        for (int i = 0; i < 256; i++) {
+            if (!EXISTS[i]) continue;
+            float t = Math.max(0f, Math.min(1f, TEMP[i])), d = Math.max(0f, Math.min(1f, RAIN[i]));
+            GRASS[i] = corners(t, d, GRASS_C);
+            FOLIAGE[i] = corners(t, d, FOLIAGE_C);
+        }
+        for (int i : new int[]{37, 38, 39, 165, 166, 167}) { GRASS[i] = 0x90814D; FOLIAGE[i] = 0xAEA42A; }   // MesaBiome
+        for (int i : new int[]{6, 134}) { GRASS[i] = 0x6A7039; FOLIAGE[i] = 0x6A7039; }                   // SwampBiome (noise 0x4C763C)
+    }
+
+    /** FoliageColor::getGrassColor/getFoliageColor: x = (1-t)*255, y = (1-t*d)*255 (0..255), bilinear between corners */
+    static int corners(float t, float d, float[] c) {
+        int x = Math.max(0, Math.min(255, (int) ((1f - t) * 255f))), y = Math.max(0, Math.min(255, (int) ((1f - d * t) * 255f)));
+        float fx = x * 0.00390625f, fy = y * 0.00390625f;
+        int out = 0;
+        for (int k = 0; k < 3; k++) {
+            float top = fx * c[3 + k] + (1f - fx) * c[k];
+            float bot = fx * c[9 + k] + (1f - fx) * c[6 + k];
+            float v = top * (1f - fy) + bot * fy;
+            out = out << 8 | Math.max(0, Math.min(255, (int) (v * 255f + 0.5f)));
+        }
+        return out;
+    }
+
     public static boolean valid(int id) { return id >= 0 && id < 256 && EXISTS[id]; }
 
     public static int tempCategory(int id) {
