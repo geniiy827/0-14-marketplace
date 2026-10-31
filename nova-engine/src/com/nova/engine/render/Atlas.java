@@ -38,7 +38,21 @@ public final class Atlas {
     public AssetManager gameAssets;        // assets of the installed game (fonts, sounds later)
 
     public void load(Context c) {
+        // 1) textures packed into the engine APK (fan build), 2) the installed game, 3) placeholder
+        try {
+            AssetManager am = c.getAssets();
+            byte[] tga = readAll(am.open("images/terrain-atlas.tga"));
+            byte[] m = readAll(am.open("images/terrain.meta"));
+            if (decodeTga(tga)) {
+                meta = new JSONArray(new String(m, "UTF-8"));
+                gameAssets = am;
+                source = "apk";
+            }
+        } catch (Throwable t) {
+            Log.i(TAG, "no packed textures: " + t);
+        }
         for (String p : GAME_PACKAGES) {
+            if (meta != null) break;
             try {
                 Context g = c.createPackageContext(p, 0);
                 AssetManager am = g.getAssets();

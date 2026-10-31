@@ -6,6 +6,8 @@ public final class Chunk {
     public final int cx, cz;
     public final byte[] blocks = new byte[16 * 16 * H];
     public final byte[] data = new byte[16 * 16 * H];
+    /** biome per column, z * 16 + x */
+    public final byte[] biome = new byte[256];
     public volatile boolean generated;
     /** per section: bumped on every change; the renderer rebuilds when it differs from the built version */
     public final int[] version = new int[SECTIONS];
@@ -22,5 +24,14 @@ public final class Chunk {
     public void set(int x, int y, int z, int id) {
         if (y < 0 || y >= H) return;
         blocks[idx(x, y, z)] = (byte) id;
+        data[idx(x, y, z)] = 0;
     }
+
+    public void set(int x, int y, int z, int id, int d) {
+        if (y < 0 || y >= H) return;
+        blocks[idx(x, y, z)] = (byte) id;
+        data[idx(x, y, z)] = (byte) d;
+    }
+
+    public int data(int x, int y, int z) { return y < 0 || y >= H ? 0 : data[idx(x, y, z)] & 15; }
 }

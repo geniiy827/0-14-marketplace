@@ -28,6 +28,12 @@ public final class Blocks {
     /** draw faces against the same block (leaves) */
     public static final boolean[] selfFaces = new boolean[MAX];
     public static final int[] light = new int[MAX];
+    /** height of the box (snow layer 0.125); cube faces only */
+    public static final float[] height = new float[MAX];
+    /** optional textures per data value: texData[id][data][face] (null = same for all data) */
+    public static final int[][][] texData = new int[MAX][][];
+    /** special tints: follow the biome colour of the column */
+    public static final int TINT_GRASS = -2, TINT_FOLIAGE = -3, TINT_WATER = -4;
 
     private Blocks() { }
 
@@ -42,8 +48,16 @@ public final class Blocks {
         layer[id] = OPAQUE;
         selfFaces[id] = false;
         light[id] = 0;
+        height[id] = 1;
+        texData[id] = null;
         for (int f = 0; f < 6; f++) { tex[id][f] = 0; tint[id][f] = 0xFFFFFF; }
         return new Def(id);
+    }
+
+    public static int texFor(int id, int data, int face) {
+        int[][] t = texData[id];
+        if (t != null && data < t.length && t[data] != null) return t[data][face];
+        return tex[id][face];
     }
 
     public static int byName(String n) {
@@ -68,6 +82,18 @@ public final class Blocks {
         public Def cross() { kind[id] = CROSS; layer[id] = CUTOUT; opaque[id] = false; solid[id] = false; return this; }
         public Def liquid() { kind[id] = LIQUID; layer[id] = TRANSLUCENT; opaque[id] = false; solid[id] = false; return this; }
         public Def light(int l) { light[id] = l; return this; }
+        public Def height(float h) { height[id] = h; opaque[id] = false; return this; }
+        /** textures for one data value: all six faces */
+        public Def data(int d, int all) { return data(d, all, all, all); }
+        public Def data(int d, int top, int bottom, int side) {
+            if (texData[id] == null || texData[id].length <= d) {
+                int[][] n = new int[Math.max(d + 1, 4)][];
+                if (texData[id] != null) System.arraycopy(texData[id], 0, n, 0, texData[id].length);
+                texData[id] = n;
+            }
+            texData[id][d] = new int[]{bottom, top, side, side, side, side};
+            return this;
+        }
         public Def notSolid() { solid[id] = false; return this; }
     }
 }

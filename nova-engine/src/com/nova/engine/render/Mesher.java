@@ -30,6 +30,19 @@ public final class Mesher {
     private final Chunk[] around = new Chunk[9];
     private final float[] uv;
     private int bx, by, bz;               // section origin (world)
+    private int data, biome;              // of the block being meshed
+
+    private int tintOf(int id, int f) {
+        int t = Blocks.tint[id][f];
+        if (t == Blocks.TINT_GRASS) return com.nova.engine.world.Biomes.GRASS[biome];
+        if (t == Blocks.TINT_FOLIAGE) {
+            if (id == 18 && data == 1) return 0x619961;        // spruce
+            if (id == 18 && data == 2) return 0x80A755;        // birch
+            return com.nova.engine.world.Biomes.FOLIAGE[biome];
+        }
+        if (t == Blocks.TINT_WATER) return com.nova.engine.world.Biomes.WATER[biome];
+        return t;
+    }
 
     public Mesher(float[] slotUv) { this.uv = slotUv; }
 
@@ -58,11 +71,13 @@ public final class Mesher {
                 int id = c.blocks[Chunk.idx(x, wy, z)] & 255;
                 if (id == 0 || !Blocks.exists[id]) continue;
                 int k = Blocks.kind[id];
+                data = c.data[Chunk.idx(x, wy, z)] & 15;
+                biome = c.biome[z * 16 + x];
                 if (k == Blocks.CROSS) { cross(id, x, y, z); continue; }
                 for (int f = 0; f < 6; f++) {
                     int[] n = NORMAL[f];
                     int nb = get(x + n[0], wy + n[1], z + n[2]);
-                    if (!visible(id, nb, k)) continue;
+                    if (!visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1)) continue;
                     face(id, f, x, y, z, k == Blocks.LIQUID ? (Blocks.kind[get(x, wy + 1, z)] == Blocks.LIQUID ? 1f : 0.875f) : 1f);
                 }
             }
@@ -98,9 +113,10 @@ public final class Mesher {
     }
 
     private void face(int id, int f, int x, int y, int z, float top) {
-        int s = Blocks.tex[id][f] * 4;
+        int s = Blocks.texFor(id, data, f) * 4;
         float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
-        int tint = Blocks.tint[id][f];
+        int tint = tintOf(id, f);
+        float bh = Blocks.height[id];
         float tr = ((tint >> 16) & 255) / 255f, tg = ((tint >> 8) & 255) / 255f, tb = (tint & 255) / 255f;
         boolean liquid = Blocks.kind[id] == Blocks.LIQUID;
         Buf out = Blocks.layer[id] == Blocks.TRANSLUCENT ? water : solid;
@@ -122,15 +138,17 @@ public final class Mesher {
         }
         // texture corners per vertex
         float[] tu = new float[4], tv = new float[4];
-        if (f >= 2) { tu[0] = u0; tv[0] = v1; tu[1] = u1; tv[1] = v1; tu[2] = u1; tv[2] = v0; tu[3] = u0; tv[3] = v0; }
+        float vt = bh < 1 ? v1 - (v1 - v0) * bh : v0;      // partial blocks: the lower part of the side texture
+        if (f >= 2) { tu[0] = u0; tv[0] = v1; tu[1] = u1; tv[1] = v1; tu[2] = u1; tv[2] = vt; tu[3] = u0; tv[3] = vt; }
         else { tu[0] = u0; tv[0] = v0; tu[1] = u0; tv[1] = v1; tu[2] = u1; tv[2] = v1; tu[3] = u1; tv[3] = v0; }
         // flip the diagonal when it makes the AO gradient symmetric
         int start = ao[0] + ao[2] < ao[1] + ao[3] ? 1 : 0;
-        int alpha = liquid ? 190 : 255;
+        int alpha = liquid && Blocks.layer[id] == Blocks.TRANSLUCENT ? 190 : 255;
         for (int i = 0; i < 4; i++) {
             int v = (start + i) & 3;
             float px = x + cr[v * 3], py = y + cr[v * 3 + 1], pz = z + cr[v * 3 + 2];
             if (liquid && cr[v * 3 + 1] == 1) py = y + top;
+            else if (bh < 1 && cr[v * 3 + 1] == 1) py = y + bh;
             float l = SHADE[f] * AO[ao[v]];
             int r = (int) (tr * l * 255), g = (int) (tg * l * 255), b = (int) (tb * l * 255);
             out.add(Float.floatToRawIntBits(px)); out.add(Float.floatToRawIntBits(py)); out.add(Float.floatToRawIntBits(pz));
@@ -141,9 +159,9 @@ public final class Mesher {
 
     /** plants: two crossed quads, each seen from both sides */
     private void cross(int id, int x, int y, int z) {
-        int s = Blocks.tex[id][2] * 4;
+        int s = Blocks.texFor(id, data, 2) * 4;
         float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
-        int tint = Blocks.tint[id][2];
+        int tint = tintOf(id, 2);
         int col = (tint >> 16 & 255) | (tint >> 8 & 255) << 8 | (tint & 255) << 16 | 255 << 24;
         float[][] q = {
                 {0.15f, 0, 0.15f, 0.85f, 0, 0.85f}, {0.85f, 0, 0.85f, 0.15f, 0, 0.15f},

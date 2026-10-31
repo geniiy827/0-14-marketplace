@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine 0.0.1 beta 1";
+    public static final String VERSION = "NOVA Engine 0.0.2 beta 2";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -73,7 +73,15 @@ public final class Game implements GLSurfaceView.Renderer {
             hud.init(atlas.gameAssets);
             if (world == null) {
                 world = new World(System.currentTimeMillis());
-                player.x = 0.5; player.z = 0.5; player.y = world.gen.height(0, 0) + 2;
+                // spawn: first dry land along a spiral from 0,0
+                int sx = 0, sz = 0;
+                for (int i = 0; i < 400; i++) {
+                    double a = i * 0.5;
+                    int tx = (int) (Math.cos(a) * i * 8), tz = (int) (Math.sin(a) * i * 8);
+                    int b = world.gen.biomeAt(tx, tz);
+                    if (b != com.nova.engine.world.Biomes.OCEAN && b != com.nova.engine.world.Biomes.DEEP_OCEAN && world.gen.height(tx, tz) > Generator.SEA) { sx = tx; sz = tz; break; }
+                }
+                player.x = sx + 0.5; player.z = sz + 0.5; player.y = world.gen.height(sx, sz) + 2;
                 player.px = player.x; player.py = player.y; player.pz = player.z;
             } else {
                 wr.sections.clear();                            // new GL context: everything re-uploads
@@ -174,8 +182,7 @@ public final class Game implements GLSurfaceView.Renderer {
                 workers.execute(new Runnable() {
                     public void run() {
                         Chunk c = new Chunk(cx, cz);
-                        world.gen.generate(c);
-                        world.chunks.put(k, c);
+                        world.gen.generate(c, world);
                         generating.remove(k);
                     }
                 });
@@ -257,6 +264,7 @@ public final class Game implements GLSurfaceView.Renderer {
             int s = Blocks.tex[id][Blocks.kind[id] == Blocks.CROSS ? 2 : 1] * 4;
             float[] uv = atlas.slotUv;
             int tint = Blocks.tint[id][1];
+            if (tint < 0) tint = tint == Blocks.TINT_FOLIAGE ? 0x59AE30 : tint == Blocks.TINT_WATER ? 0x3F76E4 : 0x79C05A;
             hud.image(atlas.texture, x + d * 6, y + d * 6, c.slot - d * 12, c.slot - d * 12, uv[s], uv[s + 1], uv[s + 2], uv[s + 3], 0xFF000000 | tint);
         }
         // buttons
@@ -272,7 +280,7 @@ public final class Game implements GLSurfaceView.Renderer {
         hud.text(VERSION, d * 6, d * 6, ts, 0xFF66F2E0);
         hud.text(fps + " fps  " + wr.drawnSections + " sec  " + world.chunks.size() + " ch", d * 6, d * 6 + ts * 1.3f, ts, 0xFFFFFFFF);
         hud.text(String.format(java.util.Locale.US, "%.1f %.1f %.1f", player.x, player.y, player.z), d * 6, d * 6 + ts * 2.6f, ts, 0xFFFFFFFF);
-        hud.text("textures: " + atlas.source, d * 6, d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);
+        hud.text("textures: " + atlas.source + "   biome: " + com.nova.engine.world.Biomes.NAME[Math.max(0, world.biome((int) Math.floor(player.x), (int) Math.floor(player.z)))], d * 6, d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);
         if (ray.hit) hud.text(Blocks.name[world.get(ray.x, ray.y, ray.z)] + "", width / 2f + d * 12, height / 2f + d * 6, ts, 0xFFFFFFFF);
         if (error != null) hud.text(error, d * 6, height / 2f, ts, 0xFFFF6060);
         hud.end();
