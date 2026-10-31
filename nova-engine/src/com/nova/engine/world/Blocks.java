@@ -27,6 +27,8 @@ public final class Blocks {
     public static final int[][] tex = new int[MAX][6];
     /** tint (0xRRGGBB, 0xFFFFFF = none) per face */
     public static final int[][] tint = new int[MAX][6];
+    /** second, tinted layer over the side faces (grass side overlay): atlas slot or -1, and its tint */
+    public static final int[] sideOverlay = new int[MAX], sideOverlayTint = new int[MAX];
     /** draw faces against the same block (leaves) */
     public static final boolean[] selfFaces = new boolean[MAX];
     public static final int[] light = new int[MAX];
@@ -53,6 +55,7 @@ public final class Blocks {
         height[id] = 1;
         texData[id] = null;
         for (int f = 0; f < 6; f++) { tex[id][f] = 0; tint[id][f] = 0xFFFFFF; }
+        sideOverlay[id] = -1;
         return new Def(id);
     }
 
@@ -78,6 +81,7 @@ public final class Blocks {
         }
         public Def tint(int rgb) { for (int f = 0; f < 6; f++) tint[id][f] = rgb; return this; }
         public Def tintTop(int rgb) { tint[id][1] = rgb; return this; }
+        public Def sideOverlay(int slot, int rgb) { sideOverlay[id] = slot; sideOverlayTint[id] = rgb; return this; }
         public Def inset(float v) { inset[id] = v; opaque[id] = false; return this; }
         public Def cutout() { layer[id] = CUTOUT; opaque[id] = false; return this; }
         public Def translucent() { layer[id] = TRANSLUCENT; opaque[id] = false; return this; }

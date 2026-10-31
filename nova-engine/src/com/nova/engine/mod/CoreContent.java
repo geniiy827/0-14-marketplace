@@ -11,7 +11,8 @@ public final class CoreContent implements NovaMod {
         r.block(1, "stone").tex(r.tex("stone:0"))
                 .data(1, r.tex("stone:1")).data(2, r.tex("stone:2")).data(3, r.tex("stone:3"))
                 .data(4, r.tex("stone:4")).data(5, r.tex("stone:5")).data(6, r.tex("stone:6"));
-        r.block(2, "grass").tex(r.tex("grass:0"), r.tex("dirt"), r.tex("grass:3")).tintTop(G);
+        r.block(2, "grass").tex(r.tex("grass:0"), r.tex("dirt"), r.tex("nova_grass_side")).tintTop(G)
+                .sideOverlay(r.tex("nova_grass_side_overlay"), G);
         r.block(3, "dirt").tex(r.tex("dirt"));
         r.block(4, "cobblestone").tex(r.tex("cobblestone"));
         Blocks.Def planks = r.block(5, "planks").tex(r.tex("planks:0"));
@@ -59,6 +60,10 @@ public final class CoreContent implements NovaMod {
         r.block(98, "stonebrick").tex(r.tex("stonebrick:0"));
         r.block(103, "melon").tex(r.tex("melon:1"), r.tex("melon:1"), r.tex("melon:0"));
         r.block(155, "quartz_block").tex(r.tex("quartz_block:1"), r.tex("quartz_block:1"), r.tex("quartz_block:0"));
+        r.block(39, "brown_mushroom").tex(r.tex("mushroom_brown")).cross();
+        r.block(40, "red_mushroom").tex(r.tex("mushroom_red")).cross();
+        r.block(86, "pumpkin").tex(r.tex("pumpkin:0"), r.tex("pumpkin:0"), r.tex("pumpkin:1"));
+        r.block(111, "waterlily").tex(r.tex("waterlily:0")).tint(F).cutout().height(1f / 64f).notSolid();
         // used by the 0.14.3 generator
         r.block(110, "mycelium").tex(r.tex("mycelium:1"), r.tex("dirt"), r.tex("mycelium:0"));
         Blocks.Def sc = r.block(159, "stained_hardened_clay").tex(r.tex("stained_clay:0"));

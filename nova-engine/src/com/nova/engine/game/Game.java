@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta4";
+    public static final String VERSION = "NOVA Engine beta5";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -44,12 +44,15 @@ public final class Game implements GLSurfaceView.Renderer {
     private ExecutorService workers;
     private final ConcurrentLinkedQueue<Mesher.Mesh> done = new ConcurrentLinkedQueue<Mesher.Mesh>();
     private final ThreadLocal<Mesher> meshers = new ThreadLocal<Mesher>();
+    private final java.util.Set<Long> decorating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
+    private final ExecutorService decoThread = Executors.newSingleThreadExecutor();
+    private com.nova.engine.world.Decorator deco;
     private final java.util.Set<Long> generating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
     private int width = 1, height = 1;
     private float density = 3;
     private long lastNs, tickAcc;
     private int radius = 6;
-    private int slot, guiTex;
+    private int slot, guiTex, iconsTex;
     private final int[] hotbar = CoreContent.HOTBAR.clone();
     private final float[] proj = new float[16], view = new float[16], mvp = new float[16], look = new float[3];
     private static final float[] SKY = {0.53f, 0.71f, 0.98f};
@@ -72,8 +75,10 @@ public final class Game implements GLSurfaceView.Renderer {
             wr.init();
             hud.init(atlas.gameAssets);
             guiTex = hud.loadTex(atlas.gameAssets, "images/gui/gui.png");
+            iconsTex = hud.loadTex(atlas.gameAssets, "images/gui/icons.png");
             if (world == null) {
                 world = new World(System.currentTimeMillis());
+                deco = new com.nova.engine.world.Decorator(world, world.seed);
                 // spawn: first dry land along a spiral from 0,0
                 int sx = 0, sz = 0;
                 for (int i = 0; i < 400; i++) {
@@ -170,9 +175,10 @@ public final class Game implements GLSurfaceView.Renderer {
             wr.upload(m);
         }
         int pcx = (int) Math.floor(player.x) >> 4, pcz = (int) Math.floor(player.z) >> 4;
-        // generate missing chunks, nearest first (a few per frame)
+        // generation like the original: terrain (parallel) -> decoration when the 3x3 around has terrain (one thread,
+        // it writes into neighbours) -> visible when the 3x3 around is decorated
         int queued = 0;
-        for (int r = 0; r <= radius + 1 && queued < 4; r++) {
+        for (int r = 0; r <= radius + 2 && queued < 4; r++) {
             for (int dz = -r; dz <= r && queued < 4; dz++) for (int dx = -r; dx <= r && queued < 4; dx++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                 final int cx = pcx + dx, cz = pcz + dz;
@@ -183,10 +189,47 @@ public final class Game implements GLSurfaceView.Renderer {
                 workers.execute(new Runnable() {
                     public void run() {
                         Chunk c = new Chunk(cx, cz);
-                        world.gen.generate(c, world);
+                        world.gen.terrain(c);
+                        world.addTerrain(c);
                         generating.remove(k);
                     }
                 });
+            }
+        }
+        int decoQueued = 0;
+        for (int r = 0; r <= radius + 1 && decoQueued < 4; r++) {
+            for (int dz = -r; dz <= r && decoQueued < 4; dz++) for (int dx = -r; dx <= r && decoQueued < 4; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                final int cx = pcx + dx, cz = pcz + dz;
+                final Chunk c = world.chunk(cx, cz);
+                if (c == null || c.stage != 1 || decorating.contains(World.key(cx, cz))) continue;
+                boolean ok = true;
+                for (int nz = -1; nz <= 1 && ok; nz++) for (int nx = -1; nx <= 1; nx++) if (world.chunk(cx + nx, cz + nz) == null) { ok = false; break; }
+                if (!ok) continue;
+                final long k = World.key(cx, cz);
+                decorating.add(k);
+                decoQueued++;
+                decoThread.execute(new Runnable() {
+                    public void run() {
+                        try { deco.decorate(cx, cz); } catch (Throwable t) { android.util.Log.e("NOVA", "decorate", t); }
+                        c.stage = 2;
+                        decorating.remove(k);
+                    }
+                });
+            }
+        }
+        for (int r = 0; r <= radius; r++) {
+            for (int dz = -r; dz <= r; dz++) for (int dx = -r; dx <= r; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                int cx = pcx + dx, cz = pcz + dz;
+                Chunk c = world.chunk(cx, cz);
+                if (c == null || c.generated || c.stage != 2) continue;
+                boolean ok = true;
+                for (int nz = -1; nz <= 1 && ok; nz++) for (int nx = -1; nx <= 1; nx++) {
+                    Chunk n = world.chunk(cx + nx, cz + nz);
+                    if (n == null || n.stage != 2) { ok = false; break; }
+                }
+                if (ok) { for (int q = 0; q < Chunk.SECTIONS; q++) c.version[q]++; c.generated = true; }
             }
         }
         // (re)mesh sections whose version changed; neighbours must exist for faces and AO
@@ -224,7 +267,7 @@ public final class Game implements GLSurfaceView.Renderer {
             wr.unloadFar(pcx, pcz, radius);
             for (java.util.Iterator<Chunk> it = world.chunks.values().iterator(); it.hasNext(); ) {
                 Chunk c = it.next();
-                if (Math.abs(c.cx - pcx) > radius + 3 || Math.abs(c.cz - pcz) > radius + 3) it.remove();
+                if (Math.abs(c.cx - pcx) > radius + 4 || Math.abs(c.cz - pcz) > radius + 4) it.remove();
             }
         }
     }
@@ -244,6 +287,7 @@ public final class Game implements GLSurfaceView.Renderer {
         Matrix.translateM(view, 0, -ex, -ey, -ez);
         Matrix.multiplyMM(mvp, 0, proj, 0, view, 0);
         GLES30.glEnable(GLES30.GL_DEPTH_TEST);
+        GLES30.glDepthFunc(GLES30.GL_LEQUAL);
         GLES30.glEnable(GLES30.GL_CULL_FACE);
         wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, far);
         drawHud();
@@ -254,8 +298,13 @@ public final class Game implements GLSurfaceView.Renderer {
         hud.begin(width, height);
         float d = density;
         // crosshair
-        hud.rect(width / 2f - d * 8, height / 2f - d, d * 16, d * 2, 0xC0FFFFFF);
-        hud.rect(width / 2f - d, height / 2f - d * 8, d * 2, d * 16, 0xC0FFFFFF);
+        if (iconsTex != 0) {      // icons.png crosshair (15x15 at 0,0)
+            float cs = 15 * d * 1.4f, g = 1f / 256f;
+            hud.image(iconsTex, width / 2f - cs / 2, height / 2f - cs / 2, cs, cs, 0, 0, 15 * g, 15 * g, 0xE0FFFFFF);
+        } else {
+            hud.rect(width / 2f - d * 8, height / 2f - d, d * 16, d * 2, 0xC0FFFFFF);
+            hud.rect(width / 2f - d, height / 2f - d * 8, d * 2, d * 16, 0xC0FFFFFF);
+        }
         // hotbar: gui.png of 0.14 (bar 182x22 at 0,0; selection 24x24 at 0,22; a slot is 20 px)
         float u = c.slot / 20f;
         if (guiTex != 0) {
@@ -279,10 +328,17 @@ public final class Game implements GLSurfaceView.Renderer {
             float g = 1f / 256f;
             hud.image(guiTex, c.barX + slot * c.slot - 2 * u, c.barY - 2 * u, 24 * u, 24 * u, 0, 22 * g, 24 * g, 46 * g, 0xFFFFFFFF);
         }
-        // buttons
-        button(c.jumpX, c.jumpY, c.btn, "^", c.jump);
-        button(c.downX, c.downY, c.btn, player.flying ? "v" : "~", c.down);
-        button(c.flyX, c.flyY, c.btn, player.flying ? "FLY" : "fly", player.flying);
+        // buttons: icons of gui.png (0.14 touch controls)
+        if (guiTex != 0) {
+            guiButton(c.jumpX, c.jumpY, c.btn, 108, 111, 18, 18, c.jump);
+            if (player.flying) guiButton(c.downX, c.downY, c.btn, 82, 135, 18, 18, c.down);
+            else guiButton(c.downX, c.downY, c.btn, 108, 137, 18, 18, c.down);
+            guiButton(c.flyX, c.flyY, c.btn, 56, 139, 18, 18, player.flying);
+        } else {
+            button(c.jumpX, c.jumpY, c.btn, "^", c.jump);
+            button(c.downX, c.downY, c.btn, player.flying ? "v" : "~", c.down);
+            button(c.flyX, c.flyY, c.btn, player.flying ? "FLY" : "fly", player.flying);
+        }
         if (c.joyActive) {
             hud.rect(c.joyCX - c.joyR, c.joyCY - c.joyR, c.joyR * 2, c.joyR * 2, 0x30FFFFFF);
             hud.rect(c.joyCX + c.joyX * c.joyR - d * 18, c.joyCY - c.joyY * c.joyR - d * 18, d * 36, d * 36, 0x80FFFFFF);
@@ -296,6 +352,12 @@ public final class Game implements GLSurfaceView.Renderer {
         if (ray.hit) hud.text(Blocks.name[world.get(ray.x, ray.y, ray.z)] + "", width / 2f + d * 12, height / 2f + d * 6, ts, 0xFFFFFFFF);
         if (error != null) hud.text(error, d * 6, height / 2f, ts, 0xFFFF6060);
         hud.end();
+    }
+
+    /** a gui.png icon (u,v,w,h in pixels) scaled into the button square; darker while pressed / active */
+    private void guiButton(float x, float y, float s, int u, int v, int w, int h, boolean on) {
+        float g = 1f / 256f, pad = s * 0.08f;
+        hud.image(guiTex, x + pad, y + pad, s - 2 * pad, s - 2 * pad, u * g, v * g, (u + w) * g, (v + h) * g, on ? 0xFFB0B0B0 : 0xE0FFFFFF);
     }
 
     private void button(float x, float y, float s, String label, boolean on) {

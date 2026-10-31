@@ -76,18 +76,24 @@ public final class Controls {
             if (role[id] == 3) jump = false;
             if (role[id] == 4) down = false;
             if (role[id] == 2 && !moved[id] && !placed[id] && a != MotionEvent.ACTION_CANCEL
-                    && System.currentTimeMillis() - t0[id] < 300) breaks++;
+                    && System.currentTimeMillis() - t0[id] < 300) places++;
             role[id] = 0;
             if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) { joyActive = false; joyX = joyY = 0; jump = down = false; for (int k = 0; k < MAXP; k++) role[k] = 0; }
         }
         return true;
     }
 
-    /** GL thread, once per frame: long presses become "place" */
+    private final long[] nextBreak = new long[MAXP];
+
+    /** GL thread, once per frame: tap = place (on release), hold = break, repeated every 250 ms while held */
     public synchronized void poll() {
         long now = System.currentTimeMillis();
-        for (int i = 0; i < MAXP; i++)
-            if (role[i] == 2 && !moved[i] && !placed[i] && now - t0[i] > 350) { placed[i] = true; places++; }
+        for (int i = 0; i < MAXP; i++) {
+            if (role[i] != 2) continue;
+            if (!placed[i]) {
+                if (!moved[i] && now - t0[i] > 350) { placed[i] = true; breaks++; nextBreak[i] = now + 250; }
+            } else if (now >= nextBreak[i]) { breaks++; nextBreak[i] = now + 250; }
+        }
     }
 
     public synchronized float takeLookX() { float v = lookDX; lookDX = 0; return v; }

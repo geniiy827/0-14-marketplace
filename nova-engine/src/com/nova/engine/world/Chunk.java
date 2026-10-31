@@ -9,6 +9,8 @@ public final class Chunk {
     /** biome per column, z * 16 + x */
     public final byte[] biome = new byte[256];
     public volatile boolean generated;
+    /** 1 = terrain done (in World.chunks), 2 = decorated */
+    public volatile int stage;
     /** per section: bumped on every change; the renderer rebuilds when it differs from the built version */
     public final int[] version = new int[SECTIONS];
 

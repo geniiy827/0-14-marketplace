@@ -103,6 +103,29 @@ public final class World {
         if ((y & 15) == 0 && s > 0) c.version[s - 1]++;
     }
 
+    // ------------------------------------------------------------------ decoration access (any chunk with terrain)
+    public int rawGet(int x, int y, int z) {
+        if (y < 0 || y >= Chunk.H) return 0;
+        Chunk c = chunks.get(key(x >> 4, z >> 4));
+        return c == null ? 0 : c.get(x & 15, y, z & 15);
+    }
+
+    public void rawSet(int x, int y, int z, int id, int data) {
+        if (y < 0 || y >= Chunk.H) return;
+        Chunk c = chunks.get(key(x >> 4, z >> 4));
+        if (c == null) return;
+        c.set(x & 15, y, z & 15, id, data);
+        if (c.generated) touchAround(c, x & 15, y, z & 15);
+    }
+
+    public int rawBiome(int x, int z) {
+        Chunk c = chunks.get(key(x >> 4, z >> 4));
+        return c == null ? 0 : c.biome[(z & 15) * 16 + (x & 15)] & 255;
+    }
+
+    /** terrain finished on a worker thread: visible to decoration, not yet to the renderer */
+    public void addTerrain(Chunk c) { c.stage = 1; chunks.put(key(c.cx, c.cz), c); }
+
     public int data(int x, int y, int z) {
         Chunk c = ready(x >> 4, z >> 4);
         return c == null ? 0 : c.data(x & 15, y, z & 15);

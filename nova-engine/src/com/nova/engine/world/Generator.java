@@ -62,6 +62,17 @@ public final class Generator {
     }
 
     // ------------------------------------------------------------------ chunk
+    /** phase 1 (worker threads): terrain, surface, caves */
+    public void terrain(Chunk c) {
+        McRandom rnd = new McRandom(c.cx * 0x14609048 + c.cz * 0x07ebe2d5);
+        int[] b = layers.get().biomes1.get(c.cx << 4, c.cz << 4, 16, 16);
+        for (int i = 0; i < 256; i++) c.biome[i] = (byte) b[i];
+        prepareHeights(c);
+        buildSurfaces(c, rnd);
+        carveCaves(c);     // interim
+    }
+
+    /** old single pass (interim decoration), kept for tools */
     public void generate(Chunk c, World w) {
         w.begin(c);
         McRandom rnd = new McRandom(c.cx * 0x14609048 + c.cz * 0x07ebe2d5);

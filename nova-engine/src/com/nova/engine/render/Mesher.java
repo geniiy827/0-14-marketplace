@@ -32,8 +32,9 @@ public final class Mesher {
     private int bx, by, bz;               // section origin (world)
     private int data, biome;              // of the block being meshed
 
-    private int tintOf(int id, int f) {
-        int t = Blocks.tint[id][f];
+    private int tintOf(int id, int f) { return tintOfValue(Blocks.tint[id][f], id); }
+
+    private int tintOfValue(int t, int id) {
         if (t == Blocks.TINT_GRASS) return com.nova.engine.world.Biomes.GRASS[biome];
         if (t == Blocks.TINT_FOLIAGE) {
             if (id == 18 && data == 1) return 0x619961;        // spruce
@@ -80,6 +81,7 @@ public final class Mesher {
                     boolean ins = f >= 2 && Blocks.inset[id] > 0;
                     if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1)) continue;
                     face(id, f, x, y, z, k == Blocks.LIQUID ? (Blocks.kind[get(x, wy + 1, z)] == Blocks.LIQUID ? 1f : 0.875f) : 1f);
+                    if (f >= 2 && Blocks.sideOverlay[id] >= 0) { overlay = true; face(id, f, x, y, z, 1f); overlay = false; }
                 }
             }
         }
@@ -113,10 +115,12 @@ public final class Mesher {
         return b != 0 && Blocks.opaque[b];
     }
 
+    private boolean overlay;
+
     private void face(int id, int f, int x, int y, int z, float top) {
-        int s = Blocks.texFor(id, data, f) * 4;
+        int s = (overlay ? Blocks.sideOverlay[id] : Blocks.texFor(id, data, f)) * 4;
         float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
-        int tint = tintOf(id, f);
+        int tint = overlay ? tintOfValue(Blocks.sideOverlayTint[id], id) : tintOf(id, f);
         float bh = Blocks.height[id];
         float tr = ((tint >> 16) & 255) / 255f, tg = ((tint >> 8) & 255) / 255f, tb = (tint & 255) / 255f;
         boolean liquid = Blocks.kind[id] == Blocks.LIQUID;

@@ -17,7 +17,16 @@
 - [?] beta4: «полупиксели» — причина: отступ в полтекселя в Atlas (16 текселей в 15). Убран. Песчаник/кварц/подзол
   по newtex_map (sandstone: 0 верх, 1 резной, 2 гладкий, 3 бок, 4 низ). Кактус: бока внутрь на 1/16 (Blocks.inset).
   HUD: хотбар из gui.png 0.14 (бар 182x22 @0,0; выделение 24x24 @0,22).
-- [ ] ДЕКОРАТОР (следующий шаг). Уже разобрано:
+- [?] beta5: Decorator.java — порядок/счётчики BiomeDecorator::decorate, сид чанка, руды (decorateOres+OreFeature
+  точно), дуб TreeFeature (точно: высота r%3+5, _prepareSpawn, листва), позиции деревьев/цветов/травы. Генерация в
+  2 фазы: рельеф (потоки) -> декор, когда есть рельеф 3x3 (один поток) -> показ, когда 3x3 задекорированы.
+  Трава на боках блока: свой оверлей (атлас: nova_grass_side + nova_grass_side_overlay, красится биомом).
+  Управление: тап = поставить, удержание = ломать (повтор 250 мс). Кнопки и прицел из gui.png / icons.png.
+  Инструменты: engine/tools/publish.sh (сборка+пуш+проверка), GitHub Actions nova-engine.yml -> релиз engine-latest.
+- [ ] ДЕКОРАТОР дальше (approx в Decorator.java): Birch/Spruce/Pine/Jungle/Fancy/Swamp/Savanna/Roof/Mega деревья,
+  Sand/Clay, TallGrass, FlowerFeature + getRandomFlowerTypeAndData, Reeds, Cactus, DeadBush, Waterlily, Pumpkin
+  (_getRandomSurfacePosition), HugeMushroom, Spring; оверрайды decorate (Forest/Plains/Taiga/Jungle/Desert/
+  ExtremeHills/Ice/Savanna); озёра, данжи, лёд в postProcess; LargeCaveFeature. Уже разобрано (для справки):
   postProcess 0x644680: Random(levelSeed) -> a=(r>>2)*2+1, b=(r>>2)*2+1; seed = levelSeed ^ (cx*a + cz*b) (координаты
   чанка); озёра/данжи/структуры/лёд до декора; декор = biome vtable[14] decorate(src, rnd, chunkMin, flag=0, FLT_MAX).
   BiomeDecorator::decorate 0x599778 порядок: decorateOres (vtable[0]); +0xec x(песок +8) / +0xf0 (глина +4) / +0xe8
