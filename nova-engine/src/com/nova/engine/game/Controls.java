@@ -59,6 +59,8 @@ public final class Controls {
         w = sw; h = sh; dp = density;
         float dpadScale = 0.5f;
         float ppm = 3f + (sh * 0.010416667f - 3f) * dpadScale;
+        ppm *= 2f;                                             // NOVA: twice the original size (asked for), capped
+        ppm = Math.min(ppm, sh * 0.55f / 48f);
         float B = 16f * ppm, S = 20f * ppm;
         float x0 = 8f, y0 = sh - B * 3f + (sw >= sh ? -8f : -80f);
         rect(up, x0 + B, y0, x0 + B + S, y0 + S);
@@ -77,8 +79,10 @@ public final class Controls {
         rect(jumpR, jx, jy1 - J, jx + J, jy1);
         scale(jumpHit, jumpR, 1.1f);
         float[] t = new float[4];
-        move(t, jumpHit, 0, -J * 0.85f); scale(ascendR, t, 0.8f);
-        move(t, jumpHit, 0, J * 0.85f); scale(descendR, t, 0.8f);
+        // flight: ascend above the jump place, descend on it (the original's -/+0.85J overlap with the bigger size)
+        float hh = jumpHit[3] - jumpHit[1];
+        move(t, jumpHit, 0, -hh * 1.05f); scale(ascendR, t, 0.9f);
+        scale(descendR, jumpHit, 0.9f);
         slot = Math.min(44 * dp, w * 0.6f / 9);
         barX = (w - slot * 9) / 2; barY = h - slot - 4 * dp;
     }

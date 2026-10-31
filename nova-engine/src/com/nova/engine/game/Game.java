@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta6";
+    public static final String VERSION = "NOVA Engine beta7";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -426,10 +426,16 @@ public final class Game implements GLSurfaceView.Renderer {
         hud.image(guiTex, cx - hw, cy - hh, hw * 2, hh * 2, u * g, v * g, (u + 26) * g, (v + 26) * g, a << 24 | cc << 16 | cc << 8 | cc);
     }
 
+    /**
+     * HudProgressRenderer: _buildFeedbackCircle: R = min(4 mm in pixels, 40), 24 segments; outer ring R..0.95R,
+     * inner disc 0.95R scaled by 0.5 + 0.5 * progress; drawn at the finger scaled by 3.5 (gui units -> pixels)
+     * with ui_invert_overlay.
+     */
     private void progressRing(float x, float y, float p) {
-        float rOut = 7f * density * 3.5f / 2f, rIn = rOut * 0.6f * (0.5f + 0.5f * p);
-        hud.invertCircle(x, y, rOut, rOut * 0.8f);
-        hud.invertCircle(x, y, rIn, 0);
+        float ppmDevice = density * 160f / 25.4f;
+        float R = Math.min(ppmDevice * 3.9996f, 40f) * 3.5f / density;      // 3.5 gui units, gui scale ~ density
+        hud.invertCircle(x, y, R, R * 0.95f, 24);
+        hud.invertCircle(x, y, R * 0.95f * (0.5f + 0.5f * p), 0, 24);
     }
 
     /** a gui.png icon (u,v,w,h in pixels) scaled into the button square; darker while pressed / active */

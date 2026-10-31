@@ -16,7 +16,7 @@ public final class Player {
     public boolean onGround, flying, inWater;
     public float moveF, moveS;                  // input -1..1
     public boolean jump, sneak;
-    private int jumpTicks;
+    private int jumpTicks, autoTicks;
 
     public void tick(World w) {
         px = x; py = y; pz = z;
@@ -41,7 +41,7 @@ public final class Player {
             mx *= 0.8; my *= 0.8; mz *= 0.8;
             my -= 0.02;
         } else {
-            double acc = onGround ? 0.1 * 1.3 : 0.02 * 1.3;    // a little faster than vanilla walking feels right on touch
+            double acc = onGround || autoTicks > 0 ? 0.1 * 1.3 : 0.02 * 1.3;   // keeps walking forward through an auto-jump    // a little faster than vanilla walking feels right on touch
             mx += ix * acc; mz += iz * acc;
             if (jump && onGround && jumpTicks == 0) { my = 0.42; jumpTicks = 10; }
             boolean wasGround = onGround;
@@ -49,13 +49,17 @@ public final class Player {
             move(w);
             // auto-jump: blocked horizontally while walking on the ground, and there is room one block up
             if (wasGround && il > 0.1 && ((bx != mx && Math.abs(bx) > 0.01) || (bz != mz && Math.abs(bz) > 0.01)) && jumpTicks == 0) {
-                if (free(w, x + Math.signum(bx) * 0.4, y + 1.01, z + Math.signum(bz) * 0.4)) { my = 0.42; jumpTicks = 10; }
+                if (free(w, x + Math.signum(bx) * 0.4, y + 1.01, z + Math.signum(bz) * 0.4)) {
+                    my = 0.42; jumpTicks = 10; autoTicks = 8;
+                    mx = bx; mz = bz;                          // keep the push towards the step
+                }
             }
             double fr = onGround ? 0.546 : 0.91;
             mx *= fr; mz *= fr;
             my = (my - 0.08) * 0.98;
         }
         if (jumpTicks > 0) jumpTicks--;
+        if (autoTicks > 0) autoTicks--;
         if (y < -40) { y = 140; my = 0; }
     }
 

@@ -181,11 +181,10 @@ public final class Hud {
     }
 
     /** white ring (inner > 0) or disc drawn with ui_invert_overlay blending (1 - dst): inverts what is under it */
-    public void invertCircle(float cx, float cy, float outer, float inner) {
+    public void invertCircle(float cx, float cy, float outer, float inner, int n) {
         flush();
         curTex = white;
         GLES30.glBlendFunc(GLES30.GL_ONE_MINUS_DST_COLOR, GLES30.GL_ONE_MINUS_SRC_COLOR);
-        int n = 32;
         for (int i = 0; i < n; i++) {
             double a0 = i * Math.PI * 2 / n, a1 = (i + 1) * Math.PI * 2 / n;
             float ox0 = cx + (float) Math.cos(a0) * outer, oy0 = cy + (float) Math.sin(a0) * outer;
