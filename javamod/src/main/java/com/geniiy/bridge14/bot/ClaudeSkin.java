@@ -55,43 +55,54 @@ public final class ClaudeSkin {
         return out;
     }
 
-    /** Робот в стиле Google Gemini: тёмно-синий корпус, градиент синий-фиолетовый, четырёхлучевая звезда Gemini на груди, цвета Google на руках/ногах. */
+    /** Gemini: белая одежда, логотип Google «G» на животе, синие джинсы, лицо человека (не робот). */
     private static byte[] gemini() {
         int W = 64, H = 32;
         int[] px = new int[W * H];
-        int body = 0xFF1F2A44, shade = 0xFF151C30, light = 0xFF2B3A5E, blue = 0xFF4285F4, purple = 0xFF9B72CB,
-                pink = 0xFFD96570, white = 0xFFF1F3F4, red = 0xFFEA4335, yellow = 0xFFFBBC05, green = 0xFF34A853;
-        fill(px, W, 0, 8, 32, 8, body);
-        fill(px, W, 8, 0, 16, 8, light);
-        fill(px, W, 8, 8, 8, 8, body);
-        fill(px, W, 9, 10, 6, 3, blue);          // визор: градиент
-        fill(px, W, 12, 10, 3, 3, purple);
-        fill(px, W, 10, 11, 1, 1, white);
-        fill(px, W, 13, 11, 1, 1, white);
-        fill(px, W, 10, 14, 4, 1, pink);
-        fill(px, W, 0, 10, 1, 2, blue);
-        fill(px, W, 23, 10, 1, 2, purple);
-        fill(px, W, 16, 20, 24, 12, body);
-        fill(px, W, 20, 16, 16, 4, light);
-        fill(px, W, 20, 20, 8, 12, body);
-        String[] star = {
-                "...X....",
-                "...X....",
-                "..XXX...",
-                "XXXXXXX.",
-                "..XXX...",
-                "...X....",
-                "...X....",
-                "........"};
-        for (int r = 0; r < 8; r++) for (int c = 0; c < 8; c++) if (star[r].charAt(c) == 'X') set(px, W, 20 + c, 21 + r, r < 3 ? blue : r == 3 ? purple : pink);
-        fill(px, W, 20, 30, 2, 2, blue); fill(px, W, 22, 30, 2, 2, red); fill(px, W, 24, 30, 2, 2, yellow); fill(px, W, 26, 30, 2, 2, green);
-        fill(px, W, 40, 16, 16, 16, body);
-        fill(px, W, 40, 20, 16, 2, blue);
-        fill(px, W, 40, 22, 16, 1, purple);
-        fill(px, W, 40, 29, 16, 3, shade);
-        fill(px, W, 0, 16, 16, 16, shade);
-        fill(px, W, 0, 20, 4, 2, blue); fill(px, W, 4, 20, 4, 2, red); fill(px, W, 8, 20, 4, 2, yellow); fill(px, W, 12, 20, 4, 2, green);
-        fill(px, W, 0, 30, 16, 2, light);
+        int skin = 0xFFF2C9A5, skinSh = 0xFFD9A982, hair = 0xFF3B2A20, eye = 0xFF4285F4, mouth = 0xFFB5544B,
+                white = 0xFFFAFAFA, whiteSh = 0xFFE3E6EA, jeans = 0xFF2F4A80, jeansSh = 0xFF243A66, shoe = 0xFF202124,
+                B = 0xFF4285F4, R = 0xFFEA4335, Y = 0xFFFBBC05, G = 0xFF34A853;
+        // голова: кожа, волосы сверху и сзади
+        fill(px, W, 0, 8, 32, 8, skin);
+        fill(px, W, 8, 0, 8, 8, hair);           // макушка
+        fill(px, W, 16, 0, 8, 8, skinSh);        // подбородок снизу
+        fill(px, W, 0, 8, 32, 2, hair);          // волосы по кругу
+        fill(px, W, 24, 8, 8, 8, hair);          // затылок
+        fill(px, W, 0, 10, 2, 3, hair); fill(px, W, 22, 10, 2, 3, hair);
+        fill(px, W, 9, 11, 2, 1, white); fill(px, W, 10, 11, 1, 1, eye);   // глаза
+        fill(px, W, 13, 11, 2, 1, white); fill(px, W, 13, 11, 1, 1, eye);
+        fill(px, W, 11, 13, 2, 1, skinSh);       // нос
+        fill(px, W, 10, 14, 4, 1, mouth);        // улыбка
+        fill(px, W, 9, 13, 1, 1, mouth); fill(px, W, 14, 13, 1, 1, mouth);
+        // тело: белая футболка
+        fill(px, W, 16, 20, 24, 12, white);
+        fill(px, W, 20, 16, 16, 4, white);
+        fill(px, W, 16, 20, 4, 12, whiteSh); fill(px, W, 28, 20, 4, 12, whiteSh);
+        fill(px, W, 32, 20, 8, 12, white);
+        fill(px, W, 22, 20, 4, 1, skin);         // вырез
+        // логотип «G» на животе (лицевая сторона тела 20..27 x 20..31), 6x6
+        String[] g = {
+                ".RRRR.",
+                "R....R",
+                "Y.....",
+                "Y..BBB",
+                "G....B",
+                ".GGGG."};
+        for (int r = 0; r < 6; r++) for (int c = 0; c < 6; c++) {
+            char ch = g[r].charAt(c);
+            int col = ch == 'R' ? R : ch == 'Y' ? Y : ch == 'G' ? G : ch == 'B' ? B : 0;
+            if (col != 0) set(px, W, 21 + c, 24 + r, col);
+        }
+        // руки: белые рукава до локтя, дальше кожа
+        fill(px, W, 40, 16, 16, 16, skin);
+        fill(px, W, 40, 20, 16, 5, white);
+        fill(px, W, 44, 16, 4, 4, white);
+        fill(px, W, 48, 16, 4, 4, skinSh);
+        // ноги: джинсы, кроссовки
+        fill(px, W, 0, 16, 16, 16, jeans);
+        fill(px, W, 0, 20, 4, 12, jeansSh);
+        fill(px, W, 0, 29, 16, 3, shoe);
+        fill(px, W, 8, 16, 4, 4, shoe);
         byte[] out = new byte[W * H * 4];
         for (int i = 0; i < px.length; i++) {
             int c = px[i];

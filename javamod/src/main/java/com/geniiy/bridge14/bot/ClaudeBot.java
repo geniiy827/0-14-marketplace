@@ -35,6 +35,7 @@ public final class ClaudeBot {
             else if (a[i].equals("--http") && i + 1 < a.length) http = Integer.parseInt(a[++i]);
             else if (a[i].equals("--dir") && i + 1 < a.length) dir = a[++i];
             else if (a[i].equals("--skin") && i + 1 < a.length) ClaudeSkin.style = a[++i];
+            else if (a[i].equals("--parent") && i + 1 < a.length) parentPid = Long.parseLong(a[++i]);
             else if (!a[i].startsWith("--")) {
                 String s = a[i]; int c = s.lastIndexOf(':');
                 if (c > 0) { host = s.substring(0, c); port = Integer.parseInt(s.substring(c + 1)); } else host = s;
@@ -45,7 +46,24 @@ public final class ClaudeBot {
         if (dir != null) b.startFiles(new java.io.File(dir));
         b.connect();
         Thread t = new Thread(b::tickLoop, "bot-tick"); t.setDaemon(false); t.start();
+        if (parentPid > 0) {   // запущен из GeminiBrain: окно закрыли — выходим из игры
+            final long pp = parentPid;
+            Thread w = new Thread(() -> {
+                while (true) {
+                    try { Thread.sleep(1500); } catch (InterruptedException e) { return; }
+                    if (!ProcessHandle.of(pp).map(ProcessHandle::isAlive).orElse(false)) {
+                        log("родитель закрыт — выхожу из игры");
+                        RakClient rq = b.rak; b.rakGen++; if (rq != null) try { rq.close("quit"); } catch (Exception ignored) {}
+                        try { Thread.sleep(400); } catch (InterruptedException ignored) {}
+                        System.exit(0);
+                    }
+                }
+            }, "parent-watch");
+            w.setDaemon(true); w.start();
+        }
     }
+
+    static long parentPid;
 
     static synchronized void log(String m) { System.out.println(new SimpleDateFormat("HH:mm:ss").format(new Date()) + " " + m); }
 

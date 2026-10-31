@@ -66,8 +66,8 @@ public final class GeminiBrain {
         server = cfg.getOrDefault("server", "block-party.ru:19132");
         nick = cfg.getOrDefault("nick", "Gemini");
         port = Integer.parseInt(cfg.getOrDefault("port", "8781"));
-        rpm = Integer.parseInt(cfg.getOrDefault("rpm", "8"));
-        rpd = Integer.parseInt(cfg.getOrDefault("rpd", "200"));
+        rpm = Integer.parseInt(cfg.getOrDefault("rpm", "12"));
+        rpd = Integer.parseInt(cfg.getOrDefault("rpd", "1000"));
         tell = cfg.getOrDefault("tell", "geniiy");
         for (String o : cfg.getOrDefault("owners", "geniiy,Ellaire_").split(",")) if (!o.trim().isEmpty()) owners.add(o.trim().toLowerCase());
         password = read("password.txt", "").trim();
@@ -102,7 +102,7 @@ public final class GeminiBrain {
             File nj = new File(dir, "ClaudeBot014-new.jar"), j = new File(dir, "ClaudeBot014.jar");
             if (nj.isFile()) { Files.move(nj.toPath(), j.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); log("поставил новый jar"); }
             String java = ProcessHandle.current().info().command().orElse("java");
-            ProcessBuilder pb = new ProcessBuilder(java, "-Dfile.encoding=UTF-8", "-jar", "ClaudeBot014.jar", server, "--nick", nick, "--dir", ".", "--http", String.valueOf(port), "--skin", "gemini");
+            ProcessBuilder pb = new ProcessBuilder(java, "-Dfile.encoding=UTF-8", "-jar", "ClaudeBot014.jar", server, "--nick", nick, "--dir", ".", "--http", String.valueOf(port), "--skin", "gemini", "--parent", String.valueOf(ProcessHandle.current().pid()));
             pb.directory(dir).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(new File(dir, "bot.log")));
             child = pb.start();
             write("bot.pid", String.valueOf(child.pid()));
@@ -475,9 +475,9 @@ public final class GeminiBrain {
             "owners=geniiy,Ellaire_",
             "# кому писать в личку (/tell), если хозяин написал в личку",
             "tell=geniiy",
-            "# лимиты запросов к Gemini (бесплатный ключ): в минуту и в день",
-            "rpm=8",
-            "rpd=200",
+            "# лимиты запросов к Gemini: в минуту и в день (это мой предохранитель; если Google скажет «лимит», бот сам подождёт)",
+            "rpm=12",
+            "rpd=1000",
             "# модель: auto (сам выберет flash-lite) или имя, например gemini-flash-lite-latest",
             "model=auto",
             "# отвечать другим игрокам, если они обращаются к Gemini (1 раз в 30 с): 1 или 0",
