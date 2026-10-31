@@ -34,6 +34,7 @@ public final class ClaudeBot {
             if (a[i].equals("--nick") && i + 1 < a.length) nick = a[++i];
             else if (a[i].equals("--http") && i + 1 < a.length) http = Integer.parseInt(a[++i]);
             else if (a[i].equals("--dir") && i + 1 < a.length) dir = a[++i];
+            else if (a[i].equals("--skin") && i + 1 < a.length) ClaudeSkin.style = a[++i];
             else if (!a[i].startsWith("--")) {
                 String s = a[i]; int c = s.lastIndexOf(':');
                 if (c > 0) { host = s.substring(0, c); port = Integer.parseInt(s.substring(c + 1)); } else host = s;
@@ -417,7 +418,9 @@ public final class ClaudeBot {
 
     void tick() {
         long t = now();
-        for (Iterator<Later> it = laters.iterator(); it.hasNext(); ) { Later l = it.next(); if (l.at <= t) { it.remove(); try { l.r.run(); } catch (Exception e) { log("later: " + e); } } }
+        List<Later> due = new ArrayList<>();
+        for (Iterator<Later> it = laters.iterator(); it.hasNext(); ) { Later l = it.next(); if (l.at <= t) { it.remove(); due.add(l); } }
+        for (Later l : due) try { l.r.run(); } catch (Exception e) { log("later: " + e); }
         if (!spawned || dead) return;
         if (chunks.get(ck((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4)) == null) return; // ждём чанк под ногами
 
@@ -946,6 +949,25 @@ public final class ClaudeBot {
         return false;
     }
 
+    int seq;   // номер текущей последовательности (join/dance/fart); stop её прерывает
+
+    void joinStep(int my, int zz, String g, int tries) {
+        later(500, () -> {
+            if (seq != my) return;
+            boolean there = x > -245.6 && x < -242.4 && Math.abs(z - (zz + 0.5)) < 1.2;
+            if (!there && tries < 40) { if (tries == 14 || tries == 28) command("goto -244 14 " + zz); joinStep(my, zz, g, tries + 1); return; }
+            if (!there) { event("[бот] не дошёл до входа в " + g); return; }
+            yaw = 90; pitch = 0;
+            walkDirX = -1; walkDirZ = 0; walkUntil = now() + 1500; task = "захожу в " + g;
+            later(3500, () -> {
+                if (seq != my) return;
+                if (g.equals("bp")) command("bp");
+                else if (g.equals("sb")) command("sb");
+                event("[бот] зашёл в " + g);
+            });
+        });
+    }
+
     void bpRoundEnd(long t) {
         long len = t - bpRoundStart; bpRoundStart = 0;
         if (len < 1500 || len > 30000) return;
@@ -1227,7 +1249,40 @@ public final class ClaudeBot {
                     String msg = line.trim().substring(a[0].length()).trim();
                     send(Proto.text(nick, msg)); event("<" + nick + "> " + msg); return "ок";
                 }
-                case "stop": stopAll(); return "остановлен";
+                case "stop": stopAll(); seq++; return "остановлен";
+                case "join": {
+                    // join bp|sb|creative — дойти до лужи-портала и включить автоигру (без ИИ)
+                    String g = a.length > 1 ? a[1].toLowerCase() : "bp";
+                    int zz = g.equals("sb") ? -137 : (g.startsWith("cr") || g.startsWith("кр")) ? -157 : g.equals("bp") ? -141 : Integer.parseInt(g);
+                    bp = false; sbAuto = false; runMode = true; final int my = ++seq;
+                    String r = command("goto -244 14 " + zz);
+                    joinStep(my, zz, g, 0);
+                    return "иду в " + g + " (" + r + ")";
+                }
+                case "dance": {
+                    stopAll(); final int my = ++seq; long d = 0;
+                    for (int r = 0; r < 3; r++) for (int yw : new int[]{0, 90, 180, 270}) {
+                        final int fy = yw;
+                        later(d, () -> { if (seq == my) { yaw = fy; pitch = 0; send(Proto.action(selfEid, Proto.ACTION_START_SNEAK, 0, 0, 0, 0)); } });
+                        later(d + 300, () -> { if (seq == my) { send(Proto.action(selfEid, Proto.ACTION_STOP_SNEAK, 0, 0, 0, 0)); if (onGround) vy = 0.42; } });
+                        d += 700;
+                    }
+                    later(d, () -> { if (seq == my) pitch = 60; });
+                    later(d + 400, () -> { if (seq == my) pitch = -60; });
+                    later(d + 800, () -> { if (seq == my) pitch = 0; });
+                    return "танцую";
+                }
+                case "fart": {
+                    // fart [ник] — повернуться спиной к игроку и 3 раза присесть
+                    final int my = ++seq; String who = a.length > 1 ? a[1] : null;
+                    if (who != null) { Ent p = findPlayer(who); if (p == null) return "игрок не найден"; lookAt(p.x, p.y + 1.5, p.z); yaw += 180; pitch = 0; }
+                    for (int k = 0; k < 3; k++) {
+                        later(k * 700L, () -> { if (seq == my) send(Proto.action(selfEid, Proto.ACTION_START_SNEAK, 0, 0, 0, 0)); });
+                        later(k * 700L + 350, () -> { if (seq == my) send(Proto.action(selfEid, Proto.ACTION_STOP_SNEAK, 0, 0, 0, 0)); });
+                    }
+                    later(2200, () -> { if (seq == my) command("say Пук!" + (who != null ? " Это тебе, " + who + ")" : "")); });
+                    return "пук";
+                }
                 case "goto": {
                     int[] tgt;
                     if (a.length >= 4) tgt = new int[]{(int) Math.floor(Double.parseDouble(a[1])), (int) Math.floor(Double.parseDouble(a[2])), (int) Math.floor(Double.parseDouble(a[3]))};
@@ -1684,7 +1739,14 @@ public final class ClaudeBot {
                         resp = out.toString();
                         break;
                     }
-                    default: resp = "GET /state | /view?r=8 | /chat?since=N | /all?since=N | /cmd?c=...\n";
+                    case "/": case "/panel": {
+                        byte[] d = PANEL.getBytes(StandardCharsets.UTF_8);
+                        ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+                        ex.sendResponseHeaders(200, d.length);
+                        try (OutputStream o = ex.getResponseBody()) { o.write(d); }
+                        return;
+                    }
+                    default: resp = "GET /panel | /state | /view?r=8 | /chat?since=N | /all?since=N | /cmd?c=...\n";
                 }
             } catch (Exception e) { resp = "ошибка: " + e; }
             byte[] d = resp.getBytes(StandardCharsets.UTF_8);
@@ -1696,11 +1758,51 @@ public final class ClaudeBot {
         log("HTTP API: http://127.0.0.1:" + httpPort + "/state");
     }
 
+    // ярлыки .bat: двойной клик — команда боту через HTTP (нужен запущенный run.bat)
+    void writeShortcuts(java.io.File k) {
+        try {
+            k.mkdirs();
+            String[][] list = {
+                {"Панель", null},
+                {"Зайти в Block Party", "join bp"}, {"Зайти в SpeedBuilders", "join sb"}, {"Зайти в креатив", "join creative"},
+                {"Выключить автоигру", "bp off"}, {"На спавн", "say /spawn"}, {"Стоп", "stop"},
+                {"Танец", "dance"}, {"Пук", "fart"}, {"Переподключиться", "reconnect"}};
+            for (String[] e : list) {
+                String body = e[1] == null
+                        ? "@echo off\r\nstart \"\" http://127.0.0.1:" + httpPort + "/panel\r\n"
+                        : "@echo off\r\nchcp 65001 >nul\r\ncurl -s \"http://127.0.0.1:" + httpPort + "/cmd?c=" + java.net.URLEncoder.encode(e[1], StandardCharsets.UTF_8) + "\" >nul || echo Бот не запущен (сначала run.bat) && pause\r\n";
+                java.nio.file.Files.write(new java.io.File(k, e[0] + ".bat").toPath(), body.getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (Exception e) { log("ярлыки: " + e); }
+    }
+
+    static final String PANEL = "<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>ClaudeBot</title><style>"
+        + ":root{--bg:#f6f4ef;--fg:#222;--card:#fff;--b:#ddd;--acc:#d9772b}@media(prefers-color-scheme:dark){:root{--bg:#1c1b19;--fg:#eee;--card:#2a2926;--b:#444}}"
+        + "body{margin:0;padding:16px;font:15px system-ui,sans-serif;background:var(--bg);color:var(--fg)}h1{font-size:20px;margin:0 0 12px}"
+        + ".g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:12px}"
+        + "button{padding:12px;border:1px solid var(--b);border-radius:10px;background:var(--card);color:var(--fg);font-size:15px;cursor:pointer}button.a{background:var(--acc);color:#fff;border:0}button:active{opacity:.6}"
+        + "form{display:flex;gap:8px;margin-bottom:8px}input{flex:1;min-width:0;padding:10px;border:1px solid var(--b);border-radius:10px;background:var(--card);color:var(--fg);font-size:15px}"
+        + "pre{background:var(--card);border:1px solid var(--b);border-radius:10px;padding:10px;white-space:pre-wrap;word-break:break-word;font-size:13px;max-height:40vh;overflow:auto}#r{color:var(--acc);min-height:1.2em}</style></head><body>"
+        + "<h1>ClaudeBot014</h1><div class=g>"
+        + "<button class=a data-c='join bp'>Зайти в Block Party</button><button class=a data-c='join sb'>Зайти в SpeedBuilders</button><button data-c='join creative'>Зайти в креатив</button>"
+        + "<button data-c='bp off'>Выключить автоигру</button><button data-c='say /spawn'>На спавн</button><button data-c='stop'>Стоп</button>"
+        + "<button data-c='dance'>Танец</button><button data-c='fart'>Пук</button><button data-c='say /money'>Баланс</button><button data-c='reconnect'>Переподключиться</button></div>"
+        + "<form id=fs><input id=s placeholder='Написать в чат'><button>Отправить</button></form>"
+        + "<form id=fc><input id=c placeholder='Команда боту: goto geniiy, follow Zov_, fart Wics4urr…'><button>Выполнить</button></form>"
+        + "<div id=r></div><pre id=st>…</pre><pre id=ch>…</pre><script>"
+        + "const r=document.getElementById('r');async function cmd(c){try{const t=await (await fetch('/cmd?c='+encodeURIComponent(c))).text();r.textContent=c+' → '+t.trim()}catch(e){r.textContent='Бот не отвечает'}}"
+        + "document.querySelectorAll('button[data-c]').forEach(b=>b.onclick=()=>cmd(b.dataset.c));"
+        + "fs.onsubmit=e=>{e.preventDefault();if(s.value)cmd('say '+s.value);s.value=''};fc.onsubmit=e=>{e.preventDefault();if(c.value)cmd(c.value);c.value=''};"
+        + "async function upd(){try{st.textContent=(await (await fetch('/state')).text()).split('\\n').slice(0,9).join('\\n');"
+        + "const t=(await (await fetch('/chat?since=0')).text()).split('\\n').filter(l=>l&&!l.startsWith('next'));ch.textContent=t.slice(-25).reverse().join('\\n')}catch(e){st.textContent='Бот не запущен'}}"
+        + "upd();setInterval(upd,1500)</script></body></html>";
+
     // ------------------------------------------------------------ обмен через файлы (папка --dir)
     void startFiles(java.io.File d) {
         d.mkdirs();
         try { java.io.File pw = new java.io.File(d, "password.txt"); if (pw.isFile()) password = new String(java.nio.file.Files.readAllBytes(pw.toPath()), StandardCharsets.UTF_8).trim(); } catch (Exception ignored) {}
         final java.io.File cmd = new java.io.File(d, "cmd.txt"), out = new java.io.File(d, "out.txt");
+        writeShortcuts(new java.io.File(d, "Кнопки"));
         log("Обмен через папку: " + d.getAbsolutePath());
         Thread t = new Thread(() -> {
             long done = -1;
