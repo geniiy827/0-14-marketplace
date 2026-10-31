@@ -110,7 +110,7 @@ public final class World {
 
     public int biome(int x, int z) {
         Chunk c = ready(x >> 4, z >> 4);
-        return c == null ? 0 : c.biome[(z & 15) * 16 + (x & 15)];
+        return c == null ? 0 : c.biome[(z & 15) * 16 + (x & 15)] & 255;
     }
 
     private void touch(int cx, int cz, int s) {

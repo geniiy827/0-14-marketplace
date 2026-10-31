@@ -3,62 +3,60 @@ package com.nova.engine.world;
 import java.util.Random;
 
 /**
- * Terrain like the original of that era (the classic Java-edition algorithm the Pocket Edition generator follows):
- * 3D density from octave Perlin noise on a 5 x 17 x 5 grid per chunk, biome depth/scale blended over 5x5 columns
- * with the parabolic weights, trilinear interpolation, then surface blocks per biome, caves (worms), ores,
- * lava pools deep down, trees and plants (decorations may cross chunk borders through World.place).
- * World height 128, sea level 63.
+ * World generator of MCPE 0.14.3 (RandomLevelSource), ported from libminecraftpe:
+ * - noises created from Random(seed) in the original order (lperlin1 16, lperlin2 16, perlin1 8, surface simplex 4,
+ *   scale 10, depth 16, forest 8), float-exact ImprovedNoise / SimplexNoise;
+ * - biomes from the layer stack (Layers), raw 1:4 biomes for the heights, Voronoi 1:1 per column;
+ * - getHeights (5x17x5 density, 3x3 biome blend) + prepareHeights (trilinear fill: stone / water below 63);
+ * - buildSurfaces: per column Biome::buildSurfaceAt with the chunk Random (MT seeded x*341873128 + z*132899541),
+ *   bedrock 2..5 blocks.
+ * Same seed = same terrain and biomes as the original. Caves, ores and plants are still the interim versions
+ * (marked below) until LargeCaveFeature and the biome decorators are ported.
  */
 public final class Generator {
     public static final int SEA = 63;
     static final int STONE = 1, GRASS = 2, DIRT = 3, BEDROCK = 7, WATER = 9, LAVA = 11, SAND = 12, GRAVEL = 13,
             GOLD = 14, IRON = 15, COAL = 16, LOG = 17, LEAVES = 18, LAPIS = 21, SANDSTONE = 24, TALLGRASS = 31,
             DEADBUSH = 32, FLOWER_Y = 37, FLOWER = 38, REDSTONE = 73, DIAMOND = 56, SNOW_LAYER = 78, ICE = 79, CACTUS = 81,
-            CLAY = 82, REEDS = 83;
+            CLAY = 82, REEDS = 83, PODZOL = 243, HARDENED_CLAY = 172, STAINED_CLAY = 159;
     private final long seed;
-    private final Octaves minLimit, maxLimit, main, depth, surface;
-    private final Noise temp, humid, cont, weird, caves;
-    private static final float[] PARABOLIC = new float[25];
+    private final int iseed;
+    private final Noises.Perlin lperlin1, lperlin2, perlin1, scaleNoise, depthNoise, forestNoise;
+    private final Noises.PerlinSimplex surfaceNoise;
+    private final ThreadLocal<Layers> layers = new ThreadLocal<Layers>() {
+        @Override protected Layers initialValue() { return new Layers(iseed); }
+    };
+    /** RandomLevelSource +0x3c..: 10/sqrt(dx^2+dz^2+0.2) as stored by the original (only the 3x3 middle is used) */
+    static final float[] WEIGHT = new float[25];
     static {
-        for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++)
-            PARABOLIC[i + 2 + (j + 2) * 5] = (float) (10.0 / Math.sqrt(i * i + j * j + 0.2));
+        int[] bits = {0x405f7f69, 0x408c544c, 0x409c24de, 0x408c544c, 0x405f7f69,
+                      0x408c544c, 0x40d7be73, 0x41120f31, 0x40d7be73, 0x408c544c,
+                      0x409c24de, 0x41120f31, 0x41b2e2ac, 0x41120f31, 0x409c24de,
+                      0x408c544c, 0x40d7be73, 0x41120f31, 0x40d7be73, 0x408c544c,
+                      0x405f7f69, 0x408c544c, 0x409c24de, 0x408c544c, 0x405f7f69};
+        for (int i = 0; i < 25; i++) WEIGHT[i] = Float.intBitsToFloat(bits[i]);
     }
 
     public Generator(long seed) {
         this.seed = seed;
-        Random r = new Random(seed);
-        minLimit = new Octaves(r, 16);
-        maxLimit = new Octaves(r, 16);
-        main = new Octaves(r, 8);
-        surface = new Octaves(r, 4);
-        depth = new Octaves(r, 16);
-        temp = new Noise(seed * 9871 + 1);
-        humid = new Noise(seed * 39811 + 2);
-        cont = new Noise(seed * 7 + 3);
-        weird = new Noise(seed * 101 + 4);
-        caves = new Noise(seed * 1013 + 5);
+        this.iseed = (int) seed;
+        McRandom r = new McRandom(iseed);
+        lperlin1 = new Noises.Perlin(r, 16);
+        lperlin2 = new Noises.Perlin(r, 16);
+        perlin1 = new Noises.Perlin(r, 8);
+        surfaceNoise = new Noises.PerlinSimplex(r, 4);
+        scaleNoise = new Noises.Perlin(r, 10);
+        depthNoise = new Noises.Perlin(r, 16);
+        forestNoise = new Noises.Perlin(r, 8);
     }
 
     // ------------------------------------------------------------------ biomes
-    public int biomeAt(int x, int z) {
-        // noise quantiles (fbm): p10 -0.24, p25 -0.13, p50 0, p75 0.12, p90 0.24
-        double c = cont.fbm(x / 900.0, z / 900.0, 4);
-        if (c < -0.12) return c < -0.25 ? Biomes.DEEP_OCEAN : Biomes.OCEAN;
-        double t = temp.fbm(x / 700.0, z / 700.0, 3), h = humid.fbm(x / 500.0, z / 500.0, 3), w = weird.fbm(x / 400.0, z / 400.0, 3);
-        if (c < -0.095) return t < -0.17 ? Biomes.ICE : Biomes.BEACH;
-        if (t < -0.17) return h > 0.0 ? Biomes.TAIGA : Biomes.ICE;
-        if (t > 0.17) return h > 0.1 ? Biomes.JUNGLE : h < -0.05 ? Biomes.DESERT : Biomes.SAVANNA;
-        if (w > 0.2) return Biomes.HILLS;
-        if (h > 0.2) return Biomes.SWAMP;
-        if (h > 0.03) return Biomes.FOREST;
-        if (w < -0.15 && h > -0.1) return Biomes.BIRCH;
-        return Biomes.PLAINS;
-    }
+    public int biomeAt(int x, int z) { return layers.get().biomes1.get(x, z, 1, 1)[0] & 255; }
 
-    /** approximate surface height (spawn search) */
+    /** surface height (spawn search) */
     public int height(int x, int z) {
         Chunk c = new Chunk(x >> 4, z >> 4);
-        terrain(c);
+        prepareHeights(c);
         for (int y = Chunk.H - 1; y > 0; y--) if (c.get(x & 15, y, z & 15) != 0) return y;
         return SEA;
     }
@@ -66,10 +64,12 @@ public final class Generator {
     // ------------------------------------------------------------------ chunk
     public void generate(Chunk c, World w) {
         w.begin(c);
-        terrain(c);
-        int bx = c.cx << 4, bz = c.cz << 4;
-        for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) c.biome[z * 16 + x] = (byte) biomeAt(bx + x, bz + z);
-        surface(c);
+        McRandom rnd = new McRandom(c.cx * 0x14609048 + c.cz * 0x07ebe2d5);
+        int[] b = layers.get().biomes1.get(c.cx << 4, c.cz << 4, 16, 16);
+        for (int i = 0; i < 256; i++) c.biome[i] = (byte) b[i];      // index x + z*16
+        prepareHeights(c);
+        buildSurfaces(c, rnd);
+        // ---- interim (not yet the original): caves, ores, plants
         carveCaves(c);
         Random r = new Random(seed ^ (c.cx * 341873128712L + c.cz * 132897987541L));
         ore(c, r, COAL, 20, 127, 12);
@@ -83,108 +83,190 @@ public final class Generator {
         w.finish(c);
     }
 
-    private void terrain(Chunk c) {
-        double[] d = new double[5 * 5 * 17];
-        int gx0 = c.cx * 4, gz0 = c.cz * 4;
-        int[] biomes = new int[9 * 9];
-        for (int j = 0; j < 9; j++) for (int i = 0; i < 9; i++) biomes[j * 9 + i] = biomeAt((gx0 + i - 2) * 4, (gz0 + j - 2) * 4);
-        for (int gz = 0; gz < 5; gz++) for (int gx = 0; gx < 5; gx++) {
-            int b0 = biomes[(gz + 2) * 9 + gx + 2];
-            float sScale = 0, sDepth = 0, sW = 0;
-            for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++) {
-                int b = biomes[(gz + 2 + j) * 9 + gx + 2 + i];
-                float bd = Biomes.DEPTH[b], bs = Biomes.SCALE[b];
-                float wgt = PARABOLIC[i + 2 + (j + 2) * 5] / (bd + 2);
-                if (bd > Biomes.DEPTH[b0]) wgt /= 2;
-                sScale += bs * wgt; sDepth += bd * wgt; sW += wgt;
-            }
-            double scale = sScale / sW * 0.9 + 0.1;
-            double dep = (sDepth / sW * 4 - 1) / 8.0;
-            double dn = depth.get2((gx0 + gx) * 200.0, (gz0 + gz) * 200.0) / 8000.0;
-            if (dn < 0) dn = -dn * 0.3;
-            dn = dn * 3 - 2;
-            if (dn < 0) { dn /= 2; if (dn < -1) dn = -1; dn /= 1.4; dn /= 2; }
-            else { if (dn > 1) dn = 1; dn /= 8; }
-            dep += dn * 0.2;
-            dep = dep * 8.5 / 8.0;
-            double base = 8.5 + dep * 4;
-            for (int gy = 0; gy < 17; gy++) {
-                double yo = (gy - base) * 12.0 * 128.0 / 256.0 / scale;
-                if (yo < 0) yo *= 4;
-                double px = (gx0 + gx) * 684.412, py = gy * 684.412, pz = (gz0 + gz) * 684.412;
-                double mn = minLimit.get(px, py, pz) / 512.0, mx = maxLimit.get(px, py, pz) / 512.0;
-                double mi = (main.get(px / 80.0, py / 160.0, pz / 80.0) / 10.0 + 1) / 2.0;
-                double v = mi < 0 ? mn : mi > 1 ? mx : mn + (mx - mn) * mi;
-                v -= yo;
-                if (gy > 13) { double t = (gy - 13) / 3.0; v = v * (1 - t) - 10 * t; }
-                d[(gx * 5 + gz) * 17 + gy] = v;
-            }
-        }
-        for (int gx = 0; gx < 4; gx++) for (int gz = 0; gz < 4; gz++) for (int gy = 0; gy < 16; gy++) {
-            double v000 = d[(gx * 5 + gz) * 17 + gy], v010 = d[(gx * 5 + gz + 1) * 17 + gy];
-            double v100 = d[((gx + 1) * 5 + gz) * 17 + gy], v110 = d[((gx + 1) * 5 + gz + 1) * 17 + gy];
-            double s000 = (d[(gx * 5 + gz) * 17 + gy + 1] - v000) / 8, s010 = (d[(gx * 5 + gz + 1) * 17 + gy + 1] - v010) / 8;
-            double s100 = (d[((gx + 1) * 5 + gz) * 17 + gy + 1] - v100) / 8, s110 = (d[((gx + 1) * 5 + gz + 1) * 17 + gy + 1] - v110) / 8;
-            for (int yy = 0; yy < 8; yy++) {
-                double a0 = v000, a1 = v010, ax0 = (v100 - v000) / 4, ax1 = (v110 - v010) / 4;
-                for (int xx = 0; xx < 4; xx++) {
-                    double v = a0, dz = (a1 - a0) / 4;
-                    for (int zz = 0; zz < 4; zz++) {
-                        int y = gy * 8 + yy, x = gx * 4 + xx, z = gz * 4 + zz;
-                        int id = 0;
-                        if (v > 0) id = STONE;
-                        else if (y < SEA) id = WATER;
-                        if (id != 0) c.set(x, y, z, id);
-                        v += dz;
-                    }
-                    a0 += ax0; a1 += ax1;
+    // ------------------------------------------------------------------ RandomLevelSource::getHeights
+    private void getHeights(float[] out, int[] raw, int x, int y, int z) {
+        float[] dn = new float[25], mn = new float[425], n1 = new float[425], n2 = new float[425];
+        depthNoise.region2(dn, x, z, 5, 5, 200f, 200f);
+        perlin1.region(mn, x, y, z, 5, 17, 5, 8.55515f, 4.277575f, 8.55515f);
+        lperlin1.region(n1, x, y, z, 5, 17, 5, 684.412f, 855.515f, 684.412f);
+        lperlin2.region(n2, x, y, z, 5, 17, 5, 684.412f, 684.412f, 684.412f);
+        int o = 0;
+        for (int i = 0; i < 5; i++) for (int j = 0; j < 5; j++) {
+            int center = raw[(j + 2) * 10 + i + 2];
+            float cd = Biomes.DEPTH[center];
+            float ds = 0f, ss = 0f, ws = 0f;
+            for (int cc = 0; cc < 3; cc++) {
+                float d0 = 0, d1 = 0, d2 = 0, s0 = 0, s1 = 0, s2 = 0, w0 = 0, w1 = 0, w2 = 0;
+                for (int rr = 0; rr < 3; rr++) {
+                    int nb = raw[(j + 1 + rr) * 10 + i + 1 + cc];
+                    float nd = Biomes.DEPTH[nb], ns = Biomes.SCALE[nb];
+                    float wt = WEIGHT[6 + rr * 5 + cc] / (nd + 2.0f);
+                    if (nd > cd) wt = wt * 0.5f;
+                    if (rr == 0) { d0 = nd; s0 = ns; w0 = wt; } else if (rr == 1) { d1 = nd; s1 = ns; w1 = wt; } else { d2 = nd; s2 = ns; w2 = wt; }
                 }
-                v000 += s000; v010 += s010; v100 += s100; v110 += s110;
+                float td = w0 * d0; td = td + w1 * d1; td = td + w2 * d2;
+                float ts = w0 * s0; ts = ts + w1 * s1; ts = ts + w2 * s2;
+                float tw = w1 + w0; tw = tw + w2;
+                ds = ds + td; ws = ws + tw; ss = ss + ts;
+            }
+            float avgD = ds / ws;
+            float base = -1f + avgD * 4f;
+            float dv = dn[i * 5 + j] * 1.25e-4f;
+            float avgS = ss / ws;
+            if (dv < 0f) dv = -(dv * 0.3f);
+            base = base * 0.125f;
+            float d3 = dv * 3f - 2f;
+            float sc = 0.1f + avgS * 0.9f;
+            float add;
+            if (d3 < 0f) {
+                add = d3 * 0.5f;
+                if (add < -1f) add = -1f;
+                add = add * 0.35714287f;
+            } else {
+                add = d3 > 1f ? 1f : d3;
+                add = add * 0.125f;
+            }
+            base = base + add * 0.2f;
+            float k = 12f / sc;
+            float off = -8.5f - base * 4.25f;
+            for (int yy = 0; yy < 17; yy++, o++) {
+                float t = (1f + mn[o] * 0.1f) * 0.5f;
+                float lo = n1[o] * 0.00390625f;
+                float yo = k * ((float) yy + off);
+                if (yo < 0f) yo = yo * 4f;
+                float v;
+                if (t < 0f) v = lo;
+                else {
+                    float hi = n2[o] * 0.001953125f;
+                    v = t <= 1f ? lo + (hi - lo) * t : hi;
+                }
+                v = v - yo;
+                if (yy > 13) {
+                    float f = (float) (yy - 13) * 0.33333334f;
+                    v = f * -10f + v * (1f - f);
+                }
+                out[o] = v;
             }
         }
     }
 
-    /** grass / dirt / sand per biome, beaches, sea floor, bedrock, snow and ice */
-    private void surface(Chunk c) {
-        int bx = c.cx << 4, bz = c.cz << 4;
-        Random r = new Random(seed * 3 + c.cx * 7919L + c.cz * 104729L);
-        for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
-            int b = c.biome[z * 16 + x];
-            double sn = surface.get2((bx + x) * 0.0625, (bz + z) * 0.0625);
-            int depthN = (int) (sn / 3.0 + 3.0 + r.nextDouble() * 0.25);
-            int top = b == Biomes.DESERT || b == Biomes.BEACH ? SAND : GRASS;
-            int fill = b == Biomes.DESERT || b == Biomes.BEACH ? SAND : DIRT;
-            int left = -1;
-            for (int y = Chunk.H - 1; y >= 0; y--) {
-                if (y <= r.nextInt(5)) { c.set(x, y, z, BEDROCK); continue; }
-                int id = c.get(x, y, z);
-                if (id == 0) { left = -1; continue; }
-                if (id != STONE) continue;
-                if (left == -1) {
-                    int t = top, f = fill;
-                    if (depthN <= 0) { t = 0; f = STONE; }
-                    if (y < SEA && t == 0) t = WATER;
-                    if (y < SEA - 1 && t == GRASS) t = b == Biomes.OCEAN || b == Biomes.DEEP_OCEAN ? GRAVEL : DIRT;
-                    if ((b == Biomes.OCEAN || b == Biomes.DEEP_OCEAN) && y < SEA - 2) { t = r.nextInt(4) == 0 ? CLAY : GRAVEL; f = GRAVEL; }
-                    left = depthN;
-                    c.set(x, y, z, y >= SEA - 1 ? t : (t == GRASS ? DIRT : t));
-                    if (t == SAND && b == Biomes.DESERT) left = depthN + r.nextInt(2);
-                } else if (left > 0) {
-                    left--;
-                    c.set(x, y, z, fill);
-                    if (left == 0 && fill == SAND) { left = r.nextInt(4); fill = SANDSTONE; }
-                }
-            }
-            if (b == Biomes.ICE || (b == Biomes.TAIGA && r.nextInt(3) == 0)) {
-                for (int y = Chunk.H - 2; y > 0; y--) {
-                    int id = c.get(x, y, z);
-                    if (id == 0) continue;
-                    if (id == WATER && y == SEA - 1) c.set(x, y, z, ICE);
-                    else if (id == GRASS || id == DIRT || id == SAND || id == STONE) c.set(x, y + 1, z, SNOW_LAYER);
-                    break;
+    // ------------------------------------------------------------------ RandomLevelSource::prepareHeights
+    private void prepareHeights(Chunk c) {
+        int[] raw = layers.get().biomes4.get(c.cx * 4 - 2, c.cz * 4 - 2, 10, 10);
+        for (int i = 0; i < raw.length; i++) if (!Biomes.valid(raw[i])) raw[i] = 0;
+        float[] h = new float[425];
+        getHeights(h, raw, c.cx * 4, 0, c.cz * 4);
+        byte[] bl = c.blocks;
+        for (int xc = 0; xc < 4; xc++) for (int zc = 0; zc < 4; zc++) {
+            int b00 = (xc * 5 + zc) * 17, b01 = (xc * 5 + zc + 1) * 17, b10 = ((xc + 1) * 5 + zc) * 17, b11 = ((xc + 1) * 5 + zc + 1) * 17;
+            for (int yc = 0; yc < 16; yc++) {
+                float s7 = h[b00 + yc], s8 = h[b01 + yc], s5 = h[b10 + yc], s6 = h[b11 + yc];
+                float s1 = (h[b00 + yc + 1] - s7) * 0.125f, s2 = (h[b01 + yc + 1] - s8) * 0.125f;
+                float s3 = (h[b10 + yc + 1] - s5) * 0.125f, s4 = (h[b11 + yc + 1] - s6) * 0.125f;
+                for (int sy = 0; sy < 8; sy++) {
+                    int y = yc * 8 + sy;
+                    float s9 = (s5 - s7) * 0.25f, s10 = (s6 - s8) * 0.25f;
+                    float s15 = s7, s13 = s8;
+                    for (int sx = 0; sx < 4; sx++) {
+                        int x = xc * 4 + sx;
+                        float s14 = (s13 - s15) * 0.25f;
+                        float v = s15;
+                        for (int sz = 0; sz < 4; sz++) {
+                            int z = zc * 4 + sz;
+                            int id = v > 0f ? STONE : y < SEA ? WATER : 0;
+                            if (id != 0) bl[Chunk.idx(x, y, z)] = (byte) id;
+                            v = v + s14;
+                        }
+                        s15 = s15 + s9;
+                        s13 = s13 + s10;
+                    }
+                    s7 = s7 + s1; s8 = s8 + s2; s5 = s5 + s3; s6 = s6 + s4;
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------ RandomLevelSource::buildSurfaces
+    private void buildSurfaces(Chunk c, McRandom rnd) {
+        float[] noise = new float[256];
+        surfaceNoise.region(noise, c.cx * 16, c.cz * 16, 16, 16, 0.125f, 0.125f, 1f, 0.5f);
+        int[] st = new int[3];
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) {
+            int b = c.biome[z * 16 + x] & 255;
+            if (!Biomes.valid(b)) b = 0;
+            surfaceAt(b, c, rnd, x, z, noise[x + z * 16], st);
+        }
+    }
+
+    /** Biome::buildSurfaceAt (+ the overrides of ExtremeHills, Taiga, MutatedSavanna; Mesa simplified) */
+    private void surfaceAt(int b, Chunk c, McRandom rnd, int x, int z, float noise, int[] st) {
+        int top = Biomes.TOP[b], topData = Biomes.TOP_DATA[b], filler = Biomes.FILLER[b];
+        int cls = Biomes.CLASS[b], type = Biomes.TYPE[b];
+        if (cls == Biomes.C_HILLS) {
+            top = GRASS; topData = 0; filler = DIRT;
+            if ((noise > 0.2f || noise < -0.1f) && type == 2) { top = GRAVEL; filler = GRAVEL; }
+            else if (noise > 1.0f && type != 1) { top = STONE; filler = STONE; }
+        } else if (cls == Biomes.C_TAIGA && (type == 1 || type == 2)) {
+            top = GRASS; topData = 0; filler = DIRT;
+            if (noise > 1.75f) { top = DIRT; topData = 1; }
+            else if ((double) noise > -0.95) top = PODZOL;
+        } else if (cls == Biomes.C_SAVANNA_MUT) {
+            top = GRASS; topData = 0; filler = DIRT;
+            if (noise > 1.75f) { top = STONE; filler = STONE; }
+            else if (noise > -0.5f) { top = DIRT; topData = 1; }
+        }
+        surfaceDefault(b, c, rnd, x, z, noise, top, topData, filler);
+    }
+
+    /** Biome::buildSurfaceAtDefault + Biome::_placeBedrock */
+    private void surfaceDefault(int b, Chunk c, McRandom rnd, int x, int z, float noise, int top, int topData, int filler) {
+        int depth = (int) (3.0f + noise * 0.33333334f + rnd.nextFloat() * 0.25f);
+        int nb = (int) (rnd.nextU32() & 3) + 2;
+        for (int y = 0; y < nb; y++) c.set(x, y, z, BEDROCK);
+        boolean mesa = Biomes.CLASS[b] == Biomes.C_MESA;
+        final int t0 = top, d0 = topData, f0 = filler;   // the biome fields (set by the override)
+        int run = -1;
+        for (int y = 127; y > 0; y--) {
+            int id = c.get(x, y, z);
+            if (id == BEDROCK) return;
+            if (id == 0) { run = -1; continue; }
+            if (id != STONE) continue;
+            if (run == -1) {
+                if (depth <= 0) { top = 0; topData = 0; filler = STONE; }
+                else if (y >= 59 && y <= 64) { top = t0; topData = d0; filler = f0; }
+                if (y <= 62 && top == 0) {
+                    if (Biomes.TEMP[b] < 0.15f) top = ICE; else top = WATER;
+                    topData = 0;
+                }
+                if (y >= 62) {
+                    if (mesa) mesaColumn(c, x, y, z, depth);
+                    else c.set(x, y, z, top, topData);
+                    run = depth;
+                } else if (y < 56 - depth) {
+                    top = 0; filler = STONE;
+                    c.set(x, y, z, GRAVEL);
+                    run = depth;
+                } else {
+                    c.set(x, y, z, filler);
+                    run = depth;
+                }
+            } else if (run > 0) {
+                run--;
+                c.set(x, y, z, filler);
+                if (run == 0 && filler == SAND) {
+                    run = (int) (rnd.nextU32() & 3) + Math.max(0, y - 63);
+                    filler = SANDSTONE;
+                }
+            }
+        }
+    }
+
+    /** Mesa: simplified until MesaBiome::buildSurfaceAt is ported (red sand near sea level, clay bands above) */
+    private static final int[] BANDS = {0, 1, 0, 14, 0, 4, 0, -1, 0, 0, 12, 0, 1, -1, 0, 0};
+    private void mesaColumn(Chunk c, int x, int y, int z, int depth) {
+        if (y <= 66) { c.set(x, y, z, SAND, 1); return; }
+        int d = BANDS[y & 15];
+        if (d < 0) c.set(x, y, z, HARDENED_CLAY); else c.set(x, y, z, STAINED_CLAY, d);
     }
 
     // ------------------------------------------------------------------ caves: noise worms carved from every chunk in range
@@ -289,7 +371,8 @@ public final class Generator {
         }
     }
 
-    // ------------------------------------------------------------------ trees and plants
+
+    // ------------------------------------------------------------------ interim plants and trees (not the original yet)
     private int top(Chunk c, int x, int z) {
         for (int y = Chunk.H - 2; y > 0; y--) {
             int id = c.get(x, y, z);
@@ -300,39 +383,40 @@ public final class Generator {
 
     private void decorate(Chunk c, World w, Random r) {
         int bx = c.cx << 4, bz = c.cz << 4;
-        int b = c.biome[8 * 16 + 8];
+        int b = c.biome[8 * 16 + 8] & 255;
+        int cls = Biomes.CLASS[b];
         float tf = Biomes.TREES[b];
         int trees = (int) tf + (r.nextFloat() < tf - (int) tf ? 1 : 0);
-        if (r.nextInt(10) == 0 && b != Biomes.DESERT && b != Biomes.OCEAN && b != Biomes.DEEP_OCEAN) trees++;
         for (int t = 0; t < trees; t++) {
             int x = r.nextInt(16), z = r.nextInt(16), y = top(c, x, z);
             int g = c.get(x, y, z);
-            if (g != GRASS && g != DIRT) continue;
-            int tb = c.biome[z * 16 + x];
-            if (tb == Biomes.TAIGA || tb == Biomes.ICE) spruce(w, r, bx + x, y + 1, bz + z);
-            else if (tb == Biomes.BIRCH || (tb == Biomes.FOREST && r.nextInt(5) == 0)) oak(w, r, bx + x, y + 1, bz + z, 2, 5 + r.nextInt(2));
-            else if (tb == Biomes.JUNGLE) oak(w, r, bx + x, y + 1, bz + z, 3, 6 + r.nextInt(6));
+            if (g != GRASS && g != DIRT && g != PODZOL) continue;
+            int tb = c.biome[z * 16 + x] & 255, tc = Biomes.CLASS[tb];
+            if (tc == Biomes.C_TAIGA || tc == Biomes.C_SNOW) spruce(w, r, bx + x, y + 1, bz + z);
+            else if (tb == 27 || tb == 28 || tc == Biomes.C_FOREST_MUT || (tc == Biomes.C_FOREST && r.nextInt(5) == 0)) oak(w, r, bx + x, y + 1, bz + z, 2, 5 + r.nextInt(2));
+            else if (tc == Biomes.C_JUNGLE) oak(w, r, bx + x, y + 1, bz + z, 3, 6 + r.nextInt(6));
             else oak(w, r, bx + x, y + 1, bz + z, 0, 4 + r.nextInt(3));
         }
-        int grass = b == Biomes.PLAINS || b == Biomes.SAVANNA ? 60 : b == Biomes.JUNGLE ? 50 : b == Biomes.FOREST || b == Biomes.TAIGA || b == Biomes.BIRCH ? 20 : b == Biomes.SWAMP ? 15 : b == Biomes.HILLS ? 8 : 2;
+        int grass = cls == Biomes.C_PLAINS || cls == Biomes.C_SAVANNA || cls == Biomes.C_SAVANNA_MUT ? 30 : cls == Biomes.C_JUNGLE ? 40
+                : cls == Biomes.C_FOREST || cls == Biomes.C_TAIGA || cls == Biomes.C_FOREST_MUT ? 15 : cls == Biomes.C_SWAMP ? 10 : cls == Biomes.C_HILLS ? 5 : 2;
         for (int i = 0; i < grass; i++) {
             int x = r.nextInt(16), z = r.nextInt(16), y = top(c, x, z);
             if (c.get(x, y, z) != GRASS || c.get(x, y + 1, z) != 0) continue;
-            int tb = c.biome[z * 16 + x];
-            c.set(x, y + 1, z, TALLGRASS, tb == Biomes.TAIGA || tb == Biomes.JUNGLE ? (r.nextInt(3) == 0 ? 2 : 1) : 1);
+            int tc = Biomes.CLASS[c.biome[z * 16 + x] & 255];
+            c.set(x, y + 1, z, TALLGRASS, tc == Biomes.C_TAIGA || tc == Biomes.C_JUNGLE ? (r.nextInt(3) == 0 ? 2 : 1) : 1);
         }
-        int flowers = b == Biomes.PLAINS ? 6 : b == Biomes.FOREST || b == Biomes.BIRCH ? 4 : b == Biomes.SWAMP || b == Biomes.SAVANNA ? 2 : 1;
+        int flowers = cls == Biomes.C_PLAINS ? 4 : cls == Biomes.C_FOREST || cls == Biomes.C_FOREST_MUT ? 3 : cls == Biomes.C_SWAMP || cls == Biomes.C_SAVANNA ? 1 : 1;
         for (int i = 0; i < flowers; i++) {
             int x = r.nextInt(16), z = r.nextInt(16), y = top(c, x, z);
             if (c.get(x, y, z) != GRASS || c.get(x, y + 1, z) != 0) continue;
             if (r.nextInt(3) == 0) c.set(x, y + 1, z, FLOWER_Y);
-            else c.set(x, y + 1, z, FLOWER, b == Biomes.SWAMP ? 1 : r.nextInt(9) == 0 ? 2 + r.nextInt(7) : 0);
+            else c.set(x, y + 1, z, FLOWER, cls == Biomes.C_SWAMP ? 1 : r.nextInt(9) == 0 ? 2 + r.nextInt(7) : 0);
         }
-        if (b == Biomes.DESERT) {
+        if (cls == Biomes.C_DESERT || cls == Biomes.C_MESA) {
             for (int i = 0; i < 6; i++) {
                 int x = 1 + r.nextInt(14), z = 1 + r.nextInt(14), y = top(c, x, z);
                 if (c.get(x, y, z) != SAND) continue;
-                if (r.nextInt(3) == 0) {
+                if (cls == Biomes.C_DESERT && r.nextInt(3) == 0) {
                     if (c.get(x + 1, y + 1, z) == 0 && c.get(x - 1, y + 1, z) == 0 && c.get(x, y + 1, z + 1) == 0 && c.get(x, y + 1, z - 1) == 0) {
                         int hgt = 1 + r.nextInt(3);
                         for (int k = 1; k <= hgt; k++) c.set(x, y + k, z, CACTUS);
@@ -340,15 +424,23 @@ public final class Generator {
                 } else if (c.get(x, y + 1, z) == 0) c.set(x, y + 1, z, DEADBUSH);
             }
         }
-        // sugar cane next to water
         for (int i = 0; i < 10; i++) {
             int x = 1 + r.nextInt(14), z = 1 + r.nextInt(14), y = top(c, x, z);
             int g = c.get(x, y, z);
-            if ((g != GRASS && g != SAND && g != DIRT) || y != SEA - 1 + 0 && y != SEA) continue;
+            if ((g != GRASS && g != SAND && g != DIRT) || y != SEA - 1 && y != SEA) continue;
             if (c.get(x + 1, y, z) == WATER || c.get(x - 1, y, z) == WATER || c.get(x, y, z + 1) == WATER || c.get(x, y, z - 1) == WATER) {
                 int hgt = 1 + r.nextInt(3);
                 for (int k = 1; k <= hgt; k++) if (c.get(x, y + k, z) == 0) c.set(x, y + k, z, REEDS);
             }
+        }
+        // snow and ice on snowy biomes (the original freezes in postProcess)
+        for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
+            int tb = c.biome[z * 16 + x] & 255;
+            if (!Biomes.SNOWY[tb] && Biomes.TEMP[tb] >= 0.15f) continue;
+            int y = top(c, x, z);
+            int id = c.get(x, y, z);
+            if (id == WATER && y == SEA - 1) c.set(x, y, z, ICE);
+            else if (id != 0 && id != WATER && id != ICE && Blocks.solid[id] && Blocks.opaque[id] && c.get(x, y + 1, z) == 0) c.set(x, y + 1, z, SNOW_LAYER);
         }
     }
 
@@ -381,63 +473,4 @@ public final class Generator {
         for (int k = 0; k < h; k++) w.place(x, y + k, z, LOG, 1);
     }
 
-    // ------------------------------------------------------------------ noise
-    /** Ken Perlin's improved noise with a random offset, like the original's NoiseGeneratorImproved */
-    static final class Improved {
-        final int[] p = new int[512];
-        final double xo, yo, zo;
-        Improved(Random r) {
-            xo = r.nextDouble() * 256; yo = r.nextDouble() * 256; zo = r.nextDouble() * 256;
-            for (int i = 0; i < 256; i++) p[i] = i;
-            for (int i = 0; i < 256; i++) { int j = r.nextInt(256 - i) + i; int t = p[i]; p[i] = p[j]; p[j] = t; p[i + 256] = p[i]; }
-        }
-        double noise(double x, double y, double z) { return Noise.noise(p, x + xo, y + yo, z + zo); }
-    }
-
-    /** octaves: octave i samples at frequency 1/2^i and weighs 2^i (as the original: large raw values) */
-    static final class Octaves {
-        final Improved[] g;
-        Octaves(Random r, int n) { g = new Improved[n]; for (int i = 0; i < n; i++) g[i] = new Improved(r); }
-        double get(double x, double y, double z) {
-            double v = 0, f = 1;
-            for (Improved o : g) { v += o.noise(x * f, y * f, z * f) / f; f /= 2; }
-            return v;
-        }
-        double get2(double x, double z) {
-            double v = 0, f = 1;
-            for (Improved o : g) { v += o.noise(x * f, 10, z * f) / f; f /= 2; }
-            return v;
-        }
-    }
-
-    static final class Noise {
-        private final int[] p = new int[512];
-        Noise(long seed) {
-            int[] q = new int[256];
-            for (int i = 0; i < 256; i++) q[i] = i;
-            Random r = new Random(seed);
-            for (int i = 255; i > 0; i--) { int j = r.nextInt(i + 1); int t = q[i]; q[i] = q[j]; q[j] = t; }
-            for (int i = 0; i < 512; i++) p[i] = q[i & 255];
-        }
-        double fbm(double x, double z, int oct) {
-            double s = 0, a = 1, f = 1, norm = 0;
-            for (int i = 0; i < oct; i++) { s += a * noise(p, x * f, 0.5 + i * 3.17, z * f); norm += a; a *= 0.5; f *= 2; }
-            return s / norm;
-        }
-        static double fade(double t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-        static double grad(int h, double x, double y, double z) {
-            h &= 15; double u = h < 8 ? x : y, v = h < 4 ? y : h == 12 || h == 14 ? x : z;
-            return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
-        }
-        static double lerp(double t, double a, double b) { return a + t * (b - a); }
-        static double noise(int[] p, double x, double y, double z) {
-            double fx = Math.floor(x), fy = Math.floor(y), fz = Math.floor(z);
-            int X = (int) ((long) fx & 255), Y = (int) ((long) fy & 255), Z = (int) ((long) fz & 255);
-            x -= fx; y -= fy; z -= fz;
-            double u = fade(x), v = fade(y), w = fade(z);
-            int A = p[X] + Y, AA = p[A] + Z, AB = p[A + 1] + Z, B = p[X + 1] + Y, BA = p[B] + Z, BB = p[B + 1] + Z;
-            return lerp(w, lerp(v, lerp(u, grad(p[AA], x, y, z), grad(p[BA], x - 1, y, z)), lerp(u, grad(p[AB], x, y - 1, z), grad(p[BB], x - 1, y - 1, z))),
-                    lerp(v, lerp(u, grad(p[AA + 1], x, y, z - 1), grad(p[BA + 1], x - 1, y, z - 1)), lerp(u, grad(p[AB + 1], x, y - 1, z - 1), grad(p[BB + 1], x - 1, y - 1, z - 1))));
-        }
-    }
 }

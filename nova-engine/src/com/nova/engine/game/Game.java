@@ -280,7 +280,7 @@ public final class Game implements GLSurfaceView.Renderer {
         hud.text(VERSION, d * 6, d * 6, ts, 0xFF66F2E0);
         hud.text(fps + " fps  " + wr.drawnSections + " sec  " + world.chunks.size() + " ch", d * 6, d * 6 + ts * 1.3f, ts, 0xFFFFFFFF);
         hud.text(String.format(java.util.Locale.US, "%.1f %.1f %.1f", player.x, player.y, player.z), d * 6, d * 6 + ts * 2.6f, ts, 0xFFFFFFFF);
-        hud.text("textures: " + atlas.source + "   biome: " + com.nova.engine.world.Biomes.NAME[Math.max(0, world.biome((int) Math.floor(player.x), (int) Math.floor(player.z)))], d * 6, d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);
+        hud.text("textures: " + atlas.source + "   biome: " + String.valueOf(com.nova.engine.world.Biomes.NAME[world.biome((int) Math.floor(player.x), (int) Math.floor(player.z))]), d * 6, d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);
         if (ray.hit) hud.text(Blocks.name[world.get(ray.x, ray.y, ray.z)] + "", width / 2f + d * 12, height / 2f + d * 6, ts, 0xFFFFFFFF);
         if (error != null) hud.text(error, d * 6, height / 2f, ts, 0xFFFF6060);
         hud.end();

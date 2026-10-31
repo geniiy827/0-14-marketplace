@@ -72,7 +72,7 @@ public final class Mesher {
                 if (id == 0 || !Blocks.exists[id]) continue;
                 int k = Blocks.kind[id];
                 data = c.data[Chunk.idx(x, wy, z)] & 15;
-                biome = c.biome[z * 16 + x];
+                biome = c.biome[z * 16 + x] & 255;
                 if (k == Blocks.CROSS) { cross(id, x, y, z); continue; }
                 for (int f = 0; f < 6; f++) {
                     int[] n = NORMAL[f];

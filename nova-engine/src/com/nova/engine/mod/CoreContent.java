@@ -57,6 +57,12 @@ public final class CoreContent implements NovaMod {
         r.block(98, "stonebrick").tex(r.tex("stonebrick:0"));
         r.block(103, "melon").tex(r.tex("melon:1"), r.tex("melon:1"), r.tex("melon:0"));
         r.block(155, "quartz_block").tex(r.tex("quartz_block:0"));
+        // used by the 0.14.3 generator
+        r.block(110, "mycelium").tex(r.tex("mycelium:1"), r.tex("dirt"), r.tex("mycelium:0"));
+        Blocks.Def sc = r.block(159, "stained_hardened_clay").tex(r.tex("stained_clay:0"));
+        for (int d = 1; d < 16; d++) sc.data(d, r.tex("stained_clay:" + d));
+        r.block(172, "hardened_clay").tex(r.tex("hardened_clay"));
+        r.block(243, "podzol").tex(r.tex("dirt:1"), r.tex("dirt"), r.tex("dirt"));
     }
 
     /** hotbar of the beta */
