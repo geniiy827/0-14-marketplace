@@ -73,6 +73,32 @@ public final class CoreContent implements NovaMod {
         Blocks.Def sc = r.block(159, "stained_hardened_clay").tex(r.tex("stained_clay:0"));
         for (int d = 1; d < 16; d++) sc.data(d, r.tex("stained_clay:" + d));
         r.block(172, "hardened_clay").tex(r.tex("hardened_clay"));
+        r.block(161, "leaves2").tex(r.tex("leaves2:0")).tint(F).cutout().selfFaces().data(1, r.tex("leaves2:1"));
+        r.block(162, "log2").tex(r.tex("log2:1"), r.tex("log2:1"), r.tex("log2:0"))
+                .data(1, r.tex("log2:3"), r.tex("log2:3"), r.tex("log2:2"));
+        // double plants: lower half data = type, upper half 8 | type (grass and fern tinted in the mesher)
+        Blocks.Def dp = r.block(175, "double_plant").tex(r.tex("double_plant_bottom:0")).tint(G).cross();
+        for (int d = 0; d < 6; d++) { dp.data(d, r.tex("double_plant_bottom:" + d)); dp.data(8 | d, r.tex("double_plant_top:" + d)); }
+        // huge mushrooms: data 1..9 cap on top and the outer sides, 0 pores, 10 stem, 14 all cap, 15 all stem
+        for (int id = 99; id <= 100; id++) {
+            int cap = r.tex("mushroom_block:" + (id - 99)), pores = r.tex("mushroom_block:2"), stem = r.tex("mushroom_block:3");
+            Blocks.Def m = r.block(id, id == 99 ? "brown_mushroom_block" : "red_mushroom_block").tex(pores);
+            for (int d = 0; d < 16; d++) {
+                if (d == 10) { m.data(d, pores, pores, stem); continue; }
+                if (d == 14) { m.data(d, cap); continue; }
+                if (d == 15) { m.data(d, stem); continue; }
+                m.data(d, d >= 1 && d <= 9 ? cap : pores, pores, pores);
+                if (d >= 1 && d <= 9) {
+                    if (d % 3 == 1) m.dataFace(d, 4, cap);
+                    if (d % 3 == 0) m.dataFace(d, 5, cap);
+                    if (d <= 3) m.dataFace(d, 2, cap);
+                    if (d >= 7) m.dataFace(d, 3, cap);
+                }
+            }
+        }
+        r.block(44, "stone_slab").tex(r.tex("stone_slab:0"), r.tex("stone_slab:0"), r.tex("stone_slab:1")).height(0.5f)
+                .data(1, r.tex("sandstone:0"), r.tex("sandstone:4"), r.tex("sandstone:3"));
+        r.block(129, "emerald_ore").tex(r.tex("emerald_ore"));
         r.block(243, "podzol").tex(r.tex("dirt:1"), r.tex("dirt"), r.tex("dirt:2"));
     }
 

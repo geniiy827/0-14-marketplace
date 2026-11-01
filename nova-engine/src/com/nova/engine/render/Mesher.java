@@ -35,6 +35,7 @@ public final class Mesher {
     private int tintOf(int id, int f) { return tintOfValue(Blocks.tint[id][f], id); }
 
     private int tintOfValue(int t, int id) {
+        if (t == Blocks.TINT_GRASS && id == 175 && (data & 7) != 2 && (data & 7) != 3) return 0xFFFFFF;
         if (t == Blocks.TINT_GRASS) return com.nova.engine.world.Biomes.GRASS[biome];
         if (t == Blocks.TINT_FOLIAGE) {
             if (id == 18 && data == 1) return 0x619961;        // spruce

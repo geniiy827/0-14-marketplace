@@ -78,16 +78,21 @@ public final class Decorator {
         r = new McRandom(seed ^ (cx * a + cz * b));
         ox = cx << 4; oz = cz << 4;
         int biome = w.rawBiome(ox + 15, oz + 15);
+        flowerN = FLOWERS[biome]; grassN = GRASSN[biome];
+        preDecorate(biome);
         decorateBiome(biome);
+        postDecorate(biome);
     }
 
     // ------------------------------------------------------------------ BiomeDecorator::decorate
+    private int flowerN, grassN;
+
     private void decorateBiome(int bi) {
         ores();
         for (int i = 0; i < SAND_N[bi]; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); disk(x, topSolid(x, z), z, SAND, 7, 2); }
         for (int i = 0; i < CLAY_N[bi]; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); clay(x, topSolid(x, z), z); }
         for (int i = 0; i < GRAVEL_N[bi]; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); disk(x, topSolid(x, z), z, GRAVEL, 6, 2); }
-        int grassCount = GRASSN[bi];
+        int grassCount = grassN;
         float t = TREES[bi];
         int trees = 0;
         if (t > 0) {
@@ -107,10 +112,9 @@ public final class Decorator {
             int x = ox + 1 + (int) (r.nextU32() % 14), z = oz + 1 + (int) (r.nextU32() % 14);
             int y = heightmap(x, z);
             tree(kind, x, y, z);
-            tallGrass(x, y, z, 1, 23, 3);
         }
-        for (int i = 0; i < BIGMUSH[bi]; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); topSolid(x, z); }   // approx: huge mushrooms not yet
-        for (int i = 0; i < FLOWERS[bi]; i++) {
+        for (int i = 0; i < BIGMUSH[bi]; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); hugeMushroom(x, heightmap(x, z), z, -1); }
+        for (int i = 0; i < flowerN; i++) {
             int x = ox + r.nextInt(16), z = oz + r.nextInt(16);
             int h = heightmap(x, z) + 32;
             int y = h == 0 ? 0 : r.nextInt(h);
@@ -121,7 +125,7 @@ public final class Decorator {
             int x = r.nextInt(16), z = r.nextInt(16);
             int y = randomHeight(x, z);
             int[] g = grassType(bi);
-            tallGrass(ox + x, y, oz + z, g[1], 128, 8);
+            tallGrass(ox + x, y, oz + z, g[1], 90, 8);     // TallGrassFeature::place(): 90 tries, spread 8
         }
         for (int i = 0; i < DEADBUSH_N[bi]; i++) { int x = r.nextInt(16), z = r.nextInt(16); deadBush(ox + x, randomHeight(x, z), oz + z); }
         for (int i = 0; i < LILY[bi]; i++) {
@@ -228,24 +232,28 @@ public final class Decorator {
 
     // ------------------------------------------------------------------ trees
     static final int T_OAK = 0, T_FANCY = 1, T_BIRCH = 2, T_SPRUCE = 3, T_PINE = 4, T_JUNGLE = 5, T_SHRUB = 6,
-            T_SWAMP = 7, T_ACACIA = 8, T_MEGA_SPRUCE = 9, T_TALL_BIRCH = 10;
+            T_SWAMP = 7, T_ACACIA = 8, T_MEGA_SPRUCE = 9, T_TALL_BIRCH = 10,
+            T_MEGA_PINE = 11, T_MEGA_JUNGLE = 12, T_CANOPY = 13;
 
     /** Biome::getTreeFeature (the random choices of each biome class) */
     private int treeFeature(int b) {
         int c = Biomes.CLASS[b];
         switch (c) {
             case Biomes.C_FOREST:
+                if ((b == 29 || b == 157) && r.nextInt(3) > 0) return T_CANOPY;
                 if (b == 27 || b == 28) return T_BIRCH;
                 if (r.nextInt(5) == 0) return T_BIRCH;
                 return r.nextInt(10) == 0 ? T_FANCY : T_OAK;
             case Biomes.C_FOREST_MUT: return T_TALL_BIRCH;
             case Biomes.C_TAIGA:
-                if (Biomes.TYPE[b] != 0 && r.nextInt(3) == 0) return T_MEGA_SPRUCE;
+                if ((b == 32 || b == 33 || b == 160 || b == 161) && r.nextInt(3) == 0)
+                    return (b == 160 || b == 161 || r.nextInt(13) == 0) ? T_MEGA_SPRUCE : T_MEGA_PINE;
                 return r.nextInt(3) == 0 ? T_PINE : T_SPRUCE;
             case Biomes.C_SNOW: return T_SPRUCE;
             case Biomes.C_JUNGLE:
                 if (r.nextInt(10) == 0) return T_FANCY;
                 if (r.nextInt(2) == 0) return T_SHRUB;
+                if (b != 23 && b != 151 && r.nextInt(3) == 0) return T_MEGA_JUNGLE;
                 return T_JUNGLE;
             case Biomes.C_SWAMP: return T_SWAMP;
             case Biomes.C_SAVANNA: case Biomes.C_SAVANNA_MUT: return r.nextInt(5) > 0 ? T_ACACIA : T_OAK;
@@ -258,14 +266,19 @@ public final class Decorator {
     private void tree(int kind, int x, int y, int z) {
         switch (kind) {
             case T_OAK: oak(x, y, z, (int) (r.nextU32() % 3) + 5, 0); break;
-            case T_FANCY: oak(x, y, z, (int) (r.nextU32() % 3) + 5, 0); break;            // approx (big oak)
-            case T_BIRCH: oak(x, y, z, r.nextInt(3) + 5, 2); break;                         // approx
-            case T_TALL_BIRCH: oak(x, y, z, r.nextInt(3) + 5 + r.nextInt(7), 2); break;      // approx
-            case T_JUNGLE: oak(x, y, z, r.nextInt(7) + 4, 3); break;                       // approx
-            case T_SWAMP: case T_ACACIA: oak(x, y, z, r.nextInt(3) + 5, 0); break;          // approx
+            case T_FANCY: new BigTree().place(x, y, z); break;
+            case T_BIRCH: oak(x, y, z, r.nextInt(3) + 5, 2); break;
+            case T_TALL_BIRCH: { int h = r.nextInt(3) + 5; h += r.nextInt(7); oak(x, y, z, h, 2); break; }
+            case T_JUNGLE: { int base = 4 + r.nextInt(7); oak(x, y, z, r.nextInt(3) + base, 3); break; }
+            case T_SWAMP: swamp(x, y, z); break;
+            case T_ACACIA: acacia(x, y, z); break;
             case T_SHRUB: shrub(x, y, z); break;
-            case T_SPRUCE: case T_MEGA_SPRUCE: spruce(x, y, z); break;
+            case T_SPRUCE: spruce(x, y, z); break;
             case T_PINE: pine(x, y, z); break;
+            case T_MEGA_SPRUCE: megaPine(x, y, z, false); break;
+            case T_MEGA_PINE: megaPine(x, y, z, true); break;
+            case T_MEGA_JUNGLE: megaJungle(x, y, z); break;
+            case T_CANOPY: canopy(x, y, z); break;
         }
     }
 
@@ -315,7 +328,7 @@ public final class Decorator {
         }
     }
 
-    /** approx (SpruceFeature) */
+    /** SpruceFeature (TaigaTree2) */
     private void spruce(int x, int y, int z) {
         int h = r.nextInt(4) + 6, top = 1 + r.nextInt(2), lh = h - top, maxR = 2 + r.nextInt(2);
         if (!prepare(x, y, z, h)) return;
@@ -330,7 +343,7 @@ public final class Decorator {
         for (int i = 0; i < th; i++) { int id = get(x, y + i, z); if (id == AIR || id == LEAVES) set(x, y + i, z, LOG, 1); }
     }
 
-    /** approx (PineFeature) */
+    /** PineFeature (TaigaTree1) */
     private void pine(int x, int y, int z) {
         int h = r.nextInt(5) + 7, bare = h - r.nextInt(2) - 3, lh = h - bare, maxR = 1 + r.nextInt(lh + 1);
         if (!prepare(x, y, z, h)) return;
@@ -343,7 +356,7 @@ public final class Decorator {
         for (int i = 0; i < h - 1; i++) { int id = get(x, y + i, z); if (id == AIR || id == LEAVES) set(x, y + i, z, LOG, 1); }
     }
 
-    /** approx (GroundBushFeature) */
+    /** GroundBushFeature */
     private void shrub(int x, int y, int z) {
         if (!soil(get(x, y - 1, z))) return;
         set(x, y, z, LOG, 3);
@@ -357,13 +370,22 @@ public final class Decorator {
     // ------------------------------------------------------------------ plants (approx)
     private int[] flowerType(int b, int x, int y, int z) {
         if (Biomes.CLASS[b] == Biomes.C_SWAMP) return new int[]{RED_FLOWER, 1};
-        if (r.nextInt(3) > 0) return new int[]{RED_FLOWER, 0};
-        return new int[]{YELLOW_FLOWER, 0};
+        if (b == 1 || b == 129) {                                   // PlainsBiome: tulips where the info noise < -0.8
+            if (infoNoise(x, z) < -0.8f) return new int[]{RED_FLOWER, new int[]{5, 4, 7, 6}[r.nextInt(4)]};
+            if (r.nextInt(3) > 0) return new int[]{RED_FLOWER, new int[]{0, 3, 8}[r.nextInt(3)]};
+            return new int[]{YELLOW_FLOWER, 0};
+        }
+        if (b == 132) {                                             // flower forest
+            int k = r.nextInt(9); return k == 0 ? new int[]{YELLOW_FLOWER, 0} : new int[]{RED_FLOWER, k == 1 ? 0 : k};
+        }
+        return r.nextInt(3) > 0 ? new int[]{YELLOW_FLOWER, 0} : new int[]{RED_FLOWER, 0};
     }
 
+    /** getGrassFeature: taiga 4/5 fern, jungle 1/4 fern, else grass (tallgrass data 1 grass, 2 fern) */
     private int[] grassType(int b) {
         int c = Biomes.CLASS[b];
-        if (c == Biomes.C_TAIGA || c == Biomes.C_JUNGLE) return new int[]{TALLGRASS, r.nextInt(4) == 0 ? 1 : 2};
+        if (c == Biomes.C_TAIGA) return new int[]{TALLGRASS, r.nextInt(5) > 0 ? 2 : 1};
+        if (c == Biomes.C_JUNGLE) return new int[]{TALLGRASS, r.nextInt(4) == 0 ? 2 : 1};
         return new int[]{TALLGRASS, 1};
     }
 
@@ -471,6 +493,429 @@ public final class Decorator {
                 int b = get(xx, yy, zz);
                 if (b == DIRT || b == CLAY) set(xx, yy, zz, CLAY, 0);
             }
+        }
+    }
+
+    // ================================================================== biome-specific decoration
+    static final int LOG2 = 162, LEAVES2 = 161, DOUBLE_PLANT = 175, MOSSY = 48, SANDSTONE = 24, SLAB = 44, MELON = 103,
+            EMERALD = 129, HUGE_BROWN = 99, HUGE_RED = 100;
+    private static final int[][] DIRS = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};   // north, east, south, west
+    private Noises.Simplex info;
+
+    /** Biome::BIOME_INFO_NOISE (PerlinSimplexNoise(Random(2345), 1)).getValue */
+    private float infoNoise(int x, int z) {
+        if (info == null) info = new Noises.Simplex(new McRandom(2345));
+        return info.value((x + 8) / 200f, (z + 8) / 200f);
+    }
+
+    private int randHeight32(int x, int z) { int h = heightmap(x, z) + 32; return (int) (r.nextU32() % h); }
+
+    /** what the <Biome>::decorate overrides do before BiomeDecorator::decorate */
+    private void preDecorate(int b) {
+        if (b == 1 || b == 129) {                                         // PlainsBiome
+            if (infoNoise(ox, oz) < -0.8f) { flowerN = 15; grassN = 5; }
+            else {
+                flowerN = 4; grassN = 10;
+                for (int i = 0; i < 7; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); doublePlant(x, randHeight32(x, z), z, 2); }
+            }
+            if (b == 129) for (int i = 0; i < 10; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); doublePlant(x, randHeight32(x, z), z, 0); }
+        } else if (Biomes.CLASS[b] == Biomes.C_FOREST || Biomes.CLASS[b] == Biomes.C_FOREST_MUT) {   // ForestBiome
+            if (b == 29 || b == 157) {
+                for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++) {
+                    int x = ox + i * 4 + 1 + r.nextInt(3), z = oz + j * 4 + 1 + r.nextInt(3);
+                    int y = heightmap(x, z);
+                    if (r.nextInt(20) == 0) hugeMushroom(x, y, z, -1);
+                    else tree(treeFeature(b), x, y, z);
+                }
+            }
+            int n = r.nextInt(5) - 3;
+            if (b == 132) n += 2;
+            for (int i = 0; i < n; i++) {
+                int k = r.nextInt(3), type = k == 0 ? 1 : k == 1 ? 4 : 5;
+                for (int t = 0; t < 5; t++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); if (doublePlant(x, randHeight32(x, z), z, type)) break; }
+            }
+        } else if (Biomes.CLASS[b] == Biomes.C_TAIGA) {                  // TaigaBiome
+            if (b == 32 || b == 33 || b == 160 || b == 161) {
+                int n = r.nextInt(3);
+                for (int i = 0; i < n; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); boulder(x, heightmap(x, z), z); }
+            }
+            for (int i = 0; i < 7; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); doublePlant(x, randHeight32(x, z), z, 3); }
+        } else if (b == 35 || b == 36) {                                  // SavannaBiome (not mutated)
+            for (int i = 0; i < 7; i++) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); doublePlant(x, randHeight32(x, z), z, 2); }
+        }
+    }
+
+    /** what the <Biome>::decorate overrides do after BiomeDecorator::decorate */
+    private void postDecorate(int b) {
+        if (b == 2 || b == 17 || b == 130) {                              // DesertBiome: well
+            if (r.nextInt(1000) == 0) { int x = ox + r.nextInt(16), z = oz + r.nextInt(16); well(x, heightmap(x, z) + 1, z); }
+        } else if (Biomes.CLASS[b] == Biomes.C_JUNGLE) {                 // JungleBiome: melons
+            int x = ox + r.nextInt(16), z = oz + r.nextInt(16);
+            int h = heightmap(x, z) * 2, y = h == 0 ? 0 : r.nextInt(h);
+            for (int i = 0; i < 64; i++) {
+                int xx = x + r.nextInt(8) - r.nextInt(8), yy = y + r.nextInt(4) - r.nextInt(4), zz = z + r.nextInt(8) - r.nextInt(8);
+                if (yy > 0 && yy < 127 && air(xx, yy, zz) && get(xx, yy - 1, zz) == GRASS) set(xx, yy, zz, MELON, 0);
+            }
+        } else if (b == 3 || b == 34 || b == 131 || b == 162 || b == 20) { // ExtremeHillsBiome: emerald
+            int n = 3 + r.nextInt(6);
+            for (int i = 0; i < n; i++) {
+                int x = ox + r.nextInt(16), y = r.nextInt(28) + 4, z = oz + r.nextInt(16);
+                if (get(x, y, z) == STONE) set(x, y, z, EMERALD, 0);
+            }
+        }
+    }
+
+    // ================================================================== plants
+    /** DoublePlantFeature::place: 64 tries, the lower half gets the type, the upper half 8 | type */
+    private boolean doublePlant(int x, int y, int z, int type) {
+        boolean placed = false;
+        for (int i = 0; i < 64; i++) {
+            int xx = x + r.nextInt(8) - r.nextInt(8), yy = y + r.nextInt(4) - r.nextInt(4), zz = z + r.nextInt(8) - r.nextInt(8);
+            if (yy > 0 && yy < 126 && air(xx, yy, zz) && air(xx, yy + 1, zz) && grassSoil(get(xx, yy - 1, zz))) {
+                set(xx, yy, zz, DOUBLE_PLANT, type); set(xx, yy + 1, zz, DOUBLE_PLANT, 8 | type); placed = true;
+            }
+        }
+        return placed;
+    }
+
+    /** BlockBlob (mossy boulders of mega taiga), radius 0 */
+    private void boulder(int x, int y, int z) {
+        while (y > 3) {
+            int b = get(x, y - 1, z);
+            if (b != AIR && (b == GRASS || b == DIRT || b == STONE)) break;
+            y--;
+        }
+        if (y <= 3) return;
+        int rad = 0;
+        for (int i = 0; i < 3; i++) {
+            int j = rad + r.nextInt(2), k = rad + r.nextInt(2), l = rad + r.nextInt(2);
+            float f = (j + k + l) * 0.333f + 0.5f;
+            for (int xx = x - j; xx <= x + j; xx++) for (int yy = y - k; yy <= y + k; yy++) for (int zz = z - l; zz <= z + l; zz++) {
+                int dx = xx - x, dy = yy - y, dz = zz - z;
+                if (dx * dx + dy * dy + dz * dz <= f * f) set(xx, yy, zz, MOSSY, 0);
+            }
+            x += -(rad + 1) + r.nextInt(2 + rad * 2);
+            y -= r.nextInt(2);
+            z += -(rad + 1) + r.nextInt(2 + rad * 2);
+        }
+    }
+
+    /** DesertWell */
+    private void well(int x, int y, int z) {
+        while (y > 2 && air(x, y, z)) y--;
+        if (get(x, y, z) != SAND) return;
+        for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) if (air(x + i, y - 1, z + j) && air(x + i, y - 2, z + j)) return;
+        for (int k = -1; k <= 0; k++) for (int l = -2; l <= 2; l++) for (int m = -2; m <= 2; m++) set(x + l, y + k, z + m, SANDSTONE, 0);
+        set(x, y, z, WATER, 0); set(x - 1, y, z, WATER, 0); set(x + 1, y, z, WATER, 0); set(x, y, z - 1, WATER, 0); set(x, y, z + 1, WATER, 0);
+        for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) if (i == -2 || i == 2 || j == -2 || j == 2) set(x + i, y + 1, z + j, SANDSTONE, 0);
+        set(x + 2, y + 1, z, SLAB, 1); set(x - 2, y + 1, z, SLAB, 1); set(x, y + 1, z + 2, SLAB, 1); set(x, y + 1, z - 2, SLAB, 1);
+        for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) set(x + i, y + 4, z + j, i == 0 && j == 0 ? SANDSTONE : SLAB, i == 0 && j == 0 ? 0 : 1);
+        for (int k = 1; k <= 3; k++) { set(x - 1, y + k, z - 1, SANDSTONE, 0); set(x - 1, y + k, z + 1, SANDSTONE, 0); set(x + 1, y + k, z - 1, SANDSTONE, 0); set(x + 1, y + k, z + 1, SANDSTONE, 0); }
+    }
+
+    /** HugeMushroomFeature: type -1 random, 0 brown, 1 red */
+    private void hugeMushroom(int x, int y, int z, int type) {
+        int block = type < 0 ? (r.nextInt(2) == 0 ? HUGE_BROWN : HUGE_RED) : (type == 0 ? HUGE_BROWN : HUGE_RED);
+        int h = r.nextInt(3) + 4;
+        if (r.nextInt(12) == 0) h *= 2;
+        if (y < 1 || y + h + 1 >= 128) return;
+        int below = get(x, y - 1, z);
+        if (below != DIRT && below != GRASS && below != MYCELIUM) return;
+        boolean brown = block == HUGE_BROWN;
+        int top = y + h, start = brown ? top : top - 3;
+        for (int yy = start; yy <= top; yy++) {
+            int rad = 1;
+            if (yy < top) rad++;
+            if (brown) rad = 3;
+            int x0 = x - rad, x1 = x + rad, z0 = z - rad, z1 = z + rad;
+            for (int xx = x0; xx <= x1; xx++) for (int zz = z0; zz <= z1; zz++) {
+                int v = 5;
+                if (xx == x0) v--; else if (xx == x1) v++;
+                if (zz == z0) v -= 3; else if (zz == z1) v += 3;
+                if (brown || yy < top) {
+                    if ((xx == x0 || xx == x1) && (zz == z0 || zz == z1)) continue;
+                    if (xx == x - (rad - 1) && zz == z0) v = 1;
+                    if (xx == x0 && zz == z - (rad - 1)) v = 1;
+                    if (xx == x + (rad - 1) && zz == z0) v = 3;
+                    if (xx == x1 && zz == z - (rad - 1)) v = 3;
+                    if (xx == x - (rad - 1) && zz == z1) v = 7;
+                    if (xx == x0 && zz == z + (rad - 1)) v = 7;
+                    if (xx == x + (rad - 1) && zz == z1) v = 9;
+                    if (xx == x1 && zz == z + (rad - 1)) v = 9;
+                }
+                if (v == 5 && yy < top) v = 0;
+                if ((v != 0 || y >= top - 1) && !Blocks.opaque[get(xx, yy, zz)]) set(xx, yy, zz, block, v);
+            }
+        }
+        for (int i = 0; i < h; i++) if (!Blocks.opaque[get(x, y + i, z)]) set(x, y + i, z, block, 10);
+    }
+
+    // ================================================================== trees
+    private boolean replaceable(int id) { return id == AIR || id == LEAVES || id == LEAVES2 || id == GRASS || id == DIRT || id == LOG || id == LOG2 || id == 6 || id == 106; }
+    private void log(int x, int y, int z, int id, int data) { int b = get(x, y, z); if (b == AIR || b == LEAVES || b == LEAVES2 || b == 106) set(x, y, z, id, data); }
+    private void leafAny(int x, int y, int z, int id, int data) { int b = get(x, y, z); if (b == AIR || b == 106) set(x, y, z, id, data); }
+
+    private boolean roomFor(int x, int y, int z, int h, int r0, int r1, int rTop) {
+        if (y < 1 || y + h + 1 > 127) return false;
+        for (int yy = y; yy <= y + 1 + h; yy++) {
+            int rr = yy == y ? r0 : r1;
+            if (yy >= y + 1 + h - 2) rr = rTop;
+            for (int xx = x - rr; xx <= x + rr; xx++) for (int zz = z - rr; zz <= z + rr; zz++) if (!free(get(xx, yy, zz))) return false;
+        }
+        return true;
+    }
+
+    /** SwampTreeFeature */
+    private void swamp(int x, int y, int z) {
+        int h = r.nextInt(4) + 5;
+        while (y > 1 && (get(x, y - 1, z) == WATER || get(x, y - 1, z) == FLOWING_WATER)) y--;
+        int below = get(x, y - 1, z);
+        if (below != GRASS && below != DIRT) return;
+        if (y < 1 || y + h + 1 > 127) return;
+        set(x, y - 1, z, DIRT, 0);
+        for (int yy = y - 3 + h; yy <= y + h; yy++) {
+            int dy = yy - (y + h), rad = 2 - dy / 2;
+            for (int xx = x - rad; xx <= x + rad; xx++) for (int zz = z - rad; zz <= z + rad; zz++) {
+                if (Math.abs(xx - x) == rad && Math.abs(zz - z) == rad && (r.nextInt(2) == 0 || dy == 0)) continue;
+                if (!Blocks.opaque[get(xx, yy, zz)]) leafAny(xx, yy, zz, LEAVES, 0);
+            }
+        }
+        for (int i = 0; i < h; i++) {
+            int b = get(x, y + i, z);
+            if (b == AIR || b == LEAVES || b == WATER || b == FLOWING_WATER) set(x, y + i, z, LOG, 0);
+        }
+    }
+
+    /** SavannaTreeFeature (acacia) */
+    private void acacia(int x, int y, int z) {
+        int h = r.nextInt(3) + r.nextInt(3) + 5;
+        if (!roomFor(x, y, z, h, 0, 1, 2)) return;
+        int below = get(x, y - 1, z);
+        if ((below != GRASS && below != DIRT) || y >= 127 - h - 1) return;
+        set(x, y - 1, z, DIRT, 0);
+        int[] f = DIRS[r.nextInt(4)];
+        int bend = h - r.nextInt(4) - 1, len = 3 - r.nextInt(3);
+        int tx = x, tz = z, top = 0;
+        for (int i = 0; i < h; i++) {
+            int yy = y + i;
+            if (i >= bend && len > 0) { tx += f[0]; tz += f[1]; len--; }
+            int b = get(tx, yy, tz);
+            if (b == AIR || b == LEAVES || b == LEAVES2) { set(tx, yy, tz, LOG2, 0); top = yy; }
+        }
+        for (int i = -3; i <= 3; i++) for (int j = -3; j <= 3; j++) if (Math.abs(i) != 3 || Math.abs(j) != 3) leafAny(tx + i, top, tz + j, LEAVES2, 0);
+        for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) leafAny(tx + i, top + 1, tz + j, LEAVES2, 0);
+        leafAny(tx + 2, top + 1, tz, LEAVES2, 0); leafAny(tx - 2, top + 1, tz, LEAVES2, 0);
+        leafAny(tx, top + 1, tz + 2, LEAVES2, 0); leafAny(tx, top + 1, tz - 2, LEAVES2, 0);
+        tx = x; tz = z;
+        int[] f2 = DIRS[r.nextInt(4)];
+        if (f2 != f) {
+            int start = bend - r.nextInt(2) - 1, n = 1 + r.nextInt(3);
+            top = 0;
+            for (int i = start; i < h && n > 0; i++, n--) {
+                if (i < 1) continue;
+                int yy = y + i;
+                tx += f2[0]; tz += f2[1];
+                int b = get(tx, yy, tz);
+                if (b == AIR || b == LEAVES || b == LEAVES2) { set(tx, yy, tz, LOG2, 0); top = yy; }
+            }
+            if (top > 0) {
+                for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) if (Math.abs(i) != 2 || Math.abs(j) != 2) leafAny(tx + i, top, tz + j, LEAVES2, 0);
+                for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) leafAny(tx + i, top + 1, tz + j, LEAVES2, 0);
+            }
+        }
+    }
+
+    /** RoofTreeFeature (dark oak) */
+    private void canopy(int x, int y, int z) {
+        int h = r.nextInt(3) + r.nextInt(2) + 6;
+        if (y < 1 || y + h + 1 >= 127) return;
+        int below = get(x, y - 1, z);
+        if (below != GRASS && below != DIRT) return;
+        for (int i = -1; i <= h + 1; i++) {
+            int rr = i == -1 || i >= h - 1 ? 2 : 1;
+            for (int a = -rr; a <= rr + 1; a++) for (int c = -rr; c <= rr + 1; c++) if (i >= 0 && !free(get(x + a, y + i, z + c))) return;
+        }
+        set(x, y - 1, z, DIRT, 0); set(x + 1, y - 1, z, DIRT, 0); set(x, y - 1, z + 1, DIRT, 0); set(x + 1, y - 1, z + 1, DIRT, 0);
+        int[] f = DIRS[r.nextInt(4)];
+        int bend = h - r.nextInt(4), len = 2 - r.nextInt(3);
+        int tx = x, tz = z, ty = y + h - 1;
+        for (int i = 0; i < h; i++) {
+            if (i >= bend && len > 0) { tx += f[0]; tz += f[1]; len--; }
+            int yy = y + i;
+            int b = get(tx, yy, tz);
+            if (b == AIR || b == LEAVES || b == LEAVES2) {
+                log(tx, yy, tz, LOG2, 1); log(tx + 1, yy, tz, LOG2, 1); log(tx, yy, tz + 1, LOG2, 1); log(tx + 1, yy, tz + 1, LOG2, 1);
+            }
+        }
+        for (int i = -2; i <= 0; i++) for (int j = -2; j <= 0; j++) {
+            int k = -1;
+            leafAny(tx + i, ty + k, tz + j, LEAVES2, 1); leafAny(1 + tx - i, ty + k, tz + j, LEAVES2, 1);
+            leafAny(tx + i, ty + k, 1 + tz - j, LEAVES2, 1); leafAny(1 + tx - i, ty + k, 1 + tz - j, LEAVES2, 1);
+            if ((i > -2 || j > -1) && (i != -1 || j != -2)) {
+                k = 1;
+                leafAny(tx + i, ty + k, tz + j, LEAVES2, 1); leafAny(1 + tx - i, ty + k, tz + j, LEAVES2, 1);
+                leafAny(tx + i, ty + k, 1 + tz - j, LEAVES2, 1); leafAny(1 + tx - i, ty + k, 1 + tz - j, LEAVES2, 1);
+            }
+        }
+        if (r.nextInt(2) == 0) {
+            leafAny(tx, ty + 2, tz, LEAVES2, 1); leafAny(tx + 1, ty + 2, tz, LEAVES2, 1);
+            leafAny(tx + 1, ty + 2, tz + 1, LEAVES2, 1); leafAny(tx, ty + 2, tz + 1, LEAVES2, 1);
+        }
+        for (int i = -3; i <= 4; i++) for (int j = -3; j <= 4; j++)
+            if ((i != -3 || j != -3) && (i != -3 || j != 4) && (i != 4 || j != -3) && (i != 4 || j != 4) && (Math.abs(i) < 3 || Math.abs(j) < 3))
+                leafAny(tx + i, ty, tz + j, LEAVES2, 1);
+        for (int i = -1; i <= 2; i++) for (int j = -1; j <= 2; j++) {
+            if ((i < 0 || i > 1 || j < 0 || j > 1) && r.nextInt(3) <= 0) {
+                int n = r.nextInt(3) + 2;
+                for (int k = 0; k < n; k++) log(x + i, ty - k - 1, z + j, LOG2, 1);
+                for (int a = -1; a <= 1; a++) for (int c = -1; c <= 1; c++) leafAny(tx + i + a, ty, tz + j + c, LEAVES2, 1);
+                for (int a = -2; a <= 2; a++) for (int c = -2; c <= 2; c++) if (Math.abs(a) != 2 || Math.abs(c) != 2) leafAny(tx + i + a, ty - 1, tz + j + c, LEAVES2, 1);
+            }
+        }
+    }
+
+    // ---- mega trees (MegaTreeFeature base: height = base + r%3 + r%extra, 2x2 trunk)
+    private boolean megaRoom(int x, int y, int z, int h) {
+        if (y < 1 || y + h + 1 > 127) return false;
+        for (int i = y; i <= y + 1 + h; i++) {
+            int rr = i == y ? 1 : 2;
+            for (int a = -rr; a <= rr && a + x >= x - rr; a++) for (int c = -rr; c <= rr; c++)
+                if (!free(get(x + a, i, z + c))) return false;
+        }
+        int b = get(x, y - 1, z);
+        if (b != GRASS && b != DIRT && b != PODZOL) return false;
+        set(x, y - 1, z, DIRT, 0); set(x + 1, y - 1, z, DIRT, 0); set(x, y - 1, z + 1, DIRT, 0); set(x + 1, y - 1, z + 1, DIRT, 0);
+        return true;
+    }
+
+    private void leavesLayerStrict(int x, int y, int z, int rad, int id, int data) {
+        int r2 = rad * rad;
+        for (int j = -rad; j <= rad + 1; j++) for (int k = -rad; k <= rad + 1; k++) {
+            int l = j - 1, m = k - 1;
+            if (j * j + k * k <= r2 || l * l + m * m <= r2 || j * j + m * m <= r2 || l * l + k * k <= r2) leafAny(x + j, y, z + k, id, data);
+        }
+    }
+
+    private void leavesLayer(int x, int y, int z, int rad, int id, int data) {
+        for (int j = -rad; j <= rad; j++) for (int k = -rad; k <= rad; k++) if (j * j + k * k <= rad * rad) leafAny(x + j, y, z + k, id, data);
+    }
+
+    /** MegaPineTreeFeature: pine = true uses the base height for the crown (mega taiga), false = mega spruce */
+    private void megaPine(int x, int y, int z, boolean pine) {
+        int h = r.nextInt(3) + 13; h += r.nextInt(15);
+        if (!megaRoom(x, y, z, h)) return;
+        int top = y + h;
+        int len = r.nextInt(5) + (pine ? 13 : 3), last = 0;
+        for (int k = top - len; k <= top; k++) {
+            int l = top - k;
+            int rad = (int) Math.floor((float) l / (float) len * 3.5f);
+            leavesLayerStrict(x, k, z, rad + (l > 0 && rad == last && (k & 1) == 0 ? 1 : 0), LEAVES, 1);
+            last = rad;
+        }
+        for (int i = 0; i < h; i++) { log(x, y + i, z, LOG, 1); log(x + 1, y + i, z, LOG, 1); log(x, y + i, z + 1, LOG, 1); log(x + 1, y + i, z + 1, LOG, 1); }
+        for (int a = -2; a <= 2; a++) for (int c = -2; c <= 2; c++)     // podzol around the trunk
+            if ((Math.abs(a) != 2 || Math.abs(c) != 2) && r.nextInt(2) == 0) {
+                for (int yy = y + 2; yy >= y - 3; yy--) {
+                    int b = get(x + a, yy, z + c);
+                    if (b == GRASS || b == DIRT) { set(x + a, yy, z + c, PODZOL, 0); break; }
+                    if (b != AIR && yy < y) break;
+                }
+            }
+    }
+
+    /** MegaJungleTreeFeature (base 10, extra 20) */
+    private void megaJungle(int x, int y, int z) {
+        int h = r.nextInt(3) + 10; h += r.nextInt(20);
+        if (!megaRoom(x, y, z, h)) return;
+        for (int j = -2; j <= 0; j++) leavesLayerStrict(x, y + h + j, z, 2 + 1 - j, LEAVES, 3);
+        for (int j = y + h - 2 - r.nextInt(4); j > y + h / 2; j -= 2 + r.nextInt(4)) {
+            float f = r.nextFloat() * (float) Math.PI * 2f;
+            int k = x + (int) (0.5f + (float) Math.cos(f) * 4f), l = z + (int) (0.5f + (float) Math.sin(f) * 4f);
+            for (int i = 0; i < 5; i++) {
+                k = x + (int) (1.5f + (float) Math.cos(f) * i); l = z + (int) (1.5f + (float) Math.sin(f) * i);
+                set(k, j - 3 + i / 2, l, LOG, 3);
+            }
+            int n = 1 + r.nextInt(2);
+            for (int k1 = j - n; k1 <= j; k1++) leavesLayer(k, k1, l, 1 - (k1 - j), LEAVES, 3);
+        }
+        for (int i = 0; i < h; i++) { log(x, y + i, z, LOG, 3); log(x + 1, y + i, z, LOG, 3); log(x, y + i, z + 1, LOG, 3); log(x + 1, y + i, z + 1, LOG, 3); }
+    }
+
+    /** FancyTreeFeature (big oak) */
+    private final class BigTree {
+        int bx, by, bz, heightLimit, height;
+        final int leafDist = 4;
+        McRandom rr;
+        final java.util.ArrayList<int[]> nodes = new java.util.ArrayList<>();
+
+        float layerSize(int y) {
+            if (y < heightLimit * 0.3f) return -1f;
+            float f = heightLimit / 2f, f1 = f - y;
+            float f2 = (float) Math.sqrt(f * f - f1 * f1);
+            if (f1 == 0f) f2 = f; else if (Math.abs(f1) >= f) return 0f;
+            return f2 * 0.5f;
+        }
+        float leafSize(int y) { return y >= 0 && y < leafDist ? (y != 0 && y != leafDist - 1 ? 3f : 2f) : -1f; }
+
+        void cross(int x, int y, int z, float rad) {
+            int i = (int) (rad + 0.618f);
+            for (int j = -i; j <= i; j++) for (int k = -i; k <= i; k++)
+                if (Math.pow(Math.abs(j) + 0.5, 2) + Math.pow(Math.abs(k) + 0.5, 2) <= rad * rad) {
+                    int b = get(x + j, y, z + k);
+                    if (b == AIR || b == LEAVES) set(x + j, y, z + k, LEAVES, 0);
+                }
+        }
+
+        /** -1 when the line is free, else the step that hit (place = false), or draws logs (place = true) */
+        int line(int x0, int y0, int z0, int x1, int y1, int z1, boolean place) {
+            int dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+            int n = Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz)));
+            float fx = n == 0 ? 0 : dx / (float) n, fy = n == 0 ? 0 : dy / (float) n, fz = n == 0 ? 0 : dz / (float) n;
+            for (int j = 0; j <= n; j++) {
+                int x = x0 + (int) Math.floor(0.5f + j * fx), y = y0 + (int) Math.floor(0.5f + j * fy), z = z0 + (int) Math.floor(0.5f + j * fz);
+                if (place) set(x, y, z, LOG, 0);
+                else if (!replaceable(get(x, y, z))) return j;
+            }
+            return -1;
+        }
+
+        void place(int x, int y, int z) {
+            bx = x; by = y; bz = z;
+            rr = new McRandom((int) r.nextU32());
+            heightLimit = 5 + rr.nextInt(12);
+            int below = get(x, y - 1, z);
+            if (below != GRASS && below != DIRT) return;
+            int j = line(x, y, z, x, y + heightLimit - 1, z, false);
+            if (j != -1) { if (j < 6) return; heightLimit = j; }
+            height = (int) (heightLimit * 0.618);
+            if (height >= heightLimit) height = heightLimit - 1;
+            int per = (int) (1.382 + Math.pow(heightLimit / 13.0, 2.0));
+            if (per < 1) per = 1;
+            int top = by + height;
+            int k = heightLimit - leafDist;
+            nodes.add(new int[]{bx, by + k, bz, top});
+            for (; k >= 0; k--) {
+                float f = layerSize(k);
+                if (f < 0f) continue;
+                for (int l = 0; l < per; l++) {
+                    double d0 = f * (rr.nextFloat() + 0.328);
+                    double d1 = rr.nextFloat() * 2f * Math.PI;
+                    int px = (int) Math.floor(bx + d0 * Math.sin(d1) + 0.5), py = by + k - 1, pz = (int) Math.floor(bz + d0 * Math.cos(d1) + 0.5);
+                    if (line(px, py, pz, px, py + leafDist, pz, false) == -1) {
+                        int i1 = bx - px, j1 = bz - pz;
+                        double d4 = py - Math.sqrt(i1 * i1 + j1 * j1) * 0.381;
+                        int k1 = d4 > top ? top : (int) d4;
+                        if (line(bx, k1, bz, px, py, pz, false) == -1) nodes.add(new int[]{px, py, pz, k1});
+                    }
+                }
+            }
+            for (int[] n : nodes) for (int i = 0; i < leafDist; i++) cross(n[0], n[1] + i, n[2], leafSize(i));
+            line(bx, by, bz, bx, by + height, bz, true);
+            for (int[] n : nodes) {
+                if (n[0] == bx && n[1] == n[3] && n[2] == bz) continue;
+                if (n[3] - by >= heightLimit * 0.2) line(bx, n[3], bz, n[0], n[1], n[2], true);
+            }
+            set(x, y - 1, z, DIRT, 0);
         }
     }
 }

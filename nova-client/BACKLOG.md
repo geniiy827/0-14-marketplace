@@ -110,3 +110,11 @@
 
 ## Идеи на потом
 - NoCubes (сглаженный ландшафт) — отложено, сложно.
+
+## beta8 (decoration)
+- RE checked: BiomeDecorator::decorate has NO grass after each tree (removed), TallGrassFeature::place() = 90 tries / spread 8,
+  FlowerFeature::placeFlower = 64 tries (&7,&3), tree count branch, Plains/Taiga/Savanna/Forest::decorate structure (DoublePlantFeature x7 etc).
+- Trees ported from the same-era (Java 1.8) algorithms: big oak, birch/tall birch, swamp, acacia, dark oak (roofed grid + huge mushrooms),
+  mega spruce/pine (+podzol), mega jungle, jungle, shrub. Not byte-checked vs the .so yet: vines/cocoa skipped (RNG order differs).
+- Double plants (175, top = 8|type), tulips/bluets/daisies by info noise in plains, ferns, mossy boulders, desert well, melons, emerald.
+- TODO structures: villages, mineshafts, strongholds, desert/jungle temples, dungeons, ocean? (0.14 has villages + mineshafts + strongholds? check StructureFeature list in .so)
