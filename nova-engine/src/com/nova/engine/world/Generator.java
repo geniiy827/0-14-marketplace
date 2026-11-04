@@ -63,6 +63,28 @@ public final class Generator {
 
     // ------------------------------------------------------------------ chunk
     /** phase 1 (worker threads): terrain, surface, caves */
+    /** the 1:4 biome layer (RiverMixer output), copied */
+    public int[] biomes4(int x, int z, int w, int h) { return layers.get().biomes4.get(x, z, w, h).clone(); }
+
+    static final int[] SPAWN_BIOMES = {4, 1, 5, 19, 21, 22, 18};   // forest plains taiga taigaHills jungle jungleHills forestHills
+    static boolean spawnBiome(int b) { for (int v : SPAWN_BIOMES) if (v == b) return true; return false; }
+
+    /**
+     * BiomeSource::getSpawnPosition / findValidSpawnPosition: x = 0, 40, 80 ... along z = 0; in the 10x10 cells of the
+     * 1:4 layer the first cell (rows, then columns) whose biome and 4 neighbours are spawn biomes -> (x + col*4, z + row*4)
+     */
+    public int[] spawnPosition() {
+        for (int x = 0; x < 4000000; x += 40) {
+            int[] a = biomes4(x / 4 - 1, -1, 12, 12);
+            for (int row = 0; row < 10; row++) for (int col = 0; col < 10; col++) {
+                int i = (row + 1) * 12 + col + 1;
+                if (spawnBiome(a[i]) && spawnBiome(a[i - 1]) && spawnBiome(a[i + 1]) && spawnBiome(a[i - 12]) && spawnBiome(a[i + 12]))
+                    return new int[]{x + col * 4, 0 + row * 4};
+            }
+        }
+        return new int[]{0, 0};
+    }
+
     public void terrain(Chunk c) {
         McRandom rnd = new McRandom(c.cx * 0x14609048 + c.cz * 0x07ebe2d5);
         int[] b = layers.get().biomes1.get(c.cx << 4, c.cz << 4, 16, 16);

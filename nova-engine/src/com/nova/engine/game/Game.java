@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta10";
+    public static final String VERSION = "NOVA Engine beta11";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -49,14 +49,8 @@ public final class Game implements GLSurfaceView.Renderer {
     public int seed() { World w = world; return w == null ? startSeed : (int) w.seed; }
 
     private void spawn() {
-        // spawn: first dry land along a spiral from 0,0
-        int sx = 0, sz = 0;
-        for (int i = 0; i < 400; i++) {
-            double a = i * 0.5;
-            int tx = (int) (Math.cos(a) * i * 8), tz = (int) (Math.sin(a) * i * 8);
-            int b = world.gen.biomeAt(tx, tz);
-            if (b != com.nova.engine.world.Biomes.OCEAN && b != com.nova.engine.world.Biomes.DEEP_OCEAN && world.gen.height(tx, tz) > Generator.SEA) { sx = tx; sz = tz; break; }
-        }
+        int[] sp = world.gen.spawnPosition();                // BiomeSource::getSpawnPosition like the original
+        int sx = sp[0], sz = sp[1];
         player.x = sx + 0.5; player.z = sz + 0.5; player.y = world.gen.height(sx, sz) + 2;
         player.px = player.x; player.py = player.y; player.pz = player.z;
         player.mx = player.my = player.mz = 0;

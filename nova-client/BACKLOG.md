@@ -139,3 +139,8 @@
   chest entity model (now a block from chest_inventory tiles).
 - TODO next: structures (StructureFeature: villages SimpleHouse/SmallTemple/BookHouse/SmallHut/PigHouse..., mineshafts,
   strongholds SH*, scattered: SwamplandHut + temples?), freeze loop.
+
+## beta11
+- Spawn = BiomeSource::getSpawnPosition 0x581b84 / findValidSpawnPosition 0x581bf8: x=0,40,80.. z=0, 10x10 cells of the 1:4 layer,
+  cell + 4 neighbours in {forest, plains, taiga, taigaHills, jungle, jungleHills, forestHills}; pos = (x+col*4, z+row*4).
+- TODO verify terrain vs original: emulator diff of RandomLevelSource::loadChunk for seed mimi (3351608).
