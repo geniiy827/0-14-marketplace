@@ -144,3 +144,11 @@
 - Spawn = BiomeSource::getSpawnPosition 0x581b84 / findValidSpawnPosition 0x581bf8: x=0,40,80.. z=0, 10x10 cells of the 1:4 layer,
   cell + 4 neighbours in {forest, plains, taiga, taigaHills, jungle, jungleHills, forestHills}; pos = (x+col*4, z+row*4).
 - TODO verify terrain vs original: emulator diff of RandomLevelSource::loadChunk for seed mimi (3351608).
+
+## beta12 (biomes verified in the emulator)
+- tools/emu_layers.py: runs Layer::getDefaultLayers + every layer's fillArea of the real .so in unicorn (fake Biome
+  objects: vptr Biome/MutatedBiome, temp +0x4c, rain +0x50, type +0x90, id +0x94, parent +0x9c) -> layer-by-layer diff.
+- BUG found: MCPE magnify gives every zoom seed+1 (not seed+i). Fixed -> all 32 layers + river branch + Voronoi equal
+  on several seeds/windows (mimi, 12345, -1919 as unsigned).
+- Spawn: neighbours by flat index of the 10x10 buffer (row wrap) -> mimi spawn 1392,32 == original screenshot.
+- Next verification: RandomLevelSource heights/surface in the emulator (prepareHeights + buildSurfaces).

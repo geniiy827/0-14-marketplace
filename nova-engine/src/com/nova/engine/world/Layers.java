@@ -58,7 +58,8 @@ public final class Layers {
     }
 
     static Layer magnify(long seed, Layer l, int n) {
-        for (int i = 0; i < n; i++) l = new Zoom(seed + i, l, false);
+        // MCPE 0.14 (checked in the emulator): every zoom of a magnify gets seed + 1, not seed + i
+        for (int i = 0; i < n; i++) l = new Zoom(seed + 1, l, false);
         return l;
     }
 

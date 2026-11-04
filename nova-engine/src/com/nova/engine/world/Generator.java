@@ -75,11 +75,14 @@ public final class Generator {
      */
     public int[] spawnPosition() {
         for (int x = 0; x < 4000000; x += 40) {
-            int[] a = biomes4(x / 4 - 1, -1, 12, 12);
+            int[] a = biomes4(x / 4, 0, 10, 10);
             for (int row = 0; row < 10; row++) for (int col = 0; col < 10; col++) {
-                int i = (row + 1) * 12 + col + 1;
-                if (spawnBiome(a[i]) && spawnBiome(a[i - 1]) && spawnBiome(a[i + 1]) && spawnBiome(a[i - 12]) && spawnBiome(a[i + 12]))
-                    return new int[]{x + col * 4, 0 + row * 4};
+                // neighbours by flat index like the original (left/right wrap to the other row; outside the
+                // 10x10 buffer the original reads stale memory - treated as not valid)
+                int i = row * 10 + col;
+                if (spawnBiome(a[i]) && i - 1 >= 0 && spawnBiome(a[i - 1]) && i + 1 < 100 && spawnBiome(a[i + 1])
+                        && i - 10 >= 0 && spawnBiome(a[i - 10]) && i + 10 < 100 && spawnBiome(a[i + 10]))
+                    return new int[]{x + col * 4, row * 4};
             }
         }
         return new int[]{0, 0};
