@@ -32,7 +32,11 @@ public final class Hud {
     private final float[] glyphW = new float[256];
     private int fontCell = 8;
 
+    private AssetManager assets;
+
     public void init(AssetManager game) {
+        assets = game;
+        java.util.Arrays.fill(uniTex, 0); java.util.Arrays.fill(uniTried, false);
         prog = Gl.program(VS, FS);
         uScreen = GLES30.glGetUniformLocation(prog, "uScreen");
         uTex = GLES30.glGetUniformLocation(prog, "uTex");
@@ -157,7 +161,102 @@ public final class Hud {
         quads++;
     }
 
+    // ------------------------------------------------------------------ transform (rotated / scaled text)
+    private boolean xf;
+    private float xa, xb, xc, xd, xtx, xty;
+
+    /** following quads: p' = (tx, ty) + R(deg) * s * p */
+    public void transform(float tx, float ty, float deg, float scale) {
+        double r = Math.toRadians(deg);
+        xa = (float) Math.cos(r) * scale; xb = (float) -Math.sin(r) * scale; xc = (float) Math.sin(r) * scale; xd = (float) Math.cos(r) * scale;
+        xtx = tx; xty = ty; xf = true;
+    }
+
+    public void noTransform() { xf = false; }
+
+    /** vertical gradient (ScreenRenderer::fillGradient) */
+    public void gradient(float x, float y, float rw, float rh, int top, int bottom) {
+        use(white);
+        float r0 = ((top >> 16) & 255) / 255f, g0 = ((top >> 8) & 255) / 255f, b0 = (top & 255) / 255f, a0 = ((top >>> 24) & 255) / 255f;
+        float r1 = ((bottom >> 16) & 255) / 255f, g1 = ((bottom >> 8) & 255) / 255f, b1 = (bottom & 255) / 255f, a1 = ((bottom >>> 24) & 255) / 255f;
+        put(x, y, 0, 0, r0, g0, b0, a0); put(x + rw, y, 1, 0, r0, g0, b0, a0); put(x + rw, y + rh, 1, 1, r1, g1, b1, a1);
+        put(x, y, 0, 0, r0, g0, b0, a0); put(x + rw, y + rh, 1, 1, r1, g1, b1, a1); put(x, y + rh, 0, 1, r1, g1, b1, a1);
+        quads++;
+    }
+
+    // ------------------------------------------------------------------ Font of 0.14.3 (default8 + unicode glyph pages)
+    private final int[] uniTex = new int[256];
+    private final boolean[] uniTried = new boolean[256];
+    private final byte[][] uniStart = new byte[256][], uniEnd = new byte[256][];
+
+    /** font/glyph_XX.png: 16 x 16 cells of 16 px; per char the first and last used column (Font::_scanUnicodeCharacterWidth) */
+    private boolean uniPage(int page) {
+        if (uniTried[page]) return uniTex[page] != 0;
+        uniTried[page] = true;
+        if (assets == null) return false;
+        try {
+            Bitmap b = BitmapFactory.decodeStream(assets.open(String.format(java.util.Locale.ROOT, "images/font/glyph_%02X.png", page)));
+            if (b == null) return false;
+            int cell = b.getWidth() / 16;
+            byte[] st = new byte[256], en = new byte[256];
+            for (int c = 0; c < 256; c++) {
+                int gx = (c % 16) * cell, gy = (c / 16) * cell, lo = cell, hi = -1;
+                for (int x = 0; x < cell; x++) for (int y = 0; y < cell; y++)
+                    if ((b.getPixel(gx + x, gy + y) >>> 24) > 0) { if (x < lo) lo = x; if (x > hi) hi = x; }
+                if (hi < 0) { lo = 0; hi = cell / 2 - 1; }
+                st[c] = (byte) lo; en[c] = (byte) hi;
+            }
+            uniStart[page] = st; uniEnd[page] = en;
+            uniTex[page] = tex(b, false);
+            return true;
+        } catch (Exception e) { return false; }
+    }
+
+    /** advance of one char in font units (8 per line) */
+    private float charW(int cp) {
+        if (cp == 0xA0) cp = 32;
+        if (cp < 128) return glyphW[cp];
+        int page = cp >> 8;
+        if (page > 255 || !uniPage(page)) return 4;
+        int st = uniStart[page][cp & 255], en = uniEnd[page][cp & 255];
+        return (en + 1 - st) / 2f + 1f;
+    }
+
+    /** width of a text in font units */
+    public float fontWidth(String s) {
+        float x = 0;
+        for (int i = 0; i < s.length(); ) { int cp = s.codePointAt(i); i += Character.charCount(cp); x += charW(cp); }
+        return x;
+    }
+
+    /** text at scale sc (pixels per font unit), optional shadow (1 unit, colour / 4) */
+    public float fontText(String s, float x, float y, float sc, int argb, boolean shadow) {
+        if (shadow) fontText0(s, x + sc, y + sc, sc, (argb & 0xFF000000) | ((argb >> 2) & 0x3F3F3F));
+        return fontText0(s, x, y, sc, argb);
+    }
+
+    private float fontText0(String s, float x, float y, float sc, int argb) {
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i); i += Character.charCount(cp);
+            if (cp == 0xA0) cp = 32;
+            if (cp < 128) {
+                use(font);
+                float u = (cp % 16) / 16f, v = (cp / 16) / 16f;
+                quad(x, y, 8 * sc, 8 * sc, u, v, u + 1 / 16f, v + 1 / 16f, argb);
+            } else if ((cp >> 8) <= 255 && uniPage(cp >> 8)) {
+                int page = cp >> 8, c = cp & 255;
+                int st = uniStart[page][c], en = uniEnd[page][c];
+                use(uniTex[page]);
+                float u0 = ((c % 16) * 16 + st) / 256f, u1 = ((c % 16) * 16 + en + 1) / 256f, v0 = (c / 16) / 16f;
+                quad(x, y, (en + 1 - st) / 2f * sc, 8 * sc, u0, v0, u1, v0 + 1 / 16f, argb);
+            }
+            x += charW(cp) * sc;
+        }
+        return x;
+    }
+
     private void put(float x, float y, float u, float v, float r, float g, float b, float a) {
+        if (xf) { float nx = xtx + xa * x + xb * y, ny = xty + xc * x + xd * y; x = nx; y = ny; }
         fb.put(x); fb.put(y); fb.put(u); fb.put(v); fb.put(r); fb.put(g); fb.put(b); fb.put(a);
     }
 

@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta17";
+    public static final String VERSION = "NOVA Engine beta18";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -39,6 +39,19 @@ public final class Game implements GLSurfaceView.Renderer {
     private final WorldRenderer wr = new WorldRenderer();
     private final Hud hud = new Hud();
     private volatile World world;
+    /** the title screen is shown until Play */
+    public volatile boolean inMenu = true;
+    private com.nova.engine.ui.StartMenu menu;
+    private final java.util.ArrayList<float[]> menuEvents = new java.util.ArrayList<float[]>();
+
+    /** UI thread: touches while the title screen is up */
+    public void menuTouch(android.view.MotionEvent e) {
+        int a = e.getActionMasked();
+        int t = a == android.view.MotionEvent.ACTION_DOWN ? 0 : a == android.view.MotionEvent.ACTION_MOVE ? 1
+                : a == android.view.MotionEvent.ACTION_UP || a == android.view.MotionEvent.ACTION_CANCEL ? 2 : -1;
+        if (t < 0) return;
+        synchronized (menuEvents) { menuEvents.add(new float[]{t, e.getX(), e.getY()}); }
+    }
     /** seed for the first world (set by the activity before the surface is created) */
     public volatile int startSeed = new java.util.Random().nextInt();
     private volatile boolean pendingWorld;
@@ -121,6 +134,12 @@ public final class Game implements GLSurfaceView.Renderer {
             hud.init(atlas.gameAssets);
             guiTex = hud.loadTex(atlas.gameAssets, "images/gui/gui.png");
             iconsTex = hud.loadTex(atlas.gameAssets, "images/gui/icons.png");
+            if (inMenu && atlas.gameAssets != null) {
+                android.util.DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
+                float inches = (float) Math.sqrt((double) dm.widthPixels * dm.widthPixels + (double) dm.heightPixels * dm.heightPixels) / xdpi;
+                java.util.Locale lc = java.util.Locale.getDefault();
+                menu = new com.nova.engine.ui.StartMenu(atlas.gameAssets, lc.getLanguage() + "_" + lc.getCountry(), inches);
+            }
             if (world == null) {
                 world = new World(startSeed);
                 deco = new com.nova.engine.world.Decorator(world, world.seed);
@@ -165,6 +184,19 @@ public final class Game implements GLSurfaceView.Renderer {
         long dt = Math.min(250_000_000L, now - lastNs);
         lastNs = now;
         frameDt = dt / 1e9f;
+        if (inMenu && menu != null) {
+            String act = null;
+            synchronized (menuEvents) {
+                for (float[] e : menuEvents) { String r = menu.touch((int) e[0], e[1], e[2]); if (r != null) act = r; }
+                menuEvents.clear();
+            }
+            if ("button.menu_play".equals(act)) inMenu = false;      // Play: straight into the world for now
+            else {
+                menu.render(hud, width, height, frameDt);
+                stream();
+                return;
+            }
+        }
         if (pendingWorld) replaceWorld();
         if (tpPending) {
             tpPending = false;
@@ -247,6 +279,8 @@ public final class Game implements GLSurfaceView.Renderer {
         int pl = c.takePlaces(touchXY);
         for (int i = 0; i < pl && i < 16; i++) {
             if (!pickAt(touchXY[i * 2], touchXY[i * 2 + 1])) continue;
+            // GameMode::useItemOn: not sneaking -> Block::use of the aimed block first; true = done (no placing)
+            if (!player.sneak && useBlock(pick.x, pick.y, pick.z)) continue;
             int nx = pick.nx(), ny = pick.ny(), nz = pick.nz();
             int id = hotbar[slot];
             int cur = world.get(nx, ny, nz);
@@ -405,6 +439,9 @@ public final class Game implements GLSurfaceView.Renderer {
         float[] fog = underwater ? new float[]{0.02f, 0.02f, 0.2f} : SKY;
         GLES30.glClearColor(fog[0], fog[1], fog[2], 1);
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT | GLES30.GL_DEPTH_BUFFER_BIT);
+        GLES30.glEnable(GLES30.GL_DEPTH_TEST);
+        GLES30.glEnable(GLES30.GL_CULL_FACE);
+        GLES30.glDisable(GLES30.GL_BLEND);
         float far = underwater ? 10 : radius * 16;
         Matrix.perspectiveM(proj, 0, 70, (float) width / height, 0.05f, radius * 16 + 64);
         Matrix.setIdentityM(view, 0);
@@ -489,24 +526,40 @@ public final class Game implements GLSurfaceView.Renderer {
      * inner disc 0.95R scaled by 0.5 + 0.5 * progress; drawn at the finger scaled by 3.5 (gui units -> pixels)
      * with ui_invert_overlay.
      */
+    /** Block::use overrides of 0.14.3 for the blocks we have; returns whether the tap was consumed */
+    private boolean useBlock(int x, int y, int z) {
+        int id = world.get(x, y, z);
+        switch (id) {
+            case 64: {                                    // DoorBlock::use -> setOpen(!open): lower half data ^ 4
+                int ly = (world.data(x, y, z) & 8) != 0 ? y - 1 : y;
+                if (world.get(x, ly, z) == 64) world.set(x, ly, z, 64, world.data(x, ly, z) ^ 4);
+                if (world.get(x, ly + 1, z) == 64) world.set(x, ly + 1, z, 64, world.data(x, ly + 1, z));   // remesh the upper half
+                return true;
+            }
+            case 96:                                      // TrapDoorBlock::use -> setOpen: data ^ 8
+                world.set(x, y, z, 96, world.data(x, y, z) ^ 8);
+                return true;
+            case 54: case 58: case 61:                    // chest / workbench / furnace open their screen (none yet)
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private void progressRing(Controls c) {
-        // _renderProgressIndicator: alpha follows button.turn_interact (GuiData::calcNewAlpha +0.02 / -0.04 a frame),
-        // drawn at the pointer. Destroy progress > 0 (survival only, creative keeps it 0): ring + disc scaled
-        // 0.5 + 0.5 * progress at alpha x 0.8. Otherwise only the ring: alpha x 0.8 on a block/entity, min(alpha x 0.4,
-        // 0.4) when the pointer hits nothing.
+        // _renderProgressIndicator: an alpha follows button.turn_interact (GuiData::calcNewAlpha +0.02 / -0.04 a frame) and
+        // the ring is drawn while it is above 0, at the pointer. The material is ui_invert_overlay = flat_white.fragment
+        // (always vec4(1)) with OneMinusDestColor / OneMinusSrcColor blending, so the ShaderColor alpha (x0.8 / x0.4)
+        // has no visible effect: the ring is always a full inversion. Destroy progress > 0 (survival only, creative
+        // keeps 0) adds the disc scaled 0.5 + 0.5 * progress.
         if (c.interactId >= 0) { ringX = c.interactX; ringY = c.interactY; }
         float steps = Math.min(4f, frameDt * 60f);
         ringAlpha = c.showProgress ? Math.min(1f, ringAlpha + 0.02f * steps) : Math.max(0f, ringAlpha - 0.04f * steps);
         float p = 0f;                                                       // GameMode::getDestroyProgress (creative)
         float ppmDevice = xdpi / 25.4f;                                     // AppPlatform pixels per millimetre
         float R = Math.min(ppmDevice * 3.9996f, 40f) * 3.5f;                // mesh radius, drawn scaled 3.5 (screen px)
-        if (p > 0f) {
-            hud.invertCircle(ringX, ringY, R, R * 0.95f, 24, ringAlpha * 0.8f);
-            hud.invertCircle(ringX, ringY, R * 0.95f * (0.5f + 0.5f * p), 0, 24, ringAlpha * 0.8f);
-        } else if (ringAlpha > 0f) {
-            float a = hl ? ringAlpha * 0.8f : Math.min(ringAlpha * 0.4f, 0.4f);
-            hud.invertCircle(ringX, ringY, R, R * 0.95f, 24, a);
-        }
+        if (p > 0f || ringAlpha > 0f) hud.invertCircle(ringX, ringY, R, R * 0.95f, 24);
+        if (p > 0f) hud.invertCircle(ringX, ringY, R * 0.95f * (0.5f + 0.5f * p), 0, 24);
     }
     private float ringX, ringY, ringAlpha, frameDt;
     private long nextDestroy;

@@ -129,6 +129,7 @@ public final class CoreContent implements NovaMod {
         for (int d = 2; d <= 5; d++) fu.data(d, r.tex("furnace:2"), r.tex("furnace:2"), r.tex("furnace:3")).dataFace(d, d, r.tex("furnace:0"));
         Blocks.Def door = r.block(64, "wooden_door").tex(r.tex("door:0")).model(Blocks.M_DOOR).notSolid();
         for (int d = 0; d < 16; d++) door.data(d, r.tex(d >= 8 ? "door:1" : "door:0"));
+        r.block(96, "trapdoor").tex(r.tex("trapdoor")).model(Blocks.M_TRAPDOOR).notSolid();
         r.block(65, "ladder").tex(r.tex("ladder")).model(Blocks.M_LADDER).notSolid();
         r.block(85, "fence").tex(planks0).model(Blocks.M_FENCE);
         r.block(101, "iron_bars").tex(r.tex("iron_bars")).model(Blocks.M_PANE);

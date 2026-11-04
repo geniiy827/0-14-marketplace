@@ -33,17 +33,42 @@ public final class Mesher {
     private int bx, by, bz;               // section origin (world)
     private int data, biome;              // of the block being meshed
 
+    private int curX, curZ;
+
+    /** biome of a section-local column (may be up to 16 outside, in the neighbour chunks) */
+    private int biomeAt(int x, int z) {
+        int ix = x < 0 ? 0 : x > 15 ? 2 : 1, iz = z < 0 ? 0 : z > 15 ? 2 : 1;
+        Chunk c = around[iz * 3 + ix];
+        if (c == null) return biome;
+        return c.biome[(z & 15) * 16 + (x & 15)] & 255;
+    }
+
     private int tintOf(int id, int f) { return tintOfValue(Blocks.tint[id][f], id); }
 
     private int tintOfValue(int t, int id) {
         if (t == Blocks.TINT_GRASS && id == 175 && (data & 7) != 2 && (data & 7) != 3) return 0xFFFFFF;
-        if (t == Blocks.TINT_GRASS) return com.nova.engine.world.Biomes.GRASS[biome];
+        if (t == Blocks.TINT_GRASS) return around[4] == null ? com.nova.engine.world.Biomes.GRASS[biome] : around[4].grass[(curZ & 15) * 16 + (curX & 15)];
         if (t == Blocks.TINT_FOLIAGE) {
             if (id == 18 && data == 1) return 0x619961;        // spruce
             if (id == 18 && data == 2) return 0x80A755;        // birch
-            return com.nova.engine.world.Biomes.FOLIAGE[biome];
+            // LeafBlock::getColor: the foliage colours of the 8 columns 4 blocks around, averaged (sum / 8 per channel)
+            int r = 0, g = 0, b = 0;
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                int c = com.nova.engine.world.Biomes.foliageColor(biomeAt(curX + dx * 4, curZ + dz * 4));
+                r += c >> 16 & 255; g += c >> 8 & 255; b += c & 255;
+            }
+            return (r >> 3) << 16 | (g >> 3) << 8 | (b >> 3);
         }
-        if (t == Blocks.TINT_WATER) return com.nova.engine.world.Biomes.WATER[biome];
+        if (t == Blocks.TINT_WATER) {
+            // LiquidBlock::getColor (water): the 3 x 3 biome water colours around, averaged
+            int r = 0, g = 0, b = 0;
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
+                int c = com.nova.engine.world.Biomes.WATER[biomeAt(curX + dx, curZ + dz)];
+                r += c >> 16 & 255; g += c >> 8 & 255; b += c & 255;
+            }
+            return (r / 9) << 16 | (g / 9) << 8 | (b / 9);
+        }
         return t;
     }
 
@@ -68,6 +93,7 @@ public final class Mesher {
                 int k = Blocks.kind[id];
                 data = c.data[Chunk.idx(x, wy, z)] & 15;
                 biome = c.biome[z * 16 + x] & 255;
+                curX = x; curZ = z;
                 if (k == Blocks.CROSS) { cross(id, x, y, z); return; }
                 if (k == Blocks.MODEL) { model(id, x, wy, y, z); return; }
                 int above = get(x, wy + 1, z);
@@ -76,8 +102,11 @@ public final class Mesher {
                     int[] n = NORMAL[f];
                     int nb = get(x + n[0], wy + n[1], z + n[2]);
                     boolean ins = f >= 2 && Blocks.inset[id] > 0;
-                    if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1) && !(id == 78 && nb == 78 && f >= 2)) continue;   // top snow of other depth beside
-                    face(id, f, x, y, z, k == Blocks.LIQUID ? (Blocks.kind[get(x, wy + 1, z)] == Blocks.LIQUID ? 1f : 0.875f) : 1f);
+                    if (k == Blocks.LIQUID) {
+                        if (!liquidFace(id, nb, f)) continue;
+                        liquidHeights(id, x, wy, z);
+                    } else if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1) && !(id == 78 && nb == 78 && f >= 2)) continue;   // top snow of other depth beside
+                    face(id, f, x, y, z, 1f);
                     if (f >= 2 && Blocks.sideOverlay[id] >= 0 && !snowy) { overlay = true; face(id, f, x, y, z, 1f); overlay = false; }
                 }
     }
@@ -113,6 +142,47 @@ public final class Mesher {
         m.solid = solid.copy(); m.solidVerts = solid.n / STRIDE;
         m.water = water.copy(); m.waterVerts = water.n / STRIDE;
         return m;
+    }
+
+    static boolean sameLiquid(int a, int b) { return (a == 8 || a == 9) ? (b == 8 || b == 9) : (a == 10 || a == 11) && (b == 10 || b == 11); }
+
+    /** LiquidBlock::shouldRenderFace: never against the same liquid or ice; always up; else Block::shouldRenderFace
+     *  with a full box = the neighbour is not solid */
+    private static boolean liquidFace(int id, int nb, int f) {
+        if (nb == 0 || !Blocks.exists[nb]) return true;
+        if (sameLiquid(id, nb) || nb == 79) return false;
+        if (f == 1) return true;
+        return !Blocks.opaque[nb];
+    }
+
+    /** Material::isSolid: not air, plants, liquids, top snow, torches */
+    private static boolean solidMaterial(int b) {
+        if (b == 0 || !Blocks.exists[b]) return false;
+        int k = Blocks.kind[b];
+        return k != Blocks.CROSS && k != Blocks.LIQUID && b != 78 && !(k == Blocks.MODEL && Blocks.model[b] == Blocks.M_TORCH);
+    }
+
+    /** corner heights of the liquid top (x, z corner offsets 00 01 11 10 -> index cx * 2 + cz) */
+    private final float[] liqH = new float[4];
+
+    /** BlockTessellator::getWaterHeight for the four top corners of the liquid at x, wy, z */
+    private void liquidHeights(int id, int x, int wy, int z) {
+        for (int cx = 0; cx < 2; cx++) for (int cz = 0; cz < 2; cz++) {
+            int px = x + cx, pz = z + cz;
+            float sum = 0f; int count = 0; boolean full = false;
+            for (int i = 0; i < 4 && !full; i++) {
+                int bx = px - (i & 1), bz = pz - (i >> 1);
+                if (sameLiquid(id, get(bx, wy + 1, bz))) { full = true; break; }
+                int b = get(bx, wy, bz);
+                if (sameLiquid(id, b)) {
+                    int d = worldData(bx, wy, bz);
+                    float h = d <= 7 ? (d + 1) * 0.11111111f : 0.11111111f;     // LiquidBlock::getHeightFromData
+                    if (d == 0 || d >= 8) { sum += h * 10f; count += 10; }
+                    sum += h; count++;
+                } else if (!solidMaterial(b)) { sum += 1f; count++; }
+            }
+            liqH[cx * 2 + cz] = full ? 1f : 1f - sum / count;
+        }
     }
 
     private static boolean visible(int id, int nb, int kind) {
@@ -183,7 +253,10 @@ public final class Mesher {
             int v = (start + i) & 3;
             float px = x + cr[v * 3], py = y + cr[v * 3 + 1], pz = z + cr[v * 3 + 2];
             if (ins > 0) { px -= n[0] * ins; pz -= n[2] * ins; }
-            if (liquid && cr[v * 3 + 1] == 1) py = y + top;
+            if (liquid) {
+                if (cr[v * 3 + 1] == 1) py = y + liqH[cr[v * 3] * 2 + cr[v * 3 + 2]] - 0.001f;   // tessellateLiquid: top - 0.001
+                if (f >= 2) { px -= n[0] * 0.001f; pz -= n[2] * 0.001f; }                       // sides 0.001 inside
+            }
             else if (bh < 1 && cr[v * 3 + 1] == 1) py = y + bh;
             float l = SHADE[f] * AO[ao[v]];
             int r = (int) (tr * l * 255), g = (int) (tg * l * 255), b = (int) (tb * l * 255);
@@ -200,6 +273,11 @@ public final class Mesher {
     // ------------------------------------------------------------------ shaped blocks (stairs, fences, doors ...)
     private void model(int id, int x, int wy, int y, int z) {
         if (Blocks.model[id] == Blocks.M_TORCH) { torchMesh(id, x, y, z); return; }
+        if (Blocks.model[id] == Blocks.M_DOOR) {
+            for (float[] b : com.nova.engine.world.Shapes.door(com.nova.engine.world.Shapes.doorComposite(access, x, wy, z)))
+                box(id, x, wy, y, z, b[0], b[1], b[2], b[3], b[4], b[5]);
+            return;
+        }
         if (Blocks.model[id] == Blocks.M_STAIRS) {
             for (float[] b : com.nova.engine.world.Shapes.stairs(data, access, x, wy, z)) box(id, x, wy, y, z, b[0], b[1], b[2], b[3], b[4], b[5]);
             return;

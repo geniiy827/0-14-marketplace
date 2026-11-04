@@ -133,6 +133,30 @@ public final class Biomes {
         for (int i : new int[]{6, 134}) { GRASS[i] = 0x6A7039; FOLIAGE[i] = 0x6A7039; }                   // SwampBiome (noise 0x4C763C)
     }
 
+    /** MutatedBiome -> its parent (MutatedBiome::getGrassColor / getFoliageColor use the parent's) */
+    public static final int[] PARENT = new int[256];
+    static {
+        for (int i = 0; i < 256; i++) PARENT[i] = i;
+        for (int b = 0; b < 128; b++) if (EXISTS[b] && MUTATION[b] >= 0) PARENT[MUTATION[b]] = b;
+        // Biome +0x6c water colour: Biome::DEFAULT_WATER_COLOR (0.596, 0.910, 1.0); SwampBiome (0.784, 0.686, 0.294)
+        for (int i = 0; i < 256; i++) WATER[i] = PARENT[i] == 6 ? 0xC8AF4B : 0x98E8FF;
+    }
+
+    private static Noises.Simplex swampNoise;
+
+    /** <Biome>::getGrassColor(BlockPos) */
+    public static int grassColor(int b, int x, int z) {
+        b = PARENT[b & 255];
+        if (b == 6) {                                                   // SwampBiome: Biome +0x98 = PerlinSimplexNoise(2345, 1)
+            if (swampNoise == null) swampNoise = new Noises.Simplex(new McRandom(2345));
+            return swampNoise.value(x * 0.0225f, z * 0.0225f) < -0.1f ? 0x4C763C : 0x6A7039;
+        }
+        return GRASS[b];
+    }
+
+    /** <Biome>::getFoliageColor */
+    public static int foliageColor(int b) { return FOLIAGE[PARENT[b & 255]]; }
+
     /** FoliageColor::getGrassColor/getFoliageColor: x = (1-t)*255, y = (1-t*d)*255 (0..255), bilinear between corners */
     static int corners(float t, float d, float[] c) {
         int x = Math.max(0, Math.min(255, (int) ((1f - t) * 255f))), y = Math.max(0, Math.min(255, (int) ((1f - d * t) * 255f)));

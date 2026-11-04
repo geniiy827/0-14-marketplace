@@ -214,3 +214,20 @@
 - Village variants in 0.14: only plain and desert (VillagePiece::biomeBlock checks one desert flag).
 - TODO structures: mineshafts, strongholds, nether fortress (no Nether yet). Field 0x2c of the touch control (move
   sensitivity) assumed 1.
+
+## beta18
+- Ring: material ui_invert_overlay = flat_white (always vec4(1)): full inversion always, the alpha only decides while it is
+  drawn (fade +0.02/-0.04 per frame -> stays ~0.4 s after lifting).
+- Block::use on tap (GameMode::useItemOn, sneaking skips): door (lower data ^ 4), trapdoor 96 (data ^ 8, new block),
+  chest/workbench/furnace consume the tap. Door shape = DoorBlock::getVisualShape (0.1825, open + hinge from the composite).
+- Liquids: LiquidBlock::shouldRenderFace (same liquid / ice no; up always; else neighbour not solid), corner heights
+  BlockTessellator::getWaterHeight (x11 for source/falling), top - 0.001, sides 0.001 inside.
+- Biome colours: FoliageColor::buildGrassColor per chunk column (5x5 biome grass 4 apart, sum*4/96, + (floor(noise)-30)/2
+  + rand&7 - 4, MT(min.x*0x88f9fa+min.z), GRASS_NOISE = PerlinSimplexNoise(0x15cf0, 5)); leaves = avg of 8 foliage 4 apart;
+  water = avg 3x3 of Biome +0x6c (default 0.596,0.910,1.0; swamp 0.784,0.686,0.294); swamp grass noise 2345 @0.0225,
+  mutated -> parent colours. TODO: Seasons leaf tint (fancy leaves layer).
+- JSON UI engine (ui/JsonUi): _ui_defs.json files from the game, inheritance, variables, anchors, sizes, layers, images
+  with nineslice, labels (lang files, default8 + unicode glyph pages), buttons. Title screen = start.start_screen +
+  CubemapBackgroundScreen panorama (fov 120, T += dt*30, sin(T*0.0025)*25+20 X, -T*0.1 Y) + gradient 0.35, splash
+  (1.3 + sin(t*7.222)^4*0.06) * 100/(len+32), -20 deg. Gui scale = MinecraftClient::calculateGuiScale. Only Play works.
+- TODO: mineshafts, strongholds; other buttons/screens; touch threshold 0x2c.

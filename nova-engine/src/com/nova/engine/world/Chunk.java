@@ -8,6 +8,8 @@ public final class Chunk {
     public final byte[] data = new byte[16 * 16 * H];
     /** biome per column, z * 16 + x */
     public final byte[] biome = new byte[256];
+    /** LevelChunk grass colour per column (0xRRGGBB), z * 16 + x: FoliageColor::buildGrassColor */
+    public final int[] grass = new int[256];
     public volatile boolean generated;
     /** 1 = terrain done (in World.chunks), 2 = decorated */
     public volatile int stage;

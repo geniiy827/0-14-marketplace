@@ -88,10 +88,38 @@ public final class Generator {
         return new int[]{0, 0};
     }
 
+    /**
+     * DBChunkStorage::postProcess -> FoliageColor::buildGrassColor. Random = MT(min.x * 0x88f9fa + min.y * 0xef88b +
+     * min.z); per column (x outer, z inner) FoliageColor::getGrassColor (the 5 x 5 biome grass colours 4 blocks apart,
+     * summed x 4 / 96 per channel - the original's divisor, so x 25/24, bytes wrapping) plus
+     * (int)((floor(GRASS_NOISE(x, 0, z)) - 30) * 0.5) + (rand & 7) - 4 on each byte.
+     */
+    public static final Noises.PerlinSimplex GRASS_NOISE = new Noises.PerlinSimplex(new McRandom(0x15cf0), 5);
+
+    void grassColors(Chunk c) {
+        int x0 = c.cx << 4, z0 = c.cz << 4;
+        int[] bb = layers.get().biomes1.get(x0 - 8, z0 - 8, 32, 32).clone();
+        McRandom r = new McRandom(x0 * 0x88f9fa + z0);
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) {
+            int sr = 0, sg = 0, sb = 0;
+            for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
+                int lx = x + dx * 4 + 8, lz = z + dz * 4 + 8;
+                int col = Biomes.grassColor(bb[lz * 32 + lx], x0 + x + dx * 4, z0 + z + dz * 4);
+                sr += (col >> 16 & 255) * 4; sg += (col >> 8 & 255) * 4; sb += (col & 255) * 4;
+            }
+            sr /= 96; sg /= 96; sb /= 96;
+            float n = GRASS_NOISE.value3(x0 + x, 0f, z0 + z);
+            int v = (int) (((float) Math.floor(n) - 30f) * 0.5f);
+            int off = v + (int) (r.nextU32() & 7) - 4;
+            c.grass[z * 16 + x] = ((sr + off) & 255) << 16 | ((sg + off) & 255) << 8 | ((sb + off) & 255);
+        }
+    }
+
     public void terrain(Chunk c) {
         McRandom rnd = new McRandom(c.cx * 0x14609048 + c.cz * 0x07ebe2d5);
         int[] b = layers.get().biomes1.get(c.cx << 4, c.cz << 4, 16, 16);
         for (int i = 0; i < 256; i++) c.biome[i] = (byte) b[i];
+        grassColors(c);
         prepareHeights(c);
         buildSurfaces(c, rnd);
         new Caves(iseed).apply(c);       // LargeCaveFeature (RandomLevelSource::loadChunk)

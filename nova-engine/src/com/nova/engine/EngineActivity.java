@@ -146,6 +146,7 @@ public final class EngineActivity extends Activity {
         view = new GLSurfaceView(this) {
             @Override
             public boolean onTouchEvent(MotionEvent e) {
+                if (game.inMenu) { game.menuTouch(e); return true; }
                 if (game.controls.menuHit(e)) { worldDialog(); return true; }
                 return game.controls.onTouch(e);
             }
