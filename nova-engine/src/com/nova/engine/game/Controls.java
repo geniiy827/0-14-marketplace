@@ -134,7 +134,7 @@ public final class Controls {
             if (role[id] == 3) jump = false;
             if (role[id] == 4) ascend = false;
             if (role[id] == 5) descend = false;
-            if (role[id] == 2 && !moved[id] && !holding[id] && a != MotionEvent.ACTION_CANCEL && now - t0[id] < 300 && tapCount < 16) {
+            if (role[id] == 2 && !moved[id] && !holding[id] && a != MotionEvent.ACTION_CANCEL && now - t0[id] < 250 && tapCount < 16) {
                 tapX[tapCount] = lx[id]; tapY[tapCount] = ly[id]; tapCount++; places++;
             }
             if (id == interactId) interactId = -1;
@@ -169,17 +169,22 @@ public final class Controls {
         moveF = (f ? 1 : 0) - (b ? 1 : 0);
         moveS = (r ? 1 : 0) - (l ? 1 : 0);
         pJump = jump; pSneak = sneak;
+        // TouchTurnInteractControl::tick: pressed -> (moved) turning for good | (held 0.4 s) destroying;
+        // destroying -> (moved) turning. Creative: break at once, then every 250 ms (GameMode::continueDestroyBlock).
         holdProgress = 0;
         for (int i = 0; i < MAXP; i++) {
-            if (role[i] != 2 || moved[i]) continue;
+            if (role[i] != 2) continue;
             long held = now - t0[i];
-            if (!holding[i]) {
-                if (i == interactId) holdProgress = Math.min(1f, held / 350f);
-                if (held > 350) { holding[i] = true; addBreak(lx[i], ly[i]); nextBreak[i] = now + 250; }
+            float p;
+            if (moved[i]) p = 0f;                                          // turning (look) stage
+            else if (!holding[i]) {
+                p = Math.min(1f, held / 400f);
+                if (held >= 400) { holding[i] = true; addBreak(lx[i], ly[i]); nextBreak[i] = now + 250; p = 0f; }
             } else {
-                if (i == interactId) holdProgress = 1f;
                 if (now >= nextBreak[i]) { addBreak(lx[i], ly[i]); nextBreak[i] = now + 250; }
+                p = 1f - (nextBreak[i] - now) / 250f;
             }
+            if (i == interactId) holdProgress = Math.max(0f, Math.min(1f, p));
         }
     }
 

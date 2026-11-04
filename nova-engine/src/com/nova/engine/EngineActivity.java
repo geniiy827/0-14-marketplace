@@ -72,12 +72,49 @@ public final class EngineActivity extends Activity {
                         android.widget.Toast.makeText(EngineActivity.this, "Сид скопирован", android.widget.Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton("Отмена", null)
+                .setNegativeButton("Постройки рядом", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface di, int w) { structuresDialog(); }
+                })
                 .create();
         d.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
             public void onDismiss(android.content.DialogInterface di) { dialogOpen = false; immersive(); }
         });
         d.show();
+    }
+
+    /** villages / pyramids / witch huts around the player, tap = teleport there */
+    private void structuresDialog() {
+        final android.widget.Toast wait = android.widget.Toast.makeText(this, "Ищу постройки...", android.widget.Toast.LENGTH_SHORT);
+        wait.show();
+        new Thread(new Runnable() {
+            public void run() {
+                final java.util.List<int[]> found = game.structures(100);
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        int n = Math.min(found.size(), 40);
+                        final String[] items = new String[n];
+                        for (int i = 0; i < n; i++) {
+                            int[] f = found.get(i);
+                            items[i] = com.nova.engine.world.Finder.TYPE[f[0]] + "   X " + f[1] + "  Z " + f[2] + "   (" + f[3] + " м)";
+                        }
+                        android.app.AlertDialog d = new android.app.AlertDialog.Builder(EngineActivity.this)
+                                .setTitle(n == 0 ? "Рядом ничего нет (1600 блоков)" : "Постройки рядом — тап: телепорт")
+                                .setItems(items, new android.content.DialogInterface.OnClickListener() {
+                                    public void onClick(android.content.DialogInterface di, int which) {
+                                        int[] f = found.get(which);
+                                        game.teleport(f[1], f[2]);
+                                    }
+                                })
+                                .setNegativeButton("Закрыть", null)
+                                .create();
+                        d.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+                            public void onDismiss(android.content.DialogInterface di) { immersive(); }
+                        });
+                        d.show();
+                    }
+                });
+            }
+        }).start();
     }
 
     private void remember(String t) {

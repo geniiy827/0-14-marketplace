@@ -62,22 +62,14 @@ public final class Mesher {
     static final float[] SHADE = {0.5f, 1.0f, 0.8f, 0.8f, 0.62f, 0.62f};
     static final float[] AO = {0.5f, 0.68f, 0.84f, 1.0f};
 
-    public Mesh build(World w, int cx, int sy, int cz, int version) {
-        for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) around[(dz + 1) * 3 + dx + 1] = w.ready(cx + dx, cz + dz);
-        if (around[4] == null) return null;
-        solid.n = 0; water.n = 0;
-        bx = cx << 4; by = sy << 4; bz = cz << 4;
-        Chunk c = around[4];
-        for (int y = 0; y < 16; y++) {
-            int wy = by + y;
-            for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
+    private void block(Chunk c, int x, int y, int z, int wy) {
                 int id = c.blocks[Chunk.idx(x, wy, z)] & 255;
-                if (id == 0 || !Blocks.exists[id]) continue;
+                if (id == 0 || !Blocks.exists[id]) return;
                 int k = Blocks.kind[id];
                 data = c.data[Chunk.idx(x, wy, z)] & 15;
                 biome = c.biome[z * 16 + x] & 255;
-                if (k == Blocks.CROSS) { cross(id, x, y, z); continue; }
-                if (k == Blocks.MODEL) { model(id, x, wy, y, z); continue; }
+                if (k == Blocks.CROSS) { cross(id, x, y, z); return; }
+                if (k == Blocks.MODEL) { model(id, x, wy, y, z); return; }
                 int above = get(x, wy + 1, z);
                 snowy = id == 2 && (above == 78 || above == 80) && Blocks.grassSnowSide >= 0;
                 for (int f = 0; f < 6; f++) {
@@ -88,7 +80,32 @@ public final class Mesher {
                     face(id, f, x, y, z, k == Blocks.LIQUID ? (Blocks.kind[get(x, wy + 1, z)] == Blocks.LIQUID ? 1f : 0.875f) : 1f);
                     if (f >= 2 && Blocks.sideOverlay[id] >= 0 && !snowy) { overlay = true; face(id, f, x, y, z, 1f); overlay = false; }
                 }
-            }
+    }
+
+    /** the geometry of one block (section-relative coordinates of its section), for the selection overlay */
+    public int[] single(World w, int wx, int wy, int wz, int[] origin) {
+        int cx = wx >> 4, cz = wz >> 4, sy = wy >> 4;
+        for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) around[(dz + 1) * 3 + dx + 1] = w.ready(cx + dx, cz + dz);
+        if (around[4] == null) return new int[0];
+        solid.n = 0; water.n = 0;
+        bx = cx << 4; by = sy << 4; bz = cz << 4;
+        origin[0] = bx; origin[1] = by; origin[2] = bz;
+        block(around[4], wx & 15, wy - by, wz & 15, wy);
+        int[] out = new int[solid.n + water.n];
+        System.arraycopy(solid.a, 0, out, 0, solid.n);
+        System.arraycopy(water.a, 0, out, solid.n, water.n);
+        return out;
+    }
+
+    public Mesh build(World w, int cx, int sy, int cz, int version) {
+        for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) around[(dz + 1) * 3 + dx + 1] = w.ready(cx + dx, cz + dz);
+        if (around[4] == null) return null;
+        solid.n = 0; water.n = 0;
+        bx = cx << 4; by = sy << 4; bz = cz << 4;
+        Chunk c = around[4];
+        for (int y = 0; y < 16; y++) {
+            int wy = by + y;
+            for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) block(c, x, y, z, wy);
         }
         Mesh m = new Mesh();
         m.world = w;
@@ -183,43 +200,41 @@ public final class Mesher {
         for (float[] b : bs) box(id, x, wy, y, z, b[0], b[1], b[2], b[3], b[4], b[5]);
     }
 
-    /** torch: a 2/16 stick from the middle of the tile, standing or leaning out of the wall (data 1..4) */
+    /**
+     * torch: BlockTessellator::tessellateTorchInWorld / tessellateTorch (the Java renderTorchAtAngle): 4 full-tile
+     * planes 1/16 from the centre (the transparent texture makes the stick), bottom shifted by (dx, dz), a cap at 10/16
+     * from the middle of the tile; wall torches at +/-0.1 toward the wall, 0.2 up, leaning 0.4.
+     */
     private void torchMesh(int id, int x, int y, int z) {
-        float bx = 0.5f, bz = 0.5f, by = 0f, lx = 0, lz = 0;
+        float px = x, py = y, pz = z, dx = 0, dz = 0;
         switch (data) {
-            case 1: bx = 0.06f; lx = 0.25f; by = 0.2f; break;
-            case 2: bx = 0.94f; lx = -0.25f; by = 0.2f; break;
-            case 3: bz = 0.06f; lz = 0.25f; by = 0.2f; break;
-            case 4: bz = 0.94f; lz = -0.25f; by = 0.2f; break;
+            case 1: px -= 0.1f; py += 0.2f; dx = -0.4f; break;
+            case 2: px += 0.1f; py += 0.2f; dx = 0.4f; break;
+            case 3: pz -= 0.1f; py += 0.2f; dz = -0.4f; break;
+            case 4: pz += 0.1f; py += 0.2f; dz = 0.4f; break;
             default: break;
         }
-        float h = 10f / 16f, hw = 1f / 16f;
         int sl = Blocks.texFor(id, data, 2) * 4;
-        float u0 = uv[sl], v0 = uv[sl + 1], du = uv[sl + 2] - u0, dv = uv[sl + 3] - v0;
-        float su0 = u0 + du * 7 / 16f, su1 = u0 + du * 9 / 16f, sv0 = v0 + dv * 6 / 16f, sv1 = v0 + dv;
-        // bottom corners (b) and top corners (t), ccw from -x-z
-        float[][] c = new float[8][];
-        float[][] o = {{-hw, -hw}, {hw, -hw}, {hw, hw}, {-hw, hw}};
-        for (int i = 0; i < 4; i++) {
-            c[i] = new float[]{x + bx + o[i][0], y + by, z + bz + o[i][1]};
-            c[i + 4] = new float[]{x + bx + lx + o[i][0], y + by + h, z + bz + lz + o[i][1]};
-        }
-        int[][] sides = {{1, 0, 4, 5}, {3, 2, 6, 7}, {0, 3, 7, 4}, {2, 1, 5, 6}};     // north, south, west, east
-        float[] shade = {0.8f, 0.8f, 0.62f, 0.62f};
-        for (int f = 0; f < 4; f++) {
-            int col = shadeCol(shade[f]);
-            int[] q = sides[f];
-            vert(solid, c[q[0]][0], c[q[0]][1], c[q[0]][2], su0, sv1, col);
-            vert(solid, c[q[1]][0], c[q[1]][1], c[q[1]][2], su1, sv1, col);
-            vert(solid, c[q[2]][0], c[q[2]][1], c[q[2]][2], su1, sv0, col);
-            vert(solid, c[q[3]][0], c[q[3]][1], c[q[3]][2], su0, sv0, col);
-        }
-        float tv0 = v0 + dv * 6 / 16f, tv1 = v0 + dv * 8 / 16f;
+        float u0 = uv[sl], v0 = uv[sl + 1], u1 = uv[sl + 2], v1 = uv[sl + 3], du = u1 - u0, dv = v1 - v0;
+        float iu7 = u0 + du * 7 / 16f, iu9 = u0 + du * 9 / 16f, iv6 = v0 + dv * 6 / 16f, iv8 = v0 + dv * 8 / 16f;
+        float iv13 = v0 + dv * 13 / 16f, iv15 = v0 + dv * 15 / 16f;
+        float cx = px + 0.5f, cz = pz + 0.5f, x0 = cx - 0.5f, x1 = cx + 0.5f, z0 = cz - 0.5f, z1 = cz + 0.5f;
+        float d = 0.0625f, h = 0.625f, tx = cx + dx * (1 - h), tz = cz + dz * (1 - h);
         int col = shadeCol(1f);
-        vert(solid, c[4][0], c[4][1], c[4][2], su0, tv0, col);
-        vert(solid, c[7][0], c[7][1], c[7][2], su0, tv1, col);
-        vert(solid, c[6][0], c[6][1], c[6][2], su1, tv1, col);
-        vert(solid, c[5][0], c[5][1], c[5][2], su1, tv0, col);
+        float[][] q = {
+                // cap
+                {tx - d, py + h, tz - d, iu7, iv6}, {tx - d, py + h, tz + d, iu7, iv8}, {tx + d, py + h, tz + d, iu9, iv8}, {tx + d, py + h, tz - d, iu9, iv6},
+                // bottom
+                {cx + d + dx, py, cz - d + dz, iu9, iv13}, {cx + d + dx, py, cz + d + dz, iu9, iv15}, {cx - d + dx, py, cz + d + dz, iu7, iv15}, {cx - d + dx, py, cz - d + dz, iu7, iv13},
+                // sides
+                {cx - d, py + 1, z0, u0, v0}, {cx - d + dx, py, z0 + dz, u0, v1}, {cx - d + dx, py, z1 + dz, u1, v1}, {cx - d, py + 1, z1, u1, v0},
+                {cx + d, py + 1, z1, u0, v0}, {cx + dx + d, py, z1 + dz, u0, v1}, {cx + dx + d, py, z0 + dz, u1, v1}, {cx + d, py + 1, z0, u1, v0},
+                {x0, py + 1, cz + d, u0, v0}, {x0 + dx, py, cz + d + dz, u0, v1}, {x1 + dx, py, cz + d + dz, u1, v1}, {x1, py + 1, cz + d, u1, v0},
+                {x1, py + 1, cz - d, u0, v0}, {x1 + dx, py, cz - d + dz, u0, v1}, {x0 + dx, py, cz - d + dz, u1, v1}, {x0, py + 1, cz - d, u1, v0}};
+        for (int i = 0; i < q.length; i += 4) {                     // both windings: seen from either side
+            for (int k = 0; k < 4; k++) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col);
+            for (int k = 3; k >= 0; k--) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col);
+        }
     }
 
     private static int shadeCol(float l) { int v = (int) (255 * l); return v | v << 8 | v << 16 | 255 << 24; }
@@ -265,8 +280,8 @@ public final class Mesher {
         int tint = tintOf(id, 2);
         int col = (tint >> 16 & 255) | (tint >> 8 & 255) << 8 | (tint & 255) << 16 | 255 << 24;
         float[][] q = {
-                {0.15f, 0, 0.15f, 0.85f, 0, 0.85f}, {0.85f, 0, 0.85f, 0.15f, 0, 0.15f},
-                {0.15f, 0, 0.85f, 0.85f, 0, 0.15f}, {0.85f, 0, 0.15f, 0.15f, 0, 0.85f}};
+                {0.05f, 0, 0.05f, 0.95f, 0, 0.95f}, {0.95f, 0, 0.95f, 0.05f, 0, 0.05f},
+                {0.05f, 0, 0.95f, 0.95f, 0, 0.05f}, {0.95f, 0, 0.05f, 0.05f, 0, 0.95f}};
         for (float[] p : q) {
             float ax = x + p[0], az = z + p[2], bxx = x + p[3], bzz = z + p[5];
             vert(solid, ax, y, az, u0, v1, col);

@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta15";
+    public static final String VERSION = "NOVA Engine beta16";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -46,6 +46,16 @@ public final class Game implements GLSurfaceView.Renderer {
 
     /** any thread: replace the world by a new one with this seed (done on the GL thread) */
     public void newWorld(int seed) { pendingSeed = seed; pendingWorld = true; }
+    /** structures within r chunks of the player: {type, x, z, distance} */
+    public java.util.List<int[]> structures(int r) {
+        World w = world;
+        if (w == null) return new java.util.ArrayList<int[]>();
+        return com.nova.engine.world.Finder.find(w, (int) Math.floor(player.x) >> 4, (int) Math.floor(player.z) >> 4, r);
+    }
+    /** any thread: move the player above x, z (lands on the top when the chunk is there) */
+    public void teleport(int x, int z) { tpX = x; tpZ = z; tpPending = true; }
+    private volatile boolean tpPending;
+    private volatile int tpX, tpZ;
     public int seed() { World w = world; return w == null ? startSeed : (int) w.seed; }
 
     private void spawn() {
@@ -155,6 +165,13 @@ public final class Game implements GLSurfaceView.Renderer {
         long dt = Math.min(250_000_000L, now - lastNs);
         lastNs = now;
         if (pendingWorld) replaceWorld();
+        if (tpPending) {
+            tpPending = false;
+            player.x = player.px = tpX + 0.5; player.z = player.pz = tpZ + 0.5; player.y = player.py = 120;
+            player.mx = player.my = player.mz = 0;
+            player.flying = true;
+            settleSpawn = true;
+        }
         if (settleSpawn) {                                   // stand on top of what decoration/villages built
             int px = (int) Math.floor(player.x), pz = (int) Math.floor(player.z);
             Chunk sc = world.ready(px >> 4, pz >> 4);
@@ -233,12 +250,7 @@ public final class Game implements GLSurfaceView.Renderer {
         }
         hl = c.interactId >= 0 && pickAt(c.interactX, c.interactY);
         if (hl) { hlX = pick.x; hlY = pick.y; hlZ = pick.z; }
-        // hold-to-destroy only counts on a block: over air, or after moving to another block, it starts over
-        if (c.interactId >= 0 && !c.interactHolding()) {
-            long key = hl ? (((long) hlX & 0x3FFFFFF) << 38) | (((long) hlZ & 0x3FFFFFF) << 12) | (hlY & 0xFFF) : Long.MIN_VALUE;
-            if (!hl || key != holdTarget) c.restartHold();
-            holdTarget = key;
-        }
+
         ray.hit = hl; ray.x = hlX; ray.y = hlY; ray.z = hlZ;
     }
 
@@ -249,32 +261,17 @@ public final class Game implements GLSurfaceView.Renderer {
             {1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0}, {0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1},
             {0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0}, {1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1}};
 
+    private Mesher hlMesher;
+    private final int[] hlOrigin = new int[3];
+
+    /** LevelRenderer::renderHitSelect: the block's own geometry again with the selection material */
     private void drawHighlight() {
-        int id = world.get(hlX, hlY, hlZ);
-        if (id == 0) return;
-        int data = world.data(hlX, hlY, hlZ), n = 0;
+        if (world.get(hlX, hlY, hlZ) == 0) return;
+        if (hlMesher == null) hlMesher = new Mesher(atlas.slotUv);
+        int[] v = hlMesher.single(world, hlX, hlY, hlZ, hlOrigin);
         int col = 166 | 166 << 8 | 166 << 16 | 255 << 24;             // shader colour 0.65
-        float[][] boxes = com.nova.engine.world.Shapes.at(world, hlX, hlY, hlZ);
-        if (boxes == null) return;
-        if (hlVerts.length < boxes.length * 6 * 4 * 6) hlVerts = new int[boxes.length * 6 * 4 * 6];
-        for (float[] b : boxes) {
-            for (int f = 0; f < 6; f++) {
-                int sl = Blocks.texFor(id, data, f) * 4;
-                float[] uv = atlas.slotUv;
-                float u0 = uv[sl], v0 = uv[sl + 1], du = uv[sl + 2] - u0, dv = uv[sl + 3] - v0;
-                for (int v = 0; v < 4; v++) {
-                    float px = CUBE[f][v * 3] == 0 ? b[0] : b[3], py = CUBE[f][v * 3 + 1] == 0 ? b[1] : b[4], pz = CUBE[f][v * 3 + 2] == 0 ? b[2] : b[5];
-                    float tu, tv;
-                    if (f <= 1) { tu = px; tv = pz; } else if (f <= 3) { tu = f == 2 ? 1 - px : px; tv = 1 - py; } else { tu = f == 4 ? pz : 1 - pz; tv = 1 - py; }
-                    // pulled out a little so it never z-fights with the block
-                    float ex = (px - 0.5f) * 0.004f, ey = (py - 0.5f) * 0.004f, ez = (pz - 0.5f) * 0.004f;
-                    hlVerts[n++] = Float.floatToRawIntBits(px + ex); hlVerts[n++] = Float.floatToRawIntBits(py + ey); hlVerts[n++] = Float.floatToRawIntBits(pz + ez);
-                    hlVerts[n++] = Float.floatToRawIntBits(u0 + du * tu); hlVerts[n++] = Float.floatToRawIntBits(v0 + dv * tv);
-                    hlVerts[n++] = col;
-                }
-            }
-        }
-        wr.drawOverlay(mvp, atlas.texture, hlVerts, n, hlX, hlY, hlZ);
+        for (int i = 5; i < v.length; i += Mesher.STRIDE) v[i] = col;
+        wr.drawOverlay(mvp, atlas.texture, v, v.length, hlOrigin[0], hlOrigin[1], hlOrigin[2]);
     }
 
     /** pumpkin faces the player (data 0 south .. 3 east) */
@@ -459,7 +456,7 @@ public final class Game implements GLSurfaceView.Renderer {
             else glyph(c.jumpR, 104, 107, c.jump);
         }
         // hold progress at the finger (HudProgressRenderer: ring + growing disc, ui_invert_overlay)
-        if (c.interactId >= 0 && hl && !c.interactHolding() && c.holdProgress > 0) progressRing(c.interactX, c.interactY, c.holdProgress);
+        if (c.interactId >= 0) progressRing(c.interactX, c.interactY, c.holdProgress);     // while the finger is down
         // info
         float ts = 8 * d;
         button(controls.menuR[0], controls.menuR[1], controls.menuR[2] - controls.menuR[0], "| |", false);

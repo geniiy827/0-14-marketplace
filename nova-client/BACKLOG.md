@@ -190,3 +190,11 @@
   biome at centre: desert/desertHills -> DesertPyramidPiece 21x15x21, swampland(M) -> SwamplandHut 7x7x9, facing S.
   Programs recorded by tools/emu_scattered.py. Hut height = updateAverageGroundHeight (max(top, 64)).
 - TODO: mineshafts, strongholds; chest loot; spawners' mobs.
+
+## beta16
+- Hold ring = TouchTurnInteractControl state machine: shown while a finger is down; look stage (moved past threshold) never breaks;
+  pressed 400 ms -> destroy (creative: break now, then every 250 ms; ring = time to next break). Tap < 250 ms = build.
+- Selection outlines the real block mesh (Mesher.single), crosses = 2 planes, torches = torch mesh.
+- Torch = renderTorchAtAngle (4 planes +-1/16, top cap 0.625, wall: offset 0.1 / lift 0.2 / tilt 0.4).
+- Structure finder: world dialog -> "Постройки рядом" (villages / pyramids / witch huts within 100 chunks, tap = teleport).
+- TODO: touch move threshold is 10dp (original 0.05 normalized), door hinges.
