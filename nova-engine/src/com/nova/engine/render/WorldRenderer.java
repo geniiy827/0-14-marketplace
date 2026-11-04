@@ -90,6 +90,12 @@ public final class WorldRenderer {
         return vbo;
     }
 
+    /** drop everything (new world) */
+    public void clearAll() {
+        for (Section s : sections.values()) { Gl.delete(s.solidVbo); Gl.delete(s.waterVbo); }
+        sections.clear();
+    }
+
     /** drop sections of chunks out of range */
     public void unloadFar(int pcx, int pcz, int radius) {
         Iterator<Map.Entry<Long, Section>> it = sections.entrySet().iterator();

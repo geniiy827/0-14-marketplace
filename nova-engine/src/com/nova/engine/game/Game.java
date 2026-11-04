@@ -31,23 +31,56 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta8";
+    public static final String VERSION = "NOVA Engine beta9";
 
     private final Context ctx;
     public final Controls controls = new Controls();
     private final Atlas atlas = new Atlas();
     private final WorldRenderer wr = new WorldRenderer();
     private final Hud hud = new Hud();
-    private World world;
+    private volatile World world;
+    /** seed for the first world (set by the activity before the surface is created) */
+    public volatile int startSeed = new java.util.Random().nextInt();
+    private volatile boolean pendingWorld;
+    private volatile int pendingSeed;
+
+    /** any thread: replace the world by a new one with this seed (done on the GL thread) */
+    public void newWorld(int seed) { pendingSeed = seed; pendingWorld = true; }
+    public int seed() { World w = world; return w == null ? startSeed : (int) w.seed; }
+
+    private void spawn() {
+        // spawn: first dry land along a spiral from 0,0
+        int sx = 0, sz = 0;
+        for (int i = 0; i < 400; i++) {
+            double a = i * 0.5;
+            int tx = (int) (Math.cos(a) * i * 8), tz = (int) (Math.sin(a) * i * 8);
+            int b = world.gen.biomeAt(tx, tz);
+            if (b != com.nova.engine.world.Biomes.OCEAN && b != com.nova.engine.world.Biomes.DEEP_OCEAN && world.gen.height(tx, tz) > Generator.SEA) { sx = tx; sz = tz; break; }
+        }
+        player.x = sx + 0.5; player.z = sz + 0.5; player.y = world.gen.height(sx, sz) + 2;
+        player.px = player.x; player.py = player.y; player.pz = player.z;
+        player.mx = player.my = player.mz = 0;
+    }
+
+    private void replaceWorld() {
+        pendingWorld = false;
+        world = new World(pendingSeed);
+        deco = new com.nova.engine.world.Decorator(world, world.seed);
+        generating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
+        decorating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
+        done.clear();
+        wr.clearAll();
+        spawn();
+    }
     private final Player player = new Player();
     private final Raycast ray = new Raycast();
     private ExecutorService workers;
     private final ConcurrentLinkedQueue<Mesher.Mesh> done = new ConcurrentLinkedQueue<Mesher.Mesh>();
     private final ThreadLocal<Mesher> meshers = new ThreadLocal<Mesher>();
-    private final java.util.Set<Long> decorating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
+    private volatile java.util.Set<Long> decorating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
     private final ExecutorService decoThread = Executors.newSingleThreadExecutor();
-    private com.nova.engine.world.Decorator deco;
-    private final java.util.Set<Long> generating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
+    private volatile com.nova.engine.world.Decorator deco;
+    private volatile java.util.Set<Long> generating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
     private int width = 1, height = 1;
     private float density = 3;
     private long lastNs, tickAcc;
@@ -77,18 +110,9 @@ public final class Game implements GLSurfaceView.Renderer {
             guiTex = hud.loadTex(atlas.gameAssets, "images/gui/gui.png");
             iconsTex = hud.loadTex(atlas.gameAssets, "images/gui/icons.png");
             if (world == null) {
-                world = new World(System.currentTimeMillis());
+                world = new World(startSeed);
                 deco = new com.nova.engine.world.Decorator(world, world.seed);
-                // spawn: first dry land along a spiral from 0,0
-                int sx = 0, sz = 0;
-                for (int i = 0; i < 400; i++) {
-                    double a = i * 0.5;
-                    int tx = (int) (Math.cos(a) * i * 8), tz = (int) (Math.sin(a) * i * 8);
-                    int b = world.gen.biomeAt(tx, tz);
-                    if (b != com.nova.engine.world.Biomes.OCEAN && b != com.nova.engine.world.Biomes.DEEP_OCEAN && world.gen.height(tx, tz) > Generator.SEA) { sx = tx; sz = tz; break; }
-                }
-                player.x = sx + 0.5; player.z = sz + 0.5; player.y = world.gen.height(sx, sz) + 2;
-                player.px = player.x; player.py = player.y; player.pz = player.z;
+                spawn();
             } else {
                 wr.sections.clear();                            // new GL context: everything re-uploads
                 for (Chunk c : world.chunks.values()) for (int s = 0; s < Chunk.SECTIONS; s++) c.version[s]++;
@@ -128,6 +152,7 @@ public final class Game implements GLSurfaceView.Renderer {
         long now = System.nanoTime();
         long dt = Math.min(250_000_000L, now - lastNs);
         lastNs = now;
+        if (pendingWorld) replaceWorld();
         input();
         tickAcc += dt;
         while (tickAcc >= 50_000_000L) { player.tick(world); tickAcc -= 50_000_000L; }
@@ -241,7 +266,7 @@ public final class Game implements GLSurfaceView.Renderer {
         for (int i = 0; i < 8; i++) {
             Mesher.Mesh m = done.poll();
             if (m == null) break;
-            wr.upload(m);
+            if (m.world == world) wr.upload(m);
         }
         int pcx = (int) Math.floor(player.x) >> 4, pcz = (int) Math.floor(player.z) >> 4;
         // generation like the original: terrain (parallel) -> decoration when the 3x3 around has terrain (one thread,
@@ -255,12 +280,14 @@ public final class Game implements GLSurfaceView.Renderer {
                 if (world.chunks.containsKey(k) || generating.contains(k)) continue;
                 generating.add(k);
                 queued++;
+                final World wld = world;
+                final java.util.Set<Long> gen = generating;
                 workers.execute(new Runnable() {
                     public void run() {
                         Chunk c = new Chunk(cx, cz);
-                        world.gen.terrain(c);
-                        world.addTerrain(c);
-                        generating.remove(k);
+                        wld.gen.terrain(c);
+                        wld.addTerrain(c);
+                        gen.remove(k);
                     }
                 });
             }
@@ -278,11 +305,13 @@ public final class Game implements GLSurfaceView.Renderer {
                 final long k = World.key(cx, cz);
                 decorating.add(k);
                 decoQueued++;
+                final com.nova.engine.world.Decorator dc = deco;
+                final java.util.Set<Long> dset = decorating;
                 decoThread.execute(new Runnable() {
                     public void run() {
-                        try { deco.decorate(cx, cz); } catch (Throwable t) { android.util.Log.e("NOVA", "decorate", t); }
+                        try { dc.decorate(cx, cz); } catch (Throwable t) { android.util.Log.e("NOVA", "decorate", t); }
                         c.stage = 2;
-                        decorating.remove(k);
+                        dset.remove(k);
                     }
                 });
             }
@@ -319,11 +348,12 @@ public final class Game implements GLSurfaceView.Renderer {
                     sec.building = true;
                     meshQueued++;
                     final int sy = s, fcx = cx, fcz = cz;
+                    final World wld = world;
                     workers.execute(new Runnable() {
                         public void run() {
                             Mesher m = meshers.get();
                             if (m == null) { m = new Mesher(atlas.slotUv); meshers.set(m); }
-                            Mesher.Mesh mesh = m.build(world, fcx, sy, fcz, ver);
+                            Mesher.Mesh mesh = m.build(wld, fcx, sy, fcz, ver);
                             if (mesh != null) done.add(mesh);
                             else sec.building = false;
                         }
@@ -409,7 +439,8 @@ public final class Game implements GLSurfaceView.Renderer {
         if (c.interactId >= 0 && c.holdProgress > 0) progressRing(c.interactX, c.interactY, c.holdProgress);
         // info
         float ts = 8 * d;
-        hud.text(VERSION, d * 6, d * 6, ts, 0xFF66F2E0);
+        button(controls.menuR[0], controls.menuR[1], controls.menuR[2] - controls.menuR[0], "| |", false);
+        hud.text(VERSION + "   seed " + seed(), d * 6, d * 6, ts, 0xFF66F2E0);
         hud.text(fps + " fps  " + wr.drawnSections + " sec  " + world.chunks.size() + " ch", d * 6, d * 6 + ts * 1.3f, ts, 0xFFFFFFFF);
         hud.text(String.format(java.util.Locale.US, "%.1f %.1f %.1f", player.x, player.y, player.z), d * 6, d * 6 + ts * 2.6f, ts, 0xFFFFFFFF);
         hud.text("textures: " + atlas.source + "   biome: " + String.valueOf(com.nova.engine.world.Biomes.NAME[world.biome((int) Math.floor(player.x), (int) Math.floor(player.z))]), d * 6, d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);

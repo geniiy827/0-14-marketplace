@@ -24,6 +24,8 @@ public final class Controls {
             upLeft = new float[4], upRight = new float[4], sneakR = new float[4], dpadZone = new float[4],
             upInvisible = new float[4], jumpR = new float[4], jumpHit = new float[4], ascendR = new float[4], descendR = new float[4];
     public float slot, barX, barY;
+    /** world / pause button (top right, where 0.14 has pause) */
+    public final float[] menuR = new float[4];
 
     // ---- state for the game
     public float moveF, moveS;
@@ -85,6 +87,16 @@ public final class Controls {
         scale(descendR, jumpHit, 0.9f);
         slot = Math.min(44 * dp, w * 0.6f / 9);
         barX = (w - slot * 9) / 2; barY = h - slot - 4 * dp;
+        float m = slot * 0.9f;
+        rect(menuR, w - m - 6 * dp, 6 * dp, w - 6 * dp, 6 * dp + m);
+    }
+
+    /** UI thread: true when this event is a finger going down on the world button */
+    public synchronized boolean menuHit(MotionEvent e) {
+        int a = e.getActionMasked();
+        if (a != MotionEvent.ACTION_DOWN && a != MotionEvent.ACTION_POINTER_DOWN) return false;
+        int idx = e.getActionIndex();
+        return in(menuR, e.getX(idx), e.getY(idx));
     }
 
     public synchronized boolean onTouch(MotionEvent e) {

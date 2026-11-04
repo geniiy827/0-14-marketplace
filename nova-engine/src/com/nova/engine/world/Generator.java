@@ -69,7 +69,7 @@ public final class Generator {
         for (int i = 0; i < 256; i++) c.biome[i] = (byte) b[i];
         prepareHeights(c);
         buildSurfaces(c, rnd);
-        carveCaves(c);     // interim
+        new Caves(iseed).apply(c);       // LargeCaveFeature (RandomLevelSource::loadChunk)
     }
 
     /** old single pass (interim decoration), kept for tools */

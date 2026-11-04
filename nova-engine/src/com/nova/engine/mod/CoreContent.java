@@ -98,6 +98,7 @@ public final class CoreContent implements NovaMod {
         }
         r.block(44, "stone_slab").tex(r.tex("stone_slab:0"), r.tex("stone_slab:0"), r.tex("stone_slab:1")).height(0.5f)
                 .data(1, r.tex("sandstone:0"), r.tex("sandstone:4"), r.tex("sandstone:3"));
+        r.block(179, "red_sandstone").tex(r.tex("redsandstone:0"), r.tex("redsandstone:4"), r.tex("redsandstone:3"));
         r.block(129, "emerald_ore").tex(r.tex("emerald_ore"));
         r.block(243, "podzol").tex(r.tex("dirt:1"), r.tex("dirt"), r.tex("dirt:2"));
     }

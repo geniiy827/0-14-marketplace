@@ -12,6 +12,83 @@ import com.nova.engine.game.Game;
 
 public final class EngineActivity extends Activity {
     private GLSurfaceView view;
+    private android.content.SharedPreferences prefs;
+    private boolean dialogOpen;
+
+    /** world menu: current seed, type a seed (number or text, empty = random), recent seeds, copy */
+    private void worldDialog() {
+        if (dialogOpen) return;
+        dialogOpen = true;
+        float dp = getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout l = new android.widget.LinearLayout(this);
+        l.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (16 * dp);
+        l.setPadding(pad, pad / 2, pad, 0);
+        android.widget.TextView cur = new android.widget.TextView(this);
+        cur.setText("Текущий сид: " + game.seed());
+        cur.setTextSize(16);
+        l.addView(cur);
+        final android.widget.EditText in = new android.widget.EditText(this);
+        in.setHint("сид: число или текст (пусто = случайный)");
+        in.setSingleLine(true);
+        l.addView(in);
+        String[] recent = prefs.getString("recent", "").split("\n");
+        boolean any = false;
+        for (final String t : recent) {
+            if (t.isEmpty()) continue;
+            if (!any) {
+                android.widget.TextView h = new android.widget.TextView(this);
+                h.setText("Недавние:");
+                h.setPadding(0, pad / 2, 0, 0);
+                l.addView(h);
+                any = true;
+            }
+            android.widget.Button b = new android.widget.Button(this);
+            b.setAllCaps(false);
+            b.setText(t + "   \u2192   " + com.nova.engine.world.Seeds.parse(t, 0));
+            b.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { in.setText(t); in.setSelection(t.length()); }
+            });
+            l.addView(b);
+        }
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(l);
+        android.app.AlertDialog d = new android.app.AlertDialog.Builder(this)
+                .setTitle("Мир")
+                .setView(sv)
+                .setPositiveButton("Создать мир", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface di, int w) {
+                        String t = in.getText().toString();
+                        int seed = com.nova.engine.world.Seeds.parse(t, new java.util.Random().nextInt());
+                        remember(t.trim().isEmpty() ? String.valueOf(seed) : t);
+                        prefs.edit().putInt("seed", seed).apply();
+                        game.newWorld(seed);
+                    }
+                })
+                .setNeutralButton("Копировать сид", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface di, int w) {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("seed", String.valueOf(game.seed())));
+                        android.widget.Toast.makeText(EngineActivity.this, "Сид скопирован", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .create();
+        d.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+            public void onDismiss(android.content.DialogInterface di) { dialogOpen = false; immersive(); }
+        });
+        d.show();
+    }
+
+    private void remember(String t) {
+        StringBuilder sb = new StringBuilder(t);
+        int n = 1;
+        for (String o : prefs.getString("recent", "").split("\n")) {
+            if (o.isEmpty() || o.equals(t) || n >= 10) continue;
+            sb.append('\n').append(o); n++;
+        }
+        prefs.edit().putString("recent", sb.toString()).apply();
+    }
     private Game game;
 
     @Override
@@ -26,9 +103,15 @@ public final class EngineActivity extends Activity {
             } catch (Throwable ignored) { }
         }
         game = new Game(this);
+        prefs = getSharedPreferences("nova", 0);
+        if (prefs.contains("seed")) game.startSeed = prefs.getInt("seed", 0);
+        else prefs.edit().putInt("seed", game.startSeed).apply();
         view = new GLSurfaceView(this) {
             @Override
-            public boolean onTouchEvent(MotionEvent e) { return game.controls.onTouch(e); }
+            public boolean onTouchEvent(MotionEvent e) {
+                if (game.controls.menuHit(e)) { worldDialog(); return true; }
+                return game.controls.onTouch(e);
+            }
         };
         view.setEGLContextClientVersion(3);
         view.setEGLConfigChooser(8, 8, 8, 8, 24, 0);

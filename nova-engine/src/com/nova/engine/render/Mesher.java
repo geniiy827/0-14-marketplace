@@ -15,6 +15,7 @@ public final class Mesher {
     /** result of one build */
     public static final class Mesh {
         public int cx, sy, cz, version;
+        public World world;             // the world it was built from (dropped when the world was replaced)
         public int[] solid, water;      // vertex data; quads of 4 vertices
         public int solidVerts, waterVerts;
     }
@@ -89,6 +90,7 @@ public final class Mesher {
             }
         }
         Mesh m = new Mesh();
+        m.world = w;
         m.cx = cx; m.sy = sy; m.cz = cz; m.version = version;
         m.solid = solid.copy(); m.solidVerts = solid.n / STRIDE;
         m.water = water.copy(); m.waterVerts = water.n / STRIDE;

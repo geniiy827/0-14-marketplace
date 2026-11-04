@@ -118,3 +118,12 @@
   mega spruce/pine (+podzol), mega jungle, jungle, shrub. Not byte-checked vs the .so yet: vines/cocoa skipped (RNG order differs).
 - Double plants (175, top = 8|type), tulips/bluets/daisies by info noise in plains, ferns, mossy boulders, desert well, melons, emerald.
 - TODO structures: villages, mineshafts, strongholds, desert/jungle temples, dungeons, ocean? (0.14 has villages + mineshafts + strongholds? check StructureFeature list in .so)
+
+## beta9 (seeds, caves)
+- Seeds = LevelSettings::parseSeedString (0x53a248): len<=1 -> random(!), trim, sscanf %d (prefix), -1 only from "-1",
+  else Util::hashCode = h*31 + byte (UTF-8). World menu (top right): type seed / recent / copy; last seed remembered.
+- Caves = LargeCaveFeature exact port (apply 0x5ebfc4 range 8, addFeature 0x622a20, addRoom 0x622880, addTunnel 0x621d30,
+  isDiggable 0x605858: stone dirt grass hardened/stained clay sandstone red sandstone mycelium podzol, sand unless water above;
+  _thinSand: 3 sand above -> sandstone/red sandstone). No ravines in 0.14. Applied in loadChunk after buildSurfaces.
+- Next: RandomLevelSource::postProcess 0x644680 (structures postProcess, lakes?, MonsterRoom), StructureFeature (villages,
+  mineshafts, strongholds, scattered: SmallTemple/SwamplandHut...), spawn (Level::validateSpawn?).
