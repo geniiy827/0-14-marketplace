@@ -91,6 +91,18 @@ public final class HandRenderer {
         }
     }
 
+    /** LevelRenderer::bobView: walking sway of the camera (and the hand) */
+    public static void bobView(float[] m, Player p, float a) {
+        float f = p.walkDist - p.oWalkDist;
+        float ang = (f * a - p.oWalkDist) * (float) Math.PI;
+        float b = p.oBob + (p.bob - p.oBob) * a;
+        float t = p.oTilt + (p.tilt - p.oTilt) * a;
+        Matrix.translateM(m, 0, (float) Math.sin(ang) * b * 0.5f, -Math.abs((float) Math.cos(ang) * b), 0f);
+        Matrix.rotateM(m, 0, (float) Math.sin(ang) * b * 3f, 0, 0, 1);
+        Matrix.rotateM(m, 0, Math.abs((float) Math.cos(ang - 0.2f) * b) * 5f, 1, 0, 0);
+        Matrix.rotateM(m, 0, t, 1, 0, 0);
+    }
+
     static float bobTerm(float v) {
         v *= 0.1f;
         if (Math.abs(v) > 1f) v = Math.signum(v) * (float) Math.sqrt(Math.sqrt(Math.abs(v)));
@@ -102,6 +114,7 @@ public final class HandRenderer {
         if (tex == 0) return;
         Matrix.perspectiveM(proj, 0, 70f, (float) width / height, 0.05f, 256f);
         Matrix.setIdentityM(m, 0);
+        bobView(m, p, a);
         // setPlayerBob
         float bx = p.oBobX + (p.bobX - p.oBobX) * a, by = p.oBobY + (p.bobY - p.oBobY) * a;
         Matrix.rotateM(m, 0, bobTerm(p.pitch - bx), 1, 0, 0);

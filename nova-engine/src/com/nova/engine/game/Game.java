@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta19";
+    public static final String VERSION = "NOVA Engine beta20";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -448,6 +448,7 @@ public final class Game implements GLSurfaceView.Renderer {
         float far = underwater ? 10 : radius * 16;
         Matrix.perspectiveM(proj, 0, 70, (float) width / height, 0.05f, radius * 16 + 64);
         Matrix.setIdentityM(view, 0);
+        com.nova.engine.render.HandRenderer.bobView(view, player, a);
         Matrix.rotateM(view, 0, player.pitch, 1, 0, 0);
         Matrix.rotateM(view, 0, player.yaw, 0, 1, 0);
         float ex = (float) player.ex(a), ey = (float) player.ey(a), ez = (float) player.ez(a);

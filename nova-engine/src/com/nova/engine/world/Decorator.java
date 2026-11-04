@@ -47,8 +47,9 @@ public final class Decorator {
 
     private final Village village;
     private final Scattered scattered;
+    private final Mineshaft mineshaft;
 
-    public Decorator(World w, long seed) { this.w = w; this.seed = (int) seed; this.village = new Village(w.gen, (int) seed); this.scattered = new Scattered(w.gen, (int) seed); }
+    public Decorator(World w, long seed) { this.w = w; this.seed = (int) seed; this.village = new Village(w.gen, (int) seed); this.scattered = new Scattered(w.gen, (int) seed); this.mineshaft = new Mineshaft(w.gen, (int) seed); }
 
     /** world access for the structures (raw: decoration stage) */
     private final Village.Blocks4 structureAccess = new Village.Blocks4() {
@@ -63,6 +64,17 @@ public final class Decorator {
                 if (Blocks.solid[id]) return y + 1;
             }
             return 0;
+        }
+    };
+
+    /** the same for the mineshaft pieces; sky light = 15 where nothing opaque is above, else 0 (no light engine yet) */
+    private final Mineshaft.World mineAccess = new Mineshaft.World() {
+        public int get(int x, int y, int z) { return Decorator.this.get(x, y, z); }
+        public void set(int x, int y, int z, int id, int data) { Decorator.this.set(x, y, z, id, data); }
+        public int sky(int x, int y, int z) {
+            if (y < 0) return 0;
+            for (int yy = y; yy < Chunk.H; yy++) { int id = Decorator.this.get(x, yy, z); if (id != AIR && Blocks.opaque[id]) return 0; }
+            return 15;
         }
     };
 
@@ -963,6 +975,8 @@ public final class Decorator {
         }
         r = new McRandom(chunkSeed);                                   // reseeded before the structures
         try { village.postProcess(structureAccess, r, ox >> 4, oz >> 4); }        // +0xc4
+        catch (Throwable t) { t.printStackTrace(); }
+        try { mineshaft.postProcess(mineAccess, r, ox >> 4, oz >> 4); }        // +0x168
         catch (Throwable t) { t.printStackTrace(); }
         try { scattered.postProcess(structureAccess, r, ox >> 4, oz >> 4); }     // +0x13c (after mineshafts/strongholds)
         catch (Throwable t) { t.printStackTrace(); }

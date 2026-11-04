@@ -7,6 +7,7 @@ package com.nova.engine.world;
 public final class McRandom {
     private final int[] mt = new int[624];
     private int mti;
+    int debugIndex() { return mti; }
 
     public McRandom(int seed) { setSeed(seed); }
 

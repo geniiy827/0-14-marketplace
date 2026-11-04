@@ -37,7 +37,12 @@ public final class Player {
         return oAttackAnim + d * a;
     }
 
+    // Entity walkDist (+0xb4, move adds the horizontal distance x 0.6), Player bob (+0xce8) and tilt (+0x1a0), for
+    // LevelRenderer::bobView
+    public float walkDist, oWalkDist, bob, oBob, tilt, oTilt;
+
     public void tick(World w) {
+        oWalkDist = walkDist; oBob = bob; oTilt = tilt;
         oAttackAnim = attackAnim;
         if (swinging) { swingTime++; if (swingTime >= 6) { swingTime = 0; swinging = false; } } else swingTime = 0;
         attackAnim = swingTime / 6f;
@@ -92,6 +97,13 @@ public final class Player {
         if (jumpTicks > 0) jumpTicks--;
         if (autoTicks > 0) autoTicks--;
         if (y < -40) { y = 140; my = 0; }
+        // Player::aiStep: bob toward min(speed, 0.1) on the ground (0 in the air), 0.4 of the way; tilt toward
+        // atan(-yd * 0.2) * 15 in the air (0 on the ground), 0.8 of the way
+        float hs = (float) Math.sqrt(mx * mx + mz * mz);
+        float tb = onGround ? Math.min(hs, 0.1f) : 0f;
+        float tt = onGround ? 0f : (float) Math.atan(-my * 0.2f) * 15f;
+        bob += (tb - bob) * 0.4f;
+        tilt += (tt - tilt) * 0.8f;
     }
 
     private boolean free(World w, double cx, double fy, double cz) {
@@ -111,6 +123,7 @@ public final class Player {
         double dz = clipZ(w, mz);
         if (dz != mz) mz = 0;
         z += dz;
+        walkDist += (float) Math.sqrt(dx * dx + dz * dz) * 0.6f;
     }
 
     private double clipY(World w, double d) {

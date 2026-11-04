@@ -240,3 +240,21 @@
   chain, PlayerRenderer::renderRightHand (setupAnim zeros -> zRot 0.1), geometry.humanoid.custom rightArm + rightSleeve,
   steve.png, entity.vertex FANCY lighting. Mob::swing / updateAttackAnim (6 ticks) on break / place / use.
 - TODO: LevelRenderer::bobView (walk bob) for the hand and camera, tile light colour at the player, equipped height anim.
+
+## beta20
+- Mineshafts (world/Mineshaft.java), ported from the binary and checked against the original run in unicorn
+  (tools/emu_mineshaft.py + tools/MineshaftCheck.java.txt): 6 starts (incl. surface variant), every piece and every
+  block identical. MCPE quirks kept: room addChildren gate nextFloat > factor, spiders only when bb.y1 <= 49 at
+  creation, cobweb placed at z - 1 of the light check, spawner light read with world coords through the local
+  getBrightness, rails 0.7 below light 9 else 0.9, getBrightness two blocks above, getTorchData table, rail data 1 on
+  W/E. Surface (dark oak, factor 0.5, moved to 68) when the chunk corner biome class is 8 (river).
+  postProcess order now village -> mineshaft -> scattered (stronghold slot between them still empty).
+  Sky light approximated: 15 when nothing opaque above, else 0.
+  Finder lists mineshafts too.
+- Strongholds (TODO next): StrongholdFeature::isFeatureChunk: MT(level seed); angle = nextFloat*2pi, dist = (u&15)+40;
+  for 3: ring point (cos, sin)*dist (Mth sin table), search 16x16 chunks around for a VILLAGE chunk
+  (VillageFeature::isFeatureChunk); found -> angle += 2pi/3*, dist += 8; not found -> angle += pi/4, dist += 4, retry.
+  Pieces SH* = Java 1.8 set (13 types) - port + emulator check like the mineshafts.
+- New from the original: LevelRenderer::bobView walking sway (camera + hand): angle = (f*a - walkDistO)*pi,
+  translate(sin*b*0.5, -|cos*b|), rotZ sin*b*3, rotX |cos(angle-0.2)*b|*5, rotX tilt; Player::aiStep bob 0.4 toward
+  min(speed, 0.1) on ground, tilt 0.8 toward atan(-yd*0.2)*15 in the air; walkDist += horizontal move * 0.6.
