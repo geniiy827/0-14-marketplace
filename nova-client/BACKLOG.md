@@ -152,3 +152,11 @@
   on several seeds/windows (mimi, 12345, -1919 as unsigned).
 - Spawn: neighbours by flat index of the 10x10 buffer (row wrap) -> mimi spawn 1392,32 == original screenshot.
 - Next verification: RandomLevelSource heights/surface in the emulator (prepareHeights + buildSurfaces).
+
+## beta13 (snow, ice)
+- Ice: postProcess freeze loop (shouldFreeze 0x527f80: temp <= RAIN_TEMP_THRESHOLD(0.15), still water data 0, block light <= 9).
+- Top snow: Seasons::postProcess 0x5b3530 after decorate: biome snow accumulation (setSnowAccumulation min/max):
+  frozenOcean/frozenRiver/coldBeach .125/.25, iceFlats .25/1, iceMountains .375/1.5, taigaCold(+Hills, M), ice spikes .125/.5;
+  depth = ceil((-0.17 + (noise3(pos)+26)*0.01923077) * int(min*8)), +1 per higher neighbour, -1 per lower (if >1);
+  noise = PerlinSimplexNoise(0x15cf0, 5).getValue(Vec3) (3D simplex sum v(p*f)/f, f halves) - 3D simplex is the standard
+  algorithm, not byte-verified. canPlaceTopSnow approximated. Snow layer height = (data+1)/8.

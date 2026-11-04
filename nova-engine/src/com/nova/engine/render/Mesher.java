@@ -126,7 +126,7 @@ public final class Mesher {
         int s = (overlay ? Blocks.sideOverlay[id] : snowy && f >= 2 ? Blocks.grassSnowSide : Blocks.texFor(id, data, f)) * 4;
         float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
         int tint = overlay ? tintOfValue(Blocks.sideOverlayTint[id], id) : snowy && f >= 2 ? 0xFFFFFF : tintOf(id, f);
-        float bh = Blocks.height[id];
+        float bh = id == 78 ? ((data & 7) + 1) / 8f : Blocks.height[id];       // top snow: data = layers - 1
         float tr = ((tint >> 16) & 255) / 255f, tg = ((tint >> 8) & 255) / 255f, tb = (tint & 255) / 255f;
         boolean liquid = Blocks.kind[id] == Blocks.LIQUID;
         Buf out = Blocks.layer[id] == Blocks.TRANSLUCENT ? water : solid;

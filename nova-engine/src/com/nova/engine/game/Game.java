@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta12";
+    public static final String VERSION = "NOVA Engine beta13";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -230,7 +230,7 @@ public final class Game implements GLSurfaceView.Renderer {
         int data = world.data(hlX, hlY, hlZ), n = 0;
         int col = 166 | 166 << 8 | 166 << 16 | 255 << 24;             // shader colour 0.65
         boolean cross = Blocks.kind[id] == Blocks.CROSS;
-        float hgt = Blocks.height[id];
+        float hgt = id == 78 ? ((data & 7) + 1) / 8f : Blocks.height[id];
         for (int f = 0; f < 6; f++) {
             int sl = Blocks.texFor(id, data, f) * 4;
             float[] uv = atlas.slotUv;

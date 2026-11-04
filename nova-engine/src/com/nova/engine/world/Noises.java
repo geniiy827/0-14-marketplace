@@ -183,6 +183,47 @@ public final class Noises {
             return ((n1 + n0) + n2) * 70f;
         }
 
+        static final int[][] G3 = {{1, 1, 0}, {-1, 1, 0}, {1, -1, 0}, {-1, -1, 0}, {1, 0, 1}, {-1, 0, 1}, {1, 0, -1}, {-1, 0, -1},
+                {0, 1, 1}, {0, -1, 1}, {0, 1, -1}, {0, -1, -1}};
+
+        /** SimplexNoise::_getValue(Vec3): 3D simplex (F3 = 1/3, G3 = 1/6, 0.6 - d, * 32), no offsets */
+        float value3(float x, float y, float z) {
+            final float F3 = 1f / 3f, G = 1f / 6f;
+            float s = ((y + x) + z) * F3;
+            float xs = s + x, ys = s + y, zs = s + z;
+            int i = (int) xs; if (xs <= 0f) i--;
+            int j = (int) ys; if (ys <= 0f) j--;
+            int k = (int) zs; if (zs <= 0f) k--;
+            float t = (float) (i + j + k) * G;
+            float x0 = x - ((float) i - t), y0 = y - ((float) j - t), z0 = z - ((float) k - t);
+            int i1, j1, k1, i2, j2, k2;
+            if (x0 >= y0) {
+                if (y0 >= z0) { i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 1; k2 = 0; }
+                else if (x0 >= z0) { i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 0; k2 = 1; }
+                else { i1 = 0; j1 = 0; k1 = 1; i2 = 1; j2 = 0; k2 = 1; }
+            } else {
+                if (y0 < z0) { i1 = 0; j1 = 0; k1 = 1; i2 = 0; j2 = 1; k2 = 1; }
+                else if (x0 < z0) { i1 = 0; j1 = 1; k1 = 0; i2 = 0; j2 = 1; k2 = 1; }
+                else { i1 = 0; j1 = 1; k1 = 0; i2 = 1; j2 = 1; k2 = 0; }
+            }
+            float x1 = x0 - i1 + G, y1 = y0 - j1 + G, z1 = z0 - k1 + G;
+            float x2 = x0 - i2 + 2f * G, y2 = y0 - j2 + 2f * G, z2 = z0 - k2 + 2f * G;
+            float x3 = x0 - 1f + 3f * G, y3 = y0 - 1f + 3f * G, z3 = z0 - 1f + 3f * G;
+            int ii = i & 255, jj = j & 255, kk = k & 255;
+            int g0 = p[ii + p[jj + p[kk]]] % 12, g1 = p[ii + i1 + p[jj + j1 + p[kk + k1]]] % 12;
+            int g2 = p[ii + i2 + p[jj + j2 + p[kk + k2]]] % 12, g3 = p[ii + 1 + p[jj + 1 + p[kk + 1]]] % 12;
+            float n = 0f;
+            float t0 = 0.6f - x0 * x0 - y0 * y0 - z0 * z0;
+            if (t0 >= 0) { t0 *= t0; n += t0 * t0 * (G3[g0][0] * x0 + G3[g0][1] * y0 + G3[g0][2] * z0); }
+            float t1 = 0.6f - x1 * x1 - y1 * y1 - z1 * z1;
+            if (t1 >= 0) { t1 *= t1; n += t1 * t1 * (G3[g1][0] * x1 + G3[g1][1] * y1 + G3[g1][2] * z1); }
+            float t2 = 0.6f - x2 * x2 - y2 * y2 - z2 * z2;
+            if (t2 >= 0) { t2 *= t2; n += t2 * t2 * (G3[g2][0] * x2 + G3[g2][1] * y2 + G3[g2][2] * z2); }
+            float t3 = 0.6f - x3 * x3 - y3 * y3 - z3 * z3;
+            if (t3 >= 0) { t3 *= t3; n += t3 * t3 * (G3[g3][0] * x3 + G3[g3][1] * y3 + G3[g3][2] * z3); }
+            return 32f * n;
+        }
+
         /** _add: buf[z*xs+x] += value(xo + (x+px)*sx, yo + (z+pz)*sz) * amp */
         void add(float[] buf, float px, float pz, int xs, int zs, float sx, float sz, float amp) {
             int idx = 0;
@@ -199,6 +240,13 @@ public final class Noises {
 
     public static final class PerlinSimplex {
         final Simplex[] levels;
+
+        /** PerlinSimplexNoise::getValue(Vec3): sum value3(p * f) / f, f = 1, 0.5, 0.25 ... */
+        public float value3(float x, float y, float z) {
+            float f = 1f, sum = 0f;
+            for (Simplex s : levels) { sum = sum + s.value3(f * x, f * y, f * z) / f; f = f * 0.5f; }
+            return sum;
+        }
 
         PerlinSimplex(McRandom r, int n) {
             levels = new Simplex[n];

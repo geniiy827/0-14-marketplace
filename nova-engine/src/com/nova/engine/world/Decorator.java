@@ -80,11 +80,13 @@ public final class Decorator {
         ox = cx << 4; oz = cz << 4;
         int biome = w.rawBiome(ox + 15, oz + 15);
         lakesAndDungeons(biome, chunkSeed);
+        freeze();
         r = new McRandom(chunkSeed);                                   // reseeded for Biome::decorate
         flowerN = FLOWERS[biome]; grassN = GRASSN[biome];
         preDecorate(biome);
         decorateBiome(biome);
         postDecorate(biome);
+        snow();                                                         // Seasons::postProcess
     }
 
     // ------------------------------------------------------------------ BiomeDecorator::decorate
@@ -1052,5 +1054,59 @@ public final class Decorator {
             }
         }
         set(px, py, pz, SPAWNER, 0);
+    }
+
+    // ================================================================== ice and top snow
+    static final int SNOW = 78;
+    static final Noises.PerlinSimplex SNOW_NOISE = new Noises.PerlinSimplex(new McRandom(0x15cf0), 5);
+    static final float[] SNOW_MIN = new float[256], SNOW_MAX = new float[256];
+    static {
+        for (int b : new int[]{10, 11, 26}) { SNOW_MIN[b] = 0.125f; SNOW_MAX[b] = 0.25f; }
+        SNOW_MIN[12] = 0.25f; SNOW_MAX[12] = 1f;
+        SNOW_MIN[13] = 0.375f; SNOW_MAX[13] = 1.5f;
+        for (int b : new int[]{30, 31, 158, 140}) { SNOW_MIN[b] = 0.125f; SNOW_MAX[b] = 0.5f; }
+    }
+
+    /** BlockSource::getTopRainBlockPos: above the highest block that stops rain (anything but air and plants) */
+    private int topRain(int x, int z) {
+        for (int y = Chunk.H - 1; y >= 0; y--) {
+            int id = get(x, y, z);
+            if (id != AIR && Blocks.kind[id] != Blocks.CROSS && id != SNOW) return y + 1;
+        }
+        return 0;
+    }
+
+    /** postProcess freeze loop: still water at the top of cold columns becomes ice */
+    private void freeze() {
+        for (int x = ox; x < ox + 16; x++) for (int z = oz; z < oz + 16; z++) {
+            int y = topRain(x, z) - 1;
+            if (y < 0 || y > 127) continue;
+            if (Biomes.TEMP[w.rawBiome(x, z) & 255] > 0.15f) continue;
+            int id = get(x, y, z);
+            if ((id == WATER || id == FLOWING_WATER) && w.data(x, y, z) == 0) set(x, y, z, ICE, 0);
+        }
+    }
+
+    /** Seasons::postProcess: top snow of a noise based depth, deeper in hollows (approx canPlaceTopSnow) */
+    private void snow() {
+        int[][] dirs = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+        for (int z = oz; z < oz + 16; z++) for (int x = ox; x < ox + 16; x++) {
+            int y = topRain(x, z);
+            int b = w.rawBiome(x, z) & 255;
+            if (!(SNOW_MAX[b] > 0f) || !(Biomes.TEMP[b] < 0.15f) || y <= 0 || y > 127) continue;
+            if (!air(x, y, z)) continue;
+            int below = get(x, y - 1, z);
+            if (below == ICE || below == 174 || Blocks.kind[below] == Blocks.LIQUID || (!Blocks.opaque[below] && below != LEAVES && below != LEAVES2)) continue;
+            float n = SNOW_NOISE.value3((float) x, (float) y, (float) z);
+            float f = -0.17f + (n + 26f) * 0.01923077f;
+            int depth = (int) Math.ceil(f * (float) (int) (SNOW_MIN[b] * 8f));
+            for (int[] d : dirs) {
+                int ny = topRain(x + d[0], z + d[1]);
+                if (ny > y) depth++;
+                else if (ny < y && depth > 1) depth--;
+            }
+            if (depth <= 0) continue;
+            set(x, y, z, SNOW, Math.min(depth, 8) - 1);
+        }
     }
 }
