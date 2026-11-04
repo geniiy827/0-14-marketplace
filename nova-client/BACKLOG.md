@@ -231,3 +231,12 @@
   CubemapBackgroundScreen panorama (fov 120, T += dt*30, sin(T*0.0025)*25+20 X, -T*0.1 Y) + gradient 0.35, splash
   (1.3 + sin(t*7.222)^4*0.06) * 100/(len+32), -20 deg. Gui scale = MinecraftClient::calculateGuiScale. Only Play works.
 - TODO: mineshafts, strongholds; other buttons/screens; touch threshold 0x2c.
+
+## beta19
+- Fix: the title screen was empty - the UI json, lang files, splashes, panorama, newgui, title, glyph pages were not
+  packed into our APK (assets come from the engine APK). Packed now (assets/ui, loc, images/gui/..., font glyph 00 01 04 20 21 22 25).
+- First person empty hand (render/HandRenderer): InGamePlayScreen::_renderItemInHand fov 70 / near 0.05, setPlayerBob
+  (0.1, 4th root above 1, x2, clamp 10; bob 0.4 per tick in LocalPlayer::aiStep), ItemInHandRenderer::render empty hand
+  chain, PlayerRenderer::renderRightHand (setupAnim zeros -> zRot 0.1), geometry.humanoid.custom rightArm + rightSleeve,
+  steve.png, entity.vertex FANCY lighting. Mob::swing / updateAttackAnim (6 ticks) on break / place / use.
+- TODO: LevelRenderer::bobView (walk bob) for the hand and camera, tile light colour at the player, equipped height anim.

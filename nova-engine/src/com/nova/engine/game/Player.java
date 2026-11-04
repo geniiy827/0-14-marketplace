@@ -19,7 +19,31 @@ public final class Player {
     private int jumpTicks, autoTicks;
     private boolean autoJumpNext;
 
+    // LocalPlayer +0xf7c / +0xf84: the arm bob (aiStep: old = bob; bob += (rot - bob) * 0.4)
+    public float bobX, bobY, oBobX, oBobY;
+    // Mob swing (Mob::swing / updateAttackAnim, duration 6 without haste / fatigue)
+    public boolean swinging;
+    public int swingTime;
+    public float attackAnim, oAttackAnim;
+
+    public void swing() {
+        if (!swinging || swingTime >= 3 || swingTime < 0) { swingTime = -1; swinging = true; }
+    }
+
+    /** Mob::getAttackAnim */
+    public float attackAnim(float a) {
+        float d = attackAnim - oAttackAnim;
+        if (d < 0) d += 1f;
+        return oAttackAnim + d * a;
+    }
+
     public void tick(World w) {
+        oAttackAnim = attackAnim;
+        if (swinging) { swingTime++; if (swingTime >= 6) { swingTime = 0; swinging = false; } } else swingTime = 0;
+        attackAnim = swingTime / 6f;
+        oBobX = bobX; oBobY = bobY;
+        bobX += (pitch - bobX) * 0.4f;
+        bobY += (yaw - bobY) * 0.4f;
         px = x; py = y; pz = z;
         double ry = Math.toRadians(yaw);
         double sin = Math.sin(ry), cos = Math.cos(ry);

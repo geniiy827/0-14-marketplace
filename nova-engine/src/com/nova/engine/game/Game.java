@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta18";
+    public static final String VERSION = "NOVA Engine beta19";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -41,6 +41,7 @@ public final class Game implements GLSurfaceView.Renderer {
     private volatile World world;
     /** the title screen is shown until Play */
     public volatile boolean inMenu = true;
+    private final com.nova.engine.render.HandRenderer hand = new com.nova.engine.render.HandRenderer();
     private com.nova.engine.ui.StartMenu menu;
     private final java.util.ArrayList<float[]> menuEvents = new java.util.ArrayList<float[]>();
 
@@ -131,6 +132,7 @@ public final class Game implements GLSurfaceView.Renderer {
             for (NovaMod m : mods) { reg.modId = m.id(); m.register(reg); }
             atlas.upload();
             wr.init();
+            hand.init(atlas.gameAssets);
             hud.init(atlas.gameAssets);
             guiTex = hud.loadTex(atlas.gameAssets, "images/gui/gui.png");
             iconsTex = hud.loadTex(atlas.gameAssets, "images/gui/icons.png");
@@ -273,6 +275,7 @@ public final class Game implements GLSurfaceView.Renderer {
             long now = System.currentTimeMillis();
             if (pickAt(c.interactX, c.interactY) && now >= nextDestroy && world.get(pick.x, pick.y, pick.z) != 7) {
                 world.set(pick.x, pick.y, pick.z, 0);
+                player.swing();
                 nextDestroy = now + 250;
             }
         } else nextDestroy = 0;
@@ -280,14 +283,14 @@ public final class Game implements GLSurfaceView.Renderer {
         for (int i = 0; i < pl && i < 16; i++) {
             if (!pickAt(touchXY[i * 2], touchXY[i * 2 + 1])) continue;
             // GameMode::useItemOn: not sneaking -> Block::use of the aimed block first; true = done (no placing)
-            if (!player.sneak && useBlock(pick.x, pick.y, pick.z)) continue;
+            if (!player.sneak && useBlock(pick.x, pick.y, pick.z)) { player.swing(); continue; }
             int nx = pick.nx(), ny = pick.ny(), nz = pick.nz();
             int id = hotbar[slot];
             int cur = world.get(nx, ny, nz);
             boolean intoPlayer = Blocks.solid[id] && nx >= Math.floor(player.x - Player.W / 2) && nx <= Math.floor(player.x + Player.W / 2)
                     && nz >= Math.floor(player.z - Player.W / 2) && nz <= Math.floor(player.z + Player.W / 2)
                     && ny >= Math.floor(player.y) && ny <= Math.floor(player.y + Player.H);
-            if ((cur == 0 || Blocks.kind[cur] == Blocks.LIQUID) && !intoPlayer) world.set(nx, ny, nz, id, id == 86 ? pumpkinFacing() : 0);
+            if ((cur == 0 || Blocks.kind[cur] == Blocks.LIQUID) && !intoPlayer) { world.set(nx, ny, nz, id, id == 86 ? pumpkinFacing() : 0); player.swing(); }
         }
         hl = c.interactId >= 0 && pickAt(c.interactX, c.interactY);
         if (hl) { hlX = pick.x; hlY = pick.y; hlZ = pick.z; }
@@ -456,6 +459,7 @@ public final class Game implements GLSurfaceView.Renderer {
         if (underwater) wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, 0f, 10f);
         else wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, far);
         if (hl) drawHighlight();
+        hand.render(player, a, width, height);                 // InGamePlayScreen::_renderItemInHand
         drawHud();
     }
 
