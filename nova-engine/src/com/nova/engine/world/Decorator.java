@@ -45,7 +45,25 @@ public final class Decorator {
     private McRandom r;
     private int ox, oz;
 
-    public Decorator(World w, long seed) { this.w = w; this.seed = (int) seed; }
+    private final Village village;
+
+    public Decorator(World w, long seed) { this.w = w; this.seed = (int) seed; this.village = new Village(w.gen, (int) seed); }
+
+    /** world access for the structures (raw: decoration stage) */
+    private final Village.Blocks4 structureAccess = new Village.Blocks4() {
+        public int get(int x, int y, int z) { return Decorator.this.get(x, y, z); }
+        public int data(int x, int y, int z) { return w.data(x, y, z); }
+        public void set(int x, int y, int z, int id, int data) { Decorator.this.set(x, y, z, id, data); }
+        public int topSolid(int x, int z, boolean liquids) {
+            for (int y = Chunk.H - 1; y >= 0; y--) {
+                int id = Decorator.this.get(x, y, z);
+                if (id == AIR || id == LEAVES || id == LEAVES2) continue;
+                if (Blocks.kind[id] == Blocks.LIQUID) { if (liquids) return y + 1; continue; }
+                if (Blocks.solid[id]) return y + 1;
+            }
+            return 0;
+        }
+    };
 
     // ------------------------------------------------------------------ world access (raw: chunks with terrain)
     int get(int x, int y, int z) { return w.rawGet(x, y, z); }
@@ -943,6 +961,8 @@ public final class Decorator {
             if (y > 59 && (y <= 63 || r.nextU32() % 10 == 0)) lake(x, y, z, LAVA);
         }
         r = new McRandom(chunkSeed);                                   // reseeded before the structures
+        try { village.postProcess(structureAccess, r, ox >> 4, oz >> 4); }
+        catch (Throwable t) { t.printStackTrace(); }
         for (int i = 0; i < 8; i++) {
             long a = r.nextU32(), b = r.nextU32(), c = r.nextU32();
             monsterRoom(ox + (int) (a & 15) + 8, (int) (b & 127), oz + (int) (c & 15) + 8);

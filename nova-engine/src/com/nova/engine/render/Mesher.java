@@ -77,13 +77,14 @@ public final class Mesher {
                 data = c.data[Chunk.idx(x, wy, z)] & 15;
                 biome = c.biome[z * 16 + x] & 255;
                 if (k == Blocks.CROSS) { cross(id, x, y, z); continue; }
+                if (k == Blocks.MODEL) { model(id, x, wy, y, z); continue; }
                 int above = get(x, wy + 1, z);
                 snowy = id == 2 && (above == 78 || above == 80) && Blocks.grassSnowSide >= 0;
                 for (int f = 0; f < 6; f++) {
                     int[] n = NORMAL[f];
                     int nb = get(x + n[0], wy + n[1], z + n[2]);
                     boolean ins = f >= 2 && Blocks.inset[id] > 0;
-                    if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1)) continue;
+                    if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1) && !(id == 78 && nb == 78 && f >= 2)) continue;   // top snow of other depth beside
                     face(id, f, x, y, z, k == Blocks.LIQUID ? (Blocks.kind[get(x, wy + 1, z)] == Blocks.LIQUID ? 1f : 0.875f) : 1f);
                     if (f >= 2 && Blocks.sideOverlay[id] >= 0 && !snowy) { overlay = true; face(id, f, x, y, z, 1f); overlay = false; }
                 }
@@ -99,7 +100,7 @@ public final class Mesher {
 
     private static boolean visible(int id, int nb, int kind) {
         if (nb == 0 || !Blocks.exists[nb]) return true;
-        if (kind == Blocks.LIQUID) return Blocks.kind[nb] != Blocks.LIQUID && !Blocks.opaque[nb];
+        if (kind == Blocks.LIQUID) return Blocks.kind[nb] != Blocks.LIQUID && !Blocks.opaque[nb] && nb != 79 && nb != 174;   // ice counts as solid for water
         if (Blocks.opaque[nb]) return false;
         if (nb == id) return Blocks.selfFaces[id];
         return true;
@@ -166,6 +167,152 @@ public final class Mesher {
             out.add(Float.floatToRawIntBits(px)); out.add(Float.floatToRawIntBits(py)); out.add(Float.floatToRawIntBits(pz));
             out.add(Float.floatToRawIntBits(tu[v])); out.add(Float.floatToRawIntBits(tv[v]));
             out.add(r | g << 8 | b << 16 | alpha << 24);
+        }
+        if (liquid) {                                        // water/lava seen from both sides: the reverse quad
+            int base = out.n - 4 * STRIDE;
+            for (int v = 3; v >= 0; v--) for (int k = 0; k < STRIDE; k++) out.add(out.a[base + v * STRIDE + k]);
+        }
+    }
+
+    // ------------------------------------------------------------------ shaped blocks (stairs, fences, doors ...)
+    private boolean connects(int nb, int id) {
+        if (nb == id) return true;
+        if (nb == 0 || !Blocks.exists[nb]) return false;
+        int m = Blocks.model[id];
+        if (m == Blocks.M_FENCE) return Blocks.model[nb] == Blocks.M_FENCE || nb == 107 || Blocks.opaque[nb];
+        return Blocks.model[nb] == Blocks.M_PANE || Blocks.opaque[nb];
+    }
+
+    private void model(int id, int x, int wy, int y, int z) {
+        int m = Blocks.model[id];
+        float s = 1f / 16f;
+        switch (m) {
+            case Blocks.M_STAIRS: {
+                boolean up = (data & 4) != 0;
+                float lo = up ? 0.5f : 0f;
+                box(id, x, wy, y, z, 0, lo, 0, 1, lo + 0.5f, 1);
+                float hy0 = up ? 0f : 0.5f, hy1 = hy0 + 0.5f;
+                switch (data & 3) {
+                    case 0: box(id, x, wy, y, z, 0.5f, hy0, 0, 1, hy1, 1); break;     // east
+                    case 1: box(id, x, wy, y, z, 0, hy0, 0, 0.5f, hy1, 1); break;     // west
+                    case 2: box(id, x, wy, y, z, 0, hy0, 0.5f, 1, hy1, 1); break;     // south
+                    default: box(id, x, wy, y, z, 0, hy0, 0, 1, hy1, 0.5f); break;    // north
+                }
+                break;
+            }
+            case Blocks.M_FENCE: {
+                box(id, x, wy, y, z, 6 * s, 0, 6 * s, 10 * s, 1, 10 * s);
+                boolean n = connects(get(x, wy, z - 1), id), so = connects(get(x, wy, z + 1), id);
+                boolean we = connects(get(x - 1, wy, z), id), ea = connects(get(x + 1, wy, z), id);
+                for (float by0 : new float[]{6 * s, 12 * s}) {
+                    float by1 = by0 + 3 * s;
+                    if (n) box(id, x, wy, y, z, 7 * s, by0, 0, 9 * s, by1, 6 * s);
+                    if (so) box(id, x, wy, y, z, 7 * s, by0, 10 * s, 9 * s, by1, 1);
+                    if (we) box(id, x, wy, y, z, 0, by0, 7 * s, 6 * s, by1, 9 * s);
+                    if (ea) box(id, x, wy, y, z, 10 * s, by0, 7 * s, 1, by1, 9 * s);
+                }
+                break;
+            }
+            case Blocks.M_PANE: {
+                boolean n = connects(get(x, wy, z - 1), id), so = connects(get(x, wy, z + 1), id);
+                boolean we = connects(get(x - 1, wy, z), id), ea = connects(get(x + 1, wy, z), id);
+                if (!n && !so && !we && !ea) { n = so = we = ea = true; }
+                box(id, x, wy, y, z, 7 * s, 0, 7 * s, 9 * s, 1, 9 * s);
+                if (n) box(id, x, wy, y, z, 7 * s, 0, 0, 9 * s, 1, 7 * s);
+                if (so) box(id, x, wy, y, z, 7 * s, 0, 9 * s, 9 * s, 1, 1);
+                if (we) box(id, x, wy, y, z, 0, 0, 7 * s, 7 * s, 1, 9 * s);
+                if (ea) box(id, x, wy, y, z, 9 * s, 0, 7 * s, 1, 1, 9 * s);
+                break;
+            }
+            case Blocks.M_DOOR: {
+                int d = data;
+                if ((d & 8) != 0) {                                   // upper half: facing from the lower half
+                    int below = get(x, wy - 1, z);
+                    d = below == id ? (worldData(x, wy - 1, z) & 7) | 8 : 8;
+                }
+                float t = 3 * s;
+                switch (d & 3) {
+                    case 0: box(id, x, wy, y, z, 0, 0, 0, t, 1, 1); break;
+                    case 1: box(id, x, wy, y, z, 0, 0, 0, 1, 1, t); break;
+                    case 2: box(id, x, wy, y, z, 1 - t, 0, 0, 1, 1, 1); break;
+                    default: box(id, x, wy, y, z, 0, 0, 1 - t, 1, 1, 1); break;
+                }
+                break;
+            }
+            case Blocks.M_LADDER: {
+                float t = s;
+                switch (data) {
+                    case 2: box(id, x, wy, y, z, 0, 0, 1 - t, 1, 1, 1); break;
+                    case 3: box(id, x, wy, y, z, 0, 0, 0, 1, 1, t); break;
+                    case 4: box(id, x, wy, y, z, 1 - t, 0, 0, 1, 1, 1); break;
+                    default: box(id, x, wy, y, z, 0, 0, 0, t, 1, 1); break;
+                }
+                break;
+            }
+            case Blocks.M_CARPET: box(id, x, wy, y, z, 0, 0, 0, 1, s, 1); break;
+            case Blocks.M_TORCH: {
+                float ox = 0, oz = 0;
+                switch (data) {
+                    case 1: ox = -0.35f; break; case 2: ox = 0.35f; break; case 3: oz = -0.35f; break; case 4: oz = 0.35f; break;
+                    default: break;
+                }
+                float lift = data >= 1 && data <= 4 ? 0.2f : 0f;
+                torch(id, x + ox, y + lift, z + oz);
+                break;
+            }
+            default: box(id, x, wy, y, z, 0, 0, 0, 1, 1, 1);
+        }
+    }
+
+    private int worldData(int x, int wy, int z) {
+        int ix = x < 0 ? 0 : x > 15 ? 2 : 1, iz = z < 0 ? 0 : z > 15 ? 2 : 1;
+        Chunk c = around[iz * 3 + ix];
+        if (c == null || wy < 0 || wy >= Chunk.H) return 0;
+        return c.data(x & 15, wy, z & 15);
+    }
+
+    /** an axis aligned part of a block: faces at the block border are culled by opaque neighbours, UV = the box area */
+    private void box(int id, int x, int wy, int y, int z, float x0, float y0, float z0, float x1, float y1, float z1) {
+        Buf out = Blocks.layer[id] == Blocks.TRANSLUCENT ? water : solid;
+        for (int f = 0; f < 6; f++) {
+            int[] n = NORMAL[f];
+            boolean border = (f == 0 && y0 == 0) || (f == 1 && y1 == 1) || (f == 2 && z0 == 0) || (f == 3 && z1 == 1) || (f == 4 && x0 == 0) || (f == 5 && x1 == 1);
+            if (border) {
+                int nb = get(x + n[0], wy + n[1], z + n[2]);
+                if (nb != 0 && Blocks.exists[nb] && Blocks.opaque[nb]) continue;
+            }
+            int sl = Blocks.texFor(id, data, f) * 4;
+            float u0 = uv[sl], v0 = uv[sl + 1], du = uv[sl + 2] - u0, dv = uv[sl + 3] - v0;
+            int tint = tintOf(id, f);
+            float l = SHADE[f];
+            int col = (int) (((tint >> 16) & 255) * l) | (int) (((tint >> 8) & 255) * l) << 8 | (int) ((tint & 255) * l) << 16 | 255 << 24;
+            int[] cr = CORNERS[f];
+            for (int v = 0; v < 4; v++) {
+                float cx = cr[v * 3] == 0 ? x0 : x1, cy = cr[v * 3 + 1] == 0 ? y0 : y1, cz = cr[v * 3 + 2] == 0 ? z0 : z1;
+                float tu, tv;
+                if (f <= 1) { tu = cx; tv = cz; }
+                else if (f <= 3) { tu = f == 2 ? 1 - cx : cx; tv = 1 - cy; }
+                else { tu = f == 4 ? cz : 1 - cz; tv = 1 - cy; }
+                vert(out, x + cx, y + cy, z + cz, u0 + du * tu, v0 + dv * tv, col);
+            }
+        }
+    }
+
+    /** torch: two crossed quads through the middle of the tile, shifted toward the wall */
+    private void torch(int id, float x, float y, float z) {
+        int s = Blocks.texFor(id, data, 2) * 4;
+        float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
+        int col = 0xFFFFFFFF;
+        float[][] q = {{0.5f, 0f, 0.5f, 1f}, {0f, 0.5f, 1f, 0.5f}};
+        for (float[] p : q) {
+            vert(solid, x + p[0], y, z + p[1], u0, v1, col);
+            vert(solid, x + p[2], y, z + p[3], u1, v1, col);
+            vert(solid, x + p[2], y + 1, z + p[3], u1, v0, col);
+            vert(solid, x + p[0], y + 1, z + p[1], u0, v0, col);
+            vert(solid, x + p[2], y, z + p[3], u1, v1, col);
+            vert(solid, x + p[0], y, z + p[1], u0, v1, col);
+            vert(solid, x + p[0], y + 1, z + p[1], u0, v0, col);
+            vert(solid, x + p[2], y + 1, z + p[3], u1, v0, col);
         }
     }
 

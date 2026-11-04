@@ -145,7 +145,7 @@ public final class WorldRenderer {
         GLES30.glEnable(GLES30.GL_BLEND);
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA);
         GLES30.glDepthMask(false);
-        GLES30.glDisable(GLES30.GL_CULL_FACE);           // the water surface is seen from below too
+        // culled like the rest: liquids carry their own back faces, ice/glass show only their front faces
         for (Map.Entry<Long, Section> e : sections.entrySet()) {
             Section s = e.getValue();
             if (s.waterVerts == 0 || !visible(e.getKey(), camX, camY, camZ, look, fogEnd)) continue;

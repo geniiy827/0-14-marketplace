@@ -9,7 +9,10 @@ public final class Blocks {
     public static final int AIR = 0;
 
     /** render kinds */
-    public static final int CUBE = 0, CROSS = 1, LIQUID = 2;
+    public static final int CUBE = 0, CROSS = 1, LIQUID = 2, MODEL = 3;
+    /** MODEL shapes */
+    public static final int M_STAIRS = 1, M_FENCE = 2, M_PANE = 3, M_DOOR = 4, M_TORCH = 5, M_LADDER = 6, M_CARPET = 7;
+    public static final int[] model = new int[MAX];
     /** side faces pulled in by this much (cactus 1/16); such faces are never culled */
     public static final float[] inset = new float[MAX];
     /** layers */
@@ -91,6 +94,7 @@ public final class Blocks {
         public Def cross() { kind[id] = CROSS; layer[id] = CUTOUT; opaque[id] = false; solid[id] = false; return this; }
         public Def liquid() { kind[id] = LIQUID; layer[id] = TRANSLUCENT; opaque[id] = false; solid[id] = false; return this; }
         public Def light(int l) { light[id] = l; return this; }
+        public Def model(int m) { kind[id] = MODEL; model[id] = m; opaque[id] = false; if (layer[id] == OPAQUE) layer[id] = CUTOUT; return this; }
         public Def height(float h) { height[id] = h; opaque[id] = false; return this; }
         /** textures for one data value: all six faces */
         public Def data(int d, int all) { return data(d, all, all, all); }

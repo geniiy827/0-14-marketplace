@@ -97,12 +97,45 @@ public final class CoreContent implements NovaMod {
             }
         }
         r.block(44, "stone_slab").tex(r.tex("stone_slab:0"), r.tex("stone_slab:0"), r.tex("stone_slab:1")).height(0.5f)
-                .data(1, r.tex("sandstone:0"), r.tex("sandstone:4"), r.tex("sandstone:3"));
+                .data(1, r.tex("sandstone:0"), r.tex("sandstone:4"), r.tex("sandstone:3"))
+                .data(2, r.tex("planks:0")).data(3, r.tex("cobblestone")).data(4, r.tex("brick")).data(5, r.tex("stonebrick:0"));
         r.block(179, "red_sandstone").tex(r.tex("redsandstone:0"), r.tex("redsandstone:4"), r.tex("redsandstone:3"));
         r.block(52, "mob_spawner").tex(r.tex("mob_spawner")).cutout();
         // chest: block model from the inventory tiles (top, side, front) until the chest entity model exists
         Blocks.Def ch = r.block(54, "chest").tex(r.tex("chest_inventory:0"), r.tex("chest_inventory:0"), r.tex("chest_inventory:1")).inset(1f / 16f);
         for (int d = 2; d <= 5; d++) ch.data(d, r.tex("chest_inventory:0"), r.tex("chest_inventory:0"), r.tex("chest_inventory:1")).dataFace(d, d, r.tex("chest_inventory:2"));
+        // ---- village blocks
+        int planks0 = r.tex("planks:0");
+        r.block(43, "double_stone_slab").tex(r.tex("stone_slab:0"), r.tex("stone_slab:0"), r.tex("stone_slab:1"));
+        r.block(47, "bookshelf").tex(planks0, planks0, r.tex("bookshelf"));
+        r.block(50, "torch").tex(r.tex("torch_on")).model(Blocks.M_TORCH).notSolid().light(14);
+        r.block(53, "oak_stairs").tex(planks0).model(Blocks.M_STAIRS);
+        r.block(67, "stone_stairs").tex(r.tex("cobblestone")).model(Blocks.M_STAIRS);
+        r.block(128, "sandstone_stairs").tex(r.tex("sandstone:0"), r.tex("sandstone:4"), r.tex("sandstone:3")).model(Blocks.M_STAIRS);
+        r.block(58, "crafting_table").tex(r.tex("crafting_table:0"), planks0, r.tex("crafting_table:2"));
+        Blocks.tex[58][2] = Blocks.tex[58][3] = r.tex("crafting_table:1");
+        Blocks.Def wheat = r.block(59, "wheat").tex(r.tex("wheat:0")).cross().notSolid();
+        for (int d = 1; d < 8; d++) wheat.data(d, r.tex("wheat:" + d));
+        int[] stage = {0, 0, 1, 1, 2, 2, 2, 3};
+        String[] cropTex = {"carrots", "potatoes", "beetroot"};
+        int[] cropId = {141, 142, 244};
+        for (int c = 0; c < 3; c++) {
+            Blocks.Def cd = r.block(cropId[c], cropTex[c]).tex(r.tex(cropTex[c] + ":0")).cross().notSolid();
+            for (int d = 1; d < 8; d++) cd.data(d, r.tex(cropTex[c] + ":" + stage[d]));
+        }
+        r.block(60, "farmland").tex(r.tex("farmland:1"), r.tex("dirt"), r.tex("dirt")).height(15f / 16f)
+                .data(7, r.tex("farmland:0"), r.tex("dirt"), r.tex("dirt"));
+        Blocks.Def fu = r.block(61, "furnace").tex(r.tex("furnace:2"), r.tex("furnace:2"), r.tex("furnace:3"));
+        for (int d = 2; d <= 5; d++) fu.data(d, r.tex("furnace:2"), r.tex("furnace:2"), r.tex("furnace:3")).dataFace(d, d, r.tex("furnace:0"));
+        Blocks.Def door = r.block(64, "wooden_door").tex(r.tex("door:0")).model(Blocks.M_DOOR).notSolid();
+        for (int d = 0; d < 16; d++) door.data(d, r.tex(d >= 8 ? "door:1" : "door:0"));
+        r.block(65, "ladder").tex(r.tex("ladder")).model(Blocks.M_LADDER).notSolid();
+        r.block(85, "fence").tex(planks0).model(Blocks.M_FENCE);
+        r.block(101, "iron_bars").tex(r.tex("iron_bars")).model(Blocks.M_PANE);
+        r.block(102, "glass_pane").tex(r.tex("glass")).model(Blocks.M_PANE);
+        Blocks.Def carpet = r.block(171, "carpet").tex(r.tex("wool:0")).model(Blocks.M_CARPET).notSolid();
+        for (int d = 1; d < 16; d++) carpet.data(d, r.tex("wool:" + d));
+        r.block(198, "grass_path").tex(r.tex("grass_path:0"), r.tex("dirt"), r.tex("grass_path:1")).height(15f / 16f);
         r.block(129, "emerald_ore").tex(r.tex("emerald_ore"));
         r.block(243, "podzol").tex(r.tex("dirt:1"), r.tex("dirt"), r.tex("dirt:2"));
     }

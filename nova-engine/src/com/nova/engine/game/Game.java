@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta13";
+    public static final String VERSION = "NOVA Engine beta14";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -54,7 +54,9 @@ public final class Game implements GLSurfaceView.Renderer {
         player.x = sx + 0.5; player.z = sz + 0.5; player.y = world.gen.height(sx, sz) + 2;
         player.px = player.x; player.py = player.y; player.pz = player.z;
         player.mx = player.my = player.mz = 0;
+        settleSpawn = true;
     }
+    private volatile boolean settleSpawn;
 
     private void replaceWorld() {
         pendingWorld = false;
@@ -147,6 +149,17 @@ public final class Game implements GLSurfaceView.Renderer {
         long dt = Math.min(250_000_000L, now - lastNs);
         lastNs = now;
         if (pendingWorld) replaceWorld();
+        if (settleSpawn) {                                   // stand on top of what decoration/villages built
+            int px = (int) Math.floor(player.x), pz = (int) Math.floor(player.z);
+            Chunk sc = world.ready(px >> 4, pz >> 4);
+            if (sc != null && sc.generated) {
+                int y = Chunk.H - 1;
+                while (y > 0 && world.get(px, y, pz) == 0) y--;
+                player.y = player.py = y + 1;
+                player.my = 0;
+                settleSpawn = false;
+            }
+        }
         input();
         tickAcc += dt;
         while (tickAcc >= 50_000_000L) { player.tick(world); tickAcc -= 50_000_000L; }

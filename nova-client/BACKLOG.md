@@ -160,3 +160,17 @@
   depth = ceil((-0.17 + (noise3(pos)+26)*0.01923077) * int(min*8)), +1 per higher neighbour, -1 per lower (if >1);
   noise = PerlinSimplexNoise(0x15cf0, 5).getValue(Vec3) (3D simplex sum v(p*f)/f, f halves) - 3D simplex is the standard
   algorithm, not byte-verified. canPlaceTopSnow approximated. Snow layer height = (data+1)/8.
+
+## beta14 (villages)
+- VillageFeature::isFeatureChunk 0x5e6cb0: seed = ax*0x9939F508 + az*0xF1565BD5 + levelSeed + 10387312 where ax = cx (cx-39 if <0)
+  (the CHUNK coordinate, not the region: MCPE quirk), spacing 40, offset u%28; biome check containsOnly r=0 {plains, desert, savanna}.
+  The start random = that MT after 2 draws. No biome check for roads/houses (Java has one).
+- Layout (VillageStart, weights, StraightRoad children, generatePieceFromSmallDoor, LightPost fallback) ported; mimi village at
+  chunk 86,2: all 23 pieces identical to the emulator (tools/emu_village.py).
+- Buildings: tools/emu_pieces.py runs every piece's postProcess in unicorn with placeBlock/generateBox/fillColumnDown/
+  generateAirColumnUp/getBlock/createDoor/createChest hooked -> VillageData.java programs per orientation/variant, replayed
+  in Village.piecePlace (clip to chunk, average ground per first chunk, biomeBlock for desert, crop ages 2+u%6).
+- Roads: grass path on top solid (liquids included) - 1, planks over liquid. selectCrops: u%3!=1 wheat else start-position hash crop.
+- TODO: chest loot (createChest consumes R), spawner/villagers, door hinge, structures: mineshaft, stronghold, scattered (temples, hut).
+- Render: MODEL kind (stairs, fence, pane/bars, door, ladder, carpet, torch); ice culling (water back faces drawn explicitly,
+  culling on in the translucent pass; water hides faces against ice); snow layers of different depth show their sides.
