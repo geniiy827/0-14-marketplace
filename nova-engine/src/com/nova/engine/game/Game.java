@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta14";
+    public static final String VERSION = "NOVA Engine beta15";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -90,7 +90,13 @@ public final class Game implements GLSurfaceView.Renderer {
     private String error;
     private volatile boolean ready;
 
-    public Game(Context c) { ctx = c; density = c.getResources().getDisplayMetrics().density; }
+    private long holdTarget = Long.MIN_VALUE;
+    private final float xdpi;
+    public Game(Context c) {
+        ctx = c; density = c.getResources().getDisplayMetrics().density;
+        float xd = c.getResources().getDisplayMetrics().xdpi;
+        xdpi = xd > 50 ? xd : density * 160f;
+    }
 
     @Override
     public void onSurfaceCreated(GL10 unused, EGLConfig config) {
@@ -227,11 +233,17 @@ public final class Game implements GLSurfaceView.Renderer {
         }
         hl = c.interactId >= 0 && pickAt(c.interactX, c.interactY);
         if (hl) { hlX = pick.x; hlY = pick.y; hlZ = pick.z; }
+        // hold-to-destroy only counts on a block: over air, or after moving to another block, it starts over
+        if (c.interactId >= 0 && !c.interactHolding()) {
+            long key = hl ? (((long) hlX & 0x3FFFFFF) << 38) | (((long) hlZ & 0x3FFFFFF) << 12) | (hlY & 0xFFF) : Long.MIN_VALUE;
+            if (!hl || key != holdTarget) c.restartHold();
+            holdTarget = key;
+        }
         ray.hit = hl; ray.x = hlX; ray.y = hlY; ray.z = hlZ;
     }
 
     // ------------------------------------------------------------------ selection (LevelRenderer::renderHitSelect)
-    private final int[] hlVerts = new int[6 * 4 * 6];
+    private int[] hlVerts = new int[6 * 4 * 6 * 10];
     private static final int[][] CUBE = {
             {0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1}, {0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0},
             {1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0}, {0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1},
@@ -242,20 +254,24 @@ public final class Game implements GLSurfaceView.Renderer {
         if (id == 0) return;
         int data = world.data(hlX, hlY, hlZ), n = 0;
         int col = 166 | 166 << 8 | 166 << 16 | 255 << 24;             // shader colour 0.65
-        boolean cross = Blocks.kind[id] == Blocks.CROSS;
-        float hgt = id == 78 ? ((data & 7) + 1) / 8f : Blocks.height[id];
-        for (int f = 0; f < 6; f++) {
-            int sl = Blocks.texFor(id, data, f) * 4;
-            float[] uv = atlas.slotUv;
-            float u0 = uv[sl], v0 = uv[sl + 1], u1 = uv[sl + 2], v1 = uv[sl + 3];
-            float[] tu = f >= 2 ? new float[]{u0, u1, u1, u0} : new float[]{u0, u0, u1, u1};
-            float[] tv = f >= 2 ? new float[]{v1, v1, v0, v0} : new float[]{v0, v1, v1, v0};
-            for (int v = 0; v < 4; v++) {
-                float px = CUBE[f][v * 3], py = CUBE[f][v * 3 + 1] * hgt, pz = CUBE[f][v * 3 + 2];
-                if (cross) { px = 0.15f + px * 0.7f; pz = 0.15f + pz * 0.7f; }
-                hlVerts[n++] = Float.floatToRawIntBits(px); hlVerts[n++] = Float.floatToRawIntBits(py); hlVerts[n++] = Float.floatToRawIntBits(pz);
-                hlVerts[n++] = Float.floatToRawIntBits(tu[v]); hlVerts[n++] = Float.floatToRawIntBits(tv[v]);
-                hlVerts[n++] = col;
+        float[][] boxes = com.nova.engine.world.Shapes.at(world, hlX, hlY, hlZ);
+        if (boxes == null) return;
+        if (hlVerts.length < boxes.length * 6 * 4 * 6) hlVerts = new int[boxes.length * 6 * 4 * 6];
+        for (float[] b : boxes) {
+            for (int f = 0; f < 6; f++) {
+                int sl = Blocks.texFor(id, data, f) * 4;
+                float[] uv = atlas.slotUv;
+                float u0 = uv[sl], v0 = uv[sl + 1], du = uv[sl + 2] - u0, dv = uv[sl + 3] - v0;
+                for (int v = 0; v < 4; v++) {
+                    float px = CUBE[f][v * 3] == 0 ? b[0] : b[3], py = CUBE[f][v * 3 + 1] == 0 ? b[1] : b[4], pz = CUBE[f][v * 3 + 2] == 0 ? b[2] : b[5];
+                    float tu, tv;
+                    if (f <= 1) { tu = px; tv = pz; } else if (f <= 3) { tu = f == 2 ? 1 - px : px; tv = 1 - py; } else { tu = f == 4 ? pz : 1 - pz; tv = 1 - py; }
+                    // pulled out a little so it never z-fights with the block
+                    float ex = (px - 0.5f) * 0.004f, ey = (py - 0.5f) * 0.004f, ez = (pz - 0.5f) * 0.004f;
+                    hlVerts[n++] = Float.floatToRawIntBits(px + ex); hlVerts[n++] = Float.floatToRawIntBits(py + ey); hlVerts[n++] = Float.floatToRawIntBits(pz + ez);
+                    hlVerts[n++] = Float.floatToRawIntBits(u0 + du * tu); hlVerts[n++] = Float.floatToRawIntBits(v0 + dv * tv);
+                    hlVerts[n++] = col;
+                }
             }
         }
         wr.drawOverlay(mvp, atlas.texture, hlVerts, n, hlX, hlY, hlZ);
@@ -443,7 +459,7 @@ public final class Game implements GLSurfaceView.Renderer {
             else glyph(c.jumpR, 104, 107, c.jump);
         }
         // hold progress at the finger (HudProgressRenderer: ring + growing disc, ui_invert_overlay)
-        if (c.interactId >= 0 && c.holdProgress > 0) progressRing(c.interactX, c.interactY, c.holdProgress);
+        if (c.interactId >= 0 && hl && !c.interactHolding() && c.holdProgress > 0) progressRing(c.interactX, c.interactY, c.holdProgress);
         // info
         float ts = 8 * d;
         button(controls.menuR[0], controls.menuR[1], controls.menuR[2] - controls.menuR[0], "| |", false);
@@ -470,8 +486,8 @@ public final class Game implements GLSurfaceView.Renderer {
      * with ui_invert_overlay.
      */
     private void progressRing(float x, float y, float p) {
-        float ppmDevice = density * 160f / 25.4f;
-        float R = Math.min(ppmDevice * 3.9996f, 40f) * 3.5f / density;      // 3.5 gui units, gui scale ~ density
+        float ppmDevice = xdpi / 25.4f;                                    // AppPlatform pixels per millimetre
+        float R = Math.min(ppmDevice * 3.9996f, 40f) * 3.5f;                // mesh radius, drawn scaled 3.5 (screen px)
         hud.invertCircle(x, y, R, R * 0.95f, 24);
         hud.invertCircle(x, y, R * 0.95f * (0.5f + 0.5f * p), 0, 24);
     }

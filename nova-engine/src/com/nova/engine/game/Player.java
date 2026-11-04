@@ -17,6 +17,7 @@ public final class Player {
     public float moveF, moveS;                  // input -1..1
     public boolean jump, sneak;
     private int jumpTicks, autoTicks;
+    private boolean autoJumpNext;
 
     public void tick(World w) {
         px = x; py = y; pz = z;
@@ -44,13 +45,19 @@ public final class Player {
             double acc = onGround || autoTicks > 0 ? 0.1 * 1.3 : 0.02 * 1.3;   // keeps walking forward through an auto-jump    // a little faster than vanilla walking feels right on touch
             mx += ix * acc; mz += iz * acc;
             if (jump && onGround && jumpTicks == 0) { my = 0.42; jumpTicks = 10; }
+            // auto-jump decided last tick (LocalPlayer::_updateAutoJump sets autoJumpTime, the jump happens on the next
+            // tick like a normal jump: the full 0.42 rise, 1.25 blocks)
+            if (autoJumpNext) { autoJumpNext = false; if (onGround) { my = 0.42; jumpTicks = 10; autoTicks = 8; } }
             boolean wasGround = onGround;
             double bx = mx, bz = mz;
             move(w);
             // auto-jump: blocked horizontally while walking on the ground, and there is room one block up
             if (wasGround && il > 0.1 && ((bx != mx && Math.abs(bx) > 0.01) || (bz != mz && Math.abs(bz) > 0.01)) && jumpTicks == 0) {
-                if (free(w, x + Math.signum(bx) * 0.4, y + 1.01, z + Math.signum(bz) * 0.4)) {
-                    my = 0.42; jumpTicks = 10; autoTicks = 8;
+                double l = Math.sqrt(bx * bx + bz * bz);
+                double fx = x + bx / l * 0.5, fz = z + bz / l * 0.5;
+                // obstacle at most one block high: room above it for the whole body
+                if (free(w, fx, y + 1.01, fz) && free(w, x, y + 1.01, z)) {
+                    autoJumpNext = true;
                     mx = bx; mz = bz;                          // keep the push towards the step
                 }
             }

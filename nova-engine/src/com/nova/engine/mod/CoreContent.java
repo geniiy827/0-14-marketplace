@@ -136,6 +136,12 @@ public final class CoreContent implements NovaMod {
         Blocks.Def carpet = r.block(171, "carpet").tex(r.tex("wool:0")).model(Blocks.M_CARPET).notSolid();
         for (int d = 1; d < 16; d++) carpet.data(d, r.tex("wool:" + d));
         r.block(198, "grass_path").tex(r.tex("grass_path:0"), r.tex("dirt"), r.tex("grass_path:1")).height(15f / 16f);
+        r.block(46, "tnt").tex(r.tex("tnt:1"), r.tex("tnt:2"), r.tex("tnt:0"));
+        r.block(70, "stone_pressure_plate").tex(r.tex("stone:0")).model(Blocks.M_CARPET).notSolid();
+        r.block(72, "wooden_pressure_plate").tex(planks0).model(Blocks.M_CARPET).notSolid();
+        r.block(134, "spruce_stairs").tex(r.tex("planks:1")).model(Blocks.M_STAIRS);
+        r.block(140, "flower_pot").tex(r.tex("flower_pot")).model(Blocks.M_POT);
+        r.block(118, "cauldron").tex(r.tex("cauldron_top"), r.tex("cauldron_bottom"), r.tex("cauldron_side")).cutout();
         r.block(129, "emerald_ore").tex(r.tex("emerald_ore"));
         r.block(243, "podzol").tex(r.tex("dirt:1"), r.tex("dirt"), r.tex("dirt:2"));
     }

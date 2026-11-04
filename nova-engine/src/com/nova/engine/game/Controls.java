@@ -61,7 +61,7 @@ public final class Controls {
         w = sw; h = sh; dp = density;
         float dpadScale = 0.5f;
         float ppm = 3f + (sh * 0.010416667f - 3f) * dpadScale;
-        ppm *= 2f;                                             // NOVA: twice the original size (asked for), capped
+        ppm *= 1.5f;                                           // NOVA: bigger than the original (asked for), capped
         ppm = Math.min(ppm, sh * 0.55f / 48f);
         float B = 16f * ppm, S = 20f * ppm;
         float x0 = 8f, y0 = sh - B * 3f + (sw >= sh ? -8f : -80f);
@@ -81,10 +81,9 @@ public final class Controls {
         rect(jumpR, jx, jy1 - J, jx + J, jy1);
         scale(jumpHit, jumpR, 1.1f);
         float[] t = new float[4];
-        // flight: ascend above the jump place, descend on it (the original's -/+0.85J overlap with the bigger size)
-        float hh = jumpHit[3] - jumpHit[1];
-        move(t, jumpHit, 0, -hh * 1.05f); scale(ascendR, t, 0.9f);
-        scale(descendR, jumpHit, 0.9f);
+        // flight: descend on the jump place, ascend right above it, touching
+        rect(descendR, jumpR[0], jumpR[1], jumpR[2], jumpR[3]);
+        move(ascendR, jumpR, 0, -J);
         slot = Math.min(44 * dp, w * 0.6f / 9);
         barX = (w - slot * 9) / 2; barY = h - slot - 4 * dp;
         float m = slot * 0.9f;
@@ -202,6 +201,12 @@ public final class Controls {
         for (int i = 0; i < n && i * 2 + 1 < xy.length; i++) { xy[i * 2] = tapX[i]; xy[i * 2 + 1] = tapY[i]; }
         tapCount = 0; places = 0; return n;
     }
+    /** the interacting finger is not on a block (or moved to another one) before the hold completed: start over */
+    public synchronized void restartHold() {
+        int i = interactId;
+        if (i >= 0 && i < MAXP && !holding[i]) t0[i] = System.currentTimeMillis();
+    }
+    public synchronized boolean interactHolding() { int i = interactId; return i >= 0 && i < MAXP && holding[i]; }
     public synchronized int takeFly() { int v = flyToggles; flyToggles = 0; return v; }
     public synchronized int takeSlot() { int v = slotPick; slotPick = -1; return v; }
 }

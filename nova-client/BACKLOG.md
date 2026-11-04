@@ -174,3 +174,19 @@
 - TODO: chest loot (createChest consumes R), spawner/villagers, door hinge, structures: mineshaft, stronghold, scattered (temples, hut).
 - Render: MODEL kind (stairs, fence, pane/bars, door, ladder, carpet, torch); ice culling (water back faces drawn explicitly,
   culling on in the translucent pass; water hides faces against ice); snow layers of different depth show their sides.
+
+## beta15 (fixes, pyramids, witch huts)
+- Stairs/doors in the recorded programs are raw: StructurePiece::getOrientationData 0x5f6418 applied at replay
+  (stairs: S 2<->3; W 0>2 1>3 2>0 3>1; E 0>2 1>3 2>1 3>0; doors: S 0<->2, W +1, E +3). Torches/ladders were already converted.
+- Shapes.java: boxes per block for mesher, selection overlay (now the block's own boxes) and the pick ray (ray vs boxes).
+- Torch: 2/16 stick from the tile centre, wall torches lean out (data 1..4).
+- Water: no faces against any non-plant block (coplanar with farmland etc. flickered).
+- Auto-jump: decided after the blocked move, jump on the next tick with the full 0.42 (was 0.83 blocks high).
+- Hold ring: radius = 3.5 * min(4 mm in px (xdpi), 40) px (HudProgressRenderer); shown only over a block; hold restarts
+  over air / on another block. NOTE 0.14: the ring is GameMode::getDestroyProgress (survival); creative breaks right away
+  then every 250 ms (GameMode::continueDestroyBlock, delay 0xfa ms) - no ring in creative.
+- Buttons x1.5 of the original (was x2); fly up directly above fly down, touching.
+- RandomScatteredLargeFeature 0x5e7c40: spacing 32 sep 8 with the LargeFeature chunk random (1 draw by addFeature);
+  biome at centre: desert/desertHills -> DesertPyramidPiece 21x15x21, swampland(M) -> SwamplandHut 7x7x9, facing S.
+  Programs recorded by tools/emu_scattered.py. Hut height = updateAverageGroundHeight (max(top, 64)).
+- TODO: mineshafts, strongholds; chest loot; spawners' mobs.

@@ -319,7 +319,7 @@ final class Village {
     }
 
     static int[] biomeBlock(Start s, int id, int data) {
-        if (!s.desert) return new int[]{id, data};
+        if (s == null || !s.desert) return new int[]{id, data};
         if (id == 17 || id == 162 || id == 4 || id == 198) return new int[]{24, 0};
         if (id == 5) return new int[]{24, 2};
         if (id == 53 || id == 67) return new int[]{128, data};
@@ -364,6 +364,11 @@ final class Village {
         else key = NAME[p.type] + "|" + p.dir + "|";
         int[][] prog = PROGRAMS.get(key);
         if (prog == null) return;
+        replay(w, r, s, p, chunk, prog);
+    }
+
+    /** runs a recorded piece program (local coordinates of the piece) clipped to the chunk; s == null: no biome blocks */
+    static void replay(Blocks4 w, McRandom r, Start s, Piece p, Box chunk, int[][] prog) {
         long lastU = 0;
         int gx = Integer.MIN_VALUE, gy = 0, gz = 0, gCount = 0;
         for (int[] o : prog) {
@@ -412,19 +417,43 @@ final class Village {
                 }
                 case 'O': {
                     int x = p.worldX(o[1], o[3]), y = p.bb.y0 + o[2], z = p.worldZ(o[1], o[3]);
-                    if (chunk.inside(x, y, z)) { w.set(x, y, z, 64, o[4] & 3); w.set(x, y + 1, z, 64, 8); }
+                    if (chunk.inside(x, y, z)) { w.set(x, y, z, 64, doorData(p.dir, o[4]) & 3); w.set(x, y + 1, z, 64, 8); }
                     gCount = 0;
                     break;
                 }
                 case 'C': place(w, s, p, chunk, o[1], o[2], o[3], 54, 2); gCount = 0; break;
+                case 'Q': place(w, s, p, chunk, o[1], o[2], o[3], 118, 0); gCount = 0; break;
                 default: break;
             }
         }
     }
 
+    static boolean stairs(int id) {
+        return id == 53 || id == 67 || id == 108 || id == 109 || id == 114 || id == 128 || id == 134 || id == 135 || id == 136
+                || id == 156 || id == 163 || id == 164 || id == 180;
+    }
+
+    /** StructurePiece::getOrientationData for stairs (shape 10): 0 east 1 west 2 south 3 north, by piece direction */
+    static int stairsData(int dir, int d) {
+        int k = d & 3, r = k;
+        if (dir == S) { if (k == 2) r = 3; else if (k == 3) r = 2; }
+        else if (dir == W) r = k == 0 ? 2 : k == 1 ? 3 : k == 2 ? 0 : 1;
+        else if (dir == E) r = k == 0 ? 2 : k == 1 ? 3 : k == 2 ? 1 : 0;
+        return (d & ~3) | r;
+    }
+
+    /** StructurePiece::getOrientationData for doors */
+    static int doorData(int dir, int d) {
+        if (dir == S) return d == 0 ? 2 : d == 2 ? 0 : d;
+        if (dir == W) return (d + 1) & 3;
+        if (dir == E) return (d + 3) & 3;
+        return d;
+    }
+
     static void place(Blocks4 w, Start s, Piece p, Box chunk, int lx, int ly, int lz, int id, int data) {
         int x = p.worldX(lx, lz), y = p.bb.y0 + ly, z = p.worldZ(lx, lz);
         if (!chunk.inside(x, y, z)) return;
+        if (stairs(id)) data = stairsData(p.dir, data);
         int[] b = biomeBlock(s, id, data);
         w.set(x, y, z, b[0], b[1]);
     }

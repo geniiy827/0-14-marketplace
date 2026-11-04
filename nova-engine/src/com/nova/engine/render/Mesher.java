@@ -100,7 +100,8 @@ public final class Mesher {
 
     private static boolean visible(int id, int nb, int kind) {
         if (nb == 0 || !Blocks.exists[nb]) return true;
-        if (kind == Blocks.LIQUID) return Blocks.kind[nb] != Blocks.LIQUID && !Blocks.opaque[nb] && nb != 79 && nb != 174;   // ice counts as solid for water
+        // liquids: no face against any block box (farmland, slabs, glass, ice ...): coplanar faces flicker
+        if (kind == Blocks.LIQUID) return Blocks.kind[nb] == Blocks.CROSS || Blocks.kind[nb] == Blocks.MODEL;
         if (Blocks.opaque[nb]) return false;
         if (nb == id) return Blocks.selfFaces[id];
         return true;
@@ -175,94 +176,53 @@ public final class Mesher {
     }
 
     // ------------------------------------------------------------------ shaped blocks (stairs, fences, doors ...)
-    private boolean connects(int nb, int id) {
-        if (nb == id) return true;
-        if (nb == 0 || !Blocks.exists[nb]) return false;
-        int m = Blocks.model[id];
-        if (m == Blocks.M_FENCE) return Blocks.model[nb] == Blocks.M_FENCE || nb == 107 || Blocks.opaque[nb];
-        return Blocks.model[nb] == Blocks.M_PANE || Blocks.opaque[nb];
+    private void model(int id, int x, int wy, int y, int z) {
+        if (Blocks.model[id] == Blocks.M_TORCH) { torchMesh(id, x, y, z); return; }
+        float[][] bs = com.nova.engine.world.Shapes.boxes(id, data, get(x, wy, z - 1), get(x, wy, z + 1), get(x - 1, wy, z), get(x + 1, wy, z),
+                get(x, wy - 1, z), worldData(x, wy - 1, z));
+        for (float[] b : bs) box(id, x, wy, y, z, b[0], b[1], b[2], b[3], b[4], b[5]);
     }
 
-    private void model(int id, int x, int wy, int y, int z) {
-        int m = Blocks.model[id];
-        float s = 1f / 16f;
-        switch (m) {
-            case Blocks.M_STAIRS: {
-                boolean up = (data & 4) != 0;
-                float lo = up ? 0.5f : 0f;
-                box(id, x, wy, y, z, 0, lo, 0, 1, lo + 0.5f, 1);
-                float hy0 = up ? 0f : 0.5f, hy1 = hy0 + 0.5f;
-                switch (data & 3) {
-                    case 0: box(id, x, wy, y, z, 0.5f, hy0, 0, 1, hy1, 1); break;     // east
-                    case 1: box(id, x, wy, y, z, 0, hy0, 0, 0.5f, hy1, 1); break;     // west
-                    case 2: box(id, x, wy, y, z, 0, hy0, 0.5f, 1, hy1, 1); break;     // south
-                    default: box(id, x, wy, y, z, 0, hy0, 0, 1, hy1, 0.5f); break;    // north
-                }
-                break;
-            }
-            case Blocks.M_FENCE: {
-                box(id, x, wy, y, z, 6 * s, 0, 6 * s, 10 * s, 1, 10 * s);
-                boolean n = connects(get(x, wy, z - 1), id), so = connects(get(x, wy, z + 1), id);
-                boolean we = connects(get(x - 1, wy, z), id), ea = connects(get(x + 1, wy, z), id);
-                for (float by0 : new float[]{6 * s, 12 * s}) {
-                    float by1 = by0 + 3 * s;
-                    if (n) box(id, x, wy, y, z, 7 * s, by0, 0, 9 * s, by1, 6 * s);
-                    if (so) box(id, x, wy, y, z, 7 * s, by0, 10 * s, 9 * s, by1, 1);
-                    if (we) box(id, x, wy, y, z, 0, by0, 7 * s, 6 * s, by1, 9 * s);
-                    if (ea) box(id, x, wy, y, z, 10 * s, by0, 7 * s, 1, by1, 9 * s);
-                }
-                break;
-            }
-            case Blocks.M_PANE: {
-                boolean n = connects(get(x, wy, z - 1), id), so = connects(get(x, wy, z + 1), id);
-                boolean we = connects(get(x - 1, wy, z), id), ea = connects(get(x + 1, wy, z), id);
-                if (!n && !so && !we && !ea) { n = so = we = ea = true; }
-                box(id, x, wy, y, z, 7 * s, 0, 7 * s, 9 * s, 1, 9 * s);
-                if (n) box(id, x, wy, y, z, 7 * s, 0, 0, 9 * s, 1, 7 * s);
-                if (so) box(id, x, wy, y, z, 7 * s, 0, 9 * s, 9 * s, 1, 1);
-                if (we) box(id, x, wy, y, z, 0, 0, 7 * s, 7 * s, 1, 9 * s);
-                if (ea) box(id, x, wy, y, z, 9 * s, 0, 7 * s, 1, 1, 9 * s);
-                break;
-            }
-            case Blocks.M_DOOR: {
-                int d = data;
-                if ((d & 8) != 0) {                                   // upper half: facing from the lower half
-                    int below = get(x, wy - 1, z);
-                    d = below == id ? (worldData(x, wy - 1, z) & 7) | 8 : 8;
-                }
-                float t = 3 * s;
-                switch (d & 3) {
-                    case 0: box(id, x, wy, y, z, 0, 0, 0, t, 1, 1); break;
-                    case 1: box(id, x, wy, y, z, 0, 0, 0, 1, 1, t); break;
-                    case 2: box(id, x, wy, y, z, 1 - t, 0, 0, 1, 1, 1); break;
-                    default: box(id, x, wy, y, z, 0, 0, 1 - t, 1, 1, 1); break;
-                }
-                break;
-            }
-            case Blocks.M_LADDER: {
-                float t = s;
-                switch (data) {
-                    case 2: box(id, x, wy, y, z, 0, 0, 1 - t, 1, 1, 1); break;
-                    case 3: box(id, x, wy, y, z, 0, 0, 0, 1, 1, t); break;
-                    case 4: box(id, x, wy, y, z, 1 - t, 0, 0, 1, 1, 1); break;
-                    default: box(id, x, wy, y, z, 0, 0, 0, t, 1, 1); break;
-                }
-                break;
-            }
-            case Blocks.M_CARPET: box(id, x, wy, y, z, 0, 0, 0, 1, s, 1); break;
-            case Blocks.M_TORCH: {
-                float ox = 0, oz = 0;
-                switch (data) {
-                    case 1: ox = -0.35f; break; case 2: ox = 0.35f; break; case 3: oz = -0.35f; break; case 4: oz = 0.35f; break;
-                    default: break;
-                }
-                float lift = data >= 1 && data <= 4 ? 0.2f : 0f;
-                torch(id, x + ox, y + lift, z + oz);
-                break;
-            }
-            default: box(id, x, wy, y, z, 0, 0, 0, 1, 1, 1);
+    /** torch: a 2/16 stick from the middle of the tile, standing or leaning out of the wall (data 1..4) */
+    private void torchMesh(int id, int x, int y, int z) {
+        float bx = 0.5f, bz = 0.5f, by = 0f, lx = 0, lz = 0;
+        switch (data) {
+            case 1: bx = 0.06f; lx = 0.25f; by = 0.2f; break;
+            case 2: bx = 0.94f; lx = -0.25f; by = 0.2f; break;
+            case 3: bz = 0.06f; lz = 0.25f; by = 0.2f; break;
+            case 4: bz = 0.94f; lz = -0.25f; by = 0.2f; break;
+            default: break;
         }
+        float h = 10f / 16f, hw = 1f / 16f;
+        int sl = Blocks.texFor(id, data, 2) * 4;
+        float u0 = uv[sl], v0 = uv[sl + 1], du = uv[sl + 2] - u0, dv = uv[sl + 3] - v0;
+        float su0 = u0 + du * 7 / 16f, su1 = u0 + du * 9 / 16f, sv0 = v0 + dv * 6 / 16f, sv1 = v0 + dv;
+        // bottom corners (b) and top corners (t), ccw from -x-z
+        float[][] c = new float[8][];
+        float[][] o = {{-hw, -hw}, {hw, -hw}, {hw, hw}, {-hw, hw}};
+        for (int i = 0; i < 4; i++) {
+            c[i] = new float[]{x + bx + o[i][0], y + by, z + bz + o[i][1]};
+            c[i + 4] = new float[]{x + bx + lx + o[i][0], y + by + h, z + bz + lz + o[i][1]};
+        }
+        int[][] sides = {{1, 0, 4, 5}, {3, 2, 6, 7}, {0, 3, 7, 4}, {2, 1, 5, 6}};     // north, south, west, east
+        float[] shade = {0.8f, 0.8f, 0.62f, 0.62f};
+        for (int f = 0; f < 4; f++) {
+            int col = shadeCol(shade[f]);
+            int[] q = sides[f];
+            vert(solid, c[q[0]][0], c[q[0]][1], c[q[0]][2], su0, sv1, col);
+            vert(solid, c[q[1]][0], c[q[1]][1], c[q[1]][2], su1, sv1, col);
+            vert(solid, c[q[2]][0], c[q[2]][1], c[q[2]][2], su1, sv0, col);
+            vert(solid, c[q[3]][0], c[q[3]][1], c[q[3]][2], su0, sv0, col);
+        }
+        float tv0 = v0 + dv * 6 / 16f, tv1 = v0 + dv * 8 / 16f;
+        int col = shadeCol(1f);
+        vert(solid, c[4][0], c[4][1], c[4][2], su0, tv0, col);
+        vert(solid, c[7][0], c[7][1], c[7][2], su0, tv1, col);
+        vert(solid, c[6][0], c[6][1], c[6][2], su1, tv1, col);
+        vert(solid, c[5][0], c[5][1], c[5][2], su1, tv0, col);
     }
+
+    private static int shadeCol(float l) { int v = (int) (255 * l); return v | v << 8 | v << 16 | 255 << 24; }
 
     private int worldData(int x, int wy, int z) {
         int ix = x < 0 ? 0 : x > 15 ? 2 : 1, iz = z < 0 ? 0 : z > 15 ? 2 : 1;
@@ -295,24 +255,6 @@ public final class Mesher {
                 else { tu = f == 4 ? cz : 1 - cz; tv = 1 - cy; }
                 vert(out, x + cx, y + cy, z + cz, u0 + du * tu, v0 + dv * tv, col);
             }
-        }
-    }
-
-    /** torch: two crossed quads through the middle of the tile, shifted toward the wall */
-    private void torch(int id, float x, float y, float z) {
-        int s = Blocks.texFor(id, data, 2) * 4;
-        float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
-        int col = 0xFFFFFFFF;
-        float[][] q = {{0.5f, 0f, 0.5f, 1f}, {0f, 0.5f, 1f, 0.5f}};
-        for (float[] p : q) {
-            vert(solid, x + p[0], y, z + p[1], u0, v1, col);
-            vert(solid, x + p[2], y, z + p[3], u1, v1, col);
-            vert(solid, x + p[2], y + 1, z + p[3], u1, v0, col);
-            vert(solid, x + p[0], y + 1, z + p[1], u0, v0, col);
-            vert(solid, x + p[2], y, z + p[3], u1, v1, col);
-            vert(solid, x + p[0], y, z + p[1], u0, v1, col);
-            vert(solid, x + p[0], y + 1, z + p[1], u0, v0, col);
-            vert(solid, x + p[2], y + 1, z + p[3], u1, v0, col);
         }
     }
 

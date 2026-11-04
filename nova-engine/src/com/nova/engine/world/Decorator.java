@@ -46,8 +46,9 @@ public final class Decorator {
     private int ox, oz;
 
     private final Village village;
+    private final Scattered scattered;
 
-    public Decorator(World w, long seed) { this.w = w; this.seed = (int) seed; this.village = new Village(w.gen, (int) seed); }
+    public Decorator(World w, long seed) { this.w = w; this.seed = (int) seed; this.village = new Village(w.gen, (int) seed); this.scattered = new Scattered(w.gen, (int) seed); }
 
     /** world access for the structures (raw: decoration stage) */
     private final Village.Blocks4 structureAccess = new Village.Blocks4() {
@@ -961,7 +962,9 @@ public final class Decorator {
             if (y > 59 && (y <= 63 || r.nextU32() % 10 == 0)) lake(x, y, z, LAVA);
         }
         r = new McRandom(chunkSeed);                                   // reseeded before the structures
-        try { village.postProcess(structureAccess, r, ox >> 4, oz >> 4); }
+        try { village.postProcess(structureAccess, r, ox >> 4, oz >> 4); }        // +0xc4
+        catch (Throwable t) { t.printStackTrace(); }
+        try { scattered.postProcess(structureAccess, r, ox >> 4, oz >> 4); }     // +0x13c (after mineshafts/strongholds)
         catch (Throwable t) { t.printStackTrace(); }
         for (int i = 0; i < 8; i++) {
             long a = r.nextU32(), b = r.nextU32(), c = r.nextU32();
