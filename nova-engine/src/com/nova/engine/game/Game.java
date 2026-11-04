@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta16";
+    public static final String VERSION = "NOVA Engine beta17";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -164,6 +164,7 @@ public final class Game implements GLSurfaceView.Renderer {
         long now = System.nanoTime();
         long dt = Math.min(250_000_000L, now - lastNs);
         lastNs = now;
+        frameDt = dt / 1e9f;
         if (pendingWorld) replaceWorld();
         if (tpPending) {
             tpPending = false;
@@ -233,10 +234,16 @@ public final class Game implements GLSurfaceView.Renderer {
         int s = c.takeSlot();
         if (s >= 0) slot = s;
         player.look(look);
-        int br = c.takeBreaks(touchXY);
-        for (int i = 0; i < br && i < 16; i++) {
-            if (pickAt(touchXY[i * 2], touchXY[i * 2 + 1]) && world.get(pick.x, pick.y, pick.z) != 7) world.set(pick.x, pick.y, pick.z, 0);
-        }
+        // MinecraftClient::tickBuildAction while destroy_or_interact is held: aimed at a block -> creative
+        // GameMode::continueDestroyBlock (break, then again 250 ms later); aimed at nothing -> stopDestroyBlock (no-op
+        // in creative) and the button stays held, so dragging over other blocks keeps breaking them
+        if (c.destroying && c.interactId >= 0) {
+            long now = System.currentTimeMillis();
+            if (pickAt(c.interactX, c.interactY) && now >= nextDestroy && world.get(pick.x, pick.y, pick.z) != 7) {
+                world.set(pick.x, pick.y, pick.z, 0);
+                nextDestroy = now + 250;
+            }
+        } else nextDestroy = 0;
         int pl = c.takePlaces(touchXY);
         for (int i = 0; i < pl && i < 16; i++) {
             if (!pickAt(touchXY[i * 2], touchXY[i * 2 + 1])) continue;
@@ -456,7 +463,7 @@ public final class Game implements GLSurfaceView.Renderer {
             else glyph(c.jumpR, 104, 107, c.jump);
         }
         // hold progress at the finger (HudProgressRenderer: ring + growing disc, ui_invert_overlay)
-        if (c.interactId >= 0) progressRing(c.interactX, c.interactY, c.holdProgress);     // while the finger is down
+        progressRing(c);
         // info
         float ts = 8 * d;
         button(controls.menuR[0], controls.menuR[1], controls.menuR[2] - controls.menuR[0], "| |", false);
@@ -482,12 +489,27 @@ public final class Game implements GLSurfaceView.Renderer {
      * inner disc 0.95R scaled by 0.5 + 0.5 * progress; drawn at the finger scaled by 3.5 (gui units -> pixels)
      * with ui_invert_overlay.
      */
-    private void progressRing(float x, float y, float p) {
-        float ppmDevice = xdpi / 25.4f;                                    // AppPlatform pixels per millimetre
+    private void progressRing(Controls c) {
+        // _renderProgressIndicator: alpha follows button.turn_interact (GuiData::calcNewAlpha +0.02 / -0.04 a frame),
+        // drawn at the pointer. Destroy progress > 0 (survival only, creative keeps it 0): ring + disc scaled
+        // 0.5 + 0.5 * progress at alpha x 0.8. Otherwise only the ring: alpha x 0.8 on a block/entity, min(alpha x 0.4,
+        // 0.4) when the pointer hits nothing.
+        if (c.interactId >= 0) { ringX = c.interactX; ringY = c.interactY; }
+        float steps = Math.min(4f, frameDt * 60f);
+        ringAlpha = c.showProgress ? Math.min(1f, ringAlpha + 0.02f * steps) : Math.max(0f, ringAlpha - 0.04f * steps);
+        float p = 0f;                                                       // GameMode::getDestroyProgress (creative)
+        float ppmDevice = xdpi / 25.4f;                                     // AppPlatform pixels per millimetre
         float R = Math.min(ppmDevice * 3.9996f, 40f) * 3.5f;                // mesh radius, drawn scaled 3.5 (screen px)
-        hud.invertCircle(x, y, R, R * 0.95f, 24);
-        hud.invertCircle(x, y, R * 0.95f * (0.5f + 0.5f * p), 0, 24);
+        if (p > 0f) {
+            hud.invertCircle(ringX, ringY, R, R * 0.95f, 24, ringAlpha * 0.8f);
+            hud.invertCircle(ringX, ringY, R * 0.95f * (0.5f + 0.5f * p), 0, 24, ringAlpha * 0.8f);
+        } else if (ringAlpha > 0f) {
+            float a = hl ? ringAlpha * 0.8f : Math.min(ringAlpha * 0.4f, 0.4f);
+            hud.invertCircle(ringX, ringY, R, R * 0.95f, 24, a);
+        }
     }
+    private float ringX, ringY, ringAlpha, frameDt;
+    private long nextDestroy;
 
     /** a gui.png icon (u,v,w,h in pixels) scaled into the button square; darker while pressed / active */
     private void guiButton(float x, float y, float s, int u, int v, int w, int h, boolean on) {

@@ -198,3 +198,19 @@
 - Torch = renderTorchAtAngle (4 planes +-1/16, top cap 0.625, wall: offset 0.1 / lift 0.2 / tilt 0.4).
 - Structure finder: world dialog -> "Постройки рядом" (villages / pyramids / witch huts within 100 chunks, tap = teleport).
 - TODO: touch move threshold is 10dp (original 0.05 normalized), door hinges.
+
+## beta17 (ring traced through the whole chain this time)
+- TouchTurnInteractControl (0x2c340c) + switchState: down -> press button.turn_interact (GuiData::setShowProgress(true));
+  move delta = sum |d| x 4 (jumps > 200 = 0), moved when delta / width >= 0.05; 0.4 s still -> press
+  button.destroy_or_interact (stays pressed while turning until the finger is lifted); up: tap (build) when < 0.25 s and
+  not moved; idle releases both.
+- MinecraftClient::tickBuildAction: while destroy is held, aimed block -> GameMode::continueDestroyBlock (creative:
+  _creativeDestroyBlock every 250 ms, 0xfa at GameMode+0x50); aimed at nothing -> stopDestroyBlock (no-op creative).
+- HudProgressRenderer::_renderProgressIndicator: alpha via GuiData::calcNewAlpha (+0.02 / -0.04 per frame) toward
+  showProgress; destroyProgress > 0 (survival only; creative never sets it) -> ring + disc (0.5+0.5p), alpha x 0.8;
+  else ring only, alpha x 0.8 on block/entity, min(alpha x 0.4, 0.4) on no hit.
+- Stairs corners: StairBlock::setStepShape / setInnerPieceShape ported (outer quarter / inner extra quarter).
+- Verified: hut roof stairs (getOrientationData stairs branch, hut orientation fixed S by ScatteredFeaturePiece ctor).
+- Village variants in 0.14: only plain and desert (VillagePiece::biomeBlock checks one desert flag).
+- TODO structures: mineshafts, strongholds, nether fortress (no Nether yet). Field 0x2c of the touch control (move
+  sensitivity) assumed 1.

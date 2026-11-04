@@ -41,6 +41,14 @@ public final class Controls {
     private final float[] sx = new float[MAXP], sy = new float[MAXP], lx = new float[MAXP], ly = new float[MAXP];
     private final long[] t0 = new long[MAXP], nextBreak = new long[MAXP];
     private final boolean[] moved = new boolean[MAXP], holding = new boolean[MAXP];
+    /** TouchTurnInteractControl of the interacting finger: 0 idle, 1 pressed, 2 turning, 3 destroy, 4 tap */
+    private int ttState;
+    private float ttDelta;
+    private long ttPress;
+    /** button.destroy_or_interact held (set in the destroy state, released only when the finger goes up) */
+    public boolean destroying;
+    /** button.turn_interact held: GuiData::setShowProgress */
+    public boolean showProgress;
     /** the interacting finger (for picking, the progress ring and the highlight): -1 none */
     public int interactId = -1;
     public float interactX, interactY, holdProgress;
@@ -115,7 +123,13 @@ public final class Controls {
             else if (flying && in(descendR, x, y)) { role[id] = 5; descend = true; }
             else if (in(sneakR, x, y) && !in(up, x, y)) { role[id] = 7; sneak = !sneak; }
             else if (in(dpadZone, x, y)) { role[id] = 1; }
-            else { role[id] = 2; if (interactId < 0) { interactId = id; interactX = x; interactY = y; } }
+            else {
+                role[id] = 2;
+                if (interactId < 0) {                                    // switchState(pressed)
+                    interactId = id; interactX = x; interactY = y;
+                    ttState = 1; ttPress = now; ttDelta = 0; showProgress = true; destroying = false;
+                }
+            }
         } else if (a == MotionEvent.ACTION_MOVE) {
             for (int i = 0; i < e.getPointerCount(); i++) {
                 int id = e.getPointerId(i);
@@ -123,8 +137,13 @@ public final class Controls {
                 float x = e.getX(i), y = e.getY(i);
                 if (role[id] == 2) {
                     lookDX += x - lx[id]; lookDY += y - ly[id];
-                    if (Math.abs(x - sx[id]) + Math.abs(y - sy[id]) > 10 * dp) moved[id] = true;
-                    if (id == interactId) { interactX = x; interactY = y; }
+                    if (id == interactId) {
+                        // incrementMoveDelta: |delta| x 4 (field 0x28), a jump over 200 counts as 0
+                        float d = (float) Math.sqrt((x - lx[id]) * (x - lx[id]) + (y - ly[id]) * (y - ly[id])) * 4f;
+                        if (d > 200f) d = 0f;
+                        ttDelta += d;
+                        interactX = x; interactY = y;
+                    }
                 }
                 lx[id] = x; ly[id] = y;
             }
@@ -134,20 +153,22 @@ public final class Controls {
             if (role[id] == 3) jump = false;
             if (role[id] == 4) ascend = false;
             if (role[id] == 5) descend = false;
-            if (role[id] == 2 && !moved[id] && !holding[id] && a != MotionEvent.ACTION_CANCEL && now - t0[id] < 250 && tapCount < 16) {
-                tapX[tapCount] = lx[id]; tapY[tapCount] = ly[id]; tapCount++; places++;
+            if (id == interactId) {
+                // pressed + released: tap when it hardly moved and was shorter than 0.25 s (then idle)
+                if (ttState == 1 && !ttMoved() && now - ttPress < 250 && a != MotionEvent.ACTION_CANCEL && tapCount < 16) {
+                    tapX[tapCount] = lx[id]; tapY[tapCount] = ly[id]; tapCount++; places++;
+                }
+                idle();
             }
-            if (id == interactId) interactId = -1;
             role[id] = 0;
             if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
-                jump = ascend = descend = false; interactId = -1;
+                jump = ascend = descend = false; if (interactId >= 0) idle();
                 for (int k = 0; k < MAXP; k++) role[k] = 0;
             }
         }
         return true;
     }
 
-    private int breakCount;
 
     /** GL thread, once per frame: D-pad state from the fingers on it, holds become destroy (repeated) */
     public synchronized void poll() {
@@ -169,49 +190,28 @@ public final class Controls {
         moveF = (f ? 1 : 0) - (b ? 1 : 0);
         moveS = (r ? 1 : 0) - (l ? 1 : 0);
         pJump = jump; pSneak = sneak;
-        // TouchTurnInteractControl::tick: pressed -> (moved) turning for good | (held 0.4 s) destroying;
-        // destroying -> (moved) turning. Creative: break at once, then every 250 ms (GameMode::continueDestroyBlock).
-        holdProgress = 0;
-        for (int i = 0; i < MAXP; i++) {
-            if (role[i] != 2) continue;
-            long held = now - t0[i];
-            float p;
-            if (moved[i]) p = 0f;                                          // turning (look) stage
-            else if (!holding[i]) {
-                p = Math.min(1f, held / 400f);
-                if (held >= 400) { holding[i] = true; addBreak(lx[i], ly[i]); nextBreak[i] = now + 250; p = 0f; }
-            } else {
-                if (now >= nextBreak[i]) { addBreak(lx[i], ly[i]); nextBreak[i] = now + 250; }
-                p = 1f - (nextBreak[i] - now) / 250f;
-            }
-            if (i == interactId) holdProgress = Math.max(0f, Math.min(1f, p));
+        // TouchTurnInteractControl::tick (0x2c340c)
+        if (interactId >= 0) {
+            if (ttState == 1) {
+                if (ttMoved()) ttState = 2;                                       // turning
+                else if (now - ttPress >= 400) { ttState = 3; destroying = true; } // destroy: press destroy_or_interact
+            } else if (ttState == 3 && ttMoved()) ttState = 2;                   // keeps destroy_or_interact held
         }
     }
 
-    private void addBreak(float x, float y) {
-        if (breakCount < 16) { breakX[breakCount] = x; breakY[breakCount] = y; breakCount++; }
-        breaks++;
-    }
+    /** move delta / window width x 1 (field 0x2c) >= 0.05 */
+    private boolean ttMoved() { return ttDelta / w >= 0.05f; }
+
+    /** switchState(idle): release turn_interact (and destroy_or_interact if it was pressed) */
+    private void idle() { interactId = -1; ttState = 0; ttDelta = 0; showProgress = false; destroying = false; }
 
     public synchronized float takeLookX() { float v = lookDX; lookDX = 0; return v; }
     public synchronized float takeLookY() { float v = lookDY; lookDY = 0; return v; }
-    /** number of destroy events; positions in breakX/breakY (cleared on take) */
-    public synchronized int takeBreaks(float[] xy) {
-        int n = breakCount;
-        for (int i = 0; i < n && i * 2 + 1 < xy.length; i++) { xy[i * 2] = breakX[i]; xy[i * 2 + 1] = breakY[i]; }
-        breakCount = 0; breaks = 0; return n;
-    }
     public synchronized int takePlaces(float[] xy) {
         int n = tapCount;
         for (int i = 0; i < n && i * 2 + 1 < xy.length; i++) { xy[i * 2] = tapX[i]; xy[i * 2 + 1] = tapY[i]; }
         tapCount = 0; places = 0; return n;
     }
-    /** the interacting finger is not on a block (or moved to another one) before the hold completed: start over */
-    public synchronized void restartHold() {
-        int i = interactId;
-        if (i >= 0 && i < MAXP && !holding[i]) t0[i] = System.currentTimeMillis();
-    }
-    public synchronized boolean interactHolding() { int i = interactId; return i >= 0 && i < MAXP && holding[i]; }
     public synchronized int takeFly() { int v = flyToggles; flyToggles = 0; return v; }
     public synchronized int takeSlot() { int v = slotPick; slotPick = -1; return v; }
 }

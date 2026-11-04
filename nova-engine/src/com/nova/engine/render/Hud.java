@@ -181,7 +181,10 @@ public final class Hud {
     }
 
     /** white ring (inner > 0) or disc drawn with ui_invert_overlay blending (1 - dst): inverts what is under it */
-    public void invertCircle(float cx, float cy, float outer, float inner, int n) {
+    public void invertCircle(float cx, float cy, float outer, float inner, int n) { invertCircle(cx, cy, outer, inner, n, 1f); }
+
+    /** ui_invert_overlay with ShaderColor alpha a: dst -> mix(dst, 1 - dst, a) */
+    public void invertCircle(float cx, float cy, float outer, float inner, int n, float a) {
         flush();
         curTex = white;
         GLES30.glBlendFunc(GLES30.GL_ONE_MINUS_DST_COLOR, GLES30.GL_ONE_MINUS_SRC_COLOR);
@@ -191,8 +194,8 @@ public final class Hud {
             float ox1 = cx + (float) Math.cos(a1) * outer, oy1 = cy + (float) Math.sin(a1) * outer;
             float ix0 = cx + (float) Math.cos(a0) * inner, iy0 = cy + (float) Math.sin(a0) * inner;
             float ix1 = cx + (float) Math.cos(a1) * inner, iy1 = cy + (float) Math.sin(a1) * inner;
-            put(ix0, iy0, 0, 0, 1, 1, 1, 1); put(ox0, oy0, 0, 0, 1, 1, 1, 1); put(ox1, oy1, 0, 0, 1, 1, 1, 1);
-            put(ix0, iy0, 0, 0, 1, 1, 1, 1); put(ox1, oy1, 0, 0, 1, 1, 1, 1); put(ix1, iy1, 0, 0, 1, 1, 1, 1);
+            put(ix0, iy0, 0, 0, a, a, a, a); put(ox0, oy0, 0, 0, a, a, a, a); put(ox1, oy1, 0, 0, a, a, a, a);
+            put(ix0, iy0, 0, 0, a, a, a, a); put(ox1, oy1, 0, 0, a, a, a, a); put(ix1, iy1, 0, 0, a, a, a, a);
             quads++;
         }
         flush();

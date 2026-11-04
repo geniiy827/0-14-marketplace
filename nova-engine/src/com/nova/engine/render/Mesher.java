@@ -124,6 +124,11 @@ public final class Mesher {
         return true;
     }
 
+    private final com.nova.engine.world.Shapes.Access access = new com.nova.engine.world.Shapes.Access() {
+        public int id(int x, int y, int z) { return get(x, y, z); }
+        public int data(int x, int y, int z) { return worldData(x, y, z); }
+    };
+
     /** block at section-local x/z (may be outside 0..15 by one) and world y */
     private int get(int x, int wy, int z) {
         if (wy < 0) return 1;
@@ -195,6 +200,10 @@ public final class Mesher {
     // ------------------------------------------------------------------ shaped blocks (stairs, fences, doors ...)
     private void model(int id, int x, int wy, int y, int z) {
         if (Blocks.model[id] == Blocks.M_TORCH) { torchMesh(id, x, y, z); return; }
+        if (Blocks.model[id] == Blocks.M_STAIRS) {
+            for (float[] b : com.nova.engine.world.Shapes.stairs(data, access, x, wy, z)) box(id, x, wy, y, z, b[0], b[1], b[2], b[3], b[4], b[5]);
+            return;
+        }
         float[][] bs = com.nova.engine.world.Shapes.boxes(id, data, get(x, wy, z - 1), get(x, wy, z + 1), get(x - 1, wy, z), get(x + 1, wy, z),
                 get(x, wy - 1, z), worldData(x, wy - 1, z));
         for (float[] b : bs) box(id, x, wy, y, z, b[0], b[1], b[2], b[3], b[4], b[5]);
