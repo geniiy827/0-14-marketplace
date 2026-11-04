@@ -75,9 +75,12 @@ public final class Decorator {
         McRandom s = new McRandom(seed);
         int a = (int) ((s.nextU32() >>> 2) << 1) + 1;
         int b = (int) ((s.nextU32() >>> 2) << 1) + 1;
-        r = new McRandom(seed ^ (cx * a + cz * b));
+        int chunkSeed = seed ^ (cx * a + cz * b);
+        r = new McRandom(chunkSeed);
         ox = cx << 4; oz = cz << 4;
         int biome = w.rawBiome(ox + 15, oz + 15);
+        lakesAndDungeons(biome, chunkSeed);
+        r = new McRandom(chunkSeed);                                   // reseeded for Biome::decorate
         flowerN = FLOWERS[biome]; grassN = GRASSN[biome];
         preDecorate(biome);
         decorateBiome(biome);
@@ -917,5 +920,137 @@ public final class Decorator {
             }
             set(x, y - 1, z, DIRT, 0);
         }
+    }
+
+    // ================================================================== RandomLevelSource::postProcess (before decorate)
+    static final int LAVA = 11, COBBLE = 4, CHEST = 54, SPAWNER = 52;
+
+    /** lakes (water, lava) with the first state of the chunk random, then the dungeons with a fresh one */
+    private void lakesAndDungeons(int biome, int chunkSeed) {
+        if (biome != 2 && biome != 17) {                               // not desert / desert hills
+            if ((r.nextU32() & 3) == 0) {
+                long u1 = r.nextU32(), u2 = r.nextU32(), u3 = r.nextU32();
+                lake(ox + (int) (u1 % 9) + 3, (int) (u2 & 127), oz + (int) (u3 % 9) + 3, WATER);
+            }
+        }
+        if ((r.nextU32() & 7) == 0) {
+            int x = ox + (int) (r.nextU32() % 9) + 3;
+            long u2 = r.nextU32(), u3 = r.nextU32();
+            int y = (int) (u3 % (u2 % 120 + 8));
+            int z = oz + (int) (r.nextU32() % 9) + 3;
+            if (y > 59 && (y <= 63 || r.nextU32() % 10 == 0)) lake(x, y, z, LAVA);
+        }
+        r = new McRandom(chunkSeed);                                   // reseeded before the structures
+        for (int i = 0; i < 8; i++) {
+            long a = r.nextU32(), b = r.nextU32(), c = r.nextU32();
+            monsterRoom(ox + (int) (a & 15) + 8, (int) (b & 127), oz + (int) (c & 15) + 8);
+        }
+    }
+
+    private boolean solidM(int id) { return id != AIR && Blocks.solid[id] && Blocks.kind[id] != Blocks.LIQUID && Blocks.kind[id] != Blocks.CROSS; }
+    private static boolean liquidM(int id) { return id == WATER || id == FLOWING_WATER || id == 10 || id == LAVA; }
+
+    /** LakeFeature::place */
+    private void lake(int px, int py, int pz, int liquid) {
+        px -= 8; pz -= 8;
+        while (py > 0 && air(px, py, pz)) py--;
+        py -= 4;
+        boolean[] g = new boolean[2048];
+        int n = (int) (r.nextU32() & 3) + 4;
+        for (int k = 0; k < n; k++) {
+            float xs = 3f + r.nextFloat() * 6f;
+            float ys = 2f + r.nextFloat() * 4f;
+            float xh = xs * 0.5f;
+            float cx = (xh - xs) + 15f;
+            float zs = 3f + r.nextFloat() * 6f;
+            float yh = ys * 0.5f;
+            float cy = (yh - ys) + 6f;
+            cx = cx * r.nextFloat();
+            cy = cy * r.nextFloat();
+            float f6 = r.nextFloat();
+            float zh = zs * 0.5f;
+            float cz = ((zh - zs) + 15f) * f6;
+            float iy = 1f / yh, ix = 1f / xh, iz = 1f / zh;
+            float[] dy = new float[7];
+            for (int j = 1; j <= 6; j++) { float v = ((float) j - cy) * iy; dy[j] = v * v; }
+            for (int x = 1; x < 15; x++) {
+                float dx = ((float) x - cx) * ix; dx = dx * dx;
+                for (int z = 1; z < 15; z++) {
+                    float dz = ((float) z - cz) * iz; dz = dz * dz;
+                    for (int j = 1; j <= 6; j++) if (dz + (dx + dy[j]) < 1f) g[(x * 16 + z) * 8 + j] = true;
+                }
+            }
+        }
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 0; y < 8; y++) {
+            if (!check(g, x, y, z)) continue;
+            int id = get(px + x, py + y, pz + z);
+            if (y >= 4) { if (liquidM(id)) return; }
+            else if (!solidM(id) && id != liquid) return;
+        }
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 0; y < 8; y++)
+            if (g[(x * 16 + z) * 8 + y]) set(px + x, py + y, pz + z, y <= 3 ? liquid : AIR, 0);
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 4; y < 8; y++) {
+            if (!g[(x * 16 + z) * 8 + y]) continue;
+            if (get(px + x, py + y - 1, pz + z) == DIRT && skyOpen(px + x, py + y, pz + z)) set(px + x, py + y - 1, pz + z, GRASS, 0);
+        }
+        if (liquid == LAVA) {
+            for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) for (int y = 0; y < 8; y++) {
+                if (!check(g, x, y, z)) continue;
+                if (y > 3 && (r.nextU32() & 1) == 0) continue;
+                if (solidM(get(px + x, py + y, pz + z))) set(px + x, py + y, pz + z, STONE, 0);
+            }
+        }
+    }
+
+    /** sky light > 0 (no light engine at generation time: nothing opaque above) */
+    private boolean skyOpen(int x, int y, int z) {
+        for (int yy = y; yy < Chunk.H; yy++) { int id = get(x, yy, z); if (id != AIR && Blocks.opaque[id]) return false; }
+        return true;
+    }
+
+    /** LakeFeature::_check: outside the lake with a lake neighbour */
+    private static boolean check(boolean[] g, int x, int y, int z) {
+        int i = (x * 16 + z) * 8 + y;
+        if (g[i]) return false;
+        return (x < 15 && g[i + 128]) || (x > 0 && g[i - 128]) || (z < 15 && g[i + 8]) || (z > 0 && g[i - 8])
+                || (y < 7 && g[i + 1]) || (y > 0 && g[i - 1]);
+    }
+
+    /** MonsterRoomFeature::place (chest loot and the spawner mob are not generated yet) */
+    private void monsterRoom(int px, int py, int pz) {
+        int xr = (int) (r.nextU32() & 1) + 2, zr = (int) (r.nextU32() & 1) + 2;
+        int x0 = px - xr - 1, x1 = px + xr + 1, z0 = pz - zr - 1, z1 = pz + zr + 1;
+        int holes = 0;
+        for (int x = x0; x <= x1; x++) for (int y = py - 1; y <= py + 4; y++) for (int z = z0; z <= z1; z++) {
+            boolean solid = solidM(get(x, y, z));
+            if (y == py - 1 && !solid) return;
+            if (y == py + 4 && !solid) return;
+            if ((x == x0 || x == x1 || z == z0 || z == z1) && y == py && air(x, y, z) && air(x, y + 1, z)) holes++;
+        }
+        if (holes < 1 || holes > 5) return;
+        for (int x = x0; x <= x1; x++) for (int y = py + 3; y >= py - 1; y--) for (int z = z0; z <= z1; z++) {
+            if (x != x0 && y != py - 1 && z != z0 && x != x1 && y != py + 4 && z != z1) { set(x, y, z, AIR, 0); continue; }
+            if (y >= 0 && !solidM(get(x, y - 1, z))) { set(x, y, z, AIR, 0); continue; }
+            if (solidM(get(x, y, z))) {
+                if (y == py - 1) set(x, y, z, (r.nextU32() & 3) != 0 ? MOSSY : COBBLE, 0);
+                else set(x, y, z, COBBLE, 0);
+            }
+        }
+        for (int t = 0; t < 2; t++) {
+            for (int k = 0; k < 3; k++) {
+                int x = px + (int) (r.nextU32() % (2 * xr + 1)) - xr;
+                int z = pz + (int) (r.nextU32() % (2 * zr + 1)) - zr;
+                if (!air(x, py, z)) continue;
+                int s = 0;
+                if (solidM(get(x - 1, py, z))) s++;
+                if (solidM(get(x + 1, py, z))) s++;
+                if (solidM(get(x, py, z - 1))) s++;
+                if (solidM(get(x, py, z + 1))) s++;
+                if (s != 1) continue;
+                set(x, py, z, CHEST, 2);
+                break;
+            }
+        }
+        set(px, py, pz, SPAWNER, 0);
     }
 }

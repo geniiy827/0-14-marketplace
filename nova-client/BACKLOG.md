@@ -127,3 +127,15 @@
   _thinSand: 3 sand above -> sandstone/red sandstone). No ravines in 0.14. Applied in loadChunk after buildSurfaces.
 - Next: RandomLevelSource::postProcess 0x644680 (structures postProcess, lakes?, MonsterRoom), StructureFeature (villages,
   mineshafts, strongholds, scattered: SmallTemple/SwamplandHut...), spawn (Level::validateSpawn?).
+
+## beta10 (postProcess: lakes, dungeons)
+- RandomLevelSource::postProcess 0x644680 order (normal worlds, flag +0x18 == 0): R = chunk random;
+  water lake if biome(max corner) not desert/desertHills and (R&3)==0 at (R%9+3, R&127, R%9+3);
+  lava lake if (R&7)==0: x=R%9+3, y=R%(R%120+8), z=R%9+3, only y>59 and (y<=63 or R%10==0);
+  4 structure LargeFeature::apply (+0xc4,+0x168,+0xf4,+0x13c) reseed; R reseeded; StructureFeature::postProcess x4;
+  8x MonsterRoomFeature at (R&15)+8,(R&127),(R&15)+8; freeze (ice/snow) loop; R reseeded -> Biome::decorate.
+- LakeFeature::place 0x60ca70 ported (float blobs, centre f*(15-size/2) without the Java +1 offset, _check, grass, lava stone).
+- MonsterRoomFeature::place 0x631b30 ported; TODO chest loot RNG (WeighedTreasureItem::addChestItems) + spawner mob id,
+  chest entity model (now a block from chest_inventory tiles).
+- TODO next: structures (StructureFeature: villages SimpleHouse/SmallTemple/BookHouse/SmallHut/PigHouse..., mineshafts,
+  strongholds SH*, scattered: SwamplandHut + temples?), freeze loop.
