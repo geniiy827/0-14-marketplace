@@ -95,6 +95,15 @@ public final class Hud {
         return t[0];
     }
 
+    /** clip the following draws to a screen rectangle (top-left origin) */
+    public void clip(float x, float y, float cw, float ch) {
+        flush();
+        GLES30.glEnable(GLES30.GL_SCISSOR_TEST);
+        GLES30.glScissor((int) x, (int) (h - y - ch), (int) Math.max(0, cw), (int) Math.max(0, ch));
+    }
+
+    public void noClip() { flush(); GLES30.glDisable(GLES30.GL_SCISSOR_TEST); }
+
     public void begin(float sw, float sh) {
         w = sw; h = sh;
         GLES30.glDisable(GLES30.GL_DEPTH_TEST);

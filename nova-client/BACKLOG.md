@@ -349,3 +349,27 @@
   (Light.TOUCHED + flush) so a flood triggers one rebuild per section, not hundreds.
 - World.set writes id + data together before bumping sections (door: id then data race).
 - Doors: could not reproduce in the JVM test (mesh changes with data ^ 4). Ask for exact case if still broken.
+
+## open after beta22 (user report)
+- FPS: first high, then falls to ~30 after a while (not only forest). Suspects: sections map only grows / far
+  sections kept, mesh rebuild storms from light spreads, GC, thermal. First: on-screen counters (sections total /
+  drawn / verts, meshes built per second, light tasks) to see what grows.
+- Grass block side looks blurry since mips (beta21e/f): check mip choice at grazing angles (original
+  NEAREST_MIPMAP_LINEAR too), the colour bleed on the side overlay's transparent texels, our overlay pass.
+- Doors: still to confirm on device.
+
+## beta23 (network start)
+- Play screen = play.default_worlds_panel from play_screen.json (Worlds / Friends tabs, network_world_item with
+  world_external, status dots, remove X, add server / new world / back). JsonUi: data bindings per built tree,
+  binding_condition "visible" no longer hides bound labels, pressed node, scrolling panels drawn by the screen (clip).
+  Layout checked offline with a Java2D stub renderer (work/uitest).
+- Server list: external_servers.txt (id:name:ip:port), RakNet unconnected ping -> MOTD/players.
+- net/RakNet.java: client (protocol 7 from RakPeer::RunUpdateCycle), split/reliable/ordered, ACK; tested in the JVM
+  against Nukkit's 2016 RakNet server code (login 16 KB split up, 90 KB split down, ping MOTD). Fixed: no holes in
+  reliable message indexes; first ordered index taken from the server.
+- game/NetGame.java: protocol 70; Login (skin steve 64x64), StartGame, MovePlayer, Batch (zlib), FullChunkData
+  (order 0 columns / 1 layered), UpdateBlock, Text (chat lines on the HUD), PlayStatus, Respawn, SetTime;
+  sends MovePlayer, RequestChunkRadius, RemoveBlock(+PlayerAction), MobEquipment+UseItem, Animate.
+- Add server = Android dialog (with nickname field) for now; TODO 1:1 AddExternalServerScreen.
+- TODO next: skin picker 1:1 + custom skins, chat screen 1:1 (input), settings (nick), remote players/entities
+  render (AddPlayer/AddEntity/MoveEntity), remaining blocks + collision shapes, survival inventory sync.

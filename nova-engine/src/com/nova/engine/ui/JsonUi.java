@@ -148,6 +148,22 @@ public final class JsonUi {
         boolean visible = true;
         String pressedName;
         boolean down;
+        /** binding values of the tree it was built for (#header, #game_online, ...) */
+        Map<String, Object> data;
+        public float x() { return x; }
+        public float y() { return y; }
+        public float w() { return w; }
+        public float h() { return h; }
+        public String name() { return name; }
+        public Node find(String nm) {
+            if (nm.equals(name)) return this;
+            for (Node c : kids) { Node r = c.find(nm); if (r != null) return r; }
+            return null;
+        }
+        public void hide() { visible = false; }
+        public void show() { visible = true; }
+        public boolean isVisible() { return visible; }
+        public List<Node> children() { return kids; }
         int order;
     }
 
@@ -160,9 +176,16 @@ public final class JsonUi {
         return g;
     }
 
-    public Node build(String screen) {
+    public Node build(String screen) { return build(screen, new HashMap<String, Object>()); }
+
+    private Map<String, Object> building;
+
+    /** build with binding values (strings for labels, booleans for #visible bindings) */
+    public Node build(String screen, Map<String, Object> data) {
         int dot = screen.indexOf('.');
+        building = data;
         Node n = make(null, screen.substring(dot + 1), flat(screen), globals(), screen.substring(0, dot));
+        building = null;
         return n;
     }
 
@@ -196,7 +219,7 @@ public final class JsonUi {
             Iterator<String> vk = v.keys();
             while (vk.hasNext()) { String k = vk.next(); if (k.startsWith("$")) env.put(k, v.opt(k)); }
         }
-        n.env = env; n.p = def;
+        n.env = env; n.p = def; n.data = building;
         n.type = def.optString("type", "panel");
         n.layer = (parent == null ? 0 : parent.layer) + def.optInt("layer", 0);
         if (def.has("visible")) n.visible = truth(def.opt("visible"), env);
@@ -204,9 +227,13 @@ public final class JsonUi {
         if (binds != null) for (int i = 0; i < binds.length(); i++) {
             JSONObject b = binds.optJSONObject(i);
             if (b == null) continue;
-            if ("visible".equals(b.optString("binding_condition")) || "#visible".equals(b.optString("binding_name_override"))) {
-                Object bn = val(b.opt("binding_name"), env);
-                n.visible &= bn instanceof String && binding((String) bn);
+            Object bn = val(b.opt("binding_name"), env);
+            if ("#visible".equals(b.optString("binding_name_override"))) {
+                n.visible &= bn instanceof String && binding((String) bn, building);
+            } else if ("visible".equals(b.optString("binding_condition")) && bn instanceof String) {
+                // binding_condition "visible" = refresh while visible; only a boolean value hides it
+                if (building != null && building.get(bn) instanceof Boolean) n.visible &= (Boolean) building.get(bn);
+                else if (!((String) bn).startsWith("#") || (building == null || !building.containsKey(bn))) n.visible &= binding((String) bn, building) || building != null && building.containsKey(bn);
             }
         }
         Object pb = val(def.opt("$pressed_button_name"), env);
@@ -230,6 +257,7 @@ public final class JsonUi {
                 cname = at == 0 ? (base == null ? "" : base.substring(base.lastIndexOf('.') + 1)) : key.substring(0, at);
             }
             if (over.has("ignored") && truth(over.opt("ignored"), env)) continue;
+            if (key.contains("scrolling_panel") || key.contains("gamepad_helper")) continue;     // drawn by the screen
             JSONObject cdef = base == null ? new JSONObject() : flat(full(base, ns));
             if (cdef.has("ignored") && truth(cdef.opt("ignored"), env)) continue;
             merge(cdef, over);
@@ -242,7 +270,8 @@ public final class JsonUi {
     }
 
     /** data bindings we can answer */
-    private static boolean binding(String b) {
+    private static boolean binding(String b, Map<String, Object> data) {
+        if (data != null && data.get(b) instanceof Boolean) return (Boolean) data.get(b);
         return "#version".equals(b);
     }
 
@@ -389,6 +418,7 @@ public final class JsonUi {
             Object tv = val(n.p.opt("text"), n.env);
             String text = tv instanceof String ? (String) tv : "";
             if (text.equals("#version")) text = "v0.14.3 alpha";
+            else if (text.startsWith("#") && n.data != null && n.data.get(text) != null) text = String.valueOf(n.data.get(text));
             else if (n.p.optBoolean("localize", true)) text = tr(text);
             float tw = hud.fontWidth(text), th = 8;
             String al = n.p.optString("alignment", n.p.optString("text_alignment", "center"));
@@ -403,6 +433,9 @@ public final class JsonUi {
 
     // ------------------------------------------------------------------ input (touch = select)
     /** pointer down / move / up in UI units; returns the pressed button name when a press is released inside */
+    /** the button node of the last fired press */
+    public Node lastPressed;
+
     public String touch(Node root, int action, float x, float y) {
         List<Node> all = new ArrayList<Node>();
         buttons(root, all);
@@ -412,7 +445,7 @@ public final class JsonUi {
             if (action == 0) b.down = in;
             else if (action == 1) b.down = b.down && in;
             else {
-                if (b.down && in) fired = b.pressedName;
+                if (b.down && in) { fired = b.pressedName != null ? b.pressedName : "button.pressed"; lastPressed = b; }
                 b.down = false;
             }
         }

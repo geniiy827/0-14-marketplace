@@ -15,9 +15,44 @@ public final class EngineActivity extends Activity {
     private android.content.SharedPreferences prefs;
     private boolean dialogOpen;
 
+    /** AddExternalServerScreen: server name, address, port */
+    private void serverDialog(final com.nova.engine.ui.PlayScreen s) {
+        android.widget.LinearLayout l = new android.widget.LinearLayout(this);
+        l.setOrientation(android.widget.LinearLayout.VERTICAL);
+        final android.widget.EditText name = new android.widget.EditText(this), addr = new android.widget.EditText(this), port = new android.widget.EditText(this);
+        final android.widget.EditText nick = new android.widget.EditText(this);
+        nick.setHint("Твой ник"); nick.setText(game.playerName);
+        l.addView(nick);
+        name.setHint("Имя сервера"); addr.setHint("Адрес (IP)"); port.setHint("Порт"); port.setText("19132");
+        port.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        l.addView(name); l.addView(addr); l.addView(port);
+        new android.app.AlertDialog.Builder(this).setTitle("Добавить сервер").setView(l)
+                .setPositiveButton("Добавить", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        int p = 19132;
+                        try { p = Integer.parseInt(port.getText().toString().trim()); } catch (Exception ignored) { }
+                        String nk = nick.getText().toString().trim();
+                        if (!nk.isEmpty()) { game.playerName = nk; prefs.edit().putString("name", nk).apply(); }
+                        String a = addr.getText().toString().trim();
+                        if (!a.isEmpty()) s.addServer(name.getText().toString().trim(), a, p);
+                    }
+                }).setNegativeButton("Отмена", null).show();
+    }
+
     /** world menu: current seed, type a seed (number or text, empty = random), recent seeds, copy */
     private void worldDialog() {
         if (dialogOpen) return;
+        if (game.onServer()) {                                   // on a server: only leaving makes sense here
+            dialogOpen = true;
+            new android.app.AlertDialog.Builder(this).setTitle("Сервер")
+                    .setPositiveButton("Выйти в меню", new android.content.DialogInterface.OnClickListener() {
+                        public void onClick(android.content.DialogInterface d, int w) { game.leaveServer(); }
+                    }).setNegativeButton("Назад", null)
+                    .setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+                        public void onDismiss(android.content.DialogInterface d) { dialogOpen = false; }
+                    }).show();
+            return;
+        }
         dialogOpen = true;
         float dp = getResources().getDisplayMetrics().density;
         android.widget.LinearLayout l = new android.widget.LinearLayout(this);
@@ -140,6 +175,13 @@ public final class EngineActivity extends Activity {
             } catch (Throwable ignored) { }
         }
         game = new Game(this);
+        game.filesDir = getFilesDir();
+        game.playerName = prefs.getString("name", "Steve");
+        game.ui = new Game.Ui() {
+            public void askServer(final com.nova.engine.ui.PlayScreen s) {
+                runOnUiThread(new Runnable() { public void run() { serverDialog(s); } });
+            }
+        };
         prefs = getSharedPreferences("nova", 0);
         if (prefs.contains("seed")) game.startSeed = prefs.getInt("seed", 0);
         else prefs.edit().putInt("seed", game.startSeed).apply();

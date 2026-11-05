@@ -55,11 +55,24 @@ public final class StartMenu {
      * MinecraftClient::calculateGuiScale (small screens): width < 1000 -> 3 at >= 800, 2 at >= 400, else 1;
      * otherwise 6 (8 above 3600) when the screen is over 15 inches or wider than 2000, else 4. Values 1..8.
      */
-    static float guiScale(int w, float inches) {
+    public static float guiScale(int w, float inches) {
         if (w < 1000) return w >= 800 ? 3 : w >= 400 ? 2 : 1;
         if (inches > 15 || w > 2000) return w > 3600 ? 8 : 6;
         return 4;
     }
+
+    /** the play screen (null until opened) */
+    public PlayScreen play;
+    public boolean onPlay;
+    /** a message for the title screen (disconnect reason) */
+    public String message;
+
+    public void openPlay(java.io.File dir, PlayScreen.Host host) {
+        if (play == null) play = new PlayScreen(ui, dir, host);
+        onPlay = true;
+    }
+
+    public JsonUi ui() { return ui; }
 
     /** draws the whole screen; returns nothing, actions come from touch() */
     public void render(Hud hud, int w, int h, float dt) {
@@ -72,12 +85,20 @@ public final class StartMenu {
         pano.render(dt);
         hud.begin(w, h);
         hud.gradient(0, 0, w, h, 0x59FFFFFF, 0x59000000);   // fillGradient (1,1,1,0.35) -> (0,0,0,0.35)
-        ui.draw(root, hud, scale);
+        if (onPlay && play != null) play.render(hud, w / scale, h / scale, scale);
+        else {
+            ui.draw(root, hud, scale);
+            if (message != null) {
+                String m = ui.tr(message);
+                hud.fontText(m, (w - hud.fontWidth(m) * scale) * 0.5f, h - 20 * scale, scale, 0xFFFFFFFF, true);
+            }
+        }
         hud.end();
     }
 
     /** 0 down, 1 move, 2 up (screen pixels); returns the pressed button name (e.g. "button.menu_play") */
     public String touch(int action, float x, float y) {
+        if (onPlay && play != null) { play.touch(action, x / scale, y / scale); return null; }
         return ui.touch(root, action, x / scale, y / scale);
     }
 }

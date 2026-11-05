@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta22";
+    public static final String VERSION = "NOVA Engine beta23";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -60,6 +60,69 @@ public final class Game implements GLSurfaceView.Renderer {
 
     /** any thread: replace the world by a new one with this seed (done on the GL thread) */
     public void newWorld(int seed) { pendingSeed = seed; pendingWorld = true; }
+
+    // ------------------------------------------------------------------ network play
+    /** the session when playing on a server (null = single player) */
+    volatile NetGame net;
+    private volatile String[] pendingConnect;
+    /** last disconnect message (shown by the menu) */
+    public volatile String lastDisconnect;
+    public String playerName = "Steve";
+    public byte[] skinBytes = new byte[64 * 64 * 4];
+
+    public int radius() { return radius; }
+
+    public boolean onServer() { return net != null; }
+
+    private volatile boolean pendingLeave;
+
+    public void leaveServer() { pendingLeave = true; }
+
+    /** set by the activity: the add-server dialog and where the server list lives */
+    public interface Ui { void askServer(com.nova.engine.ui.PlayScreen s); }
+    public volatile Ui ui;
+    public java.io.File filesDir = new java.io.File(".");
+
+    private final com.nova.engine.ui.PlayScreen.Host playHost = new com.nova.engine.ui.PlayScreen.Host() {
+        public void addServer(com.nova.engine.ui.PlayScreen s) { Ui u = ui; if (u != null) u.askServer(s); }
+        public void playLocal() { menu.onPlay = false; inMenu = false; }
+        public void newLocal() { menu.onPlay = false; newWorld(new java.util.Random().nextInt()); inMenu = false; }
+        public void join(String host, int port) { menu.onPlay = false; connect(host, port); }
+        public void back() { menu.onPlay = false; }
+    };
+
+    /** any thread: join a 0.14 server (done on the GL thread) */
+    public void connect(String host, int port) { pendingConnect = new String[]{host, Integer.toString(port)}; }
+
+    private void startNet() {
+        String[] pc = pendingConnect;
+        pendingConnect = null;
+        if (net != null) net.close();
+        world = new World(0);
+        deco = new com.nova.engine.world.Decorator(world, world.seed);
+        generating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
+        decorating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
+        done.clear();
+        wr.clearAll();
+        player.x = player.px = 0; player.y = player.py = 200; player.z = player.pz = 0;
+        player.mx = player.my = player.mz = 0;
+        player.flying = true;
+        settleSpawn = false;
+        net = new NetGame(pc[0], Integer.parseInt(pc[1]), playerName, skinBytes);
+        net.connect();
+        lastDisconnect = null;
+        inMenu = false;
+    }
+
+    private void endNet(String reason) {
+        if (net != null) net.close();
+        net = null;
+        lastDisconnect = reason;
+        if (menu != null) { menu.message = reason; menu.onPlay = false; }
+        inMenu = true;
+        pendingSeed = startSeed;
+        replaceWorld();
+    }
     /** structures within r chunks of the player: {type, x, z, distance} */
     public java.util.List<int[]> structures(int r) {
         World w = world;
@@ -146,6 +209,16 @@ public final class Game implements GLSurfaceView.Renderer {
                 float inches = (float) Math.sqrt((double) dm.widthPixels * dm.widthPixels + (double) dm.heightPixels * dm.heightPixels) / xdpi;
                 java.util.Locale lc = java.util.Locale.getDefault();
                 menu = new com.nova.engine.ui.StartMenu(atlas.gameAssets, lc.getLanguage() + "_" + lc.getCountry(), inches);
+                screenInches = inches;
+                try {                                                   // the login skin: steve.png as RGBA
+                    android.graphics.Bitmap sk = android.graphics.BitmapFactory.decodeStream(atlas.gameAssets.open("images/mob/skins/Base/steve.png"));
+                    int[] px = new int[64 * 64];
+                    sk.getPixels(px, 0, 64, 0, 0, 64, Math.min(64, sk.getHeight()));
+                    for (int i = 0; i < px.length; i++) {
+                        skinBytes[i * 4] = (byte) (px[i] >> 16); skinBytes[i * 4 + 1] = (byte) (px[i] >> 8);
+                        skinBytes[i * 4 + 2] = (byte) px[i]; skinBytes[i * 4 + 3] = (byte) (px[i] >>> 24);
+                    }
+                } catch (Exception ignored) { }
             }
             if (world == null) {
                 world = new World(startSeed);
@@ -197,14 +270,17 @@ public final class Game implements GLSurfaceView.Renderer {
                 for (float[] e : menuEvents) { String r = menu.touch((int) e[0], e[1], e[2]); if (r != null) act = r; }
                 menuEvents.clear();
             }
-            if ("button.menu_play".equals(act)) inMenu = false;      // Play: straight into the world for now
+            if ("button.menu_play".equals(act)) menu.openPlay(filesDir, playHost);   // PlayScreen (worlds / servers)
             else {
                 menu.render(hud, width, height, frameDt);
                 stream();
                 return;
             }
         }
+        if (pendingConnect != null) startNet();
+        if (pendingLeave) { pendingLeave = false; if (net != null) { endNet(null); return; } }
         if (pendingWorld) replaceWorld();
+        if (net != null && !net.tick(this, world, player)) { endNet(net.disconnect); return; }
         if (tpPending) {
             tpPending = false;
             player.x = player.px = tpX + 0.5; player.z = player.pz = tpZ + 0.5; player.y = player.py = 120;
@@ -225,7 +301,11 @@ public final class Game implements GLSurfaceView.Renderer {
         }
         input();
         tickAcc += dt;
-        while (tickAcc >= 50_000_000L) { player.tick(world); world.time++; levelTicks++; tickAcc -= 50_000_000L; }
+        while (tickAcc >= 50_000_000L) {
+            boolean hold = net != null && (!net.spawned || world.ready((int) Math.floor(player.x) >> 4, (int) Math.floor(player.z) >> 4) == null);
+            if (!hold) player.tick(world);
+            world.time++; levelTicks++; tickAcc -= 50_000_000L;
+        }
         float a = tickAcc / 50_000_000f;
         stream();
         render(a);
@@ -279,6 +359,7 @@ public final class Game implements GLSurfaceView.Renderer {
         if (c.destroying && c.interactId >= 0) {
             long now = System.currentTimeMillis();
             if (pickAt(c.interactX, c.interactY) && now >= nextDestroy && world.get(pick.x, pick.y, pick.z) != 7) {
+                if (net != null) net.breakBlock(pick.x, pick.y, pick.z);
                 world.set(pick.x, pick.y, pick.z, 0);
                 player.swing();
                 nextDestroy = now + 250;
@@ -288,14 +369,20 @@ public final class Game implements GLSurfaceView.Renderer {
         for (int i = 0; i < pl && i < 16; i++) {
             if (!pickAt(touchXY[i * 2], touchXY[i * 2 + 1])) continue;
             // GameMode::useItemOn: not sneaking -> Block::use of the aimed block first; true = done (no placing)
-            if (!player.sneak && useBlock(pick.x, pick.y, pick.z)) { player.swing(); continue; }
+            if (!player.sneak && useBlock(pick.x, pick.y, pick.z)) {
+                if (net != null) net.useItem(pick.x, pick.y, pick.z, pick.face, player, hotbar[slot], 0);
+                player.swing(); continue;
+            }
             int nx = pick.nx(), ny = pick.ny(), nz = pick.nz();
             int id = hotbar[slot];
             int cur = world.get(nx, ny, nz);
             boolean intoPlayer = Blocks.solid[id] && nx >= Math.floor(player.x - Player.W / 2) && nx <= Math.floor(player.x + Player.W / 2)
                     && nz >= Math.floor(player.z - Player.W / 2) && nz <= Math.floor(player.z + Player.W / 2)
                     && ny >= Math.floor(player.y) && ny <= Math.floor(player.y + Player.H);
-            if ((cur == 0 || Blocks.kind[cur] == Blocks.LIQUID) && !intoPlayer) { world.set(nx, ny, nz, id, id == 86 ? pumpkinFacing() : 0); player.swing(); }
+            if ((cur == 0 || Blocks.kind[cur] == Blocks.LIQUID) && !intoPlayer) {
+                if (net != null) { net.useItem(pick.x, pick.y, pick.z, pick.face, player, id, 0); net.swing(); }
+                world.set(nx, ny, nz, id, id == 86 ? pumpkinFacing() : 0); player.swing();
+            }
         }
         hl = c.interactId >= 0 && pickAt(c.interactX, c.interactY);
         if (hl) { hlX = pick.x; hlY = pick.y; hlZ = pick.z; }
@@ -342,7 +429,7 @@ public final class Game implements GLSurfaceView.Renderer {
         int pcx = (int) Math.floor(player.x) >> 4, pcz = (int) Math.floor(player.z) >> 4;
         // generation like the original: terrain (parallel) -> decoration when the 3x3 around has terrain (one thread,
         // it writes into neighbours) -> visible when the 3x3 around is decorated
-        int queued = 0;
+        int queued = net != null ? 4 : 0;                       // on a server the chunks come from it
         for (int r = 0; r <= radius + 3 && queued < 4; r++) {
             for (int dz = -r; dz <= r && queued < 4; dz++) for (int dx = -r; dx <= r && queued < 4; dx++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
@@ -365,7 +452,7 @@ public final class Game implements GLSurfaceView.Renderer {
                 });
             }
         }
-        int decoQueued = 0;
+        int decoQueued = net != null ? 4 : 0;
         for (int r = 0; r <= radius + 2 && decoQueued < 4; r++) {
             for (int dz = -r; dz <= r && decoQueued < 4; dz++) for (int dx = -r; dx <= r && decoQueued < 4; dx++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
@@ -483,6 +570,7 @@ public final class Game implements GLSurfaceView.Renderer {
     private final com.nova.engine.render.Sky sky = new com.nova.engine.render.Sky();
     private final float[] skyRot = new float[16], cloudProj = new float[16], fogDist = new float[4], sunCol = new float[4];
     private long levelTicks;
+    private float screenInches = 6f;
     private float sunGlare;
 
     private void render(float a) {
@@ -595,6 +683,27 @@ public final class Game implements GLSurfaceView.Renderer {
         hud.text("textures: " + atlas.source + "   biome: " + String.valueOf(com.nova.engine.world.Biomes.NAME[world.biome((int) Math.floor(player.x), (int) Math.floor(player.z))]), d * 6, d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);
         if (ray.hit) hud.text(Blocks.name[world.get(ray.x, ray.y, ray.z)] + "", width / 2f + d * 12, height / 2f + d * 6, ts, 0xFFFFFFFF);
         if (error != null) hud.text(error, d * 6, height / 2f, ts, 0xFFFF6060);
+        NetGame ng = net;
+        if (ng != null) {
+            // Gui chat: newest at the bottom above the hotbar, each line 9 px on black 50%, gone after 10 s
+            float gs = com.nova.engine.ui.StartMenu.guiScale(Math.max(width, height), screenInches);
+            long now = System.currentTimeMillis();
+            java.util.List<String[]> lines = new java.util.ArrayList<String[]>();
+            synchronized (ng.chat) { for (int i = ng.chat.size() - 1; i >= 0 && lines.size() < 10; i--) lines.add(ng.chat.get(i)); }
+            float y = height - 48 * gs;
+            for (String[] l : lines) {
+                long age = now - Long.parseLong(l[1]);
+                if (age > 10000) break;
+                float al = Math.min(1f, (10000 - age) / 1000f);
+                y -= 9 * gs;
+                hud.rect(2 * gs, y, 320 * gs, 9 * gs, ((int) (al * 128)) << 24);
+                hud.fontText(l[0], 4 * gs, y + 0.5f * gs, gs, ((int) (al * 255)) << 24 | 0xFFFFFF, true);
+            }
+            if (!ng.spawned) {
+                String t = ng.started ? "Загрузка мира..." : "Подключение к " + ng.host + ":" + ng.port + "...";
+                hud.fontText(t, (width - hud.fontWidth(t) * gs) / 2, height / 2f, gs, 0xFFFFFFFF, true);
+            }
+        }
         hud.end();
     }
 
