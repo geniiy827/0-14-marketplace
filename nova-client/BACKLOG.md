@@ -258,3 +258,39 @@
 - New from the original: LevelRenderer::bobView walking sway (camera + hand): angle = (f*a - walkDistO)*pi,
   translate(sin*b*0.5, -|cos*b|), rotZ sin*b*3, rotX |cos(angle-0.2)*b|*5, rotX tilt; Player::aiStep bob 0.4 toward
   min(speed, 0.1) on ground, tilt 0.8 toward atan(-yd*0.2)*15 in the air; walkDist += horizontal move * 0.6.
+
+## beta21
+- Fix: no rails / cobwebs in mineshafts - blocks 30 (web, cross) and 66 (rail, flat model) were not registered.
+  Rail = BlockTessellator::tessellateRailInWorld (Java layout, data 0..9; mineshafts use 0/1) - not checked in the .so.
+- Fix: walking micro-shake - bobView angle was (f*a - walkDistO)*pi; LevelRenderer::bobView 0x468d38:
+  (old - cur)*a - cur = -(cur + (cur-old)*a), times pi.
+- Fix: glass (and any solid-material block) under water flickered: LiquidBlock::shouldRenderFace hides the face
+  against a solid MATERIAL (not only opaque cubes); water pass has polygon offset 0.1 (terrain_water material).
+- LIGHT (world/Light.java): tables mLightEmission / mLightBlock / mTranslucency / mSolid dumped by emulating
+  Block::initBlocks (tools/emu_blocks.py -> blocks.json). LevelChunk::recalcHeightmap column fill, LightUpdate::update rule
+  (lb=max(1,lightBlock); emission sky=canSeeSky?15:0 / block=mLightEmission; light = max(emission, maxNeighbour-lb))
+  computed as its fixed point: fill when 3x3 decorated, flood when 3x3 filled, visible after the flood; edits relight
+  a 31 x 31 box (whole height if the column top moved) on the light thread (World.lightEdits).
+  NOT exactly as the original at generation: MCPE updateFast only covers minHeight-4..maxHeight and leaves deeper
+  caves with the column fill; we flood everything (= what its later update cascade converges to).
+- Smooth light (Mesher): AmbientOcclusionCalculator::calculate (4 sides + corners only when a side is not solid,
+  centre light = beside the face for solid blocks touching the edge else own, _blend zero->centre, >>2, shade 0.2 for
+  solid, face shading 0.5/1/0.8/0.6); flat path for emitters (0.875/1/0.95/0.9) and translucency >= 0.9.
+  Vertex gets TEXCOORD_1 = pair/16 (STRIDE 7), renderchunk shader multiplies by the 16x16 light texture.
+- LightTexture::refresh (GameRenderer::_tickLightTexture): ramp (i/15)/((1-i/15)*3+1), block *1.6, sky *
+  (0.05+0.95*skyDarken) with sunrise tint 0.3*a, red/green *(0.35+0.65*skyDarken), blue not, twice 0.03+0.96x, gamma 0.
+- SKY (render/Sky.java): Dimension getTimeOfDay / getSkyColor (Biome HSB) / getFogColor / getSunriseColor /
+  getSkyDarken / getStarBrightness / getCloudColor / getSunIntensity; renderSky: plane (centre = sky*getAmbientBrightness,
+  ring 2000 = fog), sun 30 @120, moon 20 (8 phases), hidden 105..255 deg, stars (Random 10842, 1500, 0.25-2cos);
+  clouds = TextureTessellator of clouds.png (16x4x16 cells, y 128.33, +0.02/tick, top or bottom faces by camera y 129,
+  sides alpha>9, shades 1/0.75/0.925/1, alpha 0.7, fade past 0.9*far). Time +1 per tick from 0.
+  NOTE: LevelRenderer::getAmbientBrightness reads +0x15a8 which nothing writes (0) -> 0.35 above y 55, 0.035 below:
+  the sky top is that dark in the code. If the phone shows the original brighter, find the writer.
+- FOG: view radius 12 chunks; onViewRadiusChanged far = max(R - 16, 40) = 176; updateFarChunksDistance
+  m = clamp(far/2,48,160), fade = m*(0.5+amb*0.5), end = far+fade-m, start = end - clamp((end-40)/2,4,96)
+  (~94..147 blocks at the surface); fog colour blended to sunrise by getSunIntensity(view)*sunrise.a; clear = fog colour.
+- Hand lit by LightTexture colour at the player (TILE_LIGHT_COLOR).
+- New from the original: cobweb slows you (WebBlock::entityInside -> makeStuckInWeb; Entity::move x0.25/0.05/0.25,
+  motion cleared), not while flying.
+- TODO: strongholds (placement decoded, see beta20), weather (rain/fog level terms are 0), underwater fog colour
+  (Biome +0x7c), torch light flicker? (0.14 uses 1.6 fixed), entity shadows.

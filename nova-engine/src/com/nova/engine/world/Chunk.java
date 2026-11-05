@@ -16,7 +16,32 @@ public final class Chunk {
     /** per section: bumped on every change; the renderer rebuilds when it differs from the built version */
     public final int[] version = new int[SECTIONS];
 
+    /** LightLayer brightness per block, idx order like blocks: SKY << 4 | BLOCK */
+    public final byte[] light = new byte[16 * 16 * H];
+
+    public int light(int layer, int i) { return layer == 0 ? (light[i] >> 4) & 15 : light[i] & 15; }
+
+    public void light(int layer, int i, int v) {
+        light[i] = (byte) (layer == 0 ? (light[i] & 15) | v << 4 : (light[i] & 0xF0) | v);
+    }
+    /** LevelChunk heightmap: 1 + the top block with mLightBlock != 0, z * 16 + x (0..128) */
+    public final byte[] height = new byte[256];
+    /** 0 = no light yet, 1 = filled (heightmap, sources), 2 = spread into / from the neighbours */
+    public volatile int lit;
+
     public Chunk(int cx, int cz) { this.cx = cx; this.cz = cz; }
+
+    /** a light value changed: rebuild the sections that sample it */
+    void touchLight(int x, int y, int z, World w) {
+        int s = y >> 4;
+        version[s]++;
+        if ((y & 15) == 0 && s > 0) version[s - 1]++;
+        if ((y & 15) == 15 && s < SECTIONS - 1) version[s + 1]++;
+        if (x == 0) w.touch(cx - 1, cz, s);
+        if (x == 15) w.touch(cx + 1, cz, s);
+        if (z == 0) w.touch(cx, cz - 1, s);
+        if (z == 15) w.touch(cx, cz + 1, s);
+    }
 
     public static int idx(int x, int y, int z) { return (y << 8) | (z << 4) | x; }
 

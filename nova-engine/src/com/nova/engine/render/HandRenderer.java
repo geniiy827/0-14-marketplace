@@ -32,10 +32,13 @@ public final class HandRenderer {
             + "void main(){ gl_Position = uMvp * vec4(aPos, 1.0); vUv = aUv;\n"
             + " vec3 N = normalize((uWorld * vec4(aN, 0.0)).xyz);\n"
             + " vL = (1.0 + N.y) * 0.5 * (1.0 - 0.45) + N.x * N.x * -0.1 + N.z * N.z * 0.1 + 0.45; }\n";
-    static final String FS = "#version 300 es\nprecision mediump float; uniform sampler2D uTex; in vec2 vUv; in float vL; out vec4 o;\n"
-            + "void main(){ vec4 c = texture(uTex, vUv); if (c.a < 0.5) discard; o = vec4(c.rgb * vL, 1.0); }\n";
+    // TILE_LIGHT_COLOR = LightTexture::getColorForUV(light at the entity): light = L * TILE_LIGHT_COLOR
+    static final String FS = "#version 300 es\nprecision mediump float; uniform sampler2D uTex; uniform vec3 uTile; in vec2 vUv; in float vL; out vec4 o;\n"
+            + "void main(){ vec4 c = texture(uTex, vUv); if (c.a < 0.5) discard; o = vec4(c.rgb * vL * uTile, 1.0); }\n";
+    /** TILE_LIGHT_COLOR of this frame */
+    public final float[] tile = {1, 1, 1};
 
-    private int prog, uMvp, uWorld, uTex, vbo, tex, verts;
+    private int prog, uMvp, uWorld, uTex, uTile, vbo, tex, verts;
     private final float[] proj = new float[16], m = new float[16], mvp = new float[16];
 
     public void init(AssetManager am) {
@@ -43,6 +46,7 @@ public final class HandRenderer {
         uMvp = GLES30.glGetUniformLocation(prog, "uMvp");
         uWorld = GLES30.glGetUniformLocation(prog, "uWorld");
         uTex = GLES30.glGetUniformLocation(prog, "uTex");
+        uTile = GLES30.glGetUniformLocation(prog, "uTile");
         vbo = Gl.buffer();
         tex = 0;
         try {
@@ -93,8 +97,9 @@ public final class HandRenderer {
 
     /** LevelRenderer::bobView: walking sway of the camera (and the hand) */
     public static void bobView(float[] m, Player p, float a) {
+        // LevelRenderer::bobView: (old - cur) * a - cur = -(cur + (cur - old) * a), times pi (+0xb4 old, +0xb8 cur)
         float f = p.walkDist - p.oWalkDist;
-        float ang = (f * a - p.oWalkDist) * (float) Math.PI;
+        float ang = -(p.walkDist + f * a) * (float) Math.PI;
         float b = p.oBob + (p.bob - p.oBob) * a;
         float t = p.oTilt + (p.tilt - p.oTilt) * a;
         Matrix.translateM(m, 0, (float) Math.sin(ang) * b * 0.5f, -Math.abs((float) Math.cos(ang) * b), 0f);
@@ -146,6 +151,7 @@ public final class HandRenderer {
         GLES30.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
         GLES30.glUniformMatrix4fv(uWorld, 1, false, m, 0);
         GLES30.glUniform1i(uTex, 0);
+        GLES30.glUniform3f(uTile, tile[0], tile[1], tile[2]);
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0);
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tex);
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo);

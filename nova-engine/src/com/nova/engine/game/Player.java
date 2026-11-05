@@ -111,8 +111,29 @@ public final class Player {
         return true;
     }
 
+    /** Entity +0x159: set by WebBlock::entityInside (makeStuckInWeb), used by the next Entity::move */
+    private boolean stuckInWeb;
+
     /** move by motion with collisions: y first, then x, then z (as the original) */
     private void move(World w) {
+        boolean stuck = stuckInWeb;
+        if (stuck) {
+            // Entity::move: stuck in a web -> this move x (0.25, 0.05, 0.25), the motion is cleared
+            stuckInWeb = false;
+            mx *= 0.25; my *= 0.05; mz *= 0.25;
+        }
+        moveClip(w);
+        if (stuck) mx = my = mz = 0;
+        // Entity::checkInsideBlocks -> WebBlock::entityInside: everyone but a flying player gets stuck
+        if (!flying) {
+            int x0 = fl(x - W / 2 + 0.001), x1 = fl(x + W / 2 - 0.001), z0 = fl(z - W / 2 + 0.001), z1 = fl(z + W / 2 - 0.001);
+            int y0 = fl(y + 0.001), y1 = fl(y + H - 0.001);
+            for (int by = y0; by <= y1; by++) for (int bx = x0; bx <= x1; bx++) for (int bz = z0; bz <= z1; bz++)
+                if (w.get(bx, by, bz) == 30) stuckInWeb = true;
+        }
+    }
+
+    private void moveClip(World w) {
         double dy = clipY(w, my);
         onGround = my < 0 && dy != my;
         if (dy != my) my = 0;

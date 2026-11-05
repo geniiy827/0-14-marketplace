@@ -12,19 +12,25 @@ import java.util.Map;
  * terrain shader with linear fog and alpha test.
  */
 public final class WorldRenderer {
+    /**
+     * renderchunk.vertex / renderchunk.fragment of 0.14 (FANCY, FOG): TEXCOORD_1 = light pair / 16 into the 16x16 light
+     * texture (TEXTURE_1, bilinear), diffuse * light * colour, fog by the camera distance:
+     * clamp((dist / RENDER_DISTANCE - FOG_CONTROL.x) / (FOG_CONTROL.y - FOG_CONTROL.x)) -> here start / end in blocks.
+     */
     static final String VS =
             "#version 300 es\n" +
-            "layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUv; layout(location=2) in vec4 aCol;\n" +
+            "layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUv; layout(location=2) in vec4 aCol; layout(location=3) in vec2 aLight;\n" +
             "uniform mat4 uMvp; uniform vec3 uOrigin; uniform vec3 uCam;\n" +
-            "out vec2 vUv; out vec4 vCol; out float vDist;\n" +
+            "out vec2 vUv; out vec2 vLm; out vec4 vCol; out float vDist;\n" +
             "void main(){ vec3 p = aPos + uOrigin; gl_Position = uMvp * vec4(p, 1.0);\n" +
-            " vUv = aUv; vCol = aCol; vDist = length(p - uCam); }\n";
+            " vUv = aUv; vLm = aLight / 16.0; vCol = aCol; vDist = length(p - uCam); }\n";
     static final String FS =
             "#version 300 es\nprecision mediump float;\n" +
-            "uniform sampler2D uTex; uniform vec3 uFog; uniform vec2 uFogRange; uniform float uAlphaCut; uniform float uFlat;\n" +
-            "in vec2 vUv; in vec4 vCol; in float vDist; out vec4 o;\n" +
+            "uniform sampler2D uTex; uniform sampler2D uLightTex; uniform vec3 uFog; uniform vec2 uFogRange; uniform float uAlphaCut; uniform float uFlat;\n" +
+            "in vec2 vUv; in vec2 vLm; in vec4 vCol; in float vDist; out vec4 o;\n" +
             "void main(){ vec4 t = texture(uTex, vUv); if (t.a < uAlphaCut) discard;\n" +
-            " vec4 c = mix(t * vCol, vCol, uFlat); float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n" +
+            " vec4 lit = t * texture(uLightTex, vLm); lit.rgb *= vCol.rgb; lit.a *= vCol.a;\n" +
+            " vec4 c = mix(lit, t * vCol, uFlat); float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n" +
             " o = vec4(mix(c.rgb, uFog, f), c.a); }\n";
 
     public static final class Section {
@@ -33,7 +39,9 @@ public final class WorldRenderer {
         public volatile boolean building;
     }
 
-    private int prog, uMvp, uOrigin, uCam, uTex, uFog, uFogRange, uAlphaCut, uFlat;
+    private int prog, uMvp, uOrigin, uCam, uTex, uLightTex, uFog, uFogRange, uAlphaCut, uFlat;
+    /** the 16x16 light texture of GameRenderer::_tickLightTexture (set by the game every frame) */
+    public int lightTex;
     private int indexBuf, maxQuads;
     public final Map<Long, Section> sections = new HashMap<Long, Section>();
     public int drawnSections;
@@ -44,6 +52,7 @@ public final class WorldRenderer {
         uOrigin = GLES30.glGetUniformLocation(prog, "uOrigin");
         uCam = GLES30.glGetUniformLocation(prog, "uCam");
         uTex = GLES30.glGetUniformLocation(prog, "uTex");
+        uLightTex = GLES30.glGetUniformLocation(prog, "uLightTex");
         uFog = GLES30.glGetUniformLocation(prog, "uFog");
         uFogRange = GLES30.glGetUniformLocation(prog, "uFogRange");
         uAlphaCut = GLES30.glGetUniformLocation(prog, "uAlphaCut");
@@ -120,6 +129,9 @@ public final class WorldRenderer {
         GLES30.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
         GLES30.glUniform3f(uCam, camX, camY, camZ);
         GLES30.glUniform1i(uTex, 0);
+        GLES30.glUniform1i(uLightTex, 1);
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE1);
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, lightTex);
         GLES30.glUniform3f(uFog, fog[0], fog[1], fog[2]);
         GLES30.glUniform2f(uFogRange, fogStart, Math.max(fogEnd, fogStart + 0.01f));
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0);
@@ -128,6 +140,7 @@ public final class WorldRenderer {
         GLES30.glEnableVertexAttribArray(0);
         GLES30.glEnableVertexAttribArray(1);
         GLES30.glEnableVertexAttribArray(2);
+        GLES30.glEnableVertexAttribArray(3);
         drawnSections = 0;
         // solid + cutout
         GLES30.glUniform1f(uAlphaCut, 0.5f);
@@ -145,15 +158,19 @@ public final class WorldRenderer {
         GLES30.glEnable(GLES30.GL_BLEND);
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA);
         GLES30.glDepthMask(false);
+        GLES30.glEnable(GLES30.GL_POLYGON_OFFSET_FILL);
+        GLES30.glPolygonOffset(0.1f, 0.1f);                              // terrain_water: polygonOffsetLevel 0.1
         // culled like the rest: liquids carry their own back faces, ice/glass show only their front faces
         for (Map.Entry<Long, Section> e : sections.entrySet()) {
             Section s = e.getValue();
             if (s.waterVerts == 0 || !visible(e.getKey(), camX, camY, camZ, look, fogEnd)) continue;
             bindAndDraw(e.getKey(), s.waterVbo, s.waterVerts);
         }
+        GLES30.glDisable(GLES30.GL_POLYGON_OFFSET_FILL);
         GLES30.glEnable(GLES30.GL_CULL_FACE);
         GLES30.glDepthMask(true);
         GLES30.glDisable(GLES30.GL_BLEND);
+        GLES30.glDisableVertexAttribArray(3);
     }
 
     private int overlayVbo;
@@ -178,15 +195,20 @@ public final class WorldRenderer {
         b.put(verts, 0, count).position(0);
         GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, count * 4, b, GLES30.GL_DYNAMIC_DRAW);
         GLES30.glUniform3f(uOrigin, bx, by, bz);
-        GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 24, 0);
-        GLES30.glVertexAttribPointer(1, 2, GLES30.GL_FLOAT, false, 24, 12);
-        GLES30.glVertexAttribPointer(2, 4, GLES30.GL_UNSIGNED_BYTE, true, 24, 20);
+        GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 28, 0);
+        GLES30.glVertexAttribPointer(1, 2, GLES30.GL_FLOAT, false, 28, 12);
+        GLES30.glVertexAttribPointer(2, 4, GLES30.GL_UNSIGNED_BYTE, true, 28, 20);
+        GLES30.glEnableVertexAttribArray(0);
+        GLES30.glEnableVertexAttribArray(1);
+        GLES30.glEnableVertexAttribArray(2);
+        GLES30.glDisableVertexAttribArray(3);
+        GLES30.glVertexAttrib2f(3, 15f, 15f);
         GLES30.glEnable(GLES30.GL_BLEND);
         GLES30.glBlendFunc(GLES30.GL_DST_COLOR, GLES30.GL_SRC_COLOR);    // ui3D.material selection_overlay
         GLES30.glDepthMask(false);
         GLES30.glEnable(GLES30.GL_POLYGON_OFFSET_FILL);
         GLES30.glPolygonOffset(-5f, -5f);                                // polygonOffsetLevel 5
-        GLES30.glDrawElements(GLES30.GL_TRIANGLES, count / 24 * 6, GLES30.GL_UNSIGNED_INT, 0);
+        GLES30.glDrawElements(GLES30.GL_TRIANGLES, count / 28 * 6, GLES30.GL_UNSIGNED_INT, 0);
         GLES30.glDisable(GLES30.GL_POLYGON_OFFSET_FILL);
         GLES30.glUniform1f(uFlat, 0f);
         GLES30.glDepthMask(true);
@@ -197,9 +219,10 @@ public final class WorldRenderer {
         int cx = (int) (k >> 36) << 8 >> 8, cz = (int) (k >> 8) << 8 >> 8, sy = (int) (k & 0xFF);
         GLES30.glUniform3f(uOrigin, cx * 16, sy * 16, cz * 16);
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo);
-        GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 24, 0);
-        GLES30.glVertexAttribPointer(1, 2, GLES30.GL_FLOAT, false, 24, 12);
-        GLES30.glVertexAttribPointer(2, 4, GLES30.GL_UNSIGNED_BYTE, true, 24, 20);
+        GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 28, 0);
+        GLES30.glVertexAttribPointer(1, 2, GLES30.GL_FLOAT, false, 28, 12);
+        GLES30.glVertexAttribPointer(2, 4, GLES30.GL_UNSIGNED_BYTE, true, 28, 20);
+        GLES30.glVertexAttribPointer(3, 2, GLES30.GL_UNSIGNED_BYTE, false, 28, 24);
         int quads = Math.min(verts / 4, maxQuads);
         GLES30.glDrawElements(GLES30.GL_TRIANGLES, quads * 6, GLES30.GL_UNSIGNED_INT, 0);
     }

@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta20";
+    public static final String VERSION = "NOVA Engine beta21";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -104,11 +104,12 @@ public final class Game implements GLSurfaceView.Renderer {
     private int width = 1, height = 1;
     private float density = 3;
     private long lastNs, tickAcc;
-    private int radius = 6;
+    /** view radius in chunks (Options view distance 12 -> LocalPlayer::getViewBlockRadius 192) */
+    private int radius = 12;
+    private final java.util.concurrent.atomic.AtomicInteger lightBusy = new java.util.concurrent.atomic.AtomicInteger();
     private int slot, guiTex, iconsTex;
     private final int[] hotbar = CoreContent.HOTBAR.clone();
     private final float[] proj = new float[16], view = new float[16], mvp = new float[16], look = new float[3];
-    private static final float[] SKY = {0.53f, 0.71f, 0.98f};
     private int fps, frames;
     private long fpsT;
     private String error;
@@ -132,6 +133,7 @@ public final class Game implements GLSurfaceView.Renderer {
             for (NovaMod m : mods) { reg.modId = m.id(); m.register(reg); }
             atlas.upload();
             wr.init();
+            sky.init(atlas.gameAssets);
             hand.init(atlas.gameAssets);
             hud.init(atlas.gameAssets);
             guiTex = hud.loadTex(atlas.gameAssets, "images/gui/gui.png");
@@ -220,7 +222,7 @@ public final class Game implements GLSurfaceView.Renderer {
         }
         input();
         tickAcc += dt;
-        while (tickAcc >= 50_000_000L) { player.tick(world); tickAcc -= 50_000_000L; }
+        while (tickAcc >= 50_000_000L) { player.tick(world); world.time++; levelTicks++; tickAcc -= 50_000_000L; }
         float a = tickAcc / 50_000_000f;
         stream();
         render(a);
@@ -336,7 +338,7 @@ public final class Game implements GLSurfaceView.Renderer {
         // generation like the original: terrain (parallel) -> decoration when the 3x3 around has terrain (one thread,
         // it writes into neighbours) -> visible when the 3x3 around is decorated
         int queued = 0;
-        for (int r = 0; r <= radius + 2 && queued < 4; r++) {
+        for (int r = 0; r <= radius + 3 && queued < 4; r++) {
             for (int dz = -r; dz <= r && queued < 4; dz++) for (int dx = -r; dx <= r && queued < 4; dx++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                 final int cx = pcx + dx, cz = pcz + dz;
@@ -357,7 +359,7 @@ public final class Game implements GLSurfaceView.Renderer {
             }
         }
         int decoQueued = 0;
-        for (int r = 0; r <= radius + 1 && decoQueued < 4; r++) {
+        for (int r = 0; r <= radius + 2 && decoQueued < 4; r++) {
             for (int dz = -r; dz <= r && decoQueued < 4; dz++) for (int dx = -r; dx <= r && decoQueued < 4; dx++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                 final int cx = pcx + dx, cz = pcz + dz;
@@ -380,18 +382,52 @@ public final class Game implements GLSurfaceView.Renderer {
                 });
             }
         }
+        // light (LevelChunk::recalcHeightmap / updateLightsAndHeights): filled when the blocks are final (3x3
+        // decorated), spread when the 3x3 is filled; visible when spread (light from chunks further out is at most
+        // 15 blocks: a later spread only touches the border, the sections get rebuilt)
+        if (lightBusy.get() == 0) {
+            final java.util.ArrayList<Chunk> fill = new java.util.ArrayList<Chunk>(), spread = new java.util.ArrayList<Chunk>();
+            for (int r = 0; r <= radius + 1 && fill.size() + spread.size() < 6; r++) {
+                for (int dz = -r; dz <= r; dz++) for (int dx = -r; dx <= r; dx++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                    int cx = pcx + dx, cz = pcz + dz;
+                    Chunk c = world.chunk(cx, cz);
+                    if (c == null || c.stage != 2 || c.lit == 2) continue;
+                    boolean ok = true;
+                    int need = c.lit == 0 ? 2 : 1;      // fill: 3x3 decorated; spread: 3x3 filled
+                    for (int nz = -1; nz <= 1 && ok; nz++) for (int nx = -1; nx <= 1; nx++) {
+                        Chunk n = world.chunk(cx + nx, cz + nz);
+                        if (n == null || (need == 2 ? n.stage != 2 : n.lit < 1)) { ok = false; break; }
+                    }
+                    if (!ok) continue;
+                    if (c.lit == 0) fill.add(c); else if (r <= radius) spread.add(c);
+                }
+            }
+            final World wld = world;
+            final boolean edits = !world.lightEdits.isEmpty();
+            if (!fill.isEmpty() || !spread.isEmpty() || edits) {
+                lightBusy.incrementAndGet();
+                decoThread.execute(new Runnable() {
+                    public void run() {
+                        try {
+                            for (Chunk c : fill) { com.nova.engine.world.Light.fill(c); c.lit = 1; }
+                            for (Chunk c : spread) { com.nova.engine.world.Light.spread(wld, c); c.lit = 2; }
+                            int[] e;
+                            while ((e = wld.lightEdits.poll()) != null) com.nova.engine.world.Light.relight(wld, e[0], e[1], e[2]);
+                        } catch (Throwable t) { android.util.Log.e("NOVA", "light", t); }
+                        lightBusy.decrementAndGet();
+                    }
+                });
+            }
+        }
         for (int r = 0; r <= radius; r++) {
             for (int dz = -r; dz <= r; dz++) for (int dx = -r; dx <= r; dx++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                 int cx = pcx + dx, cz = pcz + dz;
                 Chunk c = world.chunk(cx, cz);
-                if (c == null || c.generated || c.stage != 2) continue;
-                boolean ok = true;
-                for (int nz = -1; nz <= 1 && ok; nz++) for (int nx = -1; nx <= 1; nx++) {
-                    Chunk n = world.chunk(cx + nx, cz + nz);
-                    if (n == null || n.stage != 2) { ok = false; break; }
-                }
-                if (ok) { for (int q = 0; q < Chunk.SECTIONS; q++) c.version[q]++; c.generated = true; }
+                if (c == null || c.generated || c.lit != 2) continue;
+                for (int q = 0; q < Chunk.SECTIONS; q++) c.version[q]++;
+                c.generated = true;
             }
         }
         // (re)mesh sections whose version changed; neighbours must exist for faces and AO
@@ -436,30 +472,59 @@ public final class Game implements GLSurfaceView.Renderer {
     }
 
     // ------------------------------------------------------------------ render
+    private final com.nova.engine.render.Sky sky = new com.nova.engine.render.Sky();
+    private final float[] skyRot = new float[16], cloudProj = new float[16], fogDist = new float[3], sunCol = new float[4];
+    private long levelTicks;
+
     private void render(float a) {
         boolean underwater = Blocks.kind[world.get((int) Math.floor(player.x), (int) Math.floor(player.ey(a)), (int) Math.floor(player.z))] == Blocks.LIQUID;
-        // LevelRenderer::_setupFog: under water the fog goes from 0 to 10 blocks, colour = underwater colour * (0.35 + 0.65 * brightness)
-        float[] fog = underwater ? new float[]{0.02f, 0.02f, 0.2f} : SKY;
-        GLES30.glClearColor(fog[0], fog[1], fog[2], 1);
+        float ex = (float) player.ex(a), ey = (float) player.ey(a), ez = (float) player.ez(a);
+        long time = world.time;
+        float tod = com.nova.engine.render.Sky.timeOfDay(time, a);
+        // LevelRenderer::_setupFog: Dimension::getFogColor(fog brightness), blended toward the sunrise colour by
+        // Dimension::getSunIntensity(view) * sunrise.a; under water the biome water colour * (0.35 + 0.65 b), 0..10 blocks
+        float fb = com.nova.engine.render.Sky.dayBrightness(tod);
+        float[] fog = new float[3];
+        if (underwater) {
+            int wc = com.nova.engine.world.Biomes.WATER[world.biome((int) Math.floor(player.x), (int) Math.floor(player.z))];
+            float k = 0.35f + fb * 0.65f;
+            fog[0] = ((wc >> 16) & 255) / 255f * k * 0.2f; fog[1] = ((wc >> 8) & 255) / 255f * k * 0.2f; fog[2] = (wc & 255) / 255f * k;
+        } else {
+            com.nova.engine.render.Sky.fogColor(fb, fog);
+            com.nova.engine.render.Sky.sunrise(tod, sunCol);
+            float si = com.nova.engine.render.Sky.sunIntensity(tod, look) * sunCol[3];
+            for (int i = 0; i < 3; i++) fog[i] = fog[i] * (1 - si) + sunCol[i] * si;
+        }
+        float amb = com.nova.engine.render.Sky.ambient(ey);
+        com.nova.engine.render.Sky.fogDistances(radius * 16, amb, underwater, fogDist);
+        sky.updateLight(tod);
+        wr.lightTex = sky.lightTexture();
+        GLES30.glClearColor(fog[0], fog[1], fog[2], 1);                // LevelRenderer::setupClearColor = the fog colour
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT | GLES30.GL_DEPTH_BUFFER_BIT);
         GLES30.glEnable(GLES30.GL_DEPTH_TEST);
         GLES30.glEnable(GLES30.GL_CULL_FACE);
         GLES30.glDisable(GLES30.GL_BLEND);
-        float far = underwater ? 10 : radius * 16;
-        Matrix.perspectiveM(proj, 0, 70, (float) width / height, 0.05f, radius * 16 + 64);
+        Matrix.perspectiveM(proj, 0, 70, (float) width / height, 0.05f, Math.max(radius * 16 + 64, 600));   // far enough for the clouds
         Matrix.setIdentityM(view, 0);
         com.nova.engine.render.HandRenderer.bobView(view, player, a);
         Matrix.rotateM(view, 0, player.pitch, 1, 0, 0);
         Matrix.rotateM(view, 0, player.yaw, 0, 1, 0);
-        float ex = (float) player.ex(a), ey = (float) player.ey(a), ez = (float) player.ez(a);
+        System.arraycopy(view, 0, skyRot, 0, 16);
+        Matrix.perspectiveM(cloudProj, 0, 70, (float) width / height, 0.5f, 5000f);
+        if (!underwater) {
+            int bx = (int) Math.floor(player.x), bz = (int) Math.floor(player.z);
+            sky.renderSky(cloudProj, skyRot, time, a, com.nova.engine.world.Biomes.TEMP[world.biome(bx, bz)], amb, fog);
+        }
         Matrix.translateM(view, 0, -ex, -ey, -ez);
         Matrix.multiplyMM(mvp, 0, proj, 0, view, 0);
         GLES30.glEnable(GLES30.GL_DEPTH_TEST);
         GLES30.glDepthFunc(GLES30.GL_LEQUAL);
         GLES30.glEnable(GLES30.GL_CULL_FACE);
-        if (underwater) wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, 0f, 10f);
-        else wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, far);
+        float fogStart = underwater ? 0f : fogDist[1], fogEnd = underwater ? 10f : fogDist[2];
+        wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, fogStart, fogEnd);
+        if (!underwater) sky.renderClouds(proj, skyRot, ex, ey, ez, levelTicks, a, time, fogDist[0]);
         if (hl) drawHighlight();
+        sky.lightColor(world.lightPair((int) Math.floor(player.x), (int) Math.floor(ey), (int) Math.floor(player.z)), hand.tile);
         hand.render(player, a, width, height);                 // InGamePlayScreen::_renderItemInHand
         drawHud();
     }

@@ -2,15 +2,19 @@ package com.nova.engine.render;
 
 import com.nova.engine.world.Blocks;
 import com.nova.engine.world.Chunk;
+import com.nova.engine.world.Light;
 import com.nova.engine.world.World;
 
 /**
- * Builds the mesh of one 16^3 section (worker thread). Vertex = 6 ints:
- * x y z (float bits, block units relative to the section origin), u v (float bits), colour RGBA8.
- * Quads only (4 vertices); faces CCW seen from outside; smooth ambient occlusion per vertex.
+ * Builds the mesh of one 16^3 section (worker thread). Vertex = 7 ints:
+ * x y z (float bits, block units relative to the section origin), u v (float bits), colour RGBA8,
+ * light (BLOCK | SKY << 8: the TEXCOORD_1 of 0.14, toUV(BrightnessPair) = pair / 16 into the light texture).
+ * Quads only (4 vertices); faces CCW seen from outside.
+ * Light per vertex like BlockTessellator: tessellateBlockInWorldWithAmbienceOcclusion (AmbientOcclusionCalculator)
+ * for blocks without light emission and mTranslucency < 0.9, else tessellateBlockInWorldFlat.
  */
 public final class Mesher {
-    public static final int STRIDE = 6;
+    public static final int STRIDE = 7;
 
     /** result of one build */
     public static final class Mesh {
@@ -84,8 +88,87 @@ public final class Mesher {
             {1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1},      // east +x
     };
     static final int[][] NORMAL = {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}};
-    static final float[] SHADE = {0.5f, 1.0f, 0.8f, 0.8f, 0.62f, 0.62f};
-    static final float[] AO = {0.5f, 0.68f, 0.84f, 1.0f};
+    /** AmbientOcclusionCalculator face shading (overworld: no ceiling) and the flat ones (pow(x, 1)) */
+    static final float[] SHADE = {0.5f, 1.0f, 0.8f, 0.8f, 0.6f, 0.6f};
+    static final float[] SHADE_EMIT = {0.875f, 1.0f, 0.95f, 0.95f, 0.9f, 0.9f};
+
+    // ------------------------------------------------------------------ light (BlockTessallatorCache / BlockSource)
+    /** BlockSource::getLightColor(pos, emission): (sky, max(block, emission)) packed BLOCK | SKY << 8;
+     *  outside the world height or without a chunk: (SKY 15, BLOCK 0) */
+    private int lightAt(int x, int wy, int z) {
+        if (wy >= Chunk.H || wy < 0) return 15 << 8;
+        int ix = x < 0 ? 0 : x > 15 ? 2 : 1, iz = z < 0 ? 0 : z > 15 ? 2 : 1;
+        Chunk c = around[iz * 3 + ix];
+        if (c == null) return 15 << 8;
+        int i = Chunk.idx(x & 15, wy, z & 15);
+        int l = c.light[i];
+        int bl = l & 15, e = Light.EMIT[c.blocks[i] & 255];
+        return (bl > e ? bl : e) | ((l >> 4) & 15) << 8;
+    }
+
+    private boolean solidAt(int x, int wy, int z) { return Light.SOLID[get(x, wy, z)] != 0; }
+
+    /** Block::getShadeBrightness: 0.2 for solid blocks, else 1 */
+    private float shadeAt(int x, int wy, int z) { return Light.SOLID[get(x, wy, z)] != 0 ? 0.2f : 1f; }
+
+    /** AmbientOcclusionCalculator::_blend: a zero pair takes the centre, then the average of the four (>> 2) */
+    private static int blend(int a, int b, int c, int d) {
+        if (a == 0) a = d;
+        if (b == 0) b = d;
+        if (c == 0) c = d;
+        int bl = ((a & 15) + (b & 15) + (c & 15) + (d & 15)) >> 2;
+        int sk = ((a >> 8) + (b >> 8) + (c >> 8) + (d >> 8)) >> 2;
+        return bl | sk << 8;
+    }
+
+    private final int[] aoLight = new int[4];
+    private final float[] aoShade = new float[4];
+
+    /**
+     * AmbientOcclusionCalculator::calculate for face f of the block at x wy z, one value per CORNERS[f] vertex.
+     * touch (setTouchEdge): the face lies on the block border -> the 4 side / 4 corner positions are in the layer
+     * beside the face, else in the block's own layer. A corner is used only when one of its two sides is not solid
+     * (_notOccludedBy), else it takes the side. Centre light: the block beside the face when touching and the block
+     * itself is solid, else the block itself; centre shade: always the block beside the face.
+     */
+    private void ao(int id, int f, int x, int wy, int z, boolean touch) {
+        int[] n = NORMAL[f], cr = CORNERS[f];
+        int lx = x + (touch ? n[0] : 0), ly = wy + (touch ? n[1] : 0), lz = z + (touch ? n[2] : 0);
+        float sc = shadeAt(x + n[0], wy + n[1], z + n[2]);
+        int lc = touch && Light.SOLID[id] != 0 ? lightAt(x + n[0], wy + n[1], z + n[2]) : lightAt(x, wy, z);
+        for (int v = 0; v < 4; v++) {
+            int ox = cr[v * 3] * 2 - 1, oy = cr[v * 3 + 1] * 2 - 1, oz = cr[v * 3 + 2] * 2 - 1;
+            int ax, ay, az, bx2, by2, bz2;                   // the two side offsets
+            if (n[0] != 0) { ax = 0; ay = oy; az = 0; bx2 = 0; by2 = 0; bz2 = oz; }
+            else if (n[1] != 0) { ax = ox; ay = 0; az = 0; bx2 = 0; by2 = 0; bz2 = oz; }
+            else { ax = ox; ay = 0; az = 0; bx2 = 0; by2 = oy; bz2 = 0; }
+            float s1 = shadeAt(lx + ax, ly + ay, lz + az), s2 = shadeAt(lx + bx2, ly + by2, lz + bz2);
+            int l1 = lightAt(lx + ax, ly + ay, lz + az), l2 = lightAt(lx + bx2, ly + by2, lz + bz2);
+            float scn; int lcn;
+            if (!solidAt(lx + ax, ly + ay, lz + az) || !solidAt(lx + bx2, ly + by2, lz + bz2)) {
+                scn = shadeAt(lx + ax + bx2, ly + ay + by2, lz + az + bz2);
+                lcn = lightAt(lx + ax + bx2, ly + ay + by2, lz + az + bz2);
+            } else { scn = s2; lcn = l2; }
+            aoShade[v] = (s1 + s2 + scn + sc) * 0.25f;
+            aoLight[v] = blend(l1, lcn, l2, lc);
+        }
+    }
+
+    /** tessellateBlockInWorldFlat: one light for the face (beside it when the face is on the border, else own) */
+    private void flat(int id, int f, int x, int wy, int z, boolean touch) {
+        int[] n = NORMAL[f];
+        int l = touch ? lightAt(x + n[0], wy + n[1], z + n[2]) : lightAt(x, wy, z);
+        float sh = Light.EMIT[id] > 0 ? SHADE_EMIT[f] : SHADE[f];
+        for (int v = 0; v < 4; v++) { aoLight[v] = l; aoShade[v] = sh; }
+    }
+
+    /** BlockTessellator::tessellateBlockInWorld: AO unless the block emits light or mTranslucency >= 0.9 */
+    private void faceLight(int id, int f, int x, int wy, int z, boolean touch) {
+        if (Light.EMIT[id] == 0 && Light.TRANS[id] < 90) {
+            ao(id, f, x, wy, z, touch);
+            for (int v = 0; v < 4; v++) aoShade[v] *= SHADE[f];
+        } else flat(id, f, x, wy, z, touch);
+    }
 
     private void block(Chunk c, int x, int y, int z, int wy) {
                 int id = c.blocks[Chunk.idx(x, wy, z)] & 255;
@@ -152,7 +235,7 @@ public final class Mesher {
         if (nb == 0 || !Blocks.exists[nb]) return true;
         if (sameLiquid(id, nb) || nb == 79) return false;
         if (f == 1) return true;
-        return !Blocks.opaque[nb];
+        return !solidMaterial(nb);                           // Material::isSolid: glass, leaves, slabs ... hide it too
     }
 
     /** Material::isSolid: not air, plants, liquids, top snow, torches */
@@ -227,30 +310,25 @@ public final class Mesher {
         int[] cr = CORNERS[f], n = NORMAL[f];
         int wy = by + y;
         float ins = f >= 2 ? Blocks.inset[id] : 0;
-        // per-vertex AO
-        int[] ao = new int[4];
-        for (int v = 0; v < 4; v++) {
-            if (liquid) { ao[v] = 3; continue; }
-            int ox = cr[v * 3], oy = cr[v * 3 + 1], oz = cr[v * 3 + 2];
-            int ax = x + n[0], ay = wy + n[1], az = z + n[2];
-            // tangent directions: the two axes that are not the normal axis
-            int dx = n[0] != 0 ? 0 : ox * 2 - 1, dy = n[1] != 0 ? 0 : oy * 2 - 1, dz = n[2] != 0 ? 0 : oz * 2 - 1;
-            boolean s1, s2, cn;
-            if (n[0] != 0) { s1 = occludes(ax, ay + dy, az); s2 = occludes(ax, ay, az + dz); cn = occludes(ax, ay + dy, az + dz); }
-            else if (n[1] != 0) { s1 = occludes(ax + dx, ay, az); s2 = occludes(ax, ay, az + dz); cn = occludes(ax + dx, ay, az + dz); }
-            else { s1 = occludes(ax + dx, ay, az); s2 = occludes(ax, ay + dy, az); cn = occludes(ax + dx, ay + dy, az); }
-            ao[v] = s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (cn ? 1 : 0));
+        // light per vertex
+        if (liquid) {
+            // BlockTessellator::_getLightColorForWater: the light beside the face when that block lets light through
+            // (mTranslucency > 0.5), else the liquid's own
+            int nb = get(x + n[0], wy + n[1], z + n[2]);
+            int l = Light.TRANS[nb] > 50 ? lightAt(x + n[0], wy + n[1], z + n[2]) : lightAt(x, wy, z);
+            for (int v = 0; v < 4; v++) { aoLight[v] = l; aoShade[v] = SHADE[f]; }
+        } else {
+            boolean touch = f != 1 || bh >= 1;                  // a lower top (slab, farmland, snow) is not on the border
+            if (ins > 0 && f >= 2) touch = false;
+            faceLight(id, f, x, wy, z, touch);
         }
         // texture corners per vertex
         float[] tu = new float[4], tv = new float[4];
         float vt = bh < 1 ? v1 - (v1 - v0) * bh : v0;      // partial blocks: the lower part of the side texture
         if (f >= 2) { tu[0] = u0; tv[0] = v1; tu[1] = u1; tv[1] = v1; tu[2] = u1; tv[2] = vt; tu[3] = u0; tv[3] = vt; }
         else { tu[0] = u0; tv[0] = v0; tu[1] = u0; tv[1] = v1; tu[2] = u1; tv[2] = v1; tu[3] = u1; tv[3] = v0; }
-        // flip the diagonal when it makes the AO gradient symmetric
-        int start = ao[0] + ao[2] < ao[1] + ao[3] ? 1 : 0;
         int alpha = liquid && Blocks.layer[id] == Blocks.TRANSLUCENT ? 190 : 255;
-        for (int i = 0; i < 4; i++) {
-            int v = (start + i) & 3;
+        for (int v = 0; v < 4; v++) {
             float px = x + cr[v * 3], py = y + cr[v * 3 + 1], pz = z + cr[v * 3 + 2];
             if (ins > 0) { px -= n[0] * ins; pz -= n[2] * ins; }
             if (liquid) {
@@ -258,11 +336,12 @@ public final class Mesher {
                 if (f >= 2) { px -= n[0] * 0.001f; pz -= n[2] * 0.001f; }                       // sides 0.001 inside
             }
             else if (bh < 1 && cr[v * 3 + 1] == 1) py = y + bh;
-            float l = SHADE[f] * AO[ao[v]];
+            float l = aoShade[v];
             int r = (int) (tr * l * 255), g = (int) (tg * l * 255), b = (int) (tb * l * 255);
             out.add(Float.floatToRawIntBits(px)); out.add(Float.floatToRawIntBits(py)); out.add(Float.floatToRawIntBits(pz));
             out.add(Float.floatToRawIntBits(tu[v])); out.add(Float.floatToRawIntBits(tv[v]));
             out.add(r | g << 8 | b << 16 | alpha << 24);
+            out.add(aoLight[v]);
         }
         if (liquid) {                                        // water/lava seen from both sides: the reverse quad
             int base = out.n - 4 * STRIDE;
@@ -273,6 +352,7 @@ public final class Mesher {
     // ------------------------------------------------------------------ shaped blocks (stairs, fences, doors ...)
     private void model(int id, int x, int wy, int y, int z) {
         if (Blocks.model[id] == Blocks.M_TORCH) { torchMesh(id, x, y, z); return; }
+        if (Blocks.model[id] == Blocks.M_RAIL) { railMesh(id, x, y, z); return; }
         if (Blocks.model[id] == Blocks.M_DOOR) {
             for (float[] b : com.nova.engine.world.Shapes.door(com.nova.engine.world.Shapes.doorComposite(access, x, wy, z)))
                 box(id, x, wy, y, z, b[0], b[1], b[2], b[3], b[4], b[5]);
@@ -308,6 +388,7 @@ public final class Mesher {
         float cx = px + 0.5f, cz = pz + 0.5f, x0 = cx - 0.5f, x1 = cx + 0.5f, z0 = cz - 0.5f, z1 = cz + 0.5f;
         float d = 0.0625f, h = 0.625f, tx = cx + dx * (1 - h), tz = cz + dz * (1 - h);
         int col = shadeCol(1f);
+        int lt = lightAt(x, by + y, z);
         float[][] q = {
                 // cap
                 {tx - d, py + h, tz - d, iu7, iv6}, {tx - d, py + h, tz + d, iu7, iv8}, {tx + d, py + h, tz + d, iu9, iv8}, {tx + d, py + h, tz - d, iu9, iv6},
@@ -319,9 +400,30 @@ public final class Mesher {
                 {x0, py + 1, cz + d, u0, v0}, {x0 + dx, py, cz + d + dz, u0, v1}, {x1 + dx, py, cz + d + dz, u1, v1}, {x1, py + 1, cz + d, u1, v0},
                 {x1, py + 1, cz - d, u0, v0}, {x1 + dx, py, cz - d + dz, u0, v1}, {x0 + dx, py, cz - d + dz, u1, v1}, {x0, py + 1, cz - d, u1, v0}};
         for (int i = 0; i < q.length; i += 4) {                     // both windings: seen from either side
-            for (int k = 0; k < 4; k++) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col);
-            for (int k = 3; k >= 0; k--) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col);
+            for (int k = 0; k < 4; k++) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col, lt);
+            for (int k = 3; k >= 0; k--) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col, lt);
         }
+    }
+
+    /**
+     * BlockTessellator::tessellateRailInWorld: one quad 1/16 above the floor, seen from both sides; data 0 north-south,
+     * 1 east-west, 2..5 ascending (east, west, north, south: two corners one block higher), 6..9 curves (turned tile)
+     */
+    private void railMesh(int id, int x, int y, int z) {
+        int sl = Blocks.texFor(id, data, 1) * 4;
+        float u0 = uv[sl], v0 = uv[sl + 1], u1 = uv[sl + 2], v1 = uv[sl + 3];
+        float x6 = x + 1, x7 = x + 1, x8 = x, x9 = x, z10 = z, z11 = z + 1, z12 = z + 1, z13 = z;
+        float h = 0.0625f, y14 = y + h, y15 = y + h, y16 = y + h, y17 = y + h;
+        int d = data;
+        if (d == 1 || d == 2 || d == 3 || d == 7) { x6 = x9 = x + 1; x7 = x8 = x; z10 = z11 = z + 1; z12 = z13 = z; }
+        else if (d == 8) { x6 = x7 = x; x8 = x9 = x + 1; z10 = z13 = z + 1; z11 = z12 = z; }
+        else if (d == 9) { x6 = x9 = x; x7 = x8 = x + 1; z10 = z11 = z; z12 = z13 = z + 1; }
+        if (d == 2 || d == 4) { y14 += 1; y17 += 1; } else if (d == 3 || d == 5) { y15 += 1; y16 += 1; }
+        int col = shadeCol(1f), lt = lightAt(x, by + y, z);
+        vert(solid, x6, y14, z10, u1, v0, col, lt); vert(solid, x7, y15, z11, u1, v1, col, lt);
+        vert(solid, x8, y16, z12, u0, v1, col, lt); vert(solid, x9, y17, z13, u0, v0, col, lt);
+        vert(solid, x9, y17, z13, u0, v0, col, lt); vert(solid, x8, y16, z12, u0, v1, col, lt);
+        vert(solid, x7, y15, z11, u1, v1, col, lt); vert(solid, x6, y14, z10, u1, v0, col, lt);
     }
 
     private static int shadeCol(float l) { int v = (int) (255 * l); return v | v << 8 | v << 16 | 255 << 24; }
@@ -346,16 +448,17 @@ public final class Mesher {
             int sl = Blocks.texFor(id, data, f) * 4;
             float u0 = uv[sl], v0 = uv[sl + 1], du = uv[sl + 2] - u0, dv = uv[sl + 3] - v0;
             int tint = tintOf(id, f);
-            float l = SHADE[f];
-            int col = (int) (((tint >> 16) & 255) * l) | (int) (((tint >> 8) & 255) * l) << 8 | (int) ((tint & 255) * l) << 16 | 255 << 24;
+            faceLight(id, f, x, wy, z, border);
             int[] cr = CORNERS[f];
             for (int v = 0; v < 4; v++) {
+                float l = aoShade[v];
+                int col = (int) (((tint >> 16) & 255) * l) | (int) (((tint >> 8) & 255) * l) << 8 | (int) ((tint & 255) * l) << 16 | 255 << 24;
                 float cx = cr[v * 3] == 0 ? x0 : x1, cy = cr[v * 3 + 1] == 0 ? y0 : y1, cz = cr[v * 3 + 2] == 0 ? z0 : z1;
                 float tu, tv;
                 if (f <= 1) { tu = cx; tv = cz; }
                 else if (f <= 3) { tu = f == 2 ? 1 - cx : cx; tv = 1 - cy; }
                 else { tu = f == 4 ? cz : 1 - cz; tv = 1 - cy; }
-                vert(out, x + cx, y + cy, z + cz, u0 + du * tu, v0 + dv * tv, col);
+                vert(out, x + cx, y + cy, z + cz, u0 + du * tu, v0 + dv * tv, col, aoLight[v]);
             }
         }
     }
@@ -366,20 +469,21 @@ public final class Mesher {
         float u0 = uv[s], v0 = uv[s + 1], u1 = uv[s + 2], v1 = uv[s + 3];
         int tint = tintOf(id, 2);
         int col = (tint >> 16 & 255) | (tint >> 8 & 255) << 8 | (tint & 255) << 16 | 255 << 24;
+        int lt = lightAt(x, by + y, z);                       // tessellateCrossInWorld: the block's own light
         float[][] q = {
                 {0.05f, 0, 0.05f, 0.95f, 0, 0.95f}, {0.95f, 0, 0.95f, 0.05f, 0, 0.05f},
                 {0.05f, 0, 0.95f, 0.95f, 0, 0.05f}, {0.95f, 0, 0.05f, 0.05f, 0, 0.95f}};
         for (float[] p : q) {
             float ax = x + p[0], az = z + p[2], bxx = x + p[3], bzz = z + p[5];
-            vert(solid, ax, y, az, u0, v1, col);
-            vert(solid, bxx, y, bzz, u1, v1, col);
-            vert(solid, bxx, y + 1, bzz, u1, v0, col);
-            vert(solid, ax, y + 1, az, u0, v0, col);
+            vert(solid, ax, y, az, u0, v1, col, lt);
+            vert(solid, bxx, y, bzz, u1, v1, col, lt);
+            vert(solid, bxx, y + 1, bzz, u1, v0, col, lt);
+            vert(solid, ax, y + 1, az, u0, v0, col, lt);
         }
     }
 
-    private static void vert(Buf o, float x, float y, float z, float u, float v, int col) {
+    private static void vert(Buf o, float x, float y, float z, float u, float v, int col, int light) {
         o.add(Float.floatToRawIntBits(x)); o.add(Float.floatToRawIntBits(y)); o.add(Float.floatToRawIntBits(z));
-        o.add(Float.floatToRawIntBits(u)); o.add(Float.floatToRawIntBits(v)); o.add(col);
+        o.add(Float.floatToRawIntBits(u)); o.add(Float.floatToRawIntBits(v)); o.add(col); o.add(light);
     }
 }

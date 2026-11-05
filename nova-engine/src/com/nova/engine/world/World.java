@@ -10,6 +10,11 @@ public final class World {
     public final Generator gen;
     public long seed;
 
+    /** block changes of lit chunks: relit on the light thread (Light.relight) */
+    public final java.util.concurrent.ConcurrentLinkedQueue<int[]> lightEdits = new java.util.concurrent.ConcurrentLinkedQueue<int[]>();
+    /** Level time in ticks (24000 a day); 0 = sunrise like a new 0.14 world */
+    public volatile long time;
+
     public World(long seed) {
         this.seed = seed;
         this.gen = new Generator(seed);
@@ -31,6 +36,16 @@ public final class World {
         return c == null ? 0 : c.get(x & 15, y, z & 15);
     }
 
+    /** BlockSource::getLightColor: SKY << 8 | max(BLOCK, emission); (15, 0) outside the height or unknown chunks */
+    public int lightPair(int x, int y, int z) {
+        if (y < 0 || y >= Chunk.H) return 15 << 8;
+        Chunk c = ready(x >> 4, z >> 4);
+        if (c == null) return 15 << 8;
+        int i = Chunk.idx(x & 15, y, z & 15);
+        int l = c.light[i], bl = l & 15, e = Light.EMIT[c.blocks[i] & 255];
+        return Math.max(bl, e) | ((l >> 4) & 15) << 8;
+    }
+
     /** true = unknown (not generated yet): treated as solid for physics */
     public boolean loaded(int x, int z) { return ready(x >> 4, z >> 4) != null; }
 
@@ -46,6 +61,7 @@ public final class World {
         if (c == null) return;
         int lx = x & 15, lz = z & 15;
         c.set(lx, y, lz, id);
+        if (c.lit >= 1) lightEdits.add(new int[]{x, y, z});
         int s = y >> 4;
         touch(c.cx, c.cz, s);
         if ((y & 15) == 0 && s > 0) touch(c.cx, c.cz, s - 1);
@@ -142,7 +158,7 @@ public final class World {
         return c == null ? 0 : c.biome[(z & 15) * 16 + (x & 15)] & 255;
     }
 
-    private void touch(int cx, int cz, int s) {
+    void touch(int cx, int cz, int s) {
         Chunk c = chunk(cx, cz);
         if (c != null) c.version[s]++;
     }

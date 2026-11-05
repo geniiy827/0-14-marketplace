@@ -11,7 +11,7 @@ public final class Blocks {
     /** render kinds */
     public static final int CUBE = 0, CROSS = 1, LIQUID = 2, MODEL = 3;
     /** MODEL shapes */
-    public static final int M_STAIRS = 1, M_FENCE = 2, M_PANE = 3, M_DOOR = 4, M_TORCH = 5, M_LADDER = 6, M_CARPET = 7, M_POT = 8, M_TRAPDOOR = 9;
+    public static final int M_STAIRS = 1, M_FENCE = 2, M_PANE = 3, M_DOOR = 4, M_TORCH = 5, M_LADDER = 6, M_CARPET = 7, M_POT = 8, M_TRAPDOOR = 9, M_RAIL = 10;
     public static final int[] model = new int[MAX];
     /** side faces pulled in by this much (cactus 1/16); such faces are never culled */
     public static final float[] inset = new float[MAX];

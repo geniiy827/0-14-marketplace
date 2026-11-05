@@ -132,6 +132,10 @@ public final class CoreContent implements NovaMod {
         r.block(96, "trapdoor").tex(r.tex("trapdoor")).model(Blocks.M_TRAPDOOR).notSolid();
         r.block(65, "ladder").tex(r.tex("ladder")).model(Blocks.M_LADDER).notSolid();
         r.block(85, "fence").tex(planks0).model(Blocks.M_FENCE);
+        // mineshaft blocks: WebBlock (cross, cutout) and RailBlock (flat on the ground, data = shape)
+        r.block(30, "web").tex(r.tex("web")).cross().notSolid();
+        Blocks.Def rail = r.block(66, "rail").tex(r.tex("rail_normal")).model(Blocks.M_RAIL).notSolid();
+        for (int d = 6; d <= 9; d++) rail.data(d, r.tex("rail_normal_turned"));
         r.block(101, "iron_bars").tex(r.tex("iron_bars")).model(Blocks.M_PANE);
         r.block(102, "glass_pane").tex(r.tex("glass")).model(Blocks.M_PANE);
         Blocks.Def carpet = r.block(171, "carpet").tex(r.tex("wool:0")).model(Blocks.M_CARPET).notSolid();

@@ -75,6 +75,7 @@ public final class Shapes {
                     default: return new float[][]{{0, 0, 0, 2 * S, 1, 1}};
                 }
             case Blocks.M_CARPET: return new float[][]{{0, 0, 0, 1, S, 1}};
+            case Blocks.M_RAIL: return new float[][]{{0, 0, 0, 1, 2 * S, 1}};              // BaseRailBlock: 0.125 high
             case Blocks.M_POT: return new float[][]{{5 * S, 0, 5 * S, 11 * S, 6 * S, 11 * S}};
             case Blocks.M_TORCH:
                 switch (data) {
