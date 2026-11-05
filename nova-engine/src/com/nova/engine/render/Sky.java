@@ -145,6 +145,10 @@ public final class Sky {
         float end = far + fade - m;
         float start = end - Math.max(4f, Math.min(96f, (end - 40f) * 0.5f));
         out[0] = far; out[1] = start; out[2] = end;
+        // +0x1638 FAR_CHUNKS_DISTANCE: min(fade, end - 13.856406), at least 40 under water
+        float fc = Math.min(fade, end - 13.856406f);
+        if (underwater) fc = Math.max(fc, 40f);
+        if (out.length > 3) out[3] = fc;
     }
 
     /** LevelRenderer::getAmbientBrightness (its brightness field stays 0): below y 55 0.035, else 0.35 */

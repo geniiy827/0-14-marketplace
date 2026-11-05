@@ -108,8 +108,8 @@ public final class Mesher {
 
     private boolean solidAt(int x, int wy, int z) { return Light.SOLID[get(x, wy, z)] != 0; }
 
-    /** Block::getShadeBrightness: 0.2 for solid blocks, else 1 */
-    private float shadeAt(int x, int wy, int z) { return Light.SOLID[get(x, wy, z)] != 0 ? 0.2f : 1f; }
+    /** Block::getShadeBrightness: 0.2 for solid blocks and BlockProperty 0x20 (leaves), else 1 */
+    private float shadeAt(int x, int wy, int z) { int b = get(x, wy, z); return Light.SOLID[b] != 0 || leaf(b) ? 0.2f : 1f; }
 
     /** AmbientOcclusionCalculator::_blend: a zero pair takes the centre, then the average of the four (>> 2) */
     private static int blend(int a, int b, int c, int d) {
@@ -188,6 +188,8 @@ public final class Mesher {
                     if (k == Blocks.LIQUID) {
                         if (!liquidFace(id, nb, f)) continue;
                         liquidHeights(id, x, wy, z);
+                    } else if (leaf(id)) {
+                        if (occludeLeaf(f, nb, x, wy, z, n)) continue;
                     } else if (!ins && !visible(id, nb, k) && !(f == 1 && Blocks.height[id] < 1) && !(id == 78 && nb == 78 && f >= 2)) continue;   // top snow of other depth beside
                     face(id, f, x, y, z, 1f);
                     if (f >= 2 && Blocks.sideOverlay[id] >= 0 && !snowy) { overlay = true; face(id, f, x, y, z, 1f); overlay = false; }
@@ -268,6 +270,42 @@ public final class Mesher {
         }
     }
 
+    /** blocks with BlockProperty 0x20 (set in the LeafBlock constructor) */
+    static boolean leaf(int id) { return id == 18 || id == 161; }
+
+    /** BlockOccluder::_isOpaque: render layer opaque and mTranslucency 0 (leaves: alpha layer -> not opaque) */
+    private static boolean opaqueOcc(int b) { return b != 0 && Blocks.exists[b] && Blocks.opaque[b] && Light.TRANS[b] == 0 && !leaf(b); }
+
+    /** BlockOccluder::isDeepLeafBlock (fancy leaves): below, north, south, west, east opaque, and above not air with
+     *  translucency 0 */
+    private boolean deepLeaf(int x, int wy, int z) {
+        if (!opaqueOcc(get(x, wy - 1, z)) || !opaqueOcc(get(x, wy, z - 1)) || !opaqueOcc(get(x, wy, z + 1))
+                || !opaqueOcc(get(x - 1, wy, z)) || !opaqueOcc(get(x + 1, wy, z))) return false;
+        int up = get(x, wy + 1, z);
+        return up != 0 && Light.TRANS[up] <= 0;
+    }
+
+    /**
+     * BlockOccluder::_shouldOccludeLeaves (fancy): a deep leaf draws nothing; against air draw; invisible bedrock hides;
+     * against another leaf: hidden when that one is deep or the face is up / north / west (only one face of a pair);
+     * slabs: hidden up on a bottom slab, down under a top slab; up under top snow / carpet hidden; else hidden by opaque
+     */
+    private boolean occludeLeaf(int f, int nb, int x, int wy, int z, int[] n) {
+        if (deepLeaf(x, wy, z)) return true;
+        if (nb == 0) return false;
+        if (nb == 95) return true;
+        if (leaf(nb)) {
+            if (deepLeaf(x + n[0], wy + n[1], z + n[2])) return true;
+            return f == 1 || f == 2 || f == 4;
+        }
+        if (nb == 44 || nb == 158) {
+            boolean bottom = (worldData(x + n[0], wy + n[1], z + n[2]) & 8) == 0;
+            return (f == 1 && bottom) || (f == 0 && !bottom);
+        }
+        if (f == 1 && (nb == 78 || nb == 171)) return true;
+        return opaqueOcc(nb);
+    }
+
     private static boolean visible(int id, int nb, int kind) {
         if (nb == 0 || !Blocks.exists[nb]) return true;
         // liquids: no face against any block box (farmland, slabs, glass, ice ...): coplanar faces flicker
@@ -327,7 +365,8 @@ public final class Mesher {
         float vt = bh < 1 ? v1 - (v1 - v0) * bh : v0;      // partial blocks: the lower part of the side texture
         if (f >= 2) { tu[0] = u0; tv[0] = v1; tu[1] = u1; tv[1] = v1; tu[2] = u1; tv[2] = vt; tu[3] = u0; tv[3] = vt; }
         else { tu[0] = u0; tv[0] = v0; tu[1] = u0; tv[1] = v1; tu[2] = u1; tv[2] = v1; tu[3] = u1; tv[3] = v0; }
-        int alpha = liquid && Blocks.layer[id] == Blocks.TRANSLUCENT ? 190 : 255;
+        // water: the biome water colour's alpha (Biome::DEFAULT_WATER_COLOR a = 0) -> renderchunk NEAR_WATER mixing
+        int alpha = id == 8 || id == 9 ? 0 : liquid && Blocks.layer[id] == Blocks.TRANSLUCENT ? 190 : 255;
         for (int v = 0; v < 4; v++) {
             float px = x + cr[v * 3], py = y + cr[v * 3 + 1], pz = z + cr[v * 3 + 2];
             if (ins > 0) { px -= n[0] * ins; pz -= n[2] * ins; }

@@ -20,17 +20,29 @@ public final class WorldRenderer {
     static final String VS =
             "#version 300 es\n" +
             "layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUv; layout(location=2) in vec4 aCol; layout(location=3) in vec2 aLight;\n" +
-            "uniform mat4 uMvp; uniform vec3 uOrigin; uniform vec3 uCam;\n" +
-            "out vec2 vUv; out vec2 vLm; out vec4 vCol; out float vDist;\n" +
+            "uniform mat4 uMvp; uniform vec3 uOrigin; uniform vec3 uCam; uniform float uWater; uniform float uFarChunks;\n" +
+            "out vec2 vUv; out vec2 vLm; out vec4 vCol; out float vDist; out float vNear; out float vCamDist;\n" +
             "void main(){ vec3 p = aPos + uOrigin; gl_Position = uMvp * vec4(p, 1.0);\n" +
-            " vUv = aUv; vLm = aLight / 16.0; vCol = aCol; vDist = length(p - uCam); }\n";
+            " vUv = aUv; vLm = aLight / 16.0; vec4 color = aCol; vec3 relPos = uCam - p; float depth = length(relPos); vDist = depth;\n" +
+            " vNear = 0.0; vCamDist = 0.0;\n" +
+            " if (uWater > 0.5 && aCol.a < 0.01) {\n" +       // renderchunk.vertex NEAR_WATER + FANCY
+            "  vNear = 1.0; vCamDist = depth / uFarChunks;\n" +
+            "  float F = dot(normalize(relPos), vec3(0.0, 1.0, 0.0)); F = 1.0 - max(F, 0.1);\n" +
+            "  F = 1.0 - mix(F * F * F * F, 1.0, min(1.0, depth / uFarChunks));\n" +
+            "  color.rg -= vec2(F * 56.0 / 255.0);\n" +
+            "  vec4 depthColor = vec4(color.rgb * 0.5, 1.0); vec4 traspColor = vec4(color.rgb * 0.45, 0.8); vec4 surfColor = vec4(color.rgb, 1.0);\n" +
+            "  vec4 nearColor = mix(traspColor, depthColor, color.a); color = mix(surfColor, nearColor, F);\n" +
+            " }\n" +
+            " vCol = color; }\n";
     static final String FS =
             "#version 300 es\nprecision mediump float;\n" +
             "uniform sampler2D uTex; uniform sampler2D uLightTex; uniform vec3 uFog; uniform vec2 uFogRange; uniform float uAlphaCut; uniform float uFlat;\n" +
-            "in vec2 vUv; in vec2 vLm; in vec4 vCol; in float vDist; out vec4 o;\n" +
+            "in vec2 vUv; in vec2 vLm; in vec4 vCol; in float vDist; in float vNear; in float vCamDist; out vec4 o;\n" +
             "void main(){ vec4 t = texture(uTex, vUv); if (t.a < uAlphaCut) discard;\n" +
-            " vec4 lit = t * texture(uLightTex, vLm); lit.rgb *= vCol.rgb; lit.a *= vCol.a;\n" +
-            " vec4 c = mix(lit, t * vCol, uFlat); float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n" +
+            " vec4 lit = t * texture(uLightTex, vLm); lit.a = t.a * vCol.a;\n" +
+            " if (vNear > 0.5) lit.a = mix(lit.a, 1.0, clamp(vCamDist, 0.0, 1.0));\n" +
+            " lit.rgb *= vCol.rgb;\n" +
+            " vec4 c = mix(lit, vCol, uFlat); float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n" +
             " o = vec4(mix(c.rgb, uFog, f), c.a); }\n";
 
     public static final class Section {
@@ -39,7 +51,9 @@ public final class WorldRenderer {
         public volatile boolean building;
     }
 
-    private int prog, uMvp, uOrigin, uCam, uTex, uLightTex, uFog, uFogRange, uAlphaCut, uFlat;
+    private int prog, uMvp, uOrigin, uCam, uTex, uLightTex, uFog, uFogRange, uAlphaCut, uFlat, uWater, uFarChunks;
+    /** FAR_CHUNKS_DISTANCE (LevelRenderer +0x1638) */
+    public float farChunks = 88f;
     /** the 16x16 light texture of GameRenderer::_tickLightTexture (set by the game every frame) */
     public int lightTex;
     private int indexBuf, maxQuads;
@@ -53,6 +67,8 @@ public final class WorldRenderer {
         uCam = GLES30.glGetUniformLocation(prog, "uCam");
         uTex = GLES30.glGetUniformLocation(prog, "uTex");
         uLightTex = GLES30.glGetUniformLocation(prog, "uLightTex");
+        uWater = GLES30.glGetUniformLocation(prog, "uWater");
+        uFarChunks = GLES30.glGetUniformLocation(prog, "uFarChunks");
         uFog = GLES30.glGetUniformLocation(prog, "uFog");
         uFogRange = GLES30.glGetUniformLocation(prog, "uFogRange");
         uAlphaCut = GLES30.glGetUniformLocation(prog, "uAlphaCut");
@@ -134,6 +150,8 @@ public final class WorldRenderer {
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, lightTex);
         GLES30.glUniform3f(uFog, fog[0], fog[1], fog[2]);
         GLES30.glUniform2f(uFogRange, fogStart, Math.max(fogEnd, fogStart + 0.01f));
+        GLES30.glUniform1f(uWater, 0f);
+        GLES30.glUniform1f(uFarChunks, Math.max(farChunks, 1f));
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0);
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlasTex);
         GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, indexBuf);
@@ -160,6 +178,7 @@ public final class WorldRenderer {
         GLES30.glDepthMask(false);
         GLES30.glEnable(GLES30.GL_POLYGON_OFFSET_FILL);
         GLES30.glPolygonOffset(0.1f, 0.1f);                              // terrain_water: polygonOffsetLevel 0.1
+        GLES30.glUniform1f(uWater, 1f);
         // culled like the rest: liquids carry their own back faces, ice/glass show only their front faces
         for (Map.Entry<Long, Section> e : sections.entrySet()) {
             Section s = e.getValue();
@@ -167,6 +186,7 @@ public final class WorldRenderer {
             bindAndDraw(e.getKey(), s.waterVbo, s.waterVerts);
         }
         GLES30.glDisable(GLES30.GL_POLYGON_OFFSET_FILL);
+        GLES30.glUniform1f(uWater, 0f);
         GLES30.glEnable(GLES30.GL_CULL_FACE);
         GLES30.glDepthMask(true);
         GLES30.glDisable(GLES30.GL_BLEND);

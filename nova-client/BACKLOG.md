@@ -308,3 +308,15 @@
 - Sky dark at noon (user: the original is bright): getAmbientBrightness v (+0x15a8) has no writer found; v = sky light
   at the camera (0..15) -> 1 in open air. TODO: find the real writer (memcpy / struct copy?) to confirm.
 - Clouds opaque (user: no transparency in the original) = sad.material clouds (no Blending); fancy one had 0.7 alpha.
+
+## beta21d (hotfix)
+- Selection overlay turned dark brown: the flat path multiplied the texture in; selection_overlay uses the colour only.
+- Water: renderchunk NEAR_WATER + FANCY ported (F = 1 - max(dot(view, up), 0.1); F = 1 - mix(F^4, 1, min(1, d/FAR_CHUNKS));
+  rg -= F*56/255; near = mix((rgb*0.45, 0.8), (rgb*0.5, 1), colour.a); colour = mix((rgb,1), near, F); fragment alpha
+  *= colour.a then mix to 1 by d/FAR_CHUNKS). Biome::DEFAULT_WATER_COLOR (0.596, 0.910, 1, a 0) from the init dump.
+  FAR_CHUNKS_DISTANCE = LevelRenderer +0x1638 = min(fade, end - 13.856), >= 40 under water.
+  Under water fog colour = Biome::DEFAULT_UNDERWATER_COLOR (0.0196, 0.0196, 0.196) * (0.35 + 0.65 b).
+- Leaves (fancy) from the code: BlockProperty 0x20 (LeafBlock ctor) -> getShadeBrightness 0.2 (AO darkens around
+  leaves); BlockOccluder::_shouldOccludeLeaves: deep leaves (isDeepLeafBlock) draw nothing; between two leaves only the
+  down / south / east face; slabs / top snow / carpet / invisible bedrock rules; else hidden by opaque.
+  LeafBlock::getRenderLayer: fancy -> layer 4 (alpha, single side), cold biomes [+0x30].

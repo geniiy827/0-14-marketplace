@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta21c";
+    public static final String VERSION = "NOVA Engine beta21d";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -478,7 +478,7 @@ public final class Game implements GLSurfaceView.Renderer {
 
     // ------------------------------------------------------------------ render
     private final com.nova.engine.render.Sky sky = new com.nova.engine.render.Sky();
-    private final float[] skyRot = new float[16], cloudProj = new float[16], fogDist = new float[3], sunCol = new float[4];
+    private final float[] skyRot = new float[16], cloudProj = new float[16], fogDist = new float[4], sunCol = new float[4];
     private long levelTicks;
     private float sunGlare;
 
@@ -492,9 +492,9 @@ public final class Game implements GLSurfaceView.Renderer {
         float fb = com.nova.engine.render.Sky.dayBrightness(tod);
         float[] fog = new float[3];
         if (underwater) {
-            int wc = com.nova.engine.world.Biomes.WATER[world.biome((int) Math.floor(player.x), (int) Math.floor(player.z))];
+            // Biome::DEFAULT_UNDERWATER_COLOR (0.0196, 0.0196, 0.196) * (0.35 + 0.65 fog brightness)
             float k = 0.35f + fb * 0.65f;
-            fog[0] = ((wc >> 16) & 255) / 255f * k * 0.2f; fog[1] = ((wc >> 8) & 255) / 255f * k * 0.2f; fog[2] = (wc & 255) / 255f * k;
+            fog[0] = 0.019607844f * k; fog[1] = 0.019607844f * k; fog[2] = 0.19607845f * k;
         } else {
             com.nova.engine.render.Sky.fogColor(fb, fog);
             com.nova.engine.render.Sky.sunrise(tod, sunCol);
@@ -510,6 +510,7 @@ public final class Game implements GLSurfaceView.Renderer {
         com.nova.engine.render.Sky.fogDistances(radius * 16, amb, underwater, fogDist);
         sky.updateLight(tod);
         wr.lightTex = sky.lightTexture();
+        wr.farChunks = fogDist[3];
         GLES30.glClearColor(fog[0], fog[1], fog[2], 1);                // LevelRenderer::setupClearColor = the fog colour
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT | GLES30.GL_DEPTH_BUFFER_BIT);
         GLES30.glEnable(GLES30.GL_DEPTH_TEST);
