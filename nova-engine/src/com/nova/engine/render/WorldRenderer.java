@@ -59,8 +59,11 @@ public final class WorldRenderer {
             " vec4 c = mix(lit, vCol, uFlat); float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n" +
             " o = vec4(mix(c.rgb, uFog, f), c.a); }\n";
 
+    /** terrain_opaque: no ALPHA_TEST -> no discard (keeps early depth rejection on mobile GPUs) */
+    static final String FS_OPAQUE = FS.replace("if (t.a < uAlphaCut) discard;", "");
+
     public static final class Section {
-        int solidVbo, waterVbo, solidVerts, waterVerts;
+        int solidVbo, waterVbo, cutVbo, solidVerts, waterVerts, cutVerts;
         public volatile int version = -1;
         public volatile boolean building;
     }
@@ -76,8 +79,25 @@ public final class WorldRenderer {
     public final Map<Long, Section> sections = new HashMap<Long, Section>();
     public int drawnSections;
 
+    private int progCut, progOpaque;
+    private final int[] locCut = new int[13], locOpaque = new int[13];
+    private static final String[] UN = {"uMvp", "uOrigin", "uCam", "uTex", "uLightTex", "uWater", "uTexDim", "uFarChunks", "uFog", "uFogRange", "uAlphaCut", "uFlat", ""};
+
+    private void use(int p, int[] loc) {
+        prog = p;
+        uMvp = loc[0]; uOrigin = loc[1]; uCam = loc[2]; uTex = loc[3]; uLightTex = loc[4]; uWater = loc[5]; uTexDim = loc[6];
+        uFarChunks = loc[7]; uFog = loc[8]; uFogRange = loc[9]; uAlphaCut = loc[10]; uFlat = loc[11];
+        GLES30.glUseProgram(p);
+    }
+
     public void init() {
-        prog = Gl.program(VS, FS);
+        progOpaque = Gl.program(VS, FS_OPAQUE);
+        progCut = Gl.program(VS, FS);
+        for (int i = 0; i < 12; i++) {
+            locCut[i] = GLES30.glGetUniformLocation(progCut, UN[i]);
+            locOpaque[i] = GLES30.glGetUniformLocation(progOpaque, UN[i]);
+        }
+        prog = progCut;
         uMvp = GLES30.glGetUniformLocation(prog, "uMvp");
         uOrigin = GLES30.glGetUniformLocation(prog, "uOrigin");
         uCam = GLES30.glGetUniformLocation(prog, "uCam");
@@ -120,6 +140,8 @@ public final class WorldRenderer {
         s.solidVerts = m.solidVerts;
         s.waterVbo = put(s.waterVbo, m.water);
         s.waterVerts = m.waterVerts;
+        s.cutVbo = put(s.cutVbo, m.cut);
+        s.cutVerts = m.cutVerts;
     }
 
     private static IntBuffer upBuf;
@@ -138,7 +160,7 @@ public final class WorldRenderer {
 
     /** drop everything (new world) */
     public void clearAll() {
-        for (Section s : sections.values()) { Gl.delete(s.solidVbo); Gl.delete(s.waterVbo); }
+        for (Section s : sections.values()) { Gl.delete(s.solidVbo); Gl.delete(s.waterVbo); Gl.delete(s.cutVbo); }
         sections.clear();
     }
 
@@ -152,6 +174,7 @@ public final class WorldRenderer {
             if (Math.abs(cx - pcx) > radius + 1 || Math.abs(cz - pcz) > radius + 1) {
                 Gl.delete(e.getValue().solidVbo);
                 Gl.delete(e.getValue().waterVbo);
+                Gl.delete(e.getValue().cutVbo);
                 it.remove();
             }
         }
@@ -161,19 +184,25 @@ public final class WorldRenderer {
         draw(mvp, camX, camY, camZ, look, atlasTex, fog, fogEnd * 0.6f, fogEnd);
     }
 
-    public void draw(float[] mvp, float camX, float camY, float camZ, float[] look, int atlasTex, float[] fog, float fogStart, float fogEnd) {
-        GLES30.glUseProgram(prog);
+    private void uniforms(float[] mvp, float camX, float camY, float camZ, float[] fog, float fogStart, float fogEnd) {
         GLES30.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
         GLES30.glUniform3f(uCam, camX, camY, camZ);
         GLES30.glUniform1i(uTex, 0);
         GLES30.glUniform1i(uLightTex, 1);
-        GLES30.glActiveTexture(GLES30.GL_TEXTURE1);
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, lightTex);
         GLES30.glUniform3f(uFog, fog[0], fog[1], fog[2]);
         GLES30.glUniform2f(uFogRange, fogStart, Math.max(fogEnd, fogStart + 0.01f));
         GLES30.glUniform1f(uWater, 0f);
         GLES30.glUniform1f(uFarChunks, Math.max(farChunks, 1f));
         GLES30.glUniform3f(uTexDim, texW, texH, texLevels);
+        GLES30.glUniform1f(uFlat, 0f);
+    }
+
+    public void draw(float[] mvp, float camX, float camY, float camZ, float[] look, int atlasTex, float[] fog, float fogStart, float fogEnd) {
+        use(progOpaque, locOpaque);
+        uniforms(mvp, camX, camY, camZ, fog, fogStart, fogEnd);
+        GLES30.glUniform1f(uAlphaCut, 0f);
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE1);
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, lightTex);
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0);
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlasTex);
         GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, indexBuf);
@@ -188,7 +217,7 @@ public final class WorldRenderer {
         float lim = (fogEnd + 16) * (fogEnd + 16);
         for (Map.Entry<Long, Section> e : sections.entrySet()) {
             Section s = e.getValue();
-            if (s.solidVerts == 0 && s.waterVerts == 0) continue;
+            if (s.solidVerts == 0 && s.waterVerts == 0 && s.cutVerts == 0) continue;
             long k = e.getKey();
             int cx = (int) (k >> 36) << 8 >> 8, cz = (int) (k >> 8) << 8 >> 8, sy = (int) (k & 0xFF);
             float x0 = cx * 16, y0 = sy * 16, z0 = cz * 16;
@@ -204,9 +233,8 @@ public final class WorldRenderer {
         for (int i = 0; i < nv; i++) sortBuf[i] = ((long) Float.floatToRawIntBits(visDist[i]) << 32) | i;
         java.util.Arrays.sort(sortBuf, 0, nv);
         for (int i = 0; i < nv; i++) order[i] = (int) sortBuf[i];
-        // solid + cutout
-        GLES30.glUniform1f(uAlphaCut, 0.5f);
-        GLES30.glUniform1f(uFlat, 0f);
+        // RenderChunk layers like LevelRenderer::renderChunks: opaque (no discard) front to back, then the alpha tested
+        // layer (discard) front to back, then blend / water back to front
         GLES30.glDisable(GLES30.GL_BLEND);
         GLES30.glDepthMask(true);
         for (int i = 0; i < nv; i++) {
@@ -215,6 +243,15 @@ public final class WorldRenderer {
             if (s.solidVerts == 0) continue;
             bindAndDraw(visKeys[o], s.solidVbo, s.solidVerts);
             drawnSections++;
+        }
+        use(progCut, locCut);
+        uniforms(mvp, camX, camY, camZ, fog, fogStart, fogEnd);
+        GLES30.glUniform1f(uAlphaCut, 0.5f);
+        for (int i = 0; i < nv; i++) {
+            int o = order[i];
+            Section s = visSec[o];
+            if (s.cutVerts == 0) continue;
+            bindAndDraw(visKeys[o], s.cutVbo, s.cutVerts);
         }
         // water
         GLES30.glUniform1f(uAlphaCut, 0.01f);

@@ -339,3 +339,13 @@
   black -> mips pulled cut-outs to black. Transparent texels now take their opaque neighbours' RGB (per 16px face).
 - TexelAA is an option, off by default (RendererSettings +0x31 = 0 in Options::_initDefaultValues): shader uses plain
   texture2D; TextureOGL::setFilteringMode(TexelAA) then = mag NEAREST, min NEAREST_MIPMAP_LINEAR. Cheaper per pixel.
+
+## beta22
+- FPS: terrain split into the RenderChunk layers of the original: opaque (terrain_opaque, no ALPHA_TEST -> shader
+  without discard, so early depth rejection works on mobile GPUs), alpha tested (leaves, plants, glass, models; own
+  shader with discard), then blend/water. Before, all solid + cutout shared one discard shader -> no early-z anywhere.
+- Light flash on place/break: relight reset the box to its sources in the live arrays and flooded back, meshes built
+  in between came out dark. Now computed in a scratch box, only real differences written; section bumps batched
+  (Light.TOUCHED + flush) so a flood triggers one rebuild per section, not hundreds.
+- World.set writes id + data together before bumping sections (door: id then data race).
+- Doors: could not reproduce in the JVM test (mesh changes with data ^ 4). Ask for exact case if still broken.

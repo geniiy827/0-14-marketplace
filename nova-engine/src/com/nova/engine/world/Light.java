@@ -45,6 +45,19 @@ public final class Light {
             1,0,0,0,1,0,1,1,1,0,1,1,1,0,1,1,0,1,0,1,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
             1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1};
 
+    static final ThreadLocal<java.util.HashSet<Long>> TOUCHED = new ThreadLocal<java.util.HashSet<Long>>() {
+        protected java.util.HashSet<Long> initialValue() { return new java.util.HashSet<Long>(); }
+    };
+
+    static long skey(int cx, int cz, int s) { return ((long) (cx & 0xFFFFFF) << 36) | ((long) (cz & 0xFFFFFF) << 8) | s; }
+
+    /** bump every section touched since the last flush once (no rebuild storm, no half-lit meshes) */
+    public static void flush(World w) {
+        java.util.HashSet<Long> t = TOUCHED.get();
+        for (long k : t) w.touch((int) (k >> 36) << 8 >> 8, (int) (k >> 8) << 8 >> 8, (int) (k & 0xFF));
+        t.clear();
+    }
+
     static int cost(int id) { int l = LB[id]; return l == 0 ? 1 : l; }
 
     // ------------------------------------------------------------------ chunk creation
@@ -106,6 +119,7 @@ public final class Light {
             }
             flood(w, c, layer, q, head, tail, null);
         }
+        flush(w);
     }
 
     private static int[] queue() {
@@ -129,65 +143,105 @@ public final class Light {
 
     // ------------------------------------------------------------------ edits
     /**
-     * after a block change at x y z: recompute both layers inside the box the change can reach
-     * (15 around; sky the whole column height when the column top moved), seeded from the cells around it
+     * after a block change at x y z: the converged result of LightUpdate::update for both layers inside the box the
+     * change can reach (15 around; the whole height when the column top moved). Computed in a scratch box first and
+     * only the cells that really change are written (no dark frame while it runs).
      */
     public static void relight(World w, int wx, int wy, int wz) {
         Chunk own = w.chunk(wx >> 4, wz >> 4);
         if (own == null || own.lit < 1) return;
-        int oldH = own.height[(wz & 15) * 16 + (wx & 15)] & 255;
-        // the column of the edit: new height + sky fill (the fill below the old/new top changes)
-        int[] box = {wx - 15, wz - 15, wx + 15, wz + 15};
-        int ylo0 = Math.max(0, wy - 15), yhi0 = Math.min(Chunk.H - 1, wy + 15);
+        int lx0 = wx & 15, lz0 = wz & 15;
+        int oldH = own.height[lz0 * 16 + lx0] & 255;
+        int y = Chunk.H - 1;
+        while (y >= 0 && LB[own.blocks[Chunk.idx(lx0, y, lz0)] & 255] == 0) y--;
+        own.height[lz0 * 16 + lx0] = (byte) (y + 1);
+        boolean column = y + 1 != oldH;
+        final int R = 15, W = 2 * R + 1;
+        int bx0 = wx - R, bz0 = wz - R;
         for (int layer = 0; layer < 2; layer++) {
-            int ylo = ylo0, yhi = yhi0;
-            if (layer == 0) {
-                int lx = wx & 15, lz = wz & 15, y = Chunk.H - 1;
-                while (y >= 0 && LB[own.blocks[Chunk.idx(lx, y, lz)] & 255] == 0) y--;
-                own.height[lz * 16 + lx] = (byte) (y + 1);
-                if (y + 1 != oldH) { ylo = 0; yhi = Chunk.H - 1; }
-            }
-            // reset the box to its sources
-            for (int z = box[1]; z <= box[3]; z++) for (int x = box[0]; x <= box[2]; x++) {
+            int ylo = Math.max(0, wy - R), yhi = Math.min(Chunk.H - 1, wy + R);
+            if (layer == 0 && column) { ylo = 0; yhi = Chunk.H - 1; }
+            int HH = yhi - ylo + 1;
+            byte[] v = new byte[W * W * HH];
+            byte[] lb = new byte[W * W * HH];
+            Chunk[] ch = new Chunk[W * W];
+            // sources: sky = the column fill (15 minus mLightBlock from the top), block = mLightEmission
+            for (int dz = 0; dz < W; dz++) for (int dx = 0; dx < W; dx++) {
+                int x = bx0 + dx, z = bz0 + dz;
                 Chunk k = at(w, own, x >> 4, z >> 4);
+                ch[dz * W + dx] = k;
                 if (k == null) continue;
-                if (layer == 0) {
-                    int lx = x & 15, lz = z & 15;
-                    int br = 15;
-                    for (int y = Chunk.H - 1; y >= 0; y--) {
-                        int i = Chunk.idx(lx, y, lz);
-                        if (br > 0) { br -= LB[k.blocks[i] & 255]; if (br < 0) br = 0; }
-                        if (y < ylo || y > yhi) continue;
-                        if (k.light(0, i) != br) { k.light(0, i, br); k.touchLight(lx, y, lz, w); }
-                    }
-                } else {
-                    for (int y = ylo; y <= yhi; y++) {
-                        int i = Chunk.idx(x & 15, y, z & 15);
-                        int e = EMIT[k.blocks[i] & 255];
-                        if (k.light(1, i) != e) { k.light(1, i, e); k.touchLight(x & 15, y, z & 15, w); }
-                    }
+                int lx = x & 15, lz = z & 15, br = 15;
+                for (int yy = Chunk.H - 1; yy >= ylo; yy--) {
+                    int id = k.blocks[Chunk.idx(lx, yy, lz)] & 255;
+                    if (layer == 0 && br > 0) { br -= LB[id]; if (br < 0) br = 0; }
+                    if (yy > yhi) continue;
+                    int c = (dz * W + dx) * HH + (yy - ylo);
+                    v[c] = (byte) (layer == 0 ? br : EMIT[id]);
+                    lb[c] = (byte) cost(id);
                 }
             }
-            // seeds: every lit cell of the box and the ring of cells around it
             int[] q = queue(); int tail = 0;
-            for (int z = box[1] - 1; z <= box[3] + 1; z++) for (int x = box[0] - 1; x <= box[2] + 1; x++) {
-                Chunk k = at(w, own, x >> 4, z >> 4);
-                if (k == null) continue;
-                boolean ring = x < box[0] || x > box[2] || z < box[1] || z > box[3];
-                for (int y = Math.max(0, ylo - 1); y <= Math.min(Chunk.H - 1, yhi + 1); y++) {
-                    boolean inside = !ring && y >= ylo && y <= yhi;
-                    boolean border = ring || y < ylo || y > yhi;
-                    if (!inside && !border) continue;
-                    int v = k.light(layer, Chunk.idx(x & 15, y, z & 15));
-                    if (v > 1) {
-                        if (tail + 3 > q.length) q = grow(q);
-                        q[tail++] = x; q[tail++] = y; q[tail++] = z;
+            // light coming in from the cells around the box
+            for (int dz = 0; dz < W; dz++) for (int dx = 0; dx < W; dx++) {
+                if (ch[dz * W + dx] == null) continue;
+                for (int yy = ylo; yy <= yhi; yy++) {
+                    int c = (dz * W + dx) * HH + (yy - ylo);
+                    int cst = lb[c];
+                    if (cst >= 15) { if (v[c] > 1) { if (tail + 3 > q.length) q = grow(q); q[tail++] = dx; q[tail++] = yy; q[tail++] = dz; } continue; }
+                    int best = v[c];
+                    for (int d = 0; d < 6; d++) {
+                        int nx = dx + DX[d], ny = yy + DY[d], nz = dz + DZ[d];
+                        boolean out = nx < 0 || nz < 0 || nx >= W || nz >= W || ny < ylo || ny > yhi;
+                        if (!out || ny < 0 || ny >= Chunk.H) continue;
+                        int ax = bx0 + nx, az = bz0 + nz;
+                        Chunk k = at(w, own, ax >> 4, az >> 4);
+                        if (k == null) continue;
+                        int nv = k.light(layer, Chunk.idx(ax & 15, ny, az & 15)) - cst;
+                        if (nv > best) best = nv;
+                    }
+                    v[c] = (byte) best;
+                    if (best > 1) { if (tail + 3 > q.length) q = grow(q); q[tail++] = dx; q[tail++] = yy; q[tail++] = dz; }
+                }
+            }
+            // flood inside the box
+            int head = 0;
+            while (head < tail) {
+                int dx = q[head], yy = q[head + 1], dz = q[head + 2];
+                head += 3;
+                int val = v[(dz * W + dx) * HH + (yy - ylo)];
+                if (val <= 1) continue;
+                for (int d = 0; d < 6; d++) {
+                    int nx = dx + DX[d], ny = yy + DY[d], nz = dz + DZ[d];
+                    if (nx < 0 || nz < 0 || nx >= W || nz >= W || ny < ylo || ny > yhi || ch[nz * W + nx] == null) continue;
+                    int c = (nz * W + nx) * HH + (ny - ylo);
+                    int cst = lb[c];
+                    if (cst >= 15) continue;
+                    int cand = val - cst;
+                    if (cand > v[c]) {
+                        v[c] = (byte) cand;
+                        if (cand > 1) {
+                            if (tail + 3 > q.length) {
+                                System.arraycopy(q, head, q, 0, tail - head); tail -= head; head = 0;
+                                if (tail + 3 > q.length) q = grow(q);
+                            }
+                            q[tail++] = nx; q[tail++] = ny; q[tail++] = nz;
+                        }
                     }
                 }
             }
-            int[] fbox = {box[0], box[1], box[2], box[3]};
-            floodY(w, own, layer, q, tail, fbox, ylo, yhi);
+            // write the differences
+            for (int dz = 0; dz < W; dz++) for (int dx = 0; dx < W; dx++) {
+                Chunk k = ch[dz * W + dx];
+                if (k == null) continue;
+                int lx = (bx0 + dx) & 15, lz = (bz0 + dz) & 15;
+                for (int yy = ylo; yy <= yhi; yy++) {
+                    int i = Chunk.idx(lx, yy, lz), nv = v[(dz * W + dx) * HH + (yy - ylo)];
+                    if (k.light(layer, i) != nv) { k.light(layer, i, nv); k.touchLight(lx, yy, lz, w); }
+                }
+            }
         }
+        flush(w);
     }
 
     /** flood restricted to the box and y range (cells outside only seed) */

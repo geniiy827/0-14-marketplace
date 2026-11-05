@@ -49,18 +49,15 @@ public final class World {
     /** true = unknown (not generated yet): treated as solid for physics */
     public boolean loaded(int x, int z) { return ready(x >> 4, z >> 4) != null; }
 
-    public void set(int x, int y, int z, int id, int data) {
-        set(x, y, z, id);
-        Chunk c = ready(x >> 4, z >> 4);
-        if (c != null && y >= 0 && y < Chunk.H) c.data[Chunk.idx(x & 15, y, z & 15)] = (byte) data;
-    }
+    public void set(int x, int y, int z, int id) { set(x, y, z, id, 0); }
 
-    public void set(int x, int y, int z, int id) {
+    /** id and data written together before the sections are bumped (a mesher must never see the new id with old data) */
+    public void set(int x, int y, int z, int id, int data) {
         if (y < 0 || y >= Chunk.H) return;
         Chunk c = ready(x >> 4, z >> 4);
         if (c == null) return;
         int lx = x & 15, lz = z & 15;
-        c.set(lx, y, lz, id);
+        c.set(lx, y, lz, id, data);
         if (c.lit >= 1) lightEdits.add(new int[]{x, y, z});
         int s = y >> 4;
         touch(c.cx, c.cz, s);

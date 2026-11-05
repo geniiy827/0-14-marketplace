@@ -31,16 +31,17 @@ public final class Chunk {
 
     public Chunk(int cx, int cz) { this.cx = cx; this.cz = cz; }
 
-    /** a light value changed: rebuild the sections that sample it */
+    /** a light value changed: the sections that sample it get rebuilt (batched by Light, bumped once at the end) */
     void touchLight(int x, int y, int z, World w) {
+        java.util.HashSet<Long> t = Light.TOUCHED.get();
         int s = y >> 4;
-        version[s]++;
-        if ((y & 15) == 0 && s > 0) version[s - 1]++;
-        if ((y & 15) == 15 && s < SECTIONS - 1) version[s + 1]++;
-        if (x == 0) w.touch(cx - 1, cz, s);
-        if (x == 15) w.touch(cx + 1, cz, s);
-        if (z == 0) w.touch(cx, cz - 1, s);
-        if (z == 15) w.touch(cx, cz + 1, s);
+        t.add(Light.skey(cx, cz, s));
+        if ((y & 15) == 0 && s > 0) t.add(Light.skey(cx, cz, s - 1));
+        if ((y & 15) == 15 && s < SECTIONS - 1) t.add(Light.skey(cx, cz, s + 1));
+        if (x == 0) t.add(Light.skey(cx - 1, cz, s));
+        if (x == 15) t.add(Light.skey(cx + 1, cz, s));
+        if (z == 0) t.add(Light.skey(cx, cz - 1, s));
+        if (z == 15) t.add(Light.skey(cx, cz + 1, s));
     }
 
     public static int idx(int x, int y, int z) { return (y << 8) | (z << 4) | x; }

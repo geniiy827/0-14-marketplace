@@ -20,8 +20,8 @@ public final class Mesher {
     public static final class Mesh {
         public int cx, sy, cz, version;
         public World world;             // the world it was built from (dropped when the world was replaced)
-        public int[] solid, water;      // vertex data; quads of 4 vertices
-        public int solidVerts, waterVerts;
+        public int[] solid, water, cut;      // vertex data; quads of 4 vertices (cut = alpha tested layer)
+        public int solidVerts, waterVerts, cutVerts;
     }
 
     static final class Buf {
@@ -31,7 +31,10 @@ public final class Mesher {
         int[] copy() { return java.util.Arrays.copyOf(a, n); }
     }
 
-    private final Buf solid = new Buf(), water = new Buf();
+    private final Buf solid = new Buf(), water = new Buf(), cut = new Buf();
+
+    /** the buffer of a block's render layer */
+    private Buf layerBuf(int id) { int l = Blocks.layer[id]; return l == Blocks.TRANSLUCENT ? water : l == Blocks.CUTOUT ? cut : solid; }
     private final Chunk[] around = new Chunk[9];
     private final float[] uv;
     private int bx, by, bz;               // section origin (world)
@@ -201,20 +204,21 @@ public final class Mesher {
         int cx = wx >> 4, cz = wz >> 4, sy = wy >> 4;
         for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) around[(dz + 1) * 3 + dx + 1] = w.ready(cx + dx, cz + dz);
         if (around[4] == null) return new int[0];
-        solid.n = 0; water.n = 0;
+        solid.n = 0; water.n = 0; cut.n = 0;
         bx = cx << 4; by = sy << 4; bz = cz << 4;
         origin[0] = bx; origin[1] = by; origin[2] = bz;
         block(around[4], wx & 15, wy - by, wz & 15, wy);
-        int[] out = new int[solid.n + water.n];
+        int[] out = new int[solid.n + water.n + cut.n];
         System.arraycopy(solid.a, 0, out, 0, solid.n);
         System.arraycopy(water.a, 0, out, solid.n, water.n);
+        System.arraycopy(cut.a, 0, out, solid.n + water.n, cut.n);
         return out;
     }
 
     public Mesh build(World w, int cx, int sy, int cz, int version) {
         for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) around[(dz + 1) * 3 + dx + 1] = w.ready(cx + dx, cz + dz);
         if (around[4] == null) return null;
-        solid.n = 0; water.n = 0;
+        solid.n = 0; water.n = 0; cut.n = 0;
         bx = cx << 4; by = sy << 4; bz = cz << 4;
         Chunk c = around[4];
         for (int y = 0; y < 16; y++) {
@@ -226,6 +230,7 @@ public final class Mesher {
         m.cx = cx; m.sy = sy; m.cz = cz; m.version = version;
         m.solid = solid.copy(); m.solidVerts = solid.n / STRIDE;
         m.water = water.copy(); m.waterVerts = water.n / STRIDE;
+        m.cut = cut.copy(); m.cutVerts = cut.n / STRIDE;
         return m;
     }
 
@@ -345,7 +350,7 @@ public final class Mesher {
         float bh = id == 78 ? ((data & 7) + 1) / 8f : Blocks.height[id];       // top snow: data = layers - 1
         float tr = ((tint >> 16) & 255) / 255f, tg = ((tint >> 8) & 255) / 255f, tb = (tint & 255) / 255f;
         boolean liquid = Blocks.kind[id] == Blocks.LIQUID;
-        Buf out = Blocks.layer[id] == Blocks.TRANSLUCENT ? water : solid;
+        Buf out = layerBuf(id);
         int[] cr = CORNERS[f], n = NORMAL[f];
         int wy = by + y;
         float ins = f >= 2 ? Blocks.inset[id] : 0;
@@ -443,8 +448,8 @@ public final class Mesher {
                 {x0, py + 1, cz + d, u0, v0}, {x0 + dx, py, cz + d + dz, u0, v1}, {x1 + dx, py, cz + d + dz, u1, v1}, {x1, py + 1, cz + d, u1, v0},
                 {x1, py + 1, cz - d, u0, v0}, {x1 + dx, py, cz - d + dz, u0, v1}, {x0 + dx, py, cz - d + dz, u1, v1}, {x0, py + 1, cz - d, u1, v0}};
         for (int i = 0; i < q.length; i += 4) {                     // both windings: seen from either side
-            for (int k = 0; k < 4; k++) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col, lt);
-            for (int k = 3; k >= 0; k--) vert(solid, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col, lt);
+            for (int k = 0; k < 4; k++) vert(cut, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col, lt);
+            for (int k = 3; k >= 0; k--) vert(cut, q[i + k][0], q[i + k][1], q[i + k][2], q[i + k][3], q[i + k][4], col, lt);
         }
     }
 
@@ -463,10 +468,10 @@ public final class Mesher {
         else if (d == 9) { x6 = x9 = x; x7 = x8 = x + 1; z10 = z11 = z; z12 = z13 = z + 1; }
         if (d == 2 || d == 4) { y14 += 1; y17 += 1; } else if (d == 3 || d == 5) { y15 += 1; y16 += 1; }
         int col = shadeCol(1f), lt = lightAt(x, by + y, z);
-        vert(solid, x6, y14, z10, u1, v0, col, lt); vert(solid, x7, y15, z11, u1, v1, col, lt);
-        vert(solid, x8, y16, z12, u0, v1, col, lt); vert(solid, x9, y17, z13, u0, v0, col, lt);
-        vert(solid, x9, y17, z13, u0, v0, col, lt); vert(solid, x8, y16, z12, u0, v1, col, lt);
-        vert(solid, x7, y15, z11, u1, v1, col, lt); vert(solid, x6, y14, z10, u1, v0, col, lt);
+        vert(cut, x6, y14, z10, u1, v0, col, lt); vert(cut, x7, y15, z11, u1, v1, col, lt);
+        vert(cut, x8, y16, z12, u0, v1, col, lt); vert(cut, x9, y17, z13, u0, v0, col, lt);
+        vert(cut, x9, y17, z13, u0, v0, col, lt); vert(cut, x8, y16, z12, u0, v1, col, lt);
+        vert(cut, x7, y15, z11, u1, v1, col, lt); vert(cut, x6, y14, z10, u1, v0, col, lt);
     }
 
     private static int shadeCol(float l) { int v = (int) (255 * l); return v | v << 8 | v << 16 | 255 << 24; }
@@ -480,7 +485,7 @@ public final class Mesher {
 
     /** an axis aligned part of a block: faces at the block border are culled by opaque neighbours, UV = the box area */
     private void box(int id, int x, int wy, int y, int z, float x0, float y0, float z0, float x1, float y1, float z1) {
-        Buf out = Blocks.layer[id] == Blocks.TRANSLUCENT ? water : solid;
+        Buf out = layerBuf(id);
         for (int f = 0; f < 6; f++) {
             int[] n = NORMAL[f];
             boolean border = (f == 0 && y0 == 0) || (f == 1 && y1 == 1) || (f == 2 && z0 == 0) || (f == 3 && z1 == 1) || (f == 4 && x0 == 0) || (f == 5 && x1 == 1);
@@ -518,10 +523,10 @@ public final class Mesher {
                 {0.05f, 0, 0.95f, 0.95f, 0, 0.05f}, {0.95f, 0, 0.05f, 0.05f, 0, 0.95f}};
         for (float[] p : q) {
             float ax = x + p[0], az = z + p[2], bxx = x + p[3], bzz = z + p[5];
-            vert(solid, ax, y, az, u0, v1, col, lt);
-            vert(solid, bxx, y, bzz, u1, v1, col, lt);
-            vert(solid, bxx, y + 1, bzz, u1, v0, col, lt);
-            vert(solid, ax, y + 1, az, u0, v0, col, lt);
+            vert(cut, ax, y, az, u0, v1, col, lt);
+            vert(cut, bxx, y, bzz, u1, v1, col, lt);
+            vert(cut, bxx, y + 1, bzz, u1, v0, col, lt);
+            vert(cut, ax, y + 1, az, u0, v0, col, lt);
         }
     }
 
