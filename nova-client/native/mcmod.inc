@@ -35,6 +35,7 @@ static void mi_report(void);
 static char *mm_player(void) { return g_client ? *(char **)((char *)g_client + 0x120) : 0; }
 static void *mm_region(void *pl) { return pl ? *(void **)((char *)pl + 0x16c) : 0; }
 
+static void hook_init(void **env);
 /* ---------------- Java side ---------------- */
 static void **mm_env(void) {
     void **env = 0;
@@ -54,6 +55,7 @@ int Java_com_nova_client_ModBridge_nativeModInit(void **env, void *cls) {
     mm_event = ((void *(*)(void *, void *, const char *, const char *))f[113])(env, mm_cls, "event", "(ILjava/lang/String;[D)I");
     mm_ok = mm_cls && mm_event;
     LOG("mcmod bridge %s", mm_ok ? "ready" : "FAILED");
+    if (mm_ok) hook_init(env);
     return mm_ok ? 0 : -2;
 }
 

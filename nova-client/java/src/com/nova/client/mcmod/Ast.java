@@ -322,6 +322,12 @@ final class Ast {
         OverrideDecl(String ns, String name, Lambda fn) { this.ns = ns; this.name = name; this.fn = fn; }
     }
 
+    /** hook "Class::method" [float|int|double|void] (args) { ... original(...) ... } */
+    static final class HookDecl {
+        final String target; final char ret; final Lambda fn;
+        HookDecl(String target, char ret, Lambda fn) { this.target = target; this.ret = ret; this.fn = fn; }
+    }
+
     /** item / block / recipe ... { key: value } (registered by later stages) */
     static final class Decl {
         final String kind, name;
@@ -335,6 +341,7 @@ final class Ast {
         final List<OnEvent> events = new ArrayList<OnEvent>();
         final List<Every> every = new ArrayList<Every>();
         final List<OverrideDecl> overrides = new ArrayList<OverrideDecl>();
+        final List<HookDecl> hooks = new ArrayList<HookDecl>();
         final List<Decl> decls = new ArrayList<Decl>();
     }
 }

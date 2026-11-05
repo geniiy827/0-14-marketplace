@@ -10,6 +10,7 @@
   nova at ADDR            which function contains ADDR
   nova str TEXT           find C string, print address and code refs
   nova crash [FILE]       symbolize a NOVA-crash.txt (default: newest in uploads)
+  nova ref-build [OUT]     regenerate the browsable reference tree (default work/re014, see its INDEX.md)
   nova build              build APK quietly (version from VERSION file), prints result
 """
 import sys, os, re, struct, pickle, bisect, subprocess, glob, signal
@@ -119,7 +120,8 @@ def resolve(x):
     if len(ex) >= 1:
         if len(ex) > 1: print('# %d overloads, using first; add args to pick' % len(ex))
         return ex[0]
-    rx = re.compile(x)
+    try: rx = re.compile(x)
+    except re.error: rx = re.compile(re.escape(x))
     hits = [(a, n) for n, a in I['byname'].items() if rx.search(D(n)) or rx.search(n)]
     if not hits: sys.exit('no symbol: ' + x)
     if len(hits) > 1:
@@ -174,6 +176,9 @@ def main():
     if not a: print(__doc__); return
     c = a[0]
     if c == 'index': build_index(); print('ok'); return
+    if c == 'ref-build':
+        d = os.path.dirname(os.path.abspath(__file__)); out = a[1] if len(a) > 1 else os.path.join(W, 're014')
+        subprocess.run([sys.executable, os.path.join(d, 'build_ref.py'), out]); subprocess.run([sys.executable, os.path.join(d, 'gen_packets.py'), out]); return
     if c == 's':
         I = idx(); rx = re.compile(a[1]); k = 0
         for addr, (sz, n, _) in sorted(I['funcs'].items()):

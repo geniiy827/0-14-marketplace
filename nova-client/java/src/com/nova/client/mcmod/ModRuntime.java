@@ -25,6 +25,9 @@ public final class ModRuntime {
         String loadData(String modId);                              // JSON text or null
         void saveData(String modId, String json);
         String prelude();                                           // prelude.mcs source
+        Machine machine();                                          // hooks / calls / memory, null in tests
+        /** live mods (games/com.mojang/nova_mods/*.mcs) changed since the last scan: {id, file, source}; may be null */
+        List<String[]> liveScan();
     }
 
     /** one loaded mod */
@@ -43,6 +46,10 @@ public final class ModRuntime {
 
     final Host host;
     final Scope builtins = new Scope(null);
+    /** one script at a time: game thread events and hooks from any thread */
+    final java.util.concurrent.locks.ReentrantLock lock = new java.util.concurrent.locks.ReentrantLock();
+    private Hooks hooks;
+    private Interp console;
     private final Map<String, Ns> groups = new LinkedHashMap<String, Ns>();
     private final List<Mod> mods = new ArrayList<Mod>();
     private final Map<String, Double> idCache = new HashMap<String, Double>();
@@ -90,12 +97,88 @@ public final class ModRuntime {
         for (String[] f : ApiTable.FUNCS) bind(f);
         Ns chat = groups.get("chat");
         if (chat != null) chat.callDefault = "send";
+        bindMachine();
         try {
             Program p = Parser.parse(host.prelude());
             for (Node n : p.init) n.eval(system, system.globals);
         } catch (ScriptError e) {
             e.file = "prelude.mcs";
             host.log("prelude: " + e.where() + ": " + e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------ the game itself (mc.*, mem.*, hook)
+    private void bindMachine() {
+        Machine mach = host.machine();
+        if (mach == null) return;
+        if (hooks == null) hooks = new Hooks(this, mach);
+        hooks.bind(builtins.vars);
+        ((Ns) builtins.vars.get("mc")).members.put("hook", new Callable() {   // mc.hook("Class::f", fn(self, ..., original) {}, "float")
+            public Object call(Interp in, List<Object> args, int line) {
+                if (args.size() < 2 || !(args.get(0) instanceof String) || !(args.get(1) instanceof Callable))
+                    throw new ScriptError("mc.hook(\"Класс::функция\", fn(...) { })", line);
+                char ret = args.size() > 2 ? Interp.str(args.get(2)).charAt(0) : 0;
+                String err = hooks.install(modOf(in), (String) args.get(0), (Callable) args.get(1), null, ret, line);
+                if (err != null) throw new ScriptError(err, line);
+                return null;
+            }
+        });
+        console = new Interp("console", "консоль", builtins);
+    }
+
+    /** libnova -> a hooked function was called */
+    public long onHook(int idx, int[] words) {
+        if (hooks == null) return host.machine().callOrig(idx, words);
+        return hooks.onHook(idx, words);
+    }
+
+    /** a hook body (called by Hooks with the lock held) */
+    boolean runHook(Mod m, Runnable r) { return run(m, r, null); }
+
+    private void installHooks(Mod m) {
+        if (hooks == null || m.prog == null) return;
+        hooks.removeMod(m);
+        for (Ast.HookDecl h : m.prog.hooks) {
+            Scope hs = new Scope(m.in.globals);
+            try {
+                String err = hooks.install(m, h.target, new Interp.Fn(h.fn, hs, m.in), hs, h.ret, h.fn.line);
+                if (err != null) report(m, new ScriptError(err, h.fn.line));
+            } catch (ScriptError e) {
+                report(m, e);
+            }
+        }
+    }
+
+    /** chat line "> code": run it in the console (variables stay between lines), print the result */
+    private void consoleEval(String src) {
+        if (console == null) { chat("§cконсоль недоступна"); return; }
+        console.resetSteps();
+        try {
+            Program p = Parser.parse(src);
+            Object last = null;
+            for (Node n : p.init) last = n instanceof Ast.ExprStmt ? ((Ast.ExprStmt) n).e.eval(console, console.globals) : n.eval(console, console.globals);
+            if (last != null) chat("§7= " + Interp.str(last));
+        } catch (ScriptError e) {
+            chat("§c" + e.getMessage());
+        } catch (Ast.Jumping j) {
+            chat("§cbreak/continue/return вне цикла");
+        } catch (RuntimeException e) {
+            chat("§c" + e);
+        }
+    }
+
+    /** live reload of a mod file: replace its program, unhook the old hooks, start it again if in a world */
+    private void reloadLive(String id, String file, String src) {
+        Mod old = null;
+        for (Mod m : mods) if (m.id.equals(id)) old = m;
+        if (old != null) {
+            if (hooks != null) hooks.removeMod(old);
+            mods.remove(old);
+        }
+        Mod m = load(id, id, file, src);
+        if (inWorld) {
+            if (m.parseError != null) report(m, m.parseError);
+            else { startMod(m); chat("§a[" + file + "] перезагружен"); }
         }
     }
 
@@ -344,7 +427,7 @@ public final class ModRuntime {
         }
     }
 
-    private Mod modOf(Interp in) {
+    Mod modOf(Interp in) {
         for (Mod m : mods) if (m.in == in) return m;
         throw new ScriptError("data.*: только внутри мода", 0);
     }
@@ -400,8 +483,14 @@ public final class ModRuntime {
         for (String[] f : ApiTable.FUNCS) bind(f);
         groups.get("chat").callDefault = "send";
         for (Mod m : mods) {
+            if (m.parseError != null) { m.errors = 0; report(m, m.parseError); continue; }
+            startMod(m);
+        }
+    }
+
+    private void startMod(Mod m) {
+        {
             m.errors = 0;
-            if (m.parseError != null) { report(m, m.parseError); continue; }
             m.in.globals.vars.clear();
             for (Decl d : m.prog.decls) {
                 Double id = customIds.get(m.id + ":" + d.name);
@@ -424,11 +513,12 @@ public final class ModRuntime {
             run(m, new Runnable() {
                 public void run() { for (Node n : mm.prog.init) n.eval(mm.in, mm.in.globals); }
             }, null);
+            installHooks(m);
             for (int i = 0; i < m.everyNext.length; i++) m.everyNext[i] = 0;
         }
     }
 
-    private boolean run(Mod m, Runnable r, Object unused) {
+    boolean run(Mod m, Runnable r, Object unused) {
         if (m.errors >= 6) return false;          // stopped until the next world
         m.in.resetSteps();
         try {
@@ -448,6 +538,13 @@ public final class ModRuntime {
 
     /** from libnova: returns 1 when a handler called e.cancel() */
     public int event(int ev, String text, double[] a) {
+        lock.lock();
+        try { return event0(ev, text, a); } finally { lock.unlock(); }
+    }
+
+    private long lastLive;
+
+    private int event0(int ev, String text, double[] a) {
         if (ev < 1 || ev > ApiTable.EVENTS.length) return 0;
         String name = ApiTable.EVENTS[ev - 1][0];
         if (name.equals("world.join")) joinWorld();
@@ -456,6 +553,13 @@ public final class ModRuntime {
         if (!inWorld) return 0;
         boolean tickEv = name.equals("tick");
         if (tickEv) tick++;
+        if (name.equals("chat") && text != null && text.startsWith(">")) { consoleEval(text.substring(1)); return 1; }
+        if (tickEv && tick - lastLive >= 20) {
+            lastLive = tick;
+            List<String[]> ch = null;
+            try { ch = host.liveScan(); } catch (Throwable t) { host.log("live: " + t); }
+            if (ch != null) for (String[] c : ch) reloadLive(c[0], c[1], c[2]);
+        }
         final boolean[] cancel = {false};
         Map<String, Object> e = new LinkedHashMap<String, Object>();
         String fields = ApiTable.EVENTS[ev - 1][1];

@@ -102,8 +102,13 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   События: world.join, world.leave, tick (тики считаются по часам в `mcmod_frame`, без хуков игры).
 - **Мост:** `ModBridge.java` ↔ `native/mcmod.inc`: Java→C `nativeApi(op, double[], String)` (числа по одному на
   параметр, строки через \x1f), C→Java `ModBridge.event(int ev, String, double[])` (JNI с потока игры).
-- **Отказ от BlockLauncher-порта:** был перенесён весь ModPE API (176 функций, 19 событий; код —
-  `archive/mcmod_blocklauncher.inc`, справочник — `mcmod/api_blocklauncher/`, исходник BlockLauncher:
+- **alpha14: моды без API.** native/hook_reloc.h + hook.inc: перехват ЛЮБОЙ функции во время работы (перенос пролога
+  Thumb-2, проверен эмулятором на 6000 функций; мелкие/непереносимые — через слоты vtable и bl-вызовы), вызов по
+  имени, память. Таблица `assets/nova/symbols.tsv` (tools/gen_symbols.py: имя, mangled, адрес, размер, типы
+  аргументов s/p/f/d/q/S/c/v, float-возврат, режим i/c, места вызова). Java: mcmod/Hooks.java (+Machine.java,
+  ModBridge.Mach/onHook). Скрипт: `hook "Класс::метод" [float] (self, ...) { original() }`, mc.*, mem.*, консоль
+  `> код` в чате, живые моды из games/com.mojang/nova_mods. Тест на ПК: mcmod/test (FAKE Machine).
+- Отказ от BlockLauncher-порта (удалён в alpha14): был перенесён весь ModPE API (176 функций, 19 событий; исходник BlockLauncher:
   github.com/zhuowei/MCPELauncher коммит `fb1f78a` = поддержка 0.14.3, файлы jni/modscript*.cpp).
   На телефоне вылетало: открыть дверь, ударить свинью, команда /top. Причина НЕ найдена (отчётов не было).
   Пользователь решил писать с нуля только нужное. Оттуда можно брать смещения/символы, но добавлять по одному

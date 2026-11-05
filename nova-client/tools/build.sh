@@ -12,6 +12,7 @@ python3 -I tools/gen_intro_mesh.py intro/title.bbmodel assets_new/nova/intro
 [ -f assets_new/nova/intro/sfx/hit.ogg ] || python3 -I tools/gen_intro_sfx.py assets_new/nova/intro/sfx
 python3 -W ignore -I tools/gen_textures.py /home/claude/apk/x/assets /home/claude/jt/j/textures assets_new
 python3 -I tools/gen_mcmod.py
+python3 tools/gen_symbols.py assets_new/nova/symbols.tsv > /dev/null
 [ -f res_new/drawable/iconx.png ] || python3 -I tools/gen_icon.py
 sh tools/build_java.sh
 python3 -I tools/so_patch.py /home/claude/apk/x/lib/armeabi-v7a/libminecraftpe.so libminecraftpe.patched.so

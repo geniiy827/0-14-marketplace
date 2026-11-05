@@ -76,6 +76,55 @@ every 5 seconds { ... }
 Переменные верхнего уровня создаются заново при каждом входе в мир.
 Сохранить между запусками: `data.save("ключ", значение)` / `data.load("ключ", поумолчанию)`.
 
+## Вся игра без API: hook, mc.call, mem
+
+Мод может перехватить **любую** функцию Minecraft PE 0.14.3 и вызвать любую функцию по имени — их в игре ~22 800,
+имена как в C++ (`Класс::метод`). Список с типами аргументов: `assets/nova/symbols.tsv` в APK
+(генерирует `tools/gen_symbols.py`), разобранный код игры — `work/re014/classes/<Класс>.s` (`nova ref-build`).
+
+```
+hook "LocalPlayer::travel" (self, strafe, forward) {     // перехват: тело выполняется ВМЕСТО функции
+    return original(self, strafe * 2, forward * 2)         // original() - настоящая функция (без аргументов = те же)
+}
+hook "Mob::getJumpPower" float (self) {                     // float/int/double/void - что возвращает (если не угадано)
+    return self == mc.player() ? original() * 2 : original()
+}
+hook "Mob::causeFallDamage" (self, d) { }                  // не вызвали original() и ничего не вернули = функция отменена
+```
+
+- Первый аргумент метода класса — сам объект (`self`, это адрес в памяти). Дальше — аргументы функции по порядку.
+- Аргументы-числа приходят числами (`float` — дробные), `Vec3`/`BlockPos` по значению — таблицей `{x, y, z}`,
+  указатели и ссылки — адресом (число).
+- Если имя есть в нескольких вариантах (перегрузки), пиши полностью: `"Level::setTime(int)"`.
+- Перехват ставится, когда мод запускается (вход в мир), и снимается при перезагрузке мода.
+- Функцию может перехватить только один мод.
+
+Вызов функций игры:
+
+```
+mc.call("GuiData::displayClientMessage", mc.gui(), "привет")      // строки сами превращаются в std::string / char*
+mc.call("LocalPlayer::setPos", mc.player(), {x: 0, y: 80, z: 0}) // {x,y,z} -> Vec3 / BlockPos в памяти
+var eye = mc.callf("Mob::getJumpPower", mc.player())             // callf/calld/calli - явный тип результата
+mc.hook("Level::setTime(int)", fn(self, t, original) { return original(self, 6000) })   // перехват из кода
+```
+
+Готовые объекты: `mc.client()`, `mc.player()`, `mc.region()` (BlockSource игрока), `mc.level()`, `mc.gui()` (GuiData)
+— адреса или `null`, если не в мире. Поиск: `mc.find("Jump")` — список имён, `mc.info("Mob::travel")` — адрес,
+размер, аргументы, как перехватывается.
+
+Память: `mem.int(p, смещение)`, `mem.float(p, off)`, `mem.byte/ubyte/short/ushort/ptr`, `mem.vec3(p, off)`,
+`mem.setInt(p, v)`, `mem.setFloat(p, v)`, `mem.setByte(p, v)`..., `mem.str(p)` (std::string), `mem.cstr(p)`,
+`mem.string("текст")` (новая std::string), `mem.alloc(n)` / `mem.free(p)`, `mem.hex(n)`.
+Пример: позиция игрока — `mem.vec3(mc.player(), 8)` (y — глаза, ноги = y - 1.62).
+Неверный адрес = вылет игры (как в C++), отчёт будет в `NOVA-crash.txt`.
+
+### Консоль и живые моды
+
+- Консоль: сообщение в чат, начинающееся с `>`, выполняется как код, результат пишется в чат:
+  `> mc.find("Sheep")`, `> mem.vec3(mc.player(), 8)`, `> var p = mc.player()` (переменные консоли живут до выхода).
+- Живые моды: файлы `*.mcs` (или папки с `main.mcs`) в `games/com.mojang/nova_mods/` на телефоне. Сохранил файл —
+  через секунду мод перезапущен в игре, старые перехваты сняты. Ничего не надо собирать и импортировать.
+
 ## Замена встроенных функций
 
 Любую функцию можно заменить для всех модов. `original(...)` — вызвать старую версию:

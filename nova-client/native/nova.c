@@ -1131,6 +1131,8 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 
 #include "menus.inc"
 #include "mcmod.inc"
+#include "hook_reloc.h"
+#include "hook.inc"
 #include "scale.inc"
 #include "events.inc"
 #include "items.inc"

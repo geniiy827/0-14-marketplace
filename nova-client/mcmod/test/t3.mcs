@@ -1,0 +1,7 @@
+hook "Entity::getEyeHeight" (self) { return original() * 0.5 }
+var p = mc.player()
+chat("player {p}")
+chat("eye {mc.call(\"Entity::getEyeHeight\", p)}")
+chat(mc.find("getEyeHeight"))
+mc.call("GuiData::displayClientMessage", mc.gui(), "привет")
+mc.call("LocalPlayer::setPos", p, {x: 1, y: 70, z: 2})

@@ -1,0 +1,36 @@
+// NOVA Hooks - мод без API: перехват и вызов любых функций самой игры по имени.
+// Команды в чате: /fast, /jump, /moon. Консоль: начни сообщение с ">", например  > mc.find("Jump")
+
+var fast = false
+var jump = false
+var moon = false
+
+// любая функция игры: "Класс::метод". Первый аргумент метода - сам объект (self).
+// original() - вызвать настоящую функцию с теми же аргументами, original(a, b) - с другими.
+
+hook "LocalPlayer::travel" (self, strafe, forward) {
+    if fast { return original(self, strafe * 2.5, forward * 2.5) }
+    return original()
+}
+
+hook "Mob::getJumpPower" float (self) {          // float - функция возвращает дробное число
+    if jump and self == mc.player() { return original() * 2 }
+    return original()
+}
+
+hook "Mob::causeFallDamage" (self, distance) {
+    if moon and self == mc.player() { return }    // ничего не вернули и original() не звали = функция не выполнится
+    return original()
+}
+
+fn say(text) { mc.call("GuiData::displayClientMessage", mc.gui(), text) }   // так игра сама пишет в чат
+
+on world.join(e) {
+    say("§bNOVA Hooks: §f/fast /jump /moon, консоль: > код")
+}
+
+on chat(e) {
+    if e.text == "/fast" { fast = not fast; say("быстрый бег: {fast}"); e.cancel() }
+    if e.text == "/jump" { jump = not jump; say("высокий прыжок: {jump}"); e.cancel() }
+    if e.text == "/moon" { moon = not moon; say("без урона от падения: {moon}"); e.cancel() }
+}

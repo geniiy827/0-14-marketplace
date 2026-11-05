@@ -7,6 +7,23 @@ import java.nio.file.Paths;
 public class Test {
     static double time = 1000;
     static java.util.Map<Integer, String> OPS = new java.util.HashMap<Integer, String>();
+    static int hooks = 0;
+    static final com.nova.client.mcmod.Machine FAKE = new com.nova.client.mcmod.Machine() {
+        public int base() { return 0x70000000; }
+        public int hook(int addr, int mode, int[] sites) { System.out.println("HOOK " + Integer.toHexString(addr) + " mode " + mode + " sites " + (sites == null ? 0 : sites.length)); return hooks++; }
+        public void unhook(int idx) { System.out.println("UNHOOK " + idx); }
+        public long call(int fn, int[] w) { System.out.println("CALL " + Integer.toHexString(fn) + " " + java.util.Arrays.toString(java.util.Arrays.copyOf(w, 6))); return Float.floatToIntBits(1.62f) & 0xffffffffL; }
+        public long callOrig(int idx, int[] w) { System.out.println("ORIG " + idx + " " + w[0] + " " + Float.intBitsToFloat(w[1]) + " " + Float.intBitsToFloat(w[2])); return Float.floatToIntBits(0.42f) & 0xffffffffL; }
+        public int peek(int addr, int kind) { return 42; }
+        public void poke(int addr, int kind, int v) { System.out.println("POKE " + Integer.toHexString(addr) + " " + v); }
+        public int alloc(int n) { return 0x5000; }
+        public void free(int p) { }
+        public int strNew(String s) { System.out.println("STR '" + s + "'"); return 0x6000; }
+        public String strGet(int p) { return "s"; }
+        public String cstr(int p) { return "c"; }
+        public int global(int which) { return 0x1000 + which; }
+        public java.io.InputStream symbols() throws java.io.IOException { return new java.io.FileInputStream(System.getProperty("syms")); }
+    };
     public static void main(String[] a) throws Exception {
         Class<?> c = Class.forName("com.nova.client.mcmod.ApiOps");
         for (java.lang.reflect.Field f : c.getDeclaredFields()) { f.setAccessible(true); OPS.put(f.getInt(null), f.getName()); }
@@ -34,6 +51,8 @@ public class Test {
             public String loadData(String id) { return null; }
             public void saveData(String id, String j) { System.out.println("SAVE " + id + ": " + j); }
             public String prelude() { return prelude; }
+            public com.nova.client.mcmod.Machine machine() { return FAKE; }
+            public java.util.List<String[]> liveScan() { return null; }
         });
         for (int i = 1; i < a.length; i++)
             rt.load("test" + i, "Test" + i, Paths.get(a[i]).getFileName().toString(), new String(Files.readAllBytes(Paths.get(a[i])), "UTF-8"));
@@ -42,5 +61,13 @@ public class Test {
         System.out.println("break cancel=" + rt.event(4, null, new double[]{1, 2, 3, 1, 0, 278, 1}));
         System.out.println("chat cancel=" + rt.event(9, "/heal", null));
         System.out.println("chat cancel=" + rt.event(9, "hello", null));
+        rt.event(4, "/fast", null); rt.event(4, "/moon", null);
+        int[] tw = new int[12]; tw[0] = 0x1001; tw[1] = Float.floatToIntBits(0.5f); tw[2] = Float.floatToIntBits(1f);
+        long r0 = rt.onHook(0, tw);
+        int[] fw = new int[12]; fw[0] = 0x1001; fw[1] = Float.floatToIntBits(5f);
+        System.out.println("fall " + rt.onHook(2, fw));
+        long r = rt.onHook(1, new int[]{0x1001,0,0,0,0,0,0,0,0,0,0,0});
+        System.out.println("hook result " + Float.intBitsToFloat((int) r));
+        System.out.println("console cancel=" + rt.event(4, "> mem.hex(mc.player()) + \" \" + mc.info(\"LocalPlayer::travel\")", null));
     }
 }

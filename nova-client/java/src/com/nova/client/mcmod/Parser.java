@@ -11,6 +11,7 @@ import com.nova.client.mcmod.Lexer.Tok;
  *
  * top level:  on world.join(e) { }      every 20 ticks { }   every 2 seconds { }
  *             fn name(a, b = 1) { }     override chat.send(text) { original(text) }
+ *             hook "Player::getEyeHeight" float (self) { return original() * 0.5 }
  *             item name { key: value }  (declarations)      any statement
  * statements: var x = 1   x += 2   if c { } else if c { } else { }   while c { }
  *             for i in 1..10 { }   for x in list { }   return x   break   continue
@@ -89,6 +90,17 @@ final class Parser {
                 String name = ident("имя функции");
                 Lambda fn = lambdaRest(ns + "." + name, line);
                 prog.overrides.add(new OverrideDecl(ns, name, fn));
+            } else if (k.is("hook") && peek(1).type == Lexer.STR) {
+                next();
+                String target = next().text;
+                char ret = 0;
+                if (peek().type == Lexer.ID) {
+                    String t = next().text;
+                    if (t.equals("float")) ret = 'f'; else if (t.equals("double")) ret = 'd'; else if (t.equals("int")) ret = 'i';
+                    else if (t.equals("void")) ret = 'v'; else throw new ScriptError("тип результата: float, int, double или void", line);
+                }
+                Lambda fn = lambdaRest(target, line);
+                prog.hooks.add(new HookDecl(target, ret, fn));
             } else if (k.is("fn") && peek(1).type == Lexer.ID) {
                 next();
                 String name = ident("имя функции");
