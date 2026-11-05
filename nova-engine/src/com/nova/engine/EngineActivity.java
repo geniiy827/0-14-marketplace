@@ -174,15 +174,42 @@ public final class EngineActivity extends Activity {
                 getWindow().setAttributes(lp);
             } catch (Throwable ignored) { }
         }
+        final java.io.File crash = new java.io.File(getFilesDir(), "crash.txt");
+        if (crash.exists()) {                                    // the last crash, so it can be sent
+            try {
+                java.io.FileInputStream fi = new java.io.FileInputStream(crash);
+                byte[] bb = new byte[(int) crash.length()];
+                int rd = 0; while (rd < bb.length) { int k = fi.read(bb, rd, bb.length - rd); if (k < 0) break; rd += k; }
+                fi.close();
+                String txt = new String(bb, 0, rd, "UTF-8");
+                crash.delete();
+                final android.widget.TextView tv = new android.widget.TextView(this);
+                tv.setText(txt); tv.setTextIsSelectable(true); tv.setPadding(24, 24, 24, 24);
+                new android.app.AlertDialog.Builder(this).setTitle("Прошлый вылет").setView(tv).setPositiveButton("OK", null).show();
+            } catch (Exception ignored) { }
+        }
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            public void uncaughtException(Thread th, Throwable e) {
+                try {
+                    java.io.StringWriter sw = new java.io.StringWriter();
+                    e.printStackTrace(new java.io.PrintWriter(sw));
+                    java.io.FileWriter fw = new java.io.FileWriter(crash);
+                    fw.write(Game.VERSION + " thread " + th.getName() + "\n" + sw);
+                    fw.close();
+                } catch (Exception ignored) { }
+                if (prev != null) prev.uncaughtException(th, e);
+            }
+        });
         game = new Game(this);
         game.filesDir = getFilesDir();
-        game.playerName = prefs.getString("name", "Steve");
         game.ui = new Game.Ui() {
             public void askServer(final com.nova.engine.ui.PlayScreen s) {
                 runOnUiThread(new Runnable() { public void run() { serverDialog(s); } });
             }
         };
         prefs = getSharedPreferences("nova", 0);
+        game.playerName = prefs.getString("name", "Steve");
         if (prefs.contains("seed")) game.startSeed = prefs.getInt("seed", 0);
         else prefs.edit().putInt("seed", game.startSeed).apply();
         view = new GLSurfaceView(this) {

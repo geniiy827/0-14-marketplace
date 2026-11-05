@@ -373,3 +373,5 @@
 - Add server = Android dialog (with nickname field) for now; TODO 1:1 AddExternalServerScreen.
 - TODO next: skin picker 1:1 + custom skins, chat screen 1:1 (input), settings (nick), remote players/entities
   render (AddPlayer/AddEntity/MoveEntity), remaining blocks + collision shapes, survival inventory sync.
+
+## beta23b: launch crash (prefs used before init for the nickname), INTERNET permission was missing, GL-thread errors shown instead of crashing, last crash shown on next start

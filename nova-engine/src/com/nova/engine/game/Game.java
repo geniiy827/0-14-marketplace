@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta23";
+    public static final String VERSION = "NOVA Engine beta23b";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -255,6 +255,19 @@ public final class Game implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 unused) {
+        try { frame(); }
+        catch (Throwable t) {
+            // never take the app down from the GL thread: show what broke (and drop a server session)
+            android.util.Log.e("NOVA", "frame", t);
+            StringBuilder sb = new StringBuilder(t.toString());
+            StackTraceElement[] st = t.getStackTrace();
+            for (int i = 0; i < Math.min(3, st.length); i++) sb.append("  @").append(st[i].getClassName().replace("com.nova.engine.", "")).append(':').append(st[i].getLineNumber());
+            error = sb.toString();
+            if (net != null) { try { endNet(error); } catch (Throwable ignored) { net = null; inMenu = true; } }
+        }
+    }
+
+    private void frame() {
         if (!ready) {
             GLES30.glClearColor(0.1f, 0.1f, 0.15f, 1);
             GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
