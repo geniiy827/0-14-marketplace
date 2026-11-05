@@ -379,3 +379,19 @@
 ## RE reference (re014)
 - `nova ref-build` -> /home/claude/work/re014 (INDEX.md): per-class annotated .s (floats, strings, GOT, this+offsets,
   vtable slots, callers), fields/, vtables/, packets.md, calls.tsv, strings. Generators in engine/tools/re. Not committed.
+
+## beta24 (entities from the server, chat 1:1)
+- Entities: AddPlayer / AddEntity / AddItemEntity / Remove* / MoveEntity (lerpTo 3 ticks) / MovePlayer of others /
+  SetEntityMotion / EntityEvent (hurt, death) / Animate (swing) / SetEntityData (name tag) / MobEquipment / PlayerList (skins).
+- Models: skins/Base/{Vanilla,Mobs}.json via Geometry rules (inherit "a:b", reset, pivot, rotation, inflate, mirror,
+  neverRender; ModelPart::load conversion), texture size = geometry's or the texture's own; code-built models
+  (chicken, rabbit, slime, magma, silverfish, blaze) from native_models.json. EntityType ids from EntityTypeToString (emulated).
+- setupAnim: Humanoid (constants checked), Zombie arms, Quadruped (body PI/2 checked), Creeper, Spider, Chicken legs; wolf / ocelot body
+  from Java (not checked). Death roll, hurt red overlay, fog, light at the entity.
+- Items on the ground: bobbing 1/4 block cube; falling blocks full cube. Name tags of players.
+- Tap a mob/player on a server: InteractPacket action 2 (attack).
+- Chat: hud_screen.json chat_grid 1:1 (top left, 240x10 rows, 9 s + 1 s in_quart fade); chat button left of pause,
+  input via the system keyboard (ChatScreen layout itself not ported yet).
+- [ ] check on device: player y (feet + 1.62), mob y on Genisys/Nukkit (Nukkit adds height/2 + 0.1 to mob moves!)
+- [ ] held item in hand of other players, armor, sheep colour, villager professions, baby mobs, slime size.
+- [ ] ChatScreen 1:1 (setupPositions: back button 20x20 top right, send button, keyboard toggle).

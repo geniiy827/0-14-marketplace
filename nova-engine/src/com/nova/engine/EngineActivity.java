@@ -16,6 +16,30 @@ public final class EngineActivity extends Activity {
     private boolean dialogOpen;
 
     /** AddExternalServerScreen: server name, address, port */
+    /** ChatScreen: the system keyboard on a text box, send -> TextPacket (chat), "/..." goes as a command text too */
+    private void chatDialog() {
+        final android.widget.EditText in = new android.widget.EditText(this);
+        in.setSingleLine(true);
+        in.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEND);
+        final android.app.AlertDialog d = new android.app.AlertDialog.Builder(this).setView(in)
+                .setPositiveButton("Отправить", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface di, int w) { send(in.getText().toString()); }
+                })
+                .setNegativeButton("Назад", null).create();
+        in.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
+            public boolean onEditorAction(android.widget.TextView v, int id, android.view.KeyEvent ev) { send(in.getText().toString()); d.dismiss(); return true; }
+        });
+        d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        d.show();
+        in.requestFocus();
+    }
+
+    private void send(final String t) {
+        final String m = t.trim();
+        if (m.isEmpty()) return;
+        view.queueEvent(new Runnable() { public void run() { game.say(m); } });
+    }
+
     private void serverDialog(final com.nova.engine.ui.PlayScreen s) {
         android.widget.LinearLayout l = new android.widget.LinearLayout(this);
         l.setOrientation(android.widget.LinearLayout.VERTICAL);
@@ -217,6 +241,7 @@ public final class EngineActivity extends Activity {
             public boolean onTouchEvent(MotionEvent e) {
                 if (game.inMenu) { game.menuTouch(e); return true; }
                 if (game.controls.menuHit(e)) { worldDialog(); return true; }
+                if (game.onServer() && game.controls.chatHit(e)) { chatDialog(); return true; }
                 return game.controls.onTouch(e);
             }
         };

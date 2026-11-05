@@ -26,6 +26,8 @@ public final class Controls {
     public float slot, barX, barY;
     /** world / pause button (top right, where 0.14 has pause) */
     public final float[] menuR = new float[4];
+    /** chat button (on a server), left of pause */
+    public final float[] chatR = new float[4];
 
     // ---- state for the game
     public float moveF, moveS;
@@ -96,6 +98,15 @@ public final class Controls {
         barX = (w - slot * 9) / 2; barY = h - slot - 4 * dp;
         float m = slot * 0.9f;
         rect(menuR, w - m - 6 * dp, 6 * dp, w - 6 * dp, 6 * dp + m);
+        rect(chatR, menuR[0] - m - 4 * dp, menuR[1], menuR[0] - 4 * dp, menuR[3]);
+    }
+
+    /** UI thread: a finger going down on the chat button */
+    public synchronized boolean chatHit(MotionEvent e) {
+        int a = e.getActionMasked();
+        if (a != MotionEvent.ACTION_DOWN && a != MotionEvent.ACTION_POINTER_DOWN) return false;
+        int idx = e.getActionIndex();
+        return in(chatR, e.getX(idx), e.getY(idx));
     }
 
     /** UI thread: true when this event is a finger going down on the world button */

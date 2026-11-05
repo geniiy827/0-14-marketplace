@@ -31,6 +31,10 @@ public final class NetGame implements RakNet.Listener {
     public boolean started, spawned;
     public final java.util.ArrayList<String[]> chat = new java.util.ArrayList<String[]>();   // {text, time}
     private final byte[] skin;
+    /** entities shown by the server, by runtime id (GL thread only) */
+    public final java.util.HashMap<Long, Ent> ents = new java.util.HashMap<Long, Ent>();
+    /** PlayerListPacket entries: uuid -> {name, skinName, skin} */
+    private final java.util.HashMap<String, Object[]> plist = new java.util.HashMap<String, Object[]>();
 
     public NetGame(String host, int port, String name, byte[] skin) {
         this.host = host; this.port = port; this.name = name; this.skin = skin;
@@ -118,10 +122,105 @@ public final class NetGame implements RakNet.Listener {
                 }
                 case 0x9d: {                                        // MovePlayer
                     long e = r.i64();
-                    float x = r.f32(), y = r.f32(), z = r.f32(), yaw = r.f32(); r.f32(); float pitch = r.f32();
+                    float x = r.f32(), y = r.f32(), z = r.f32(), yaw = r.f32(), head = r.f32(), pitch = r.f32();
                     if (e == eid || e == 0) {
                         p.x = p.px = x; p.y = p.py = y - Player.EYE; p.z = p.pz = z;
                         p.yaw = yaw - 180f; p.pitch = pitch; p.mx = p.my = p.mz = 0;
+                    } else {
+                        Ent en = ents.get(e);
+                        if (en != null) en.lerpTo(x, y, z, yaw, head, pitch);
+                    }
+                    break;
+                }
+                case 0x96: {                                        // AddPlayer: uuid, name, eid, pos, motion, yaw, head yaw, pitch, item, data
+                    long hi = r.i64(), lo = r.i64();
+                    String n = r.str();
+                    long e = r.i64();
+                    float x = r.f32(), y = r.f32(), z = r.f32(), mx = r.f32(), my = r.f32(), mz = r.f32();
+                    float yaw = r.f32(), head = r.f32(), pitch = r.f32();
+                    Ent en = new Ent(e, Ent.PLAYER);
+                    en.name = n; en.uuidHi = hi; en.uuidLo = lo;
+                    en.set(x, y, z, yaw, head, pitch);
+                    int[] it = slot(r); en.itemId = it[0]; en.itemData = it[1];
+                    meta(r, en);
+                    Object[] pl = plist.get(hi + ":" + lo);
+                    if (pl != null) { en.skinName = (String) pl[1]; en.skin = (byte[]) pl[2]; }
+                    if (e != eid) ents.put(e, en);
+                    break;
+                }
+                case 0x97: { long e = r.i64(); ents.remove(e); break; }       // RemovePlayer: eid, uuid
+                case 0x98: {                                        // AddEntity: eid, type, pos, motion, yaw, pitch, data, links
+                    long e = r.i64(); int type = r.i32();
+                    float x = r.f32(), y = r.f32(), z = r.f32(), mx = r.f32(), my = r.f32(), mz = r.f32();
+                    float yaw = r.f32(), pitch = r.f32();
+                    Ent en = new Ent(e, type & 0xff);
+                    en.set(x, y, z, yaw, yaw, pitch);
+                    en.mx = mx; en.my = my; en.mz = mz;
+                    meta(r, en);
+                    ents.put(e, en);
+                    break;
+                }
+                case 0x99: ents.remove(r.i64()); break;             // RemoveEntity
+                case 0x9a: {                                        // AddItemEntity: eid, item, pos, motion
+                    long e = r.i64();
+                    int[] it = slot(r);
+                    float x = r.f32(), y = r.f32(), z = r.f32(), mx = r.f32(), my = r.f32(), mz = r.f32();
+                    Ent en = new Ent(e, Ent.ITEM);
+                    en.itemId = it[0]; en.itemData = it[1]; en.itemCount = it[2];
+                    en.set(x, y, z, 0, 0, 0); en.mx = mx; en.my = my; en.mz = mz;
+                    ents.put(e, en);
+                    break;
+                }
+                case 0x9b: { r.i64(); ents.remove(r.i64()); break; }    // TakeItemEntity: target, item eid
+                case 0x9c: {                                        // MoveEntity: count, {eid, pos, yaw, head yaw, pitch}
+                    int c = r.i32();
+                    for (int i = 0; i < c && r.left() >= 32; i++) {
+                        long e = r.i64();
+                        float x = r.f32(), y = r.f32(), z = r.f32(), yaw = r.f32(), head = r.f32(), pitch = r.f32();
+                        Ent en = ents.get(e);
+                        if (en != null) en.lerpTo(x, y, z, yaw, head, pitch);
+                    }
+                    break;
+                }
+                case 0xae: {                                        // SetEntityMotion: count, {eid, motion}
+                    int c = r.i32();
+                    for (int i = 0; i < c && r.left() >= 20; i++) {
+                        long e = r.i64(); float mx = r.f32(), my = r.f32(), mz = r.f32();
+                        Ent en = ents.get(e);
+                        if (en != null) { en.mx = mx; en.my = my; en.mz = mz; }
+                    }
+                    break;
+                }
+                case 0xa4: {                                        // EntityEvent: eid, event (2 hurt, 3 death)
+                    long e = r.i64(); int ev = r.u8();
+                    Ent en = ents.get(e);
+                    if (en != null) { if (ev == 2) en.hurt = 10; else if (ev == 3) { en.hurt = 10; if (en.death == 0) en.death = 1; } }
+                    break;
+                }
+                case 0xb2: {                                        // Animate: action (1 swing), eid
+                    int act = r.u8(); long e = r.i64();
+                    Ent en = ents.get(e);
+                    if (en != null && act == 1) en.swing();
+                    break;
+                }
+                case 0xad: { long e = r.i64(); Ent en = ents.get(e); if (en != null) meta(r, en); break; }   // SetEntityData
+                case 0xa7: {                                        // MobEquipment: eid, item, slot, selected
+                    long e = r.i64(); Ent en = ents.get(e);
+                    int[] it = slot(r);
+                    if (en != null) { en.itemId = it[0]; en.itemData = it[1]; }
+                    break;
+                }
+                case 0xc3: {                                        // PlayerList: type (0 add, 1 remove), count, entries
+                    int t = r.u8(), c = r.i32();
+                    for (int i = 0; i < c && r.left() >= 16; i++) {
+                        long hi = r.i64(), lo = r.i64();
+                        if (t == 0) {
+                            long e = r.i64(); String n = r.str(), sn = r.str();
+                            int len = r.u16();
+                            byte[] sk = len > 0 && len <= r.left() ? r.bytes(len) : null;
+                            plist.put(hi + ":" + lo, new Object[]{n, sn, sk});
+                            for (Ent en : ents.values()) if (en.uuidHi == hi && en.uuidLo == lo) { en.skinName = sn; en.skin = sk; }
+                        } else plist.remove(hi + ":" + lo);
                     }
                     break;
                 }
@@ -142,6 +241,55 @@ public final class NetGame implements RakNet.Listener {
                 default: break;
             }
         } catch (Exception ex) { android.util.Log.w("NOVA", "packet " + Integer.toHexString(id), ex); }
+    }
+
+    /** PacketUtil::readItemInstance: id u16; if > 0: count u8, aux u16, nbt length u16 + nbt -> {id, aux, count} */
+    private static int[] slot(RakNet.Rd r) {
+        int id = (short) r.u16();
+        if (id <= 0) return new int[]{0, 0, 0};
+        int cnt = r.u8(), aux = (short) r.u16();
+        int nl = r.u16();
+        if (nl > r.left()) nl = ((nl & 255) << 8) | (nl >> 8);
+        if (nl <= r.left()) r.skip(nl);
+        return new int[]{id, aux < 0 ? 0 : aux, cnt};
+    }
+
+    /**
+     * SynchedEntityData::unpack: items (type << 5 | key) until 0x7f; byte, short, int, float, string (u16 + bytes),
+     * slot (id, aux, count), pos (3 ints), long; little endian. Keys: 0 flags, 2 name tag, 3 show name tag,
+     * 20 falling block (id | data << 8).
+     */
+    private static void meta(RakNet.Rd r, Ent e) {
+        while (r.left() > 0) {
+            int b = r.u8();
+            if (b == 0x7f) break;
+            int type = b >> 5, key = b & 31;
+            int v = 0; String str = null;
+            switch (type) {
+                case 0: v = (byte) r.u8(); break;
+                case 1: v = (short) (r.u8() | r.u8() << 8); break;
+                case 2: v = r.u8() | r.u8() << 8 | r.u8() << 16 | r.u8() << 24; break;
+                case 3: r.skip(4); break;
+                case 4: { int l = r.u8() | r.u8() << 8; byte[] sb = r.bytes(Math.min(l, r.left())); try { str = new String(sb, "UTF-8"); } catch (Exception ex) { str = ""; } break; }
+                case 5: r.skip(5); break;
+                case 6: r.skip(12); break;
+                case 7: r.skip(8); break;
+                default: return;
+            }
+            if (key == 0 && type == 0) e.flags = v;
+            else if (key == 2 && str != null) e.name = str;
+            else if (key == 3) e.showName = v != 0;
+            else if (key == 20 && type == 2) { e.itemId = v & 0xff; e.itemData = (v >> 8) & 15; }
+        }
+    }
+
+    /** advance the entities one tick (Game tick loop) */
+    public void tickEntities(World w) { for (Ent e : ents.values()) e.tick(w); }
+
+    /** InteractPacket: action 2 = attack (left click), target eid */
+    public void attack(long target) {
+        RakNet.Buf b = new RakNet.Buf(); b.u8(0xa9); b.u8(2); b.i64(target); send(b);
+        swing();
     }
 
     private void text(RakNet.Rd r) {

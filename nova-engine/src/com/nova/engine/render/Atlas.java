@@ -194,26 +194,35 @@ public final class Atlas {
 
     // ------------------------------------------------------------------ TGA
     private boolean decodeTga(byte[] d) {
+        int[] r = tga(d);
+        if (r == null) return false;
+        width = r[0]; height = r[1];
+        pixels = java.util.Arrays.copyOfRange(r, 2, r.length);
+        return true;
+    }
+
+    /** uncompressed / RLE true-colour TGA -> {w, h, ARGB pixels top-down...} or null */
+    public static int[] tga(byte[] d) {
         int idLen = d[0] & 255, type = d[2] & 255;
         int w = (d[12] & 255) | (d[13] & 255) << 8, h = (d[14] & 255) | (d[15] & 255) << 8;
         int bpp = d[16] & 255, desc = d[17] & 255;
-        if ((type != 2 && type != 10) || (bpp != 32 && bpp != 24)) return false;
+        if ((type != 2 && type != 10) || (bpp != 32 && bpp != 24)) return null;
         int bytes = bpp / 8, p = 18 + idLen, n = w * h;
-        int[] px = new int[n];
+        int[] px = new int[n + 2];
+        px[0] = w; px[1] = h;
         int i = 0;
         while (i < n && p < d.length) {
-            if (type == 2) { px[i++] = pix(d, p, bytes); p += bytes; continue; }
+            if (type == 2) { px[2 + i++] = pix(d, p, bytes); p += bytes; continue; }
             int hdr = d[p++] & 255, cnt = (hdr & 127) + 1;
-            if ((hdr & 128) != 0) { int c = pix(d, p, bytes); p += bytes; for (int k = 0; k < cnt && i < n; k++) px[i++] = c; }
-            else for (int k = 0; k < cnt && i < n; k++) { px[i++] = pix(d, p, bytes); p += bytes; }
+            if ((hdr & 128) != 0) { int c = pix(d, p, bytes); p += bytes; for (int k = 0; k < cnt && i < n; k++) px[2 + i++] = c; }
+            else for (int k = 0; k < cnt && i < n; k++) { px[2 + i++] = pix(d, p, bytes); p += bytes; }
         }
         if ((desc & 0x20) == 0) {                       // bottom-left origin: flip
-            int[] f = new int[n];
-            for (int y = 0; y < h; y++) System.arraycopy(px, (h - 1 - y) * w, f, y * w, w);
+            int[] f = new int[n + 2]; f[0] = w; f[1] = h;
+            for (int y = 0; y < h; y++) System.arraycopy(px, 2 + (h - 1 - y) * w, f, 2 + y * w, w);
             px = f;
         }
-        pixels = px; width = w; height = h;
-        return true;
+        return px;
     }
 
     private static int pix(byte[] d, int p, int bytes) {

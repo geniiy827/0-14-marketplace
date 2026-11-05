@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta23b";
+    public static final String VERSION = "NOVA Engine beta24";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -42,6 +42,10 @@ public final class Game implements GLSurfaceView.Renderer {
     /** the title screen is shown until Play */
     public volatile boolean inMenu = true;
     private final com.nova.engine.render.HandRenderer hand = new com.nova.engine.render.HandRenderer();
+    private final com.nova.engine.render.EntityRenderer entR = new com.nova.engine.render.EntityRenderer();
+    private final float[] vpRel = new float[16];
+    private double camX, camY, camZ;
+    private float lastA;
     private com.nova.engine.ui.StartMenu menu;
     private final java.util.ArrayList<float[]> menuEvents = new java.util.ArrayList<float[]>();
 
@@ -73,6 +77,9 @@ public final class Game implements GLSurfaceView.Renderer {
     public int radius() { return radius; }
 
     public boolean onServer() { return net != null; }
+
+    /** chat line typed by the player (GL thread) */
+    public void say(String m) { if (net != null) net.say(m.length() > 255 ? m.substring(0, 255) : m); }
 
     private volatile boolean pendingLeave;
 
@@ -201,6 +208,7 @@ public final class Game implements GLSurfaceView.Renderer {
             wr.texW = atlas.width; wr.texH = atlas.height; wr.texLevels = atlas.mipLevels;
             sky.init(atlas.gameAssets);
             hand.init(atlas.gameAssets);
+            try { entR.init(ctx.getAssets()); } catch (Exception e) { android.util.Log.w("NOVA", "entities", e); }
             hud.init(atlas.gameAssets);
             guiTex = hud.loadTex(atlas.gameAssets, "images/gui/gui.png");
             iconsTex = hud.loadTex(atlas.gameAssets, "images/gui/icons.png");
@@ -317,6 +325,7 @@ public final class Game implements GLSurfaceView.Renderer {
         while (tickAcc >= 50_000_000L) {
             boolean hold = net != null && (!net.spawned || world.ready((int) Math.floor(player.x) >> 4, (int) Math.floor(player.z) >> 4) == null);
             if (!hold) player.tick(world);
+            if (net != null) net.tickEntities(world);
             world.time++; levelTicks++; tickAcc -= 50_000_000L;
         }
         float a = tickAcc / 50_000_000f;
@@ -380,6 +389,15 @@ public final class Game implements GLSurfaceView.Renderer {
         } else nextDestroy = 0;
         int pl = c.takePlaces(touchXY);
         for (int i = 0; i < pl && i < 16; i++) {
+            if (net != null) {                                   // tap on a mob / player: GameMode::attack -> InteractPacket
+                screenDir(touchXY[i * 2], touchXY[i * 2 + 1], pickDir);
+                Ent hit = pickEntity(player.ex(1), player.ey(1), player.ez(1), pickDir[0], pickDir[1], pickDir[2], 3.5);
+                if (hit != null) {
+                    pick.cast(world, player.ex(1), player.ey(1), player.ez(1), pickDir[0], pickDir[1], pickDir[2], 6);
+                    double bx = pick.x + 0.5 - player.ex(1), by = pick.y + 0.5 - player.ey(1), bz = pick.z + 0.5 - player.ez(1);
+                    if (!pick.hit || Math.sqrt(bx * bx + by * by + bz * bz) - 0.5 > entHitD) { net.attack(hit.id); player.swing(); continue; }
+                }
+            }
             if (!pickAt(touchXY[i * 2], touchXY[i * 2 + 1])) continue;
             // GameMode::useItemOn: not sneaking -> Block::use of the aimed block first; true = done (no placing)
             if (!player.sneak && useBlock(pick.x, pick.y, pick.z)) {
@@ -638,6 +656,13 @@ public final class Game implements GLSurfaceView.Renderer {
         GLES30.glEnable(GLES30.GL_CULL_FACE);
         float fogStart = underwater ? 0f : fogDist[1], fogEnd = underwater ? 10f : fogDist[2];
         wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, fogStart, fogEnd);
+        Matrix.multiplyMM(vpRel, 0, proj, 0, skyRot, 0);
+        camX = ex; camY = ey; camZ = ez; lastA = a;
+        if (net != null && !net.ents.isEmpty()) {                 // EntityRenderDispatcher after the opaque terrain
+            entR.render(net.ents.values(), vpRel, ex, ey, ez, a, entLight, fog, fogStart, fogEnd, atlas);
+            GLES30.glEnable(GLES30.GL_DEPTH_TEST);
+            GLES30.glDepthFunc(GLES30.GL_LEQUAL);
+        }
         if (!underwater) sky.renderClouds(proj, skyRot, ex, ey, ez, levelTicks, a, time, fogDist[0], sunGlare);
         if (hl) drawHighlight();
         sky.lightColor(world.lightPair((int) Math.floor(player.x), (int) Math.floor(ey), (int) Math.floor(player.z)), hand.tile);
@@ -645,9 +670,63 @@ public final class Game implements GLSurfaceView.Renderer {
         drawHud();
     }
 
+    private final com.nova.engine.render.EntityRenderer.Light entLight = new com.nova.engine.render.EntityRenderer.Light() {
+        public void color(double x, double y, double z, float[] out) {
+            sky.lightColor(world.lightPair((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z)), out);
+        }
+    };
+
+    /** EntityRenderer::renderNameTag for the players: white text on black 25 %, 0.016666668 * 1.6 blocks per pixel */
+    private void drawNameTags() {
+        if (net == null) return;
+        float a = lastA;
+        for (Ent e : net.ents.values()) {
+            if (e.type != Ent.PLAYER || e.name == null || e.name.isEmpty() || !e.showName) continue;
+            double x = e.ox + (e.x - e.ox) * a, y = e.oy + (e.y - e.oy) * a - e.heightOffset(), z = e.oz + (e.z - e.oz) * a;
+            double dx = x - camX, dy = y + 1.8 + 0.5 - camY, dz = z - camZ;
+            double d2 = dx * dx + dy * dy + dz * dz;
+            if (d2 > 64 * 64) continue;
+            float[] sp = entR.project(vpRel, (float) dx, (float) dy, (float) dz, width, height);
+            if (sp == null) continue;
+            float k = 0.016666668f * 1.6f * proj[5] * height / 2f / sp[2];
+            if (k < 0.5f) k = 0.5f;
+            String n = e.name;
+            float tw = hud.fontWidth(n) * k;
+            hud.rect(sp[0] - tw / 2 - k, sp[1] - k, tw + 2 * k, 9 * k, 0x40000000);
+            hud.fontText(n, sp[0] - tw / 2, sp[1], k, 0xFFFFFFFF, false);
+        }
+    }
+
+    /** the closest server entity along a ray (AABB test), within maxD; sets entHitD */
+    private double entHitD;
+    private Ent pickEntity(double ox, double oy, double oz, float dx, float dy, float dz, double maxD) {
+        if (net == null) return null;
+        Ent best = null; double bd = maxD;
+        for (Ent e : net.ents.values()) {
+            if (e.type == Ent.ITEM || e.death > 0) continue;
+            float[] sz = com.nova.engine.render.EntityRenderer.size(e.type);
+            double fy = e.y - e.heightOffset();
+            double x0 = e.x - sz[0] / 2 - ox, x1 = e.x + sz[0] / 2 - ox, y0 = fy - oy, y1 = fy + sz[1] - oy, z0 = e.z - sz[0] / 2 - oz, z1 = e.z + sz[0] / 2 - oz;
+            double tmin = 0, tmax = bd;
+            double[] lo = {x0, y0, z0}, hi = {x1, y1, z1}; float[] d = {dx, dy, dz};
+            boolean ok = true;
+            for (int i = 0; i < 3 && ok; i++) {
+                if (Math.abs(d[i]) < 1e-6) { if (lo[i] > 0 || hi[i] < 0) ok = false; continue; }
+                double t1 = lo[i] / d[i], t2 = hi[i] / d[i];
+                if (t1 > t2) { double t = t1; t1 = t2; t2 = t; }
+                tmin = Math.max(tmin, t1); tmax = Math.min(tmax, t2);
+                if (tmin > tmax) ok = false;
+            }
+            if (ok && tmin < bd) { bd = tmin; best = e; }
+        }
+        entHitD = bd;
+        return best;
+    }
+
     private void drawHud() {
         Controls c = controls;
         hud.begin(width, height);
+        drawNameTags();
         float d = density;
         // crosshair
         // no crosshair in touch mode (0.14 picks under the finger)
@@ -689,28 +768,30 @@ public final class Game implements GLSurfaceView.Renderer {
         progressRing(c);
         // info
         float ts = 8 * d;
+        float dbgY = net != null ? height * 0.4f : 0;       // under the chat on a server
         button(controls.menuR[0], controls.menuR[1], controls.menuR[2] - controls.menuR[0], "| |", false);
-        hud.text(VERSION + "   seed " + seed(), d * 6, d * 6, ts, 0xFF66F2E0);
-        hud.text(fps + " fps  " + wr.drawnSections + " sec  " + world.chunks.size() + " ch", d * 6, d * 6 + ts * 1.3f, ts, 0xFFFFFFFF);
-        hud.text(String.format(java.util.Locale.US, "%.1f %.1f %.1f", player.x, player.y, player.z), d * 6, d * 6 + ts * 2.6f, ts, 0xFFFFFFFF);
-        hud.text("textures: " + atlas.source + "   biome: " + String.valueOf(com.nova.engine.world.Biomes.NAME[world.biome((int) Math.floor(player.x), (int) Math.floor(player.z))]), d * 6, d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);
+        if (net != null) button(controls.chatR[0], controls.chatR[1], controls.chatR[2] - controls.chatR[0], "...", false);
+        hud.text(VERSION + "   seed " + seed(), d * 6, dbgY + d * 6, ts, 0xFF66F2E0);
+        hud.text(fps + " fps  " + wr.drawnSections + " sec  " + (net != null ? net.ents.size() + " ent  " : "") + world.chunks.size() + " ch", d * 6, dbgY + d * 6 + ts * 1.3f, ts, 0xFFFFFFFF);
+        hud.text(String.format(java.util.Locale.US, "%.1f %.1f %.1f", player.x, player.y, player.z), d * 6, dbgY + d * 6 + ts * 2.6f, ts, 0xFFFFFFFF);
+        hud.text("textures: " + atlas.source + "   biome: " + String.valueOf(com.nova.engine.world.Biomes.NAME[world.biome((int) Math.floor(player.x), (int) Math.floor(player.z))]), d * 6, dbgY + d * 6 + ts * 3.9f, ts, 0xFFB0B0B0);
         if (ray.hit) hud.text(Blocks.name[world.get(ray.x, ray.y, ray.z)] + "", width / 2f + d * 12, height / 2f + d * 6, ts, 0xFFFFFFFF);
         if (error != null) hud.text(error, d * 6, height / 2f, ts, 0xFFFF6060);
         NetGame ng = net;
         if (ng != null) {
-            // Gui chat: newest at the bottom above the hotbar, each line 9 px on black 50%, gone after 10 s
+            // hud_screen.json chat_grid: top left, offset (0, 10), rows chat_grid_item 240 x 10 in message order:
+            // label (top left, shadow) on gui/newgui/Black.png alpha 0.5; anim: wait 9 s, then 1 s in_quart to 0
             float gs = com.nova.engine.ui.StartMenu.guiScale(Math.max(width, height), screenInches);
             long now = System.currentTimeMillis();
             java.util.List<String[]> lines = new java.util.ArrayList<String[]>();
-            synchronized (ng.chat) { for (int i = ng.chat.size() - 1; i >= 0 && lines.size() < 10; i--) lines.add(ng.chat.get(i)); }
-            float y = height - 48 * gs;
+            synchronized (ng.chat) { for (int i = ng.chat.size() - 1; i >= 0 && lines.size() < 20; i--) { if (now - Long.parseLong(ng.chat.get(i)[1]) > 10000) break; lines.add(0, ng.chat.get(i)); } }
+            float y = 10 * gs;
             for (String[] l : lines) {
-                long age = now - Long.parseLong(l[1]);
-                if (age > 10000) break;
-                float al = Math.min(1f, (10000 - age) / 1000f);
-                y -= 9 * gs;
-                hud.rect(2 * gs, y, 320 * gs, 9 * gs, ((int) (al * 128)) << 24);
-                hud.fontText(l[0], 4 * gs, y + 0.5f * gs, gs, ((int) (al * 255)) << 24 | 0xFFFFFF, true);
+                float age = (now - Long.parseLong(l[1])) / 1000f;
+                float t = Math.max(0f, Math.min(1f, age - 9f)), k = 1f - t * t * t * t;
+                hud.rect(0, y, 240 * gs, 10 * gs, ((int) (k * 0.5f * 255)) << 24);
+                hud.fontText(l[0], 0, y, gs, ((int) (k * 255)) << 24 | 0xFFFFFF, true);
+                y += 10 * gs;
             }
             if (!ng.spawned) {
                 String t = ng.started ? "Загрузка мира..." : "Подключение к " + ng.host + ":" + ng.port + "...";
