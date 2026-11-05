@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta21";
+    public static final String VERSION = "NOVA Engine beta21b";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -99,6 +99,8 @@ public final class Game implements GLSurfaceView.Renderer {
     private final ThreadLocal<Mesher> meshers = new ThreadLocal<Mesher>();
     private volatile java.util.Set<Long> decorating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
     private final ExecutorService decoThread = Executors.newSingleThreadExecutor();
+    /** light thread of its own: queued behind the decoration backlog it never got a turn */
+    private final ExecutorService lightThread = Executors.newSingleThreadExecutor();
     private volatile com.nova.engine.world.Decorator deco;
     private volatile java.util.Set<Long> generating = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
     private int width = 1, height = 1;
@@ -350,9 +352,11 @@ public final class Game implements GLSurfaceView.Renderer {
                 final java.util.Set<Long> gen = generating;
                 workers.execute(new Runnable() {
                     public void run() {
-                        Chunk c = new Chunk(cx, cz);
-                        wld.gen.terrain(c);
-                        wld.addTerrain(c);
+                        try {
+                            Chunk c = new Chunk(cx, cz);
+                            wld.gen.terrain(c);
+                            wld.addTerrain(c);
+                        } catch (Throwable t) { android.util.Log.e("NOVA", "terrain", t); }
                         gen.remove(k);
                     }
                 });
@@ -387,7 +391,7 @@ public final class Game implements GLSurfaceView.Renderer {
         // 15 blocks: a later spread only touches the border, the sections get rebuilt)
         if (lightBusy.get() == 0) {
             final java.util.ArrayList<Chunk> fill = new java.util.ArrayList<Chunk>(), spread = new java.util.ArrayList<Chunk>();
-            for (int r = 0; r <= radius + 1 && fill.size() + spread.size() < 6; r++) {
+            for (int r = 0; r <= radius + 1 && fill.size() + spread.size() < 24; r++) {
                 for (int dz = -r; dz <= r; dz++) for (int dx = -r; dx <= r; dx++) {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                     int cx = pcx + dx, cz = pcz + dz;
@@ -407,7 +411,7 @@ public final class Game implements GLSurfaceView.Renderer {
             final boolean edits = !world.lightEdits.isEmpty();
             if (!fill.isEmpty() || !spread.isEmpty() || edits) {
                 lightBusy.incrementAndGet();
-                decoThread.execute(new Runnable() {
+                lightThread.execute(new Runnable() {
                     public void run() {
                         try {
                             for (Chunk c : fill) { com.nova.engine.world.Light.fill(c); c.lit = 1; }
@@ -453,7 +457,8 @@ public final class Game implements GLSurfaceView.Renderer {
                         public void run() {
                             Mesher m = meshers.get();
                             if (m == null) { m = new Mesher(atlas.slotUv); meshers.set(m); }
-                            Mesher.Mesh mesh = m.build(wld, fcx, sy, fcz, ver);
+                            Mesher.Mesh mesh = null;
+                            try { mesh = m.build(wld, fcx, sy, fcz, ver); } catch (Throwable t) { android.util.Log.e("NOVA", "mesh", t); }
                             if (mesh != null) done.add(mesh);
                             else sec.building = false;
                         }
@@ -475,6 +480,7 @@ public final class Game implements GLSurfaceView.Renderer {
     private final com.nova.engine.render.Sky sky = new com.nova.engine.render.Sky();
     private final float[] skyRot = new float[16], cloudProj = new float[16], fogDist = new float[3], sunCol = new float[4];
     private long levelTicks;
+    private float sunGlare;
 
     private void render(float a) {
         boolean underwater = Blocks.kind[world.get((int) Math.floor(player.x), (int) Math.floor(player.ey(a)), (int) Math.floor(player.z))] == Blocks.LIQUID;
@@ -492,9 +498,14 @@ public final class Game implements GLSurfaceView.Renderer {
         } else {
             com.nova.engine.render.Sky.fogColor(fb, fog);
             com.nova.engine.render.Sky.sunrise(tod, sunCol);
-            float si = com.nova.engine.render.Sky.sunIntensity(tod, look) * sunCol[3];
+            float si = com.nova.engine.render.Sky.sunIntensity(tod, look, 0.35f) * sunCol[3];
             for (int i = 0; i < 3; i++) fog[i] = fog[i] * (1 - si) + sunCol[i] * si;
+            // LevelRenderer::startFrame: +0x1c9c = getSunIntensity(a, camera, 0.9); _skyDarkeningFactor = it * 0.2 is
+            // taken off the fog, sky and cloud colours (looking into the sun darkens the view)
+            sunGlare = com.nova.engine.render.Sky.sunIntensity(tod, look, 0.9f);
+            for (int i = 0; i < 3; i++) fog[i] = Math.max(0f, fog[i] - sunGlare * 0.2f);
         }
+        if (underwater) sunGlare = 0;
         float amb = com.nova.engine.render.Sky.ambient(ey);
         com.nova.engine.render.Sky.fogDistances(radius * 16, amb, underwater, fogDist);
         sky.updateLight(tod);
@@ -513,7 +524,7 @@ public final class Game implements GLSurfaceView.Renderer {
         Matrix.perspectiveM(cloudProj, 0, 70, (float) width / height, 0.5f, 5000f);
         if (!underwater) {
             int bx = (int) Math.floor(player.x), bz = (int) Math.floor(player.z);
-            sky.renderSky(cloudProj, skyRot, time, a, com.nova.engine.world.Biomes.TEMP[world.biome(bx, bz)], amb, fog);
+            sky.renderSky(cloudProj, skyRot, time, a, com.nova.engine.world.Biomes.TEMP[world.biome(bx, bz)], amb, fog, sunGlare);
         }
         Matrix.translateM(view, 0, -ex, -ey, -ez);
         Matrix.multiplyMM(mvp, 0, proj, 0, view, 0);
@@ -522,7 +533,7 @@ public final class Game implements GLSurfaceView.Renderer {
         GLES30.glEnable(GLES30.GL_CULL_FACE);
         float fogStart = underwater ? 0f : fogDist[1], fogEnd = underwater ? 10f : fogDist[2];
         wr.draw(mvp, ex, ey, ez, look, atlas.texture, fog, fogStart, fogEnd);
-        if (!underwater) sky.renderClouds(proj, skyRot, ex, ey, ez, levelTicks, a, time, fogDist[0]);
+        if (!underwater) sky.renderClouds(proj, skyRot, ex, ey, ez, levelTicks, a, time, fogDist[0], sunGlare);
         if (hl) drawHighlight();
         sky.lightColor(world.lightPair((int) Math.floor(player.x), (int) Math.floor(ey), (int) Math.floor(player.z)), hand.tile);
         hand.render(player, a, width, height);                 // InGamePlayScreen::_renderItemInHand

@@ -150,16 +150,16 @@ public final class Sky {
     /** LevelRenderer::getAmbientBrightness (its brightness field stays 0): below y 55 0.035, else 0.35 */
     public static float ambient(float eyeY) { return eyeY < 55f ? 0.035f : 0.35f; }
 
-    /** Dimension::getSunIntensity(a, entity, 0.35) with the view vector */
-    public static float sunIntensity(float tod, float[] look) {
+    /** Dimension::getSunIntensity(a, entity, k) with the view vector (fog: k 0.35, LevelRenderer::startFrame: k 0.9) */
+    public static float sunIntensity(float tod, float[] look, float k) {
         float ang = tod * TAU;
         float sx = 0.25f, sy = (float) Math.cos(ang), sz = (float) Math.sin(ang);
         float h = (look[0] * sx + look[1] * sy + look[2] * sz + 1f) * 0.5f;
         float fake = sy < -0.1f ? 0f : sy < 0 ? 1f + sy * 10f : 1f;     // _fakeSunHorizon
         h *= fake;
         if (h > 1f) return 1f;
-        if (h < 0.35f) h = 0.35f;
-        return (h - 0.35f) / 0.65f;
+        if (h < k) h = k;
+        return (h - k) / (1f - k);
     }
 
     // ------------------------------------------------------------------ rendering
@@ -315,12 +315,13 @@ public final class Sky {
      * LevelRenderer::renderSky. proj: the camera projection; rot: the view rotation (no translation).
      * sky: Dimension::getSkyColor at the camera (biome temperature); fog: this frame's fog colour.
      */
-    public void renderSky(float[] proj, float[] rot, long time, float a, float temperature, float ambient, float[] fog) {
+    public void renderSky(float[] proj, float[] rot, long time, float a, float temperature, float ambient, float[] fog, float glare) {
         float tod = timeOfDay(time, a);
         float[] sky = new float[3];
         biomeSky(temperature, sky);
         float bri = dayBrightness(tod);
-        float sr = sky[0] * bri * ambient, sg = sky[1] * bri * ambient, sb = sky[2] * bri * ambient;
+        float dk = glare * 0.2f;                                         // _skyDarkeningFactor
+        float sr = sky[0] * bri * ambient - dk, sg = sky[1] * bri * ambient - dk, sb = sky[2] * bri * ambient - dk;
         GLES30.glDisable(GLES30.GL_DEPTH_TEST);
         GLES30.glDepthMask(false);
         GLES30.glDisable(GLES30.GL_CULL_FACE);
@@ -355,6 +356,7 @@ public final class Sky {
             Matrix.setIdentityM(w, 0);
             Matrix.rotateM(w, 0, dg, 1, 0, 0);
             Matrix.translateM(w, 0, 0, 120, 0);
+            if (sun) Matrix.scaleM(w, 0, 1 + glare * 0.35f, 1 + glare * 0.35f, 1 + glare * 0.35f);   // _renderSunOrMoon
             Matrix.multiplyMM(t, 0, mvp, 0, w, 0);
             GLES30.glUniformMatrix4fv(uTexMvp, 1, false, t, 0);
             float s, u0, u1, v0, v1;
@@ -367,6 +369,12 @@ public final class Sky {
             // _buildSunAndMoonQuad: (-s,0,-s u1 v0) (s,0,-s u0 v0) (s,0,s u0 v1) (-s,0,s u1 v1)
             float[] q = {-s, 0, -s, u1, v0, s, 0, -s, u0, v0, s, 0, s, u0, v1, -s, 0, -s, u1, v0, s, 0, s, u0, v1, -s, 0, s, u1, v1};
             draw(pTex, GLES30.GL_TRIANGLES, q, 6, 5, true);
+            if (sun && glare > 0.2f) {                              // looking into it: twice more, colour x intensity
+                GLES30.glUniform4f(uTexCur, glare, glare, glare, 1);
+                GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 6);
+                GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 6);
+                GLES30.glUniform4f(uTexCur, 1, 1, 1, 1);
+            }
         }
         // stars: (OneMinusDstColor, One), rotated sunAngle
         float star = starBrightness(tod);
@@ -449,7 +457,7 @@ public final class Sky {
      * LevelRenderer::renderClouds. view: camera rotation only; cam: camera position; ticks: level ticks;
      * proj: a projection that reaches the clouds; far: RENDER_DISTANCE
      */
-    public void renderClouds(float[] proj, float[] rot, double camX, double camY, double camZ, long ticks, float a, long time, float far) {
+    public void renderClouds(float[] proj, float[] rot, double camX, double camY, double camZ, long ticks, float a, long time, float far, float glare) {
         if (cloudPix == null) return;
         double sx = camX + (ticks + a) * 0.02, sz = camZ;
         boolean above = camY >= 129.0;
@@ -466,6 +474,7 @@ public final class Sky {
         sunrise(tod, sr);
         float k = sr[3] * 0.35f;
         cr = sr[0] * k + cr * (1 - k); cg = sr[1] * k + cg * (1 - k); cb = sr[2] * k + cb * (1 - k);
+        cr -= glare * 0.2f; cg -= glare * 0.2f; cb -= glare * 0.2f;   // _skyDarkeningFactor
         Matrix.setIdentityM(w, 0);
         Matrix.translateM(w, 0, (float) (cloudChunkX * 16 - sx), (float) (128.33 - camY), (float) (cloudChunkZ * 16 - sz));
         Matrix.scaleM(w, 0, 16, 4, 16);
@@ -481,13 +490,16 @@ public final class Sky {
         GLES30.glUniform1f(uCloudRd, far);
         GLES30.glEnable(GLES30.GL_BLEND);
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA);
-        GLES30.glDisable(GLES30.GL_CULL_FACE);
+        GLES30.glEnable(GLES30.GL_CULL_FACE);                            // fancy.material clouds: back faces culled
+        GLES30.glDepthMask(true);
+        GLES30.glColorMask(true, true, true, false);                     // DisableAlphaWrite
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, cloudVbo);
         GLES30.glEnableVertexAttribArray(0);
         GLES30.glEnableVertexAttribArray(1);
         GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 28, 0);
         GLES30.glVertexAttribPointer(1, 4, GLES30.GL_FLOAT, false, 28, 12);
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, cloudCount);
+        GLES30.glColorMask(true, true, true, true);
         GLES30.glDisable(GLES30.GL_BLEND);
         GLES30.glEnable(GLES30.GL_CULL_FACE);
     }

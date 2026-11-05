@@ -294,3 +294,12 @@
   motion cleared), not while flying.
 - TODO: strongholds (placement decoded, see beta20), weather (rain/fog level terms are 0), underwater fog colour
   (Biome +0x7c), torch light flicker? (0.14 uses 1.6 fixed), entity shadows.
+
+## beta21b (hotfix)
+- World never appeared: the light tasks ran on the decoration thread behind its whole backlog (4 new decorations
+  queued every frame) -> own light thread, up to 24 chunks per batch. largeHeap (12 chunks = ~1000 columns in memory),
+  terrain / mesh worker errors no longer leave a chunk stuck.
+- Sun glare from the code: LevelRenderer::startFrame stores getSunIntensity(a, camera, 0.9) at +0x1c9c;
+  _skyDarkeningFactor = it * 0.2 is subtracted from fog (clear), sky and cloud colours; _renderSunOrMoon scales the sun
+  by 1 + it*0.35 and above 0.2 draws it twice more with colour * it.
+- Clouds: fancy.material "clouds" = Blending + DisableAlphaWrite, culling on (inner faces were visible), depth write on.
