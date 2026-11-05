@@ -112,12 +112,45 @@ public final class Atlas {
         return s;
     }
 
+    /**
+     * The 0.14 atlas keeps colour in its fully transparent texels (tallgrass 186 grey, leaves 131, around opaque 142 / 135)
+     * so the box-filtered mips (and the bilinear TexelAA edges) do not pull cut-out plants toward black; ours had black
+     * there. Fill each transparent texel's RGB from its opaque neighbours inside the 16 x 16 face (alpha untouched).
+     */
+    private void bleed() {
+        int[] p = pixels;
+        boolean[] set = new boolean[p.length];
+        for (int i = 0; i < p.length; i++) set[i] = (p[i] >>> 24) != 0;
+        for (int pass = 0; pass < 16; pass++) {
+            boolean any = false;
+            boolean[] next = set.clone();
+            for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                int i = y * width + x;
+                if (set[i]) continue;
+                int r = 0, g = 0, b = 0, n = 0;
+                for (int d = 0; d < 4; d++) {
+                    int nx = x + (d == 0 ? -1 : d == 1 ? 1 : 0), ny = y + (d == 2 ? -1 : d == 3 ? 1 : 0);
+                    if (nx < 0 || ny < 0 || nx >= width || ny >= height || (nx >> 4) != (x >> 4) || (ny >> 4) != (y >> 4)) continue;
+                    int j = ny * width + nx;
+                    if (!set[j]) continue;
+                    r += (p[j] >> 16) & 255; g += (p[j] >> 8) & 255; b += p[j] & 255; n++;
+                }
+                if (n == 0) continue;
+                p[i] = (p[i] & 0xFF000000) | (r / n) << 16 | (g / n) << 8 | (b / n);
+                next[i] = true; any = true;
+            }
+            set = next;
+            if (!any) break;
+        }
+    }
+
     /** GL thread */
     public void upload() {
         int[] t = new int[1];
         GLES30.glGenTextures(1, t, 0);
         texture = t[0];
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texture);
+        bleed();
         ByteBuffer bb = ByteBuffer.allocateDirect(width * height * 4).order(ByteOrder.nativeOrder());
         for (int p : pixels) { bb.put((byte) (p >> 16)); bb.put((byte) (p >> 8)); bb.put((byte) p); bb.put((byte) (p >>> 24)); }
         bb.position(0);
@@ -145,8 +178,10 @@ public final class Atlas {
             cur = nx; w = nw; h = nh; mipLevels = lv;
         }
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAX_LEVEL, mipLevels);
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR_MIPMAP_NEAREST);
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR);
+        // TextureOGL::setFilteringMode(TexelAA) with the TexelAA option off (default): mag NEAREST,
+        // min NEAREST_MIPMAP_LINEAR (0x2702) when the texture has mips
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_NEAREST_MIPMAP_LINEAR);
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_NEAREST);
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE);
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE);
     }

@@ -383,7 +383,10 @@ public final class Mesher {
             out.add(r | g << 8 | b << 16 | alpha << 24);
             out.add(aoLight[v]);
         }
-        if (liquid) {                                        // water/lava seen from both sides: the reverse quad
+        // water/lava seen from both sides; leaves: LeafBlock::getRenderLayer (fancy) = RENDERLAYER_ALPHATEST ->
+        // terrain_alpha, which has DisableCulling: both sides of each face (_initLayers order: opaque, opaque_seasons,
+        // doubleside, alpha, alpha_single_side, ...)
+        if (liquid || leaf(id)) {                            // the reverse quad
             int base = out.n - 4 * STRIDE;
             for (int v = 3; v >= 0; v--) for (int k = 0; k < STRIDE; k++) out.add(out.a[base + v * STRIDE + k]);
         }

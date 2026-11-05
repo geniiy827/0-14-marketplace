@@ -51,7 +51,8 @@ public final class WorldRenderer {
             "  highp vec2 sc = max(vec2(1.0 / du, 1.0 / dv), 1.0); t = clamp(t * sc, 0.0, 0.5) + clamp(t * sc - (sc - 0.5), 0.0, 0.5); m = (m + t) / uTexDim.xy; }\n" +
             " highp float l0 = clamp(floor(lv), 0.0, uTexDim.z), l1 = clamp(floor(lv + 1.0), 0.0, uTexDim.z);\n" +
             " return mix(textureLod(uTex, clampFace(m, l0), l0), textureLod(uTex, clampFace(m, l1), l1), fract(lv)); }\n" +
-            "void main(){ vec4 t = texAA(vUv); if (t.a < uAlphaCut) discard;\n" +
+            // TEXEL_AA_FEATURE is off by default (Options::setTexelAA -> RendererSettings +0x31 = 0): plain texture2D
+            "void main(){ vec4 t = texture(uTex, vUv); if (t.a < uAlphaCut) discard;\n" +
             " vec4 lit = t * texture(uLightTex, vLm); lit.a = t.a * vCol.a;\n" +
             " if (vNear > 0.5) lit.a = mix(lit.a, 1.0, clamp(vCamDist, 0.0, 1.0));\n" +
             " lit.rgb *= vCol.rgb;\n" +

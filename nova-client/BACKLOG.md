@@ -330,3 +330,12 @@
   arrays in the mesher; one reused upload buffer.
 - TODO perf from the original: LevelRenderer _updateColumnVisibility / VisibilityExtimator (occlusion of chunks behind
   terrain), RenderChunk sorting by camera, far-chunk fade-in.
+
+## beta21f
+- Leaves see-through from the side: fancy leaves are RENDERLAYER_ALPHATEST -> terrain_alpha (DisableCulling), so the
+  one face kept between two leaves is seen from both sides (RenderChunk::_initLayers material order: opaque,
+  opaque_seasons, doubleside, alpha, alpha_single_side, alpha_seasons, blend, water, far...). Leaf quads double-sided.
+- Plants dark in the distance: the 0.14 atlas keeps colour in transparent texels (tallgrass 186, leaves 131); ours had
+  black -> mips pulled cut-outs to black. Transparent texels now take their opaque neighbours' RGB (per 16px face).
+- TexelAA is an option, off by default (RendererSettings +0x31 = 0 in Options::_initDefaultValues): shader uses plain
+  texture2D; TextureOGL::setFilteringMode(TexelAA) then = mag NEAREST, min NEAREST_MIPMAP_LINEAR. Cheaper per pixel.
