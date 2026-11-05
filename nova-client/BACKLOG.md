@@ -303,3 +303,8 @@
   _skyDarkeningFactor = it * 0.2 is subtracted from fog (clear), sky and cloud colours; _renderSunOrMoon scales the sun
   by 1 + it*0.35 and above 0.2 draws it twice more with colour * it.
 - Clouds: fancy.material "clouds" = Blending + DisableAlphaWrite, culling on (inner faces were visible), depth write on.
+
+## beta21c (hotfix)
+- Sky dark at noon (user: the original is bright): getAmbientBrightness v (+0x15a8) has no writer found; v = sky light
+  at the camera (0..15) -> 1 in open air. TODO: find the real writer (memcpy / struct copy?) to confirm.
+- Clouds opaque (user: no transparency in the original) = sad.material clouds (no Blending); fancy one had 0.7 alpha.

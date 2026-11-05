@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta21b";
+    public static final String VERSION = "NOVA Engine beta21c";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -506,7 +506,7 @@ public final class Game implements GLSurfaceView.Renderer {
             for (int i = 0; i < 3; i++) fog[i] = Math.max(0f, fog[i] - sunGlare * 0.2f);
         }
         if (underwater) sunGlare = 0;
-        float amb = com.nova.engine.render.Sky.ambient(ey);
+        float amb = com.nova.engine.render.Sky.ambient(ey, world.lightPair((int) Math.floor(player.x), (int) Math.floor(ey), (int) Math.floor(player.z)) >> 8);
         com.nova.engine.render.Sky.fogDistances(radius * 16, amb, underwater, fogDist);
         sky.updateLight(tod);
         wr.lightTex = sky.lightTexture();

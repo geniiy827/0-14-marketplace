@@ -148,7 +148,15 @@ public final class Sky {
     }
 
     /** LevelRenderer::getAmbientBrightness (its brightness field stays 0): below y 55 0.035, else 0.35 */
-    public static float ambient(float eyeY) { return eyeY < 55f ? 0.035f : 0.35f; }
+    /**
+     * LevelRenderer::getAmbientBrightness: min(v + (y < 55 ? 0.35 : 3.5), 10) * 0.1. v (+0x15a8) has no writer we could
+     * find (0 gives a dark sky even at noon - not what the original shows), so v = the sky light at the camera
+     * (0..15): open air -> 1, underground -> 0.35 / 0.035 as in the code.
+     */
+    public static float ambient(float eyeY, int skyLight) {
+        float v = skyLight + (eyeY < 55f ? 0.35f : 3.5f);
+        return Math.min(v, 10f) * 0.1f;
+    }
 
     /** Dimension::getSunIntensity(a, entity, k) with the view vector (fog: k 0.35, LevelRenderer::startFrame: k 0.9) */
     public static float sunIntensity(float tod, float[] look, float k) {
@@ -488,9 +496,8 @@ public final class Sky {
         GLES30.glUniformMatrix4fv(uCloudWorld, 1, false, w, 0);
         GLES30.glUniform4f(uCloudCur, Math.max(cr, 0), Math.max(cg, 0), Math.max(cb, 0), 0.7f);
         GLES30.glUniform1f(uCloudRd, far);
-        GLES30.glEnable(GLES30.GL_BLEND);
-        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA);
-        GLES30.glEnable(GLES30.GL_CULL_FACE);                            // fancy.material clouds: back faces culled
+        GLES30.glDisable(GLES30.GL_BLEND);                              // sad.material clouds: no blending (opaque)
+        GLES30.glEnable(GLES30.GL_CULL_FACE);
         GLES30.glDepthMask(true);
         GLES30.glColorMask(true, true, true, false);                     // DisableAlphaWrite
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, cloudVbo);
