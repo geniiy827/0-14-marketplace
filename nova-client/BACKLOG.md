@@ -375,3 +375,7 @@
   render (AddPlayer/AddEntity/MoveEntity), remaining blocks + collision shapes, survival inventory sync.
 
 ## beta23b: launch crash (prefs used before init for the nickname), INTERNET permission was missing, GL-thread errors shown instead of crashing, last crash shown on next start
+
+## RE reference (re014)
+- `nova ref-build` -> /home/claude/work/re014 (INDEX.md): per-class annotated .s (floats, strings, GOT, this+offsets,
+  vtable slots, callers), fields/, vtables/, packets.md, calls.tsv, strings. Generators in engine/tools/re. Not committed.
