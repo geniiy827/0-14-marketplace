@@ -336,6 +336,7 @@ public final class Mesher {
     }
 
     private boolean overlay, snowy;
+    private final float[] tu = new float[4], tv = new float[4];
 
     private void face(int id, int f, int x, int y, int z, float top) {
         int s = (overlay ? Blocks.sideOverlay[id] : snowy && f >= 2 ? Blocks.grassSnowSide : Blocks.texFor(id, data, f)) * 4;
@@ -361,7 +362,7 @@ public final class Mesher {
             faceLight(id, f, x, wy, z, touch);
         }
         // texture corners per vertex
-        float[] tu = new float[4], tv = new float[4];
+        float[] tu = this.tu, tv = this.tv;
         float vt = bh < 1 ? v1 - (v1 - v0) * bh : v0;      // partial blocks: the lower part of the side texture
         if (f >= 2) { tu[0] = u0; tv[0] = v1; tu[1] = u1; tv[1] = v1; tu[2] = u1; tv[2] = vt; tu[3] = u0; tv[3] = vt; }
         else { tu[0] = u0; tv[0] = v0; tu[1] = u0; tv[1] = v1; tu[2] = u1; tv[2] = v1; tu[3] = u1; tv[3] = v0; }

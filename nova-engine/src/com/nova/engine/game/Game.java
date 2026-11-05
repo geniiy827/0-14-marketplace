@@ -31,7 +31,7 @@ import javax.microedition.khronos.opengles.GL10;
 /** The game loop (GL thread): ticks at 20 TPS, renders every frame, feeds the worker threads. */
 public final class Game implements GLSurfaceView.Renderer {
     static final String TAG = "NOVA.game";
-    public static final String VERSION = "NOVA Engine beta21d";
+    public static final String VERSION = "NOVA Engine beta21e";
 
     private final Context ctx;
     public final Controls controls = new Controls();
@@ -135,6 +135,7 @@ public final class Game implements GLSurfaceView.Renderer {
             for (NovaMod m : mods) { reg.modId = m.id(); m.register(reg); }
             atlas.upload();
             wr.init();
+            wr.texW = atlas.width; wr.texH = atlas.height; wr.texLevels = atlas.mipLevels;
             sky.init(atlas.gameAssets);
             hand.init(atlas.gameAssets);
             hud.init(atlas.gameAssets);
@@ -336,6 +337,8 @@ public final class Game implements GLSurfaceView.Renderer {
             if (m == null) break;
             if (m.world == world) wr.upload(m);
         }
+        // the chunk scans below look up ~1000 columns several times (boxed keys): every 3rd frame is plenty
+        if (frames % 3 != 0) return;
         int pcx = (int) Math.floor(player.x) >> 4, pcz = (int) Math.floor(player.z) >> 4;
         // generation like the original: terrain (parallel) -> decoration when the 3x3 around has terrain (one thread,
         // it writes into neighbours) -> visible when the 3x3 around is decorated
@@ -436,8 +439,8 @@ public final class Game implements GLSurfaceView.Renderer {
         }
         // (re)mesh sections whose version changed; neighbours must exist for faces and AO
         int meshQueued = 0;
-        for (int r = 0; r <= radius && meshQueued < 6; r++) {
-            for (int dz = -r; dz <= r && meshQueued < 6; dz++) for (int dx = -r; dx <= r && meshQueued < 6; dx++) {
+        for (int r = 0; r <= radius && meshQueued < 12; r++) {
+            for (int dz = -r; dz <= r && meshQueued < 12; dz++) for (int dx = -r; dx <= r && meshQueued < 12; dx++) {
                 if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                 int cx = pcx + dx, cz = pcz + dz;
                 final Chunk c = world.ready(cx, cz);

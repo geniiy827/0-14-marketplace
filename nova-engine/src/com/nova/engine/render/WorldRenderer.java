@@ -21,7 +21,7 @@ public final class WorldRenderer {
             "#version 300 es\n" +
             "layout(location=0) in vec3 aPos; layout(location=1) in vec2 aUv; layout(location=2) in vec4 aCol; layout(location=3) in vec2 aLight;\n" +
             "uniform mat4 uMvp; uniform vec3 uOrigin; uniform vec3 uCam; uniform float uWater; uniform float uFarChunks;\n" +
-            "out vec2 vUv; out vec2 vLm; out vec4 vCol; out float vDist; out float vNear; out float vCamDist;\n" +
+            "out highp vec2 vUv; out vec2 vLm; out vec4 vCol; out float vDist; out float vNear; out float vCamDist;\n" +
             "void main(){ vec3 p = aPos + uOrigin; gl_Position = uMvp * vec4(p, 1.0);\n" +
             " vUv = aUv; vLm = aLight / 16.0; vec4 color = aCol; vec3 relPos = uCam - p; float depth = length(relPos); vDist = depth;\n" +
             " vNear = 0.0; vCamDist = 0.0;\n" +
@@ -37,8 +37,21 @@ public final class WorldRenderer {
     static final String FS =
             "#version 300 es\nprecision mediump float;\n" +
             "uniform sampler2D uTex; uniform sampler2D uLightTex; uniform vec3 uFog; uniform vec2 uFogRange; uniform float uAlphaCut; uniform float uFlat;\n" +
-            "in vec2 vUv; in vec2 vLm; in vec4 vCol; in float vDist; in float vNear; in float vCamDist; out vec4 o;\n" +
-            "void main(){ vec4 t = texture(uTex, vUv); if (t.a < uAlphaCut) discard;\n" +
+            "in highp vec2 vUv; in vec2 vLm; in vec4 vCol; in float vDist; in float vNear; in float vCamDist; out vec4 o;\n" +
+            // util.h texture2D_AA (TEXEL_AA, ATLAS_TEXTURE): one-pixel-wide bilinear edges, mip level from the derivatives
+            // + 0.5 bias, uvs clamped inside the 16x16 atlas face per level, two levels mixed
+            "uniform highp vec3 uTexDim;\n" +
+            "highp vec2 clampFace(highp vec2 uv, highp float lv){ highp vec2 n = uTexDim.xy / 16.0; highp vec2 f = fract(uv * n);\n" +
+            " highp vec2 c = uv * n - f; highp vec2 ht = vec2(0.5) / (vec2(16.0) / pow(2.0, lv)); f = clamp(f, ht, vec2(1.0) - ht); return (c + f) / n; }\n" +
+            "vec4 texAA(highp vec2 uv){ highp vec2 dx = dFdx(uv) * uTexDim.xy, dy = dFdy(uv) * uTexDim.xy;\n" +
+            " highp vec2 dU = vec2(dx.x, dy.x), dV = vec2(dx.y, dy.y); highp float du = sqrt(dot(dU, dU)), dv = sqrt(dot(dV, dV));\n" +
+            " highp float d = max(dot(dx, dx), dot(dy, dy)); highp float lv = 0.5 * log2(d) + 0.5; lv = clamp(lv, 0.0, uTexDim.z);\n" +
+            " highp vec2 m;\n" +
+            " if (lv >= 1.0) m = uv; else { highp vec2 t = fract(uv * uTexDim.xy); m = uv * uTexDim.xy - t;\n" +
+            "  highp vec2 sc = max(vec2(1.0 / du, 1.0 / dv), 1.0); t = clamp(t * sc, 0.0, 0.5) + clamp(t * sc - (sc - 0.5), 0.0, 0.5); m = (m + t) / uTexDim.xy; }\n" +
+            " highp float l0 = clamp(floor(lv), 0.0, uTexDim.z), l1 = clamp(floor(lv + 1.0), 0.0, uTexDim.z);\n" +
+            " return mix(textureLod(uTex, clampFace(m, l0), l0), textureLod(uTex, clampFace(m, l1), l1), fract(lv)); }\n" +
+            "void main(){ vec4 t = texAA(vUv); if (t.a < uAlphaCut) discard;\n" +
             " vec4 lit = t * texture(uLightTex, vLm); lit.a = t.a * vCol.a;\n" +
             " if (vNear > 0.5) lit.a = mix(lit.a, 1.0, clamp(vCamDist, 0.0, 1.0));\n" +
             " lit.rgb *= vCol.rgb;\n" +
@@ -51,7 +64,9 @@ public final class WorldRenderer {
         public volatile boolean building;
     }
 
-    private int prog, uMvp, uOrigin, uCam, uTex, uLightTex, uFog, uFogRange, uAlphaCut, uFlat, uWater, uFarChunks;
+    private int prog, uMvp, uOrigin, uCam, uTex, uLightTex, uFog, uFogRange, uAlphaCut, uFlat, uWater, uFarChunks, uTexDim;
+    /** TEXTURE_DIMENSIONS: atlas width, height, mip levels */
+    public float texW = 512, texH = 256, texLevels = 4;
     /** FAR_CHUNKS_DISTANCE (LevelRenderer +0x1638) */
     public float farChunks = 88f;
     /** the 16x16 light texture of GameRenderer::_tickLightTexture (set by the game every frame) */
@@ -68,6 +83,7 @@ public final class WorldRenderer {
         uTex = GLES30.glGetUniformLocation(prog, "uTex");
         uLightTex = GLES30.glGetUniformLocation(prog, "uLightTex");
         uWater = GLES30.glGetUniformLocation(prog, "uWater");
+        uTexDim = GLES30.glGetUniformLocation(prog, "uTexDim");
         uFarChunks = GLES30.glGetUniformLocation(prog, "uFarChunks");
         uFog = GLES30.glGetUniformLocation(prog, "uFog");
         uFogRange = GLES30.glGetUniformLocation(prog, "uFogRange");
@@ -105,10 +121,14 @@ public final class WorldRenderer {
         s.waterVerts = m.waterVerts;
     }
 
+    private static IntBuffer upBuf;
+
     private static int put(int vbo, int[] data) {
         if (data.length == 0) { Gl.delete(vbo); return 0; }
         if (vbo == 0) vbo = Gl.buffer();
-        IntBuffer b = Gl.ints(data.length);
+        if (upBuf == null || upBuf.capacity() < data.length) upBuf = Gl.ints(Math.max(data.length, 1 << 18));
+        IntBuffer b = upBuf;
+        b.clear();
         b.put(data).position(0);
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo);
         GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, data.length * 4, b, GLES30.GL_STATIC_DRAW);
@@ -152,6 +172,7 @@ public final class WorldRenderer {
         GLES30.glUniform2f(uFogRange, fogStart, Math.max(fogEnd, fogStart + 0.01f));
         GLES30.glUniform1f(uWater, 0f);
         GLES30.glUniform1f(uFarChunks, Math.max(farChunks, 1f));
+        GLES30.glUniform3f(uTexDim, texW, texH, texLevels);
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0);
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlasTex);
         GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, indexBuf);
@@ -160,15 +181,38 @@ public final class WorldRenderer {
         GLES30.glEnableVertexAttribArray(2);
         GLES30.glEnableVertexAttribArray(3);
         drawnSections = 0;
+        // LevelRenderer: frustum culled render chunks (FrustumCuller), opaque front to back, blend back to front
+        frustum(mvp);
+        int nv = 0;
+        float lim = (fogEnd + 16) * (fogEnd + 16);
+        for (Map.Entry<Long, Section> e : sections.entrySet()) {
+            Section s = e.getValue();
+            if (s.solidVerts == 0 && s.waterVerts == 0) continue;
+            long k = e.getKey();
+            int cx = (int) (k >> 36) << 8 >> 8, cz = (int) (k >> 8) << 8 >> 8, sy = (int) (k & 0xFF);
+            float x0 = cx * 16, y0 = sy * 16, z0 = cz * 16;
+            float mx = x0 + 8 - camX, my = y0 + 8 - camY, mz = z0 + 8 - camZ;
+            float d2 = mx * mx + my * my + mz * mz;
+            if (d2 > lim || !boxInFrustum(x0, y0, z0, x0 + 16, y0 + 16, z0 + 16)) continue;
+            if (nv == visKeys.length) { visKeys = java.util.Arrays.copyOf(visKeys, nv * 2); visSec = java.util.Arrays.copyOf(visSec, nv * 2); visDist = java.util.Arrays.copyOf(visDist, nv * 2); }
+            visKeys[nv] = k; visSec[nv] = s; visDist[nv] = d2; nv++;
+        }
+        // sort by distance: (float bits of d2 << 32 | index), positive floats sort like their bits
+        if (sortBuf.length < nv) sortBuf = new long[visKeys.length];
+        if (order.length < nv) order = new int[visKeys.length];
+        for (int i = 0; i < nv; i++) sortBuf[i] = ((long) Float.floatToRawIntBits(visDist[i]) << 32) | i;
+        java.util.Arrays.sort(sortBuf, 0, nv);
+        for (int i = 0; i < nv; i++) order[i] = (int) sortBuf[i];
         // solid + cutout
         GLES30.glUniform1f(uAlphaCut, 0.5f);
         GLES30.glUniform1f(uFlat, 0f);
         GLES30.glDisable(GLES30.GL_BLEND);
         GLES30.glDepthMask(true);
-        for (Map.Entry<Long, Section> e : sections.entrySet()) {
-            Section s = e.getValue();
-            if (s.solidVerts == 0 || !visible(e.getKey(), camX, camY, camZ, look, fogEnd)) continue;
-            bindAndDraw(e.getKey(), s.solidVbo, s.solidVerts);
+        for (int i = 0; i < nv; i++) {
+            int o = order[i];
+            Section s = visSec[o];
+            if (s.solidVerts == 0) continue;
+            bindAndDraw(visKeys[o], s.solidVbo, s.solidVerts);
             drawnSections++;
         }
         // water
@@ -180,10 +224,11 @@ public final class WorldRenderer {
         GLES30.glPolygonOffset(0.1f, 0.1f);                              // terrain_water: polygonOffsetLevel 0.1
         GLES30.glUniform1f(uWater, 1f);
         // culled like the rest: liquids carry their own back faces, ice/glass show only their front faces
-        for (Map.Entry<Long, Section> e : sections.entrySet()) {
-            Section s = e.getValue();
-            if (s.waterVerts == 0 || !visible(e.getKey(), camX, camY, camZ, look, fogEnd)) continue;
-            bindAndDraw(e.getKey(), s.waterVbo, s.waterVerts);
+        for (int i = nv - 1; i >= 0; i--) {
+            int o = order[i];
+            Section s = visSec[o];
+            if (s.waterVerts == 0) continue;
+            bindAndDraw(visKeys[o], s.waterVbo, s.waterVerts);
         }
         GLES30.glDisable(GLES30.GL_POLYGON_OFFSET_FILL);
         GLES30.glUniform1f(uWater, 0f);
@@ -191,6 +236,31 @@ public final class WorldRenderer {
         GLES30.glDepthMask(true);
         GLES30.glDisable(GLES30.GL_BLEND);
         GLES30.glDisableVertexAttribArray(3);
+    }
+
+    private long[] visKeys = new long[1024];
+    private Section[] visSec = new Section[1024];
+    private float[] visDist = new float[1024];
+    private int[] order = new int[1024];
+    private long[] sortBuf = new long[1024];
+    private final float[] planes = new float[24];
+
+    /** the 6 clip planes of a column-major mvp (Gribb-Hartmann) */
+    private void frustum(float[] m) {
+        for (int i = 0; i < 6; i++) {
+            int row = i >> 1; float sg = (i & 1) == 0 ? 1 : -1;
+            float a = m[3] + sg * m[row], b = m[7] + sg * m[4 + row], c = m[11] + sg * m[8 + row], d = m[15] + sg * m[12 + row];
+            planes[i * 4] = a; planes[i * 4 + 1] = b; planes[i * 4 + 2] = c; planes[i * 4 + 3] = d;
+        }
+    }
+
+    private boolean boxInFrustum(float x0, float y0, float z0, float x1, float y1, float z1) {
+        for (int i = 0; i < 6; i++) {
+            float a = planes[i * 4], b = planes[i * 4 + 1], c = planes[i * 4 + 2], d = planes[i * 4 + 3];
+            float px = a >= 0 ? x1 : x0, py = b >= 0 ? y1 : y0, pz = c >= 0 ? z1 : z0;
+            if (a * px + b * py + c * pz + d < 0) return false;
+        }
+        return true;
     }
 
     private int overlayVbo;

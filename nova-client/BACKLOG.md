@@ -320,3 +320,13 @@
   leaves); BlockOccluder::_shouldOccludeLeaves: deep leaves (isDeepLeafBlock) draw nothing; between two leaves only the
   down / south / east face; slabs / top snow / carpet / invisible bedrock rules; else hidden by opaque.
   LeafBlock::getRenderLayer: fancy -> layer 4 (alpha, single side), cold biomes [+0x30].
+
+## beta21e (perf + shimmer)
+- Distant shimmer: atlas had no mips and NEAREST. 0.14 ships terrain-atlas_mip0..3 = 2x2 box averages (verified) and
+  samples with util.h texture2D_AA (TEXEL_AA + ATLAS_TEXTURE: mip from derivatives +0.5 bias, one-pixel bilinear edges,
+  uv clamped inside the 16px face per level, two levels mixed). Ported; 4 box-filtered levels built for our atlas.
+- FPS: real frustum culling of sections (planes from the mvp) instead of a view cone; opaque sections drawn near->far
+  (early depth reject), blend far->near; chunk scans every 3rd frame (they box ~30k keys a frame); no per-face
+  arrays in the mesher; one reused upload buffer.
+- TODO perf from the original: LevelRenderer _updateColumnVisibility / VisibilityExtimator (occlusion of chunks behind
+  terrain), RenderChunk sorting by camera, far-chunk fade-in.

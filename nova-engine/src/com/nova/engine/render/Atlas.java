@@ -28,6 +28,8 @@ public final class Atlas {
     public static final String[] GAME_PACKAGES = {"com.mojang.minecraftpn", "com.mojang.minecraftpe"};
 
     public int texture;
+    /** mip levels below the base (TEXTURE_DIMENSIONS.z) */
+    public int mipLevels;
     public int width, height;
     public String source = "none";
     private int[] pixels;                  // ARGB until uploaded
@@ -120,8 +122,31 @@ public final class Atlas {
         for (int p : pixels) { bb.put((byte) (p >> 16)); bb.put((byte) (p >> 8)); bb.put((byte) p); bb.put((byte) (p >>> 24)); }
         bb.position(0);
         GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, bb);
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_NEAREST);
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_NEAREST);
+        // terrain-atlas_mip0..3.tga of 0.14 are 2x2 box averages of the level above (checked: mean diff 0.15 / 255):
+        // build the same 4 levels for our atlas; sampled by renderchunk's texture2D_AA (TexelAA)
+        int[] cur = pixels; int w = width, h = height;
+        mipLevels = 0;
+        for (int lv = 1; lv <= 4 && w > 1 && h > 1; lv++) {
+            int nw = w / 2, nh = h / 2;
+            int[] nx = new int[nw * nh];
+            ByteBuffer mb = ByteBuffer.allocateDirect(nw * nh * 4).order(ByteOrder.nativeOrder());
+            for (int y = 0; y < nh; y++) for (int x = 0; x < nw; x++) {
+                int p0 = cur[(2 * y) * w + 2 * x], p1 = cur[(2 * y) * w + 2 * x + 1], p2 = cur[(2 * y + 1) * w + 2 * x], p3 = cur[(2 * y + 1) * w + 2 * x + 1];
+                int a = ((p0 >>> 24) + (p1 >>> 24) + (p2 >>> 24) + (p3 >>> 24) + 2) >> 2;
+                int r = (((p0 >> 16) & 255) + ((p1 >> 16) & 255) + ((p2 >> 16) & 255) + ((p3 >> 16) & 255) + 2) >> 2;
+                int g = (((p0 >> 8) & 255) + ((p1 >> 8) & 255) + ((p2 >> 8) & 255) + ((p3 >> 8) & 255) + 2) >> 2;
+                int b = ((p0 & 255) + (p1 & 255) + (p2 & 255) + (p3 & 255) + 2) >> 2;
+                int v = a << 24 | r << 16 | g << 8 | b;
+                nx[y * nw + x] = v;
+                mb.put((byte) r); mb.put((byte) g); mb.put((byte) b); mb.put((byte) a);
+            }
+            mb.position(0);
+            GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, lv, GLES30.GL_RGBA, nw, nh, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, mb);
+            cur = nx; w = nw; h = nh; mipLevels = lv;
+        }
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAX_LEVEL, mipLevels);
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR_MIPMAP_NEAREST);
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR);
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE);
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE);
     }
