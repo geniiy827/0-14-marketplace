@@ -1,0 +1,71 @@
+// Пистолет - сделан без API: стреляет настоящими снарядами игры через её же функции.
+// Взять: творческий инвентарь, вкладка «Инструменты». Кнопка «Огонь» справа, пока пистолет в руке.
+
+item pistol {
+    name: {ru: "Пистолет", en: "Pistol"}
+    texture: "textures/pistol.png"
+    hand: "tool"
+    stack: 1
+    category: "tools"
+    action: "Огонь"
+}
+
+var MAG = 12            // патронов в магазине
+var ammo = MAG
+var reload = 0          // тиков до конца перезарядки
+var cooldown = 0        // тиков до следующего выстрела
+
+fn tip(t) { ui.tip(t) }
+
+fn hud() {
+    if reload > 0 { tip("§7перезарядка...") } else { tip("§e{ammo} / {MAG}") }
+}
+
+// Так игра сама выпускает стрелу из лука (BowItem::releaseUsing): new Arrow(игрок, сила), потом Level::addEntity.
+// Мы делаем то же самое, только быстрее, сильнее и без лука.
+fn shoot() {
+    var p = mc.player()
+    var lvl = mem.ptr(p, 0x78)                                       // Player -> Level
+    if mc.call("Level::isClientSide() const", lvl) != 0 {
+        tip("§cна сервере стреляет только сервер")
+        return
+    }
+    var bullet = mem.alloc(0x1a8)                                    // sizeof(Arrow) в 0.14.3
+    mc.call("Arrow::Arrow(Mob&, float, ItemInstance const*)", bullet, p, 7, 0)   // 7 = скорость (лук: до 2)
+    mc.call("Arrow::setBaseDamage(float)", bullet, 7)                // урон (у стрелы 2)
+    mc.call("Arrow::setCritical(bool)", bullet, true)                // след из искр
+    var holder = mem.alloc(4)                                        // std::unique_ptr<Entity>
+    mem.setPtr(holder, bullet)
+    mc.callAt(mem.ptr(mem.ptr(lvl), 12 * 4), lvl, holder)            // level->addEntity(...) - 12-й слот vtable
+    var left = mem.ptr(holder)
+    if left != 0 { mc.callAt(mem.ptr(mem.ptr(left), 4), left) }       // уровень не взял - удалить
+    mem.free(holder)
+    mc.call("Level::playSound(Entity*, std::string const&, float, float, EntityLocation)",
+            lvl, p, "random.explode", 0.35, 1.9, 0)
+    var pitch = mem.float(p, 56)                                     // отдача: камера чуть вверх
+    mem.setFloat(p + 56, pitch - 2.5)
+}
+
+on action(e) {
+    if e.item != pistol { return }
+    if reload > 0 or cooldown > 0 { return }
+    if ammo <= 0 {
+        reload = 40
+        mc.call("Level::playSound(Vec3 const&, std::string const&, float, float)",
+                mem.ptr(mc.player(), 0x78), mem.vec3(mc.player(), 8), "random.click", 1, 0.8)
+        hud()
+        return
+    }
+    shoot()
+    ammo -= 1
+    cooldown = 4
+    hud()
+}
+
+every 1 ticks {
+    if cooldown > 0 { cooldown -= 1 }
+    if reload > 0 {
+        reload -= 1
+        if reload == 0 { ammo = MAG; hud() }
+    }
+}

@@ -12,7 +12,7 @@ public class Test {
         public int base() { return 0x70000000; }
         public int hook(int addr, int mode, int[] sites) { System.out.println("HOOK " + Integer.toHexString(addr) + " mode " + mode + " sites " + (sites == null ? 0 : sites.length)); return hooks++; }
         public void unhook(int idx) { System.out.println("UNHOOK " + idx); }
-        public long call(int fn, int[] w) { System.out.println("CALL " + Integer.toHexString(fn) + " " + java.util.Arrays.toString(java.util.Arrays.copyOf(w, 6))); return Float.floatToIntBits(1.62f) & 0xffffffffL; }
+        public long call(int fn, int[] w) { System.out.println("CALL " + Integer.toHexString(fn) + " " + java.util.Arrays.toString(java.util.Arrays.copyOf(w, 6))); return fn == 0x7052ddf8 ? 0 : Float.floatToIntBits(1.62f) & 0xffffffffL; }
         public long callOrig(int idx, int[] w) { System.out.println("ORIG " + idx + " " + w[0] + " " + Float.intBitsToFloat(w[1]) + " " + Float.intBitsToFloat(w[2])); return Float.floatToIntBits(0.42f) & 0xffffffffL; }
         public int peek(int addr, int kind) { return 42; }
         public void poke(int addr, int kind, int v) { System.out.println("POKE " + Integer.toHexString(addr) + " " + v); }
@@ -56,7 +56,12 @@ public class Test {
         });
         for (int i = 1; i < a.length; i++)
             rt.load("test" + i, "Test" + i, Paths.get(a[i]).getFileName().toString(), new String(Files.readAllBytes(Paths.get(a[i])), "UTF-8"));
+        rt.customIds.put("test1:pistol", 470.0);
         rt.event(1, null, null);
+        if (System.getProperty("pistol") != null) {
+            for (int k = 0; k < 3; k++) { System.out.println("action -> " + rt.event(12, null, new double[]{470})); for (int t = 0; t < 5; t++) rt.event(3, null, null); }
+            return;
+        }
         for (int t = 0; t < 45; t++) rt.event(3, null, null);
         System.out.println("break cancel=" + rt.event(4, null, new double[]{1, 2, 3, 1, 0, 278, 1}));
         System.out.println("chat cancel=" + rt.event(9, "/heal", null));

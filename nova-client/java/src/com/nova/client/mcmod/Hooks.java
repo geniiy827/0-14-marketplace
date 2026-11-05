@@ -69,7 +69,7 @@ final class Hooks {
 
     Sym find(String name, int line) {
         loadSymbols();
-        String n = name.trim();
+        String n = name.trim().replace("std::string", "std::basic_string<char, std::char_traits<char>, std::allocator<char> >");
         Sym s = byName.get(n);
         if (s == null) s = byMangled.get(n);
         if (s == null) {
