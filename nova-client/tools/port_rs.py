@@ -14,7 +14,7 @@ structures.bin (little endian):
   'NSB1' u16 nloot u16 nmobs u16 nstruct
   mobs:   u8 len + name (EntityTypeFromString)
   loot:   u8 rollsMin u8 rollsMax u16 n, n x (u16 id, u16 data, u8 min, u8 max, u16 weight)
-  struct: u8 len + name, u8 kind (0 surface, 1 underground), u16 chance (1 in N chunks), i8 yoff, u8 ymin, u8 ymax,
+  struct: u8 len + name, u8 kind (0 surface, 1 underground, 2 surface or under water), u16 chance (1 in N chunks), i8 yoff, u8 ymin, u8 ymax,
           u8 maxSlope, u8 nbiomes + biomes, u16 sx sy sz, u16 npal, palette, u32 nblocks, blocks,
           u8 nRandomChests, u16 randomChestLoot group, u16 ncand + cand (u8 x y z)
           u8 ngroups, groups: u8 n + u16 loot ids
@@ -26,7 +26,22 @@ import json, os, struct, sys, random
 import nbtlib
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else ''
-OUT = sys.argv[2] if len(sys.argv) > 2 else 'structures.bin'
+OUT = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith('--') else 'structures.bin'
+EXT = os.path.abspath(os.path.join(ROOT, *(['..'] * 7))) if ROOT else ''
+# data folders of each mod (namespace -> folder with structure(s)/, loot_table(s)/, worldgen/)
+ROOTS = {'repurposed_structures': ROOT,
+         'yungsextras': os.path.join(EXT, 'YUNGs-Extras/Common/src/main/resources/data/yungsextras'),
+         'towers_of_the_wild': os.path.join(EXT, 'Towers_Of_The_Wild-1.16.3/src/main/resources/data/towers_of_the_wild')}
+
+def data_file(ns, kind, path, ext):
+    """kind: structure / loot_table / processor_list; 1.16 mods use the plural folder names"""
+    base = ROOTS.get(ns)
+    if not base: return None
+    for k in (kind, kind + 's'):
+        sub = 'worldgen/' + k if kind == 'processor_list' else k
+        f = os.path.join(base, sub, path + ext)
+        if os.path.exists(f): return f
+    return None
 
 # ------------------------------------------------------------------ biomes of 0.14 (ids as in Java 1.8)
 B = dict(plains=[1], desert=[2, 17, 130], hills=[3, 20, 34, 131, 162], forest=[4, 18], flower=[132], taiga=[5, 19, 133],
@@ -74,7 +89,7 @@ REPEATER_DATA = {'north': 0, 'east': 1, 'south': 2, 'west': 3}
 BUTTON_DATA = {'east': 1, 'west': 2, 'south': 3, 'north': 4}
 
 SIMPLE = {
-    'air': (0, 0), 'cave_air': (0, 0), 'void_air': (0, 0), 'stone': (1, 0), 'granite': (1, 1), 'polished_granite': (1, 2),
+    'smooth_stone': (43, 8), 'air': (0, 0), 'cave_air': (0, 0), 'void_air': (0, 0), 'stone': (1, 0), 'granite': (1, 1), 'polished_granite': (1, 2),
     'diorite': (1, 3), 'polished_diorite': (1, 4), 'andesite': (1, 5), 'polished_andesite': (1, 6),
     'deepslate': (1, 0), 'cobbled_deepslate': (4, 0), 'polished_deepslate': (1, 6), 'deepslate_bricks': (98, 0),
     'deepslate_tiles': (98, 0), 'tuff': (1, 5), 'calcite': (1, 3), 'blackstone': (1, 5), 'polished_blackstone': (1, 6),
@@ -317,7 +332,7 @@ class Loot:
         """a loot table -> ids of 0.14 tables (one per pool)"""
         if ref in self.index: return self.index[ref]
         ns, path = ref.split(':', 1)
-        f = os.path.join(ROOT, 'loot_table', path + '.json') if ns == 'repurposed_structures' else None
+        f = data_file(ns, 'loot_table', path, '.json')
         ids = []
         self.index[ref] = ids
         if not f or not os.path.exists(f): return ids
@@ -352,8 +367,9 @@ def processors(ref):
     """rule processors -> {input name: [(probability, output name, props)]}, pillar -> {trigger: (out, props)}"""
     rules, pillars = {}, {}
     if not ref: return rules, pillars
-    f = os.path.join(ROOT, 'worldgen/processor_list', ref.split(':', 1)[1] + '.json')
-    if not os.path.exists(f): return rules, pillars
+    ns, path = ref.split(':', 1)
+    f = data_file(ns, 'processor_list', path, '.json')
+    if not f: return rules, pillars
     for pr in json.load(open(f)).get('processors', []):
         t = pr.get('processor_type')
         if t == 'minecraft:capped': continue                      # archaeology (suspicious gravel) - not in 0.14
@@ -374,7 +390,8 @@ def processors(ref):
 
 # ------------------------------------------------------------------ templates
 def load_nbt(path):
-    n = nbtlib.load(os.path.join(ROOT, 'structure', path + '.nbt'))
+    ns, p = path.split(':', 1) if ':' in path else ('repurposed_structures', path)
+    n = nbtlib.load(data_file(ns, 'structure', p, '.nbt'))
     pal = n['palette'] if 'palette' in n else n['palettes'][0]
     states = []
     for st in pal:
@@ -536,6 +553,60 @@ def build():
         out.append(s)
     return loot, mobs, out
 
+DIRS = {'down': (0, -1, 0), 'up': (0, 1, 0), 'north': (0, 0, -1), 'south': (0, 0, 1), 'west': (-1, 0, 0), 'east': (1, 0, 0)}
+
+def jigsaws(t):
+    return [(pos, t[1][st][1].get('orientation', 'down_south'), nbt) for pos, st, nbt in t[2] if t[1][st][0].endswith('jigsaw')]
+
+def joined(name, kind, chance, base_yoff, slope, bio, a_path, b_path, procs, loot, mobs):
+    """two templates joined at their jigsaws (tower bottom + top, pyramid body + pit), shifted to start at 0"""
+    a, b = load_nbt(a_path), load_nbt(b_path)
+    ja, jb = jigsaws(a), jigsaws(b)
+    if not ja or not jb: return None
+    (pa, oa, _), (pb, ob, _) = ja[0], jb[0]
+    d = DIRS[oa.split('_')[0]]
+    off = (pa[0] + d[0] - pb[0], pa[1] + d[1] - pb[1], pa[2] + d[2] - pb[2])
+    sh = (-min(0, off[0]), -min(0, off[1]), -min(0, off[2]))
+    s = Struct(name, kind, chance, base_yoff - sh[1], 0, 0, slope, bio)
+    s.add_template(a_path, procs, loot, mobs, offset=sh)
+    s.add_template(b_path, procs, loot, mobs, offset=(off[0] + sh[0], off[1] + sh[1], off[2] + sh[2]))
+    return s
+
+def build_adventure():
+    """Adventure Craft: Repurposed Structures + YUNG's Extras + Towers of the Wild"""
+    loot, mobs, out = build()
+    Y = 'yungsextras:'
+    desert = biomes('desert')
+    singles = [  # (template, chance, yoff, slope, biomes, kind)
+        ('desert/wells/well_sm', 260, -7, 2, desert, 0), ('desert/wells/well_md', 300, -7, 2, desert, 0),
+        ('desert/wells/well_lg', 360, -7, 2, desert, 0), ('desert/wells/dry_well_sm', 260, -7, 2, desert, 0),
+        ('desert/wells/dry_well_md', 300, -7, 2, desert, 0), ('desert/wells/dry_well_lg', 360, -7, 2, desert, 0),
+        ('desert/wells/wishing_well_sm', 400, -7, 2, desert, 0), ('desert/wells/wishing_well_md', 450, -7, 2, desert, 0),
+        ('desert/wells/wishing_well_lg', 500, -7, 2, desert, 0), ('desert/obelisk/obelisk', 300, 0, 2, desert, 0),
+        ('desert/obelisk/obelisk_creeper', 450, 0, 2, desert, 0), ('desert/obelisk/obelisk_rare', 700, 0, 2, desert, 0),
+        ('desert/obelisk/obelisk_ruined', 300, 0, 2, desert, 0), ('desert/misc/chillzone', 350, 0, 2, desert, 0),
+        ('desert/misc/giant_torch', 350, 0, 2, desert, 0), ('desert/misc/ruins_0', 250, -1, 2, desert, 0)]
+    swamp = biomes('swamp')
+    for i in range(11): singles.append(('swamp/arch/swamp_arch_%d' % i, 330, -1, 4, swamp, 2))
+    for i in range(22): singles.append(('swamp/double_arch/swamp_double_arch_%d' % i, 600, -1, 4, swamp, 2))
+    for i in range(8): singles.append(('swamp/cubby/swamp_cubby_%d' % i, 330, -1, 3, swamp, 2))
+    for i in range(3): singles.append(('swamp/pillar/swamp_pillar_%d' % i, 250, -1, 3, swamp, 2))
+    singles += [('swamp/misc/swamp_church', 700, -1, 4, swamp, 2), ('swamp/misc/swamp_ogre_0', 500, -1, 3, swamp, 2)]
+    for path, chance, yoff, slope, bio, kind in singles:
+        st = Struct('yung_' + path.split('/')[-1], kind, chance, yoff, 0, 0, slope, bio)
+        st.add_template(Y + path, None, loot, mobs)
+        out.append(st)
+    T = 'towers_of_the_wild:'
+    towers = [('regular', ALL_LAND, 'tower_bottom', 'tower_top'),
+              ('derelict', biomes('savanna', 'desert', 'mesa'), 'derelict_tower_bottom', 'derelict_tower_top'),
+              ('derelict_grass', biomes('plains', 'forest', 'birch', 'roofed'), 'derelict_grass_tower_bottom', 'derelict_grass_tower_top'),
+              ('ice', biomes('ice', 'coldtaiga'), 'ice_tower_bottom', 'ice_tower_top'),
+              ('jungle', biomes('jungle'), 'jungle_tower_bottom', 'jungle_tower_top')]
+    for n, bio, bot, top in towers:
+        st = joined('tower_' + n, 0, 300, 0, 3, bio, T + n + '/' + bot, T + n + '/' + top, None, loot, mobs)
+        if st: out.append(st)
+    return loot, mobs, out
+
 def write(loot, mobs, structs):
     b = bytearray(b'NSB1')
     b += struct.pack('<HHH', len(loot.tables), len(mobs), len(structs))
@@ -564,7 +635,7 @@ def write(loot, mobs, structs):
     return len(b)
 
 if __name__ == '__main__':
-    loot, mobs, structs = build()
+    loot, mobs, structs = build_adventure() if '--adventure' in sys.argv else build()
     n = write(loot, mobs, structs)
     print('structures', len(structs), 'loot tables', len(loot.tables), 'mobs', mobs, 'bytes', n)
     for s in structs: print('  %-28s %s blocks %5d pal %3d groups %d cands %d' % (s.name, s.size, len(s.blocks), len(s.pal), len(s.groups), len(s.cands)))

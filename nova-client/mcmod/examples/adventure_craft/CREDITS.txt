@@ -1,0 +1,5 @@
+Adventure Craft - постройки перенесены в Minecraft PE 0.14 (NOVA) из модов Java Edition:
+- Repurposed Structures - TelepathicGrunt - LGPL-3.0 - https://github.com/telepathicgrunt/repurposedstructures
+- YUNG's Extras - YUNGNICKYOUNG - LGPL-3.0 - https://github.com/YUNG-GANG/YUNGs-Extras
+- Towers of the Wild - Idrae - CC BY-NC-SA 4.0 (не для продажи) - https://github.com/Idrae/Towers_Of_The_Wild-1.16.3
+Блоки и предметы заменены на те, что есть в 0.14 (tools/port_rs.py).

@@ -226,9 +226,10 @@ static void st_fill_chest(void *bs, int x, int y, int z, SDef *d, int group, voi
     }
 }
 
-static int st_ground(void *bs, int x, int z) {
+static int st_ground(void *bs, int x, int z, int water_ok) {   /* water_ok: the bottom under water (swamps) */
     for (int y = 127; y > 2; y--) {
         int id = st_get(bs, x, y, z);
+        if (water_ok && (id == 8 || id == 9)) continue;
         if (st_liquid(id)) return -1;
         if (!st_soft(id)) return y + 1;
     }
@@ -240,11 +241,11 @@ static int st_place(void *bs, void *rnd, SDef *d, int cx, int cz, u32 h) {
     int r = (h >> 8) & 3;
     int sx = (r & 1) ? d->sz : d->sx, sz = (r & 1) ? d->sx : d->sz;
     int x0 = cx * 16 + 8 - sx / 2, z0 = cz * 16 + 8 - sz / 2, y0;
-    if (d->kind == 0) {
+    if (d->kind == 0 || d->kind == 2) {          /* 0 surface, 2 surface or under shallow water */
         int xs[5] = {x0, x0 + sx - 1, x0, x0 + sx - 1, x0 + sx / 2}, zs[5] = {z0, z0, z0 + sz - 1, z0 + sz - 1, z0 + sz / 2};
         int lo = 999, hi = -1;
         for (int i = 0; i < 5; i++) {
-            int g = st_ground(bs, xs[i], zs[i]);
+            int g = st_ground(bs, xs[i], zs[i], d->kind == 2);
             if (g < 0) return 0;
             if (g < lo) lo = g;
             if (g > hi) hi = g;
@@ -290,7 +291,7 @@ static int st_place(void *bs, void *rnd, SDef *d, int cx, int cz, u32 h) {
         st_rot(&x, &z, d->sx, d->sz, r);
         int wx = x0 + x, wy = y0 + k->y, wz = z0 + z;
         st_set(bs, wx, wy, wz, id, data);
-        if ((e->flags & 1) || (d->kind == 0 && k->y == 0 && id && !st_liquid(id))) {   /* pillars / foundation */
+        if ((e->flags & 1) || (d->kind != 1 && k->y == 0 && id && !st_liquid(id))) {   /* pillars / foundation */
             int lim = (e->flags & 1) ? 32 : 6;
             for (int y = wy - 1; y > 1 && lim-- > 0; y--) {
                 int w = st_get(bs, wx, y, wz);
