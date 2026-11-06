@@ -660,8 +660,9 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     private byte[] fileData(String path) {
         String np0 = norm(path);
         // pictures of mods for libnova (ui.hud): nova/mod/<mod id>/<file in the mod>
-        if (np0 != null && np0.startsWith("nova/mod/") && !np0.contains("..")) {
-            String rest = np0.substring(9);
+        int nm = np0 == null ? -1 : np0.indexOf("nova/mod/");     // the game may put a pack folder in front
+        if (nm >= 0 && !np0.contains("..")) {
+            String rest = np0.substring(nm + 9);
             int sl = rest.indexOf('/');
             if (sl > 0) {
                 PackManager.Pack p = PackManager.find(this, "mod-" + rest.substring(0, sl));
@@ -733,6 +734,18 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         if (np != null && np.contains("nova/pack_icon_")) {
             int[] px = packIcon(np);
             if (px != null) return px;
+        }
+        if (np != null && np.contains("nova/mod/")) {          // ui.hud pictures of mods (textures go through here)
+            byte[] d = fileData(path);
+            Bitmap mb = d == null ? null : BitmapFactory.decodeByteArray(d, 0, d.length);
+            if (mb != null) {
+                int w = mb.getWidth(), h = mb.getHeight();
+                int[] px = new int[w * h + 2];
+                px[0] = w;
+                px[1] = h;
+                mb.getPixels(px, 2, w, 0, 0, w, h);
+                return px;
+            }
         }
         if (np != null && np.contains("nova/toast_icon_") && toastIcon != null) {
             Bitmap tb = BitmapFactory.decodeByteArray(toastIcon, 0, toastIcon.length);
