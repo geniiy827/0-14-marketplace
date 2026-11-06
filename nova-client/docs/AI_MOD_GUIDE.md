@@ -74,6 +74,11 @@ block ruby_block {
     // model: "models/lamp.bbmodel"   collision: [[0,0,0,16,2,16]] | "model" | "full" | "none"
 }
 ```
+Redstone (the game's own circuits, like the block of redstone and the lamp; the host computes them in a friends'
+world): `redstone: "source"` (signal 15), `redstone: {type: "source", power: 4}`,
+`redstone: {type: "lamp", on: "my_lamp_lit"}` + a second block `redstone: {type: "lamp_on", off: "my_lamp"}`
+(lights with a signal; the lit block is not in the creative inventory and drops the unlit one).
+Recipes: see `mcmod/examples/redstone_update/main.mcs` (`Recipes::addShapedRecipe` with a `vector<Recipes::Type>`).
 The name becomes a global holding the numeric id: `if e.item == pistol`, `world.setBlock(x, y, z, ruby_block)`.
 If registration failed, the name holds a string, so check `type(pistol) == "number"`.
 

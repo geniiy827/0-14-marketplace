@@ -214,6 +214,7 @@ typedef struct {
     float sel[6];                        /* selection / outline box */
     char name[64];
     void *block;
+    int rs, rs_power, rs_on, rs_off;     /* redstone: 1 source (power), 2 lamp off, 3 lamp on; the other lamp state */
 } ModBlock;
 static ModBlock mblocks[MB_MAX];
 static int mblock_count, mblocks_done;
@@ -274,6 +275,9 @@ int Java_com_nova_client_ModBridge_nativeDefineBlocks(void **env, void *cls, voi
         p += m->ncol * 6;
         for (int k = 0; k < 6; k++) m->sel[k] = (float)d[p + k];
         p += 6;
+        if (p + 4 > n) break;
+        m->rs = (int)d[p]; m->rs_power = (int)d[p + 1]; m->rs_on = (int)d[p + 2]; m->rs_off = (int)d[p + 3];
+        p += 4;
         int k = 0;
         while (*np && *np != '\x1f' && k < 63) m->name[k++] = *np++;
         m->name[k] = 0;
@@ -322,6 +326,65 @@ static MAABB *mb_get_aabb(void *b, void *bs, MPos *pos, MAABB *out, int x, int y
     return out;
 }
 
+/* ---- redstone of mod blocks: the game's own circuit components (as RedstoneBlock / RedstoneLampBlock do) ---- */
+static void *(*mf_bs_dim)(void *bs);
+static char *(*mf_dim_circuit)(void *dim);
+static int (*mf_isclient)(void *level);
+static int (*mf_setblock_pos)(void *bs, MPos *pos, const MBlockID *id, unsigned char data, int flags);
+static void *rs_src_vt[3];                     /* RedstoneBlock: isRedstoneBlock, onPlace (-> onLoaded) */
+static void *rs_lamp_vt[2];                    /* RedstoneLampBlock: onPlace, onLoaded (a ConsumerComponent) */
+#define CREATE_PRODUCER 0x5b8e90               /* CircuitSystem::create<ProducerComponent>(pos, region, dir) */
+
+static int rs_server(void *bs) {
+    void *lvl = mf_getlevel ? mf_getlevel(bs) : 0;
+    return lvl && mf_isclient && !mf_isclient(lvl);
+}
+static void mb_rs_source_loaded(void *b, void *bs, MPos *pos) {
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    if (!m || !rs_server(bs)) return;
+    char *cs = mf_dim_circuit(mf_bs_dim(bs));
+    void *c = ((void *(*)(void *, MPos *, void *, int))((mcbase + CREATE_PRODUCER) | 1))(cs, pos, bs, 6);
+    int power = m->rs_power < 1 ? 1 : m->rs_power > 15 ? 15 : m->rs_power;
+    if (c) ((void (*)(void *, int))(*(void ***)c)[4])(c, power);   /* ProducerComponent::setStrength */
+}
+static void mb_rs_lamp_update(void *b, void *bs, MPos *pos, int strength, int first) {
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    if (!m || !rs_server(bs) || !mf_setblock_pos) return;
+    int want = strength > 0 ? m->rs_on : m->rs_off;
+    if (want <= 0 || want > 255 || want == m->id) return;
+    char *cs = mf_dim_circuit(mf_bs_dim(bs));
+    MBlockID id = {(unsigned char)want};
+    cs[0] = 1;                                     /* as RedstoneLampBlock: no re-entry while the block changes */
+    mf_setblock_pos(bs, pos, &id, 0, 2);
+    cs[0] = 0;
+}
+static int mb_rs_lamp_drop(void *b, void *rnd, int data, int fortune) {
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    return m && m->rs_off > 0 ? m->rs_off : *((unsigned char *)b + 4);
+}
+
+/* a block with redstone gets its own vtable (mb_vtable + the redstone slots) */
+static u32 *mb_rs_vtable(ModBlock *m) {
+    if (m->rs == 1 && !rs_src_vt[0]) return 0;
+    if ((m->rs == 2 || m->rs == 3) && !rs_lamp_vt[0]) return 0;
+    if (!mf_bs_dim || !mf_dim_circuit || !mf_isclient || !mf_getlevel) return 0;
+    u32 *v = f_new(VT_BLOCK_WORDS * 4);
+    for (int i = 0; i < VT_BLOCK_WORDS; i++) v[i] = mb_vtable[i];
+    if (m->rs == 1) {
+        v[2 + 18] = (u32)rs_src_vt[0];                    /* isRedstoneBlock: dust connects to it */
+        v[2 + 27] = (u32)rs_src_vt[1];                    /* onPlace -> onLoaded */
+        v[2 + 33] = (u32)mb_rs_source_loaded;             /* a producer of rs_power */
+    } else {
+        if (m->rs == 2 && m->rs_off <= 0) m->rs_off = m->id;
+        if (m->rs == 3 && m->rs_on <= 0) m->rs_on = m->id;
+        v[2 + 27] = (u32)rs_lamp_vt[0];
+        v[2 + 33] = (u32)rs_lamp_vt[1];
+        v[2 + 32] = (u32)mb_rs_lamp_update;
+        if (m->rs == 3) v[2 + 48] = (u32)mb_rs_lamp_drop;  /* a lit lamp drops the unlit one */
+    }
+    return v;
+}
+
 static void mcmod_register_blocks(void) {
     if (mblocks_done || !mblock_count) return;
     mblocks_done = 1;
@@ -349,7 +412,9 @@ static void mcmod_register_blocks(void) {
         u32 nm[1];
         gstr(nm, m->name);
         mf_block_ctor(b, nm, m->id, mat);
-        *(u32 *)b = (u32)(mb_vtable + 2);
+        u32 *vt = m->rs ? mb_rs_vtable(m) : 0;
+        if (m->rs && !vt) LOGE("mcmod: redstone of %s unavailable", m->name);
+        *(u32 *)b = (u32)((vt ? vt : mb_vtable) + 2);
         mblock_of[m->id] = m;
         m->block = b;
         /* 0.14.3: +48 render layer (3 opaque, 8 alpha-tested like glass), +52 block shape (0 cube), +56 flags: keep */
@@ -389,7 +454,7 @@ static void h_init_creative(void) {
     int before = list ? (int)((list[1] - list[0]) / 20) : 0;
     mcmod_register_blocks();
     for (int i = 0; i < mblock_count; i++)
-        if (mblocks[i].block && mf_add_creative) mf_add_creative((short)mblocks[i].id, 0);
+        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps */
     mcmod_register_items();
     /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
     if (list) {
@@ -622,6 +687,15 @@ static void mcmod_init(void *mc, u32 base) {
     S(mf_light_block, "_ZN5Block11mLightBlockE");
     S(mf_solid, "_ZN5Block6mSolidE");
     S(mf_block_ctor, "_ZN5BlockC1ERKSsiRK8Material");
+    S(mf_bs_dim, "_ZN11BlockSource12getDimensionEv");
+    S(mf_dim_circuit, "_ZN9Dimension16getCircuitSystemEv");
+    S(mf_isclient, "_ZNK5Level12isClientSideEv");
+    S(mf_setblock_pos, "_ZN11BlockSource15setBlockAndDataERK8BlockPos7BlockIDhi");
+    {
+        u32 *vr = dlsym(mc, "_ZTV13RedstoneBlock"), *vl = dlsym(mc, "_ZTV17RedstoneLampBlock");
+        if (vr) { rs_src_vt[0] = (void *)vr[2 + 18]; rs_src_vt[1] = (void *)vr[2 + 27]; }
+        if (vl) { rs_lamp_vt[0] = (void *)vl[2 + 27]; rs_lamp_vt[1] = (void *)vl[2 + 33]; }
+    }
     S(mf_blockitem_ctor, "_ZN9BlockItemC1ERKSsi");
     S(mf_block_setsolid, "_ZN5Block8setSolidEb");
     S(mf_block_setcat, "_ZN5Block11setCategoryE20CreativeItemCategory");

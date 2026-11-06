@@ -83,6 +83,7 @@ final class ModBlocks {
         }
         Map<String, Integer> ids = loadIds();
         List<Double> out = new ArrayList<Double>();
+        List<Object[]> rsRefs = new ArrayList<Object[]>();
         StringBuilder nm = new StringBuilder();
         for (Object[] d : rt.blockDecls()) {
             ModRuntime.Mod m = (ModRuntime.Mod) d[0];
@@ -97,6 +98,19 @@ final class ModBlocks {
                 if (id < 0) throw new Exception("закончились свободные номера блоков (" + FIRST_ID + ".." + LAST_ID + ")");
                 List<Double> one = new ArrayList<Double>();
                 build(one, dir, id, p);
+                // redstone: "source" | {type: "source", power: 1..15} | {type: "lamp", on: "lit_block"} | {type: "lamp_on", off: "unlit_block"}
+                Object rs = p.get("redstone");
+                String rsType = rs instanceof Map ? String.valueOf(((Map<?, ?>) rs).get("type")) : rs == null ? "" : String.valueOf(rs);
+                double rsKind = rsType.equals("source") ? 1 : rsType.equals("lamp") ? 2 : rsType.equals("lamp_on") ? 3 : 0;
+                if (rs != null && rsKind == 0) throw new Exception("redstone: \"source\", {type: \"lamp\", on: ...} или {type: \"lamp_on\", off: ...}");
+                double power = 15;
+                if (rs instanceof Map && ((Map<?, ?>) rs).get("power") instanceof Double) power = Math.max(1, Math.min(15, (Double) ((Map<?, ?>) rs).get("power")));
+                one.add(rsKind); one.add(power); one.add(-1.0); one.add(-1.0);
+                if (rs instanceof Map) {
+                    Object on = ((Map<?, ?>) rs).get("on"), off = ((Map<?, ?>) rs).get("off");
+                    if (on != null) rsRefs.add(new Object[]{out.size() + one.size() - 2, m.id + ":" + on, m, line});
+                    if (off != null) rsRefs.add(new Object[]{out.size() + one.size() - 1, m.id + ":" + off, m, line});
+                }
                 out.addAll(one);
                 String internal = (m.id + "_" + name).toLowerCase(Locale.US).replaceAll("[^a-z0-9_]", "_");
                 if (nm.length() > 0) nm.append('\u001f');
@@ -112,6 +126,11 @@ final class ModBlocks {
                 rt.reportLater(m, "block " + name + ": " + e.getMessage(), line);
                 Log.w(TAG, "block " + name, e);
             }
+        }
+        for (Object[] r : rsRefs) {                       // the other lamp state, by name (same mod)
+            Integer other = ids.get((String) r[1]);
+            if (other == null) rt.reportLater((ModRuntime.Mod) r[2], "redstone: нет блока " + r[1], (Integer) r[3]);
+            else out.set((Integer) r[0], (double) other);
         }
         saveIds(ids);
         data = new double[out.size()];

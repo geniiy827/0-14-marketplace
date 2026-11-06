@@ -1,0 +1,124 @@
+// Обновление редстоуна: тестовый мод для игры с друзьями.
+// Блоки работают через схемы самой игры (CircuitSystem), как блок редстоуна и лампа: в общем мире всё считает
+// хост, а у друзей тот же мод (меню «Друзья» само предложит его загрузить), поэтому картинка одинаковая.
+// Выдать всё: команда /redstone в чате. Крафты добавляются при входе в мир.
+
+item redstone_crystal {
+    name: {ru: "Редстоун-кристалл", en: "Redstone crystal"}
+    texture: "textures/redstone_crystal.png"
+}
+
+// источник сигнала силы 15, светится
+block crystal_block {
+    name: {ru: "Блок редстоун-кристаллов", en: "Redstone crystal block"}
+    texture: "textures/crystal_block.png"
+    hardness: 5
+    sound: "stone"
+    light: 7
+    redstone: "source"
+}
+
+// слабый источник: сигнал 4 (доходит на 3 блока провода)
+block dim_redstone_block {
+    name: {ru: "Тусклый редстоун-блок", en: "Dim redstone block"}
+    texture: "textures/dim_redstone_block.png"
+    hardness: 3
+    sound: "stone"
+    redstone: {type: "source", power: 4}
+}
+
+// лампы: горят от сигнала (как лампа игры, но со своим видом)
+block quartz_lamp {
+    name: {ru: "Кварцевая лампа", en: "Quartz lamp"}
+    texture: "textures/quartz_lamp_off.png"
+    hardness: 0.3
+    sound: "glass"
+    redstone: {type: "lamp", on: "quartz_lamp_lit"}
+}
+block quartz_lamp_lit {
+    name: {ru: "Кварцевая лампа", en: "Quartz lamp"}
+    texture: "textures/quartz_lamp_on.png"
+    hardness: 0.3
+    sound: "glass"
+    light: 15
+    redstone: {type: "lamp_on", off: "quartz_lamp"}
+}
+block emerald_lamp {
+    name: {ru: "Изумрудная лампа", en: "Emerald lamp"}
+    texture: "textures/emerald_lamp_off.png"
+    hardness: 0.3
+    sound: "glass"
+    redstone: {type: "lamp", on: "emerald_lamp_lit"}
+}
+block emerald_lamp_lit {
+    name: {ru: "Изумрудная лампа", en: "Emerald lamp"}
+    texture: "textures/emerald_lamp_on.png"
+    hardness: 0.3
+    sound: "glass"
+    light: 15
+    redstone: {type: "lamp_on", off: "emerald_lamp"}
+}
+
+// ---------------------------------------------------------------- крафты
+// Так рецепты добавляет сама игра (Recipes::_addFenceRecipes): vector<Recipes::Type> + Recipes::addShapedRecipe.
+// Recipes::Type = 32 байта: +0 Item*, +4 Block*, +8 ItemInstance (20 байт), +28 буква.
+var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+var REDSTONE = 331
+var QUARTZ = 406
+var EMERALD = 388
+var STONE = 1
+var GLOWSTONE = 89
+var LAMP = 123          // лампа игры
+
+fn stack(p, id, count) { mc.call("ItemInstance::ItemInstance(int, int, int)", p, id, count, 0) }
+
+// rows: 3 строки по 3 символа (пробел = пусто), keys: [["R", id], ...]
+fn shaped(result, count, rows, keys) {
+    if type(result) != "number" { return }
+    var book = mc.call("Recipes::getInstance()")
+    var out = mem.alloc(20)
+    stack(out, result, count)
+    if mc.call("Recipes::getRecipeFor(ItemInstance const&)", book, out) != 0 { return }   // уже есть (второй вход в мир)
+    var n = keys.len()
+    var types = mem.alloc(n * 32)
+    var i = 0
+    while i < n {
+        var t = types + i * 32
+        stack(t + 8, keys[i][1], 1)
+        mem.setByte(t + 28, LETTERS.find(keys[i][0]) + 65)
+        i += 1
+    }
+    var vec = mem.alloc(12)
+    mem.setPtr(vec, types)
+    mem.setPtr(vec + 4, types + n * 32)
+    mem.setPtr(vec + 8, types + n * 32)
+    mc.call("Recipes::addShapedRecipe(ItemInstance const&, std::string const&, std::string const&, std::string const&, std::vector<Recipes::Type, std::allocator<Recipes::Type> > const&)",
+            book, out, rows[0], rows[1], rows[2], vec)
+}
+
+on world.join(e) {
+    shaped(redstone_crystal, 1, [" R ", "RQR", " R "], [["R", REDSTONE], ["Q", QUARTZ]])
+    shaped(crystal_block, 1, ["CCC", "CCC", "CCC"], [["C", redstone_crystal]])
+    shaped(dim_redstone_block, 4, ["SRS", "RSR", "SRS"], [["S", STONE], ["R", REDSTONE]])
+    shaped(quartz_lamp, 1, ["QRQ", "RGR", "QRQ"], [["Q", QUARTZ], ["R", REDSTONE], ["G", GLOWSTONE]])
+    shaped(emerald_lamp, 1, [" E ", "ELE", " E "], [["E", EMERALD], ["L", LAMP]])
+}
+
+// ---------------------------------------------------------------- /redstone: выдать всё
+fn give(id, count) {
+    if type(id) != "number" { ui.tip("§cне зарегистрирован: {id}"); return }
+    var it = mem.alloc(64)
+    stack(it, id, count)
+    mc.call("Inventory::add(ItemInstance&, bool)", mem.ptr(mc.player(), 0xda0), it, true)
+}
+
+on chat(e) {
+    if e.text != "/redstone" { return }
+    e.cancel()
+    give(redstone_crystal, 16)
+    give(crystal_block, 8)
+    give(dim_redstone_block, 8)
+    give(quartz_lamp, 8)
+    give(emerald_lamp, 8)
+    ui.tip("§cОбновление редстоуна: §fвсё выдано")
+}

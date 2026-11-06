@@ -240,3 +240,13 @@ item wand {
 
 Ошибки показываются в чате красным: `[Мой мод] main.mcs:12: неизвестное имя 'helth'`.
 После 6 ошибок мод останавливается до следующего входа в мир.
+
+## Редстоун у блоков (alpha18)
+```
+block my_source { texture: "textures/a.png"  redstone: "source" }                 // сигнал 15
+block weak      { texture: "textures/b.png"  redstone: {type: "source", power: 4} }
+block my_lamp   { texture: "textures/off.png" redstone: {type: "lamp", on: "my_lamp_lit"} }
+block my_lamp_lit { texture: "textures/on.png" light: 15 redstone: {type: "lamp_on", off: "my_lamp"} }
+```
+Работает через схемы самой игры (CircuitSystem: ProducerComponent / ConsumerComponent), как блок редстоуна и лампа.
+Крафты: пример в `mcmod/examples/redstone_update/main.mcs`.
