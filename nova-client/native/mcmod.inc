@@ -33,7 +33,12 @@ static int ev_op(int op, const double *a, int n, char *s, double *out);
 static void ev_frame(void);
 static void mi_report(void);
 static char *mm_player(void) { return g_client ? *(char **)((char *)g_client + 0x120) : 0; }
-static void *mm_region(void *pl) { return pl ? *(void **)((char *)pl + 0x16c) : 0; }
+/* the player's BlockSource; while a world is still being entered the field holds no real object yet
+ * (seen: 0x570 -> crash in BlockSource::getChunk), so anything that is not a heap address counts as none */
+static void *mm_region(void *pl) {
+    void *bs = pl ? *(void **)((char *)pl + 0x16c) : 0;
+    return (u32)bs < 0x10000 ? 0 : bs;
+}
 
 static void hook_init(void **env);
 /* ---------------- Java side ---------------- */
@@ -153,11 +158,12 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
         return 5;
     }
     case OP_WORLD_BLOCK:
+        if (!bs) { out[0] = out[1] = 0; return 2; }
         out[0] = mf_getblock ? mf_getblock(bs, FL(0), FL(1), FL(2)) : 0;
         out[1] = mf_getdata ? mf_getdata(bs, FL(0), FL(1), FL(2)) : 0;
         return 2;
     case OP_WORLD_SET_BLOCK: {
-        if (!mf_setblock || FL(1) < 0 || FL(1) > 127) return 0;
+        if (!bs || !mf_setblock || FL(1) < 0 || FL(1) > 127) return 0;
         MBlockID id = {(unsigned char)(int)A(3)};
         mf_setblock(bs, FL(0), FL(1), FL(2), &id, (unsigned char)(int)A(4), 3);
         return 0;
