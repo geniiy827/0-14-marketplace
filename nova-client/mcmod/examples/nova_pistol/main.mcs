@@ -69,3 +69,14 @@ every 1 ticks {
         if reload == 0 { ammo = MAG; hud() }
     }
 }
+
+// /gun - выдать пистолет (ItemInstance(id, 1, 0) -> Inventory::add)
+on chat(e) {
+    if e.text != "/gun" { return }
+    e.cancel()
+    if type(pistol) != "number" { ui.tip("§cпистолет не зарегистрирован: {pistol}"); return }
+    var it = mem.alloc(64)
+    mc.call("ItemInstance::ItemInstance(int, int, int)", it, pistol, 1, 0)
+    mc.call("Inventory::add(ItemInstance&, bool)", mem.ptr(mc.player(), 0xda0), it, true)
+    ui.tip("§aпистолет выдан (id {pistol})")
+}
