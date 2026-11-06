@@ -231,7 +231,7 @@ fn hud() {
         if hudKey != "off" { ui.hud("thirst", []); hudKey = "off" }
         return
     }
-    var row = headInWater() ? 2 : 1
+    var row = 0                   // под голодом
     var s = math.floor(sat)
     var k = "{thirst}:{s}:{thirsty > 0}:{row}"
     if k == hudKey { return }
@@ -303,18 +303,14 @@ fn recipes() {
     mc.call("FurnaceRecipes::addFurnaceRecipe(int, ItemInstance const&)", fr, canteen_water, r2)
 }
 
-// ================================================================ ванильное питьё и еда (зелья, молоко, арбуз, супы)
-hook "ItemInstance::useTimeDepleted(Level*, Player*)" (self, level, pl) {
-    var id = mc.calli("ItemInstance::getId() const", self)
-    var aux = mem.short(self, 2)
-    var r = original()
-    if pl == mc.player() and active {
-        if id == 373 { drink(aux == 0 ? D_NORMAL : D_POTION) }      // бутылка воды / зелье
-        else if id == 335 { drink([4, 1.0, 0]) }                      // молоко
-        else if id == 360 { drink([2, 0.5, 0]) }                      // ломтик арбуза
-        else if id == 282 or id == 459 or id == 413 { drink([2, 0.5, 0]) }   // супы
-    }
-    return r
+// ================================================================ ванильное питьё (зелья, молоко, арбуз, супы)
+on item.use(e) {
+    if not active { return }
+    var id = e.item
+    if id == 373 { drink(e.itemData == 0 ? D_NORMAL : D_POTION) }      // бутылка воды / зелье
+    else if id == 335 { drink([4, 1.0, 0]) }                          // молоко
+    else if id == 360 { drink([2, 0.5, 0]) }                          // ломтик арбуза
+    else if id == 282 or id == 459 or id == 413 { drink([2, 0.5, 0]) }  // супы
 }
 
 // ================================================================ события

@@ -73,7 +73,7 @@ static void hud_draw(void *client) {
     for (int i = 0; i < HUD_SLOTS; i++) {
         HudRow *h = &hud_rows[i];
         if (!h->slot[0]) continue;
-        int y = H - 39 - 10 * h->row;
+        int y = h->row <= 0 ? H - 30 : H - 48 - 10 * (h->row - 1);   /* 0: under hunger/hearts, 1: over them */
         for (int k = 0; k < h->n; k++) {
             int t = h->tex[k];
             if (t < 0) continue;
@@ -86,7 +86,7 @@ static void hud_draw(void *client) {
                 hud_tex[t].ok = 1;
             }
             int x = h->side ? W / 2 - 90 + 8 * k : W / 2 + 90 - 8 * (h->n - k) - 1;
-            int rect[4] = {x, y, 9, 9};
+            int rect[4] = {x, y, 16, 16};               /* pictures are 16x16 (power of two), the icon in its top-left 9x9 */
             f_blit(sr, hud_tex[t].tex, rect);
         }
     }

@@ -81,7 +81,7 @@ final class ApiTable {
         {"ui.popup", "title:any, text:any=\"\"", "-", "n:12:-1:-1:"},
         {"ui.toast", "title:any, text:any=\"\"", "-", "java:ui.toast"},
         {"ui.action", "text:str", "-", "n:13:-1:-1:"},
-        {"ui.hud", "slot:str, icons:any, row:num=1, side:str=\"right\"", "-", "java:ui.hud"},
+        {"ui.hud", "slot:str, icons:any, row:num=0, side:str=\"right\"", "-", "java:ui.hud"},
         {"__hud", "slot:str", "-", "n:14:-1:-1:"},
         {"vec.new", "x:num=0, y:num=0, z:num=0", "any", "java:Lib"},
         {"vec.add", "a:any, b:any", "any", "java:Lib"},

@@ -259,6 +259,6 @@ block my_lamp_lit { texture: "textures/on.png" light: 15 redstone: {type: "lamp_
 (перенос Repurposed Structures, LGPL-3.0).
 
 ## Ряд иконок на HUD (alpha22)
-`ui.hud("thirst", ["textures/a.png", ...], 1, "right")` — ряд иконок 9x9 над хотбаром, как сердца и голод:
-до 20 картинок мода слева направо; row 1 — над голодом/сердцами, 2 — выше; side "right" (голод) или "left" (сердца).
+`ui.hud("thirst", ["textures/a.png", ...], 0, "right")` — ряд иконок над хотбаром (картинки 16x16, иконка 9x9 в левом верхнем углу):
+до 20 картинок мода слева направо; row 0 — под голодом/сердцами, 1 — над ними, 2 — выше; side "right" (голод) или "left" (сердца).
 `ui.hud("thirst", [])` — убрать. Пример — жажда в `mcmod/examples/adventure_craft`.
