@@ -87,7 +87,7 @@ class Service{
 	}
 
 	private function dispatch(array $req, $ip, $n){
-		if(self::count($this->hits, $ip, 60) >= (int) $this->c("limits.requests-per-minute-ip", 600)) return $this->fail("rate");
+		if(self::count($this->hits, $ip, 60) >= max(300, (int) $this->c("limits.requests-per-minute-ip", 600))) return $this->fail("rate");   // presence needs ~20/min per phone
 		self::add($this->hits, $ip);
 		$op = isset($req["op"]) && is_string($req["op"]) ? $req["op"] : "";
 		// replay protection: a fresh time and a nonce never seen in the last 15 minutes

@@ -140,7 +140,7 @@ enum { R_NONE, R_PACK_ON, R_PACK_DEL, R_NAME, R_SEED, R_SURV, R_CREAT, R_INF, R_
        R_MOBS, R_SPX, R_SPZ, R_CREATE, R_NEWTEX, R_IMPORT,
        R_ACC_TAG, R_ACC_PASS, R_ACC_PASS2, R_ACC_LOGIN, R_ACC_TOREG, R_ACC_REG, R_ACC_TOLOGIN, R_ACC_LOGOUT,
        R_FR_TAG, R_FR_SEND, R_FR_JOIN, R_FR_DEL, R_FR_ACCEPT, R_FR_DECLINE, R_FR_CANCEL,
-       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND };
+       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND, R_FR_MODS, R_NET_MODS };
 
 static int nova_pending, nova_creating, nova_kind, nova_close, nova_ttl, nova_select = -1;
 static void *nova_screen;
@@ -379,6 +379,7 @@ static int nova_panes(void *scr) {
             } else if (f[0][0] == 'F') {
                 void *c = new_card(plist, f[1], f[2], -1);
                 if (f[3][0] == '1') add_button(c, "nova.fr.join", R_FR_JOIN, f[1]);
+                if (f[3][0] == 'm') add_button(c, "nova.fr.mods", R_FR_MODS, f[1]);   /* the host's mods first */
                 add_button(c, "nova.fr.remove", R_FR_DEL, f[1]);
                 n++;
             } else if (f[0][0] == 'O') {
@@ -394,10 +395,10 @@ static int nova_panes(void *scr) {
         push_pane(S, plist);
         nova_select = nova_b[0] == '0' ? -1 : 1;
     } else if (nova_kind == NOVA_NETSET) {
-        /* nova_a: "on\tf|i\tmax"; nova_b: the world name */
-        char line[64], *f[3];
+        /* nova_a: "on\tf|i\tmax\tmods"; nova_b: the world name */
+        char line[64], *f[4];
         const char *p = nova_a;
-        split_line(&p, line, sizeof line, f, 3);
+        split_line(&p, line, sizeof line, f, 4);
         void *p0 = new_pane();
         void *g = new_group(p0, nova_b[0] ? nova_b : "nova.net.title");
         add_toggle(g, "nova.net.on", R_NET_ON, f[0][0] == '1', 0);
@@ -413,6 +414,8 @@ static int nova_panes(void *scr) {
         nopt_val[i] = mx - 1;
         netmax_caption(i);
         f_cstep(g, o, g_client);
+        g = new_group(p0, "nova.net.modsgroup");
+        add_toggle(g, "nova.net.mods", R_NET_MODS, f[3][0] != '0', 0);
         new_group(p0, "nova.net.hint");
         push_pane(S, p0);
     } else if (nova_kind == NOVA_INVITE) {
@@ -546,9 +549,9 @@ static void acc_action(int i, const char *op) {
 static void button_action(int i) {
     static const struct { int role; const char *op; } fr[] = {
         {R_FR_SEND, "request"}, {R_FR_JOIN, "join"}, {R_FR_DEL, "remove"}, {R_FR_ACCEPT, "accept"},
-        {R_FR_DECLINE, "decline"}, {R_FR_CANCEL, "cancel"}};
+        {R_FR_DECLINE, "decline"}, {R_FR_CANCEL, "cancel"}, {R_FR_MODS, "mods"}};
     int p = 0;
-    for (int k = 0; k < 6; k++) {
+    for (int k = 0; k < 7; k++) {
         if (fr[k].role != nopt_role[i]) continue;
         p = append(nova_result, p, sizeof nova_result, "F|");
         p = append(nova_result, p, sizeof nova_result, fr[k].op);
@@ -603,7 +606,8 @@ static void nova_screen_gone(void *scr) {
         char num[4]; int v = role_val(R_NET_MAX) + 1, k = 0;
         if (v >= 10) num[k++] = '0' + v / 10;
         num[k++] = '0' + v % 10; num[k] = 0;
-        append(nova_result, p, sizeof nova_result, num);
+        p = append(nova_result, p, sizeof nova_result, num);
+        append(nova_result, p, sizeof nova_result, role_val(R_NET_MODS) ? "\x1f" "1" : "\x1f" "0");
         nova_result_ready = 1;
     }
     if ((nova_kind == NOVA_FRIENDS || nova_kind == NOVA_INVITE) && !nova_result_ready) {

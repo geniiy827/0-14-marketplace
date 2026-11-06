@@ -170,6 +170,7 @@ static void ui_frame(void *client) {
     int k = ui_reload;
     ui_reload = 0;
     if (f_reload_ui) f_reload_ui(client);
+    LOG("ui definitions reloaded (%d)", k);
     if (k == 2 && f_set_start && !mm_player()) {
         void *chooser = f_getchooser(client);
         if (chooser) f_set_start(chooser);

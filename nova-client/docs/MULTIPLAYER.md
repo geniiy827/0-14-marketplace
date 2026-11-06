@@ -39,3 +39,17 @@ its other end. The max-player limit and invite-only mode are checked on `join`.
 - Start and pause JSON are served by Java per state (markers `/*nova:in*/`, `/*nova:out*/`, `/*nova:net*/`,
   `/*nova:quit*/`, `/*nova:panel*/`). Then `MinecraftClient::handleReloadUIDefinitions` (+ `setStartMenuScreen`).
 - Invite banner: drawn with the toast; taps on its buttons are taken out of `Multitouch::feed` (C hook).
+
+## alpha17
+- Direct path only while pongs come back (0x04 → 0x05 every second). A router that lets packets out but not in
+  makes the link use the server. It no longer loses the packets of one direction (that froze the world).
+- RakNet MTU is clamped to 1400 in the offline handshake (OpenConnectionRequest1 is cut, and the MTU fields of
+  Reply1 / Request2 / Reply2 are clamped). 1492 + our 9 bytes was fragmented on the internet.
+- Players are counted only by links whose game still sends. A link closes 12–20 s after its game stops.
+- The server's rate limit is at least 300 requests a minute per IP, whatever config.yml says.
+- Mods of the host: world setting "Передавать друзьям мои моды". Presence carries `mods` (count) and `msig`, a
+  signature of the enabled mods (uuid=sha1) and their block and item numbers. A friend with another signature
+  gets **Загрузить моды**. It downloads over a files link (`join {files:true}`, packets 0x06 request / 0x07 data,
+  1100-byte chunks, window 48, relayed like 0x02). It then enables exactly the host's mods, takes the host's
+  numbers (blockids.json / itemids.json) and restarts. After the restart it opens the friends screen, or joins
+  when the download came from an invite (`files/nova/after_restart.properties`).

@@ -134,6 +134,9 @@ _NET = [
  ('nova.ban.invited', 'You are invited', 'Вас пригласили'),
  ('nova.ban.join', 'Join', 'Войти'),
  ('nova.ban.no', 'No', 'Нет'),
+ ('nova.fr.mods', 'Download the mods', 'Загрузить моды'),
+ ('nova.net.modsgroup', 'Mods', 'Моды'),
+ ('nova.net.mods', 'Friends get my mods', 'Передавать друзьям мои моды'),
 ]
 for _k, _en, _ru in _NET:
     K.append(_k)

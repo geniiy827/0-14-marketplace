@@ -15,7 +15,10 @@
  *   presence {world: null | {name, mode: "friends" | "invite", max, players}}   (sent from the tunnel socket)
  *                                         -> invites [{from, world, players, max}], links [{id, peer, role}]
  *   invite {tag}  invite.decline {from}
- *   join {tag}                            -> {link, peer: "ip:port", name}  (sent from the tunnel socket)
+ *   join {tag, files?}                    -> {link, peer: "ip:port", name}  (sent from the tunnel socket)
+ *                                            files: a link only to download the host's mods (not a player)
+ * A world may carry "mods" (how many) and "msig" (signature of the host's mod set): a friend without the same set
+ * downloads it from the host over a files link (packets 0x06 / 0x07, relayed like 0x02).
  *   leave {link}
  */
 namespace NovaAccounts;
@@ -130,7 +133,9 @@ class Social{
 						"name" => mb_substr(isset($x["name"]) && is_string($x["name"]) ? $x["name"] : "", 0, 32, "UTF-8"),
 						"mode" => (isset($x["mode"]) && $x["mode"] === "invite") ? "invite" : "friends",
 						"max" => $max,
-						"players" => max(1, min($max, (int) (isset($x["players"]) ? $x["players"] : 1)))
+						"players" => max(1, min($max, (int) (isset($x["players"]) ? $x["players"] : 1))),
+						"mods" => max(0, min(64, (int) (isset($x["mods"]) ? $x["mods"] : 0))),
+						"msig" => (isset($x["msig"]) && is_string($x["msig"]) && preg_match('/^[0-9a-f]{0,40}$/', $x["msig"])) ? $x["msig"] : ""
 					];
 				}
 				$inv = isset($this->online[$id]) ? $this->online[$id][4] : [];
@@ -151,7 +156,8 @@ class Social{
 				foreach($inv as $from => $v){
 					if($v[0] <= time() - self::INVITE_SECONDS or ($wf = $this->worldOf($from, $id)) === null){ unset($this->online[$id][4][$from]); continue; }
 					$a = $this->store->byId($from);
-					if($a !== null) $invites[] = ["from" => $a["tag"], "world" => $wf["name"], "players" => $wf["players"], "max" => $wf["max"]];
+					if($a !== null) $invites[] = ["from" => $a["tag"], "world" => $wf["name"], "players" => $wf["players"], "max" => $wf["max"],
+						"mods" => $wf["mods"], "msig" => $wf["msig"]];
 				}
 				$links = [];
 				foreach($this->links as $lid => $l){
@@ -160,7 +166,7 @@ class Social{
 						$this->links[$lid][2] = [$ip, $port];              // the host's tunnel address may change
 						$this->byAddr[$ip . ":" . $port] = $lid;
 						$j = $this->store->byId($l[1]);
-						$links[] = ["id" => $lid, "peer" => $l[3][0] . ":" . $l[3][1], "role" => "host", "tag" => $j ? $j["tag"] : ""];
+						$links[] = ["id" => $lid, "peer" => $l[3][0] . ":" . $l[3][1], "role" => "host", "tag" => $j ? $j["tag"] : "", "files" => !empty($l[6])];
 					}
 				}
 				return ["ok" => true, "invites" => $invites, "links" => $links, "incoming" => $this->store->countRel($id, 0, false)];
@@ -186,12 +192,14 @@ class Social{
 				$hid = (int) $o["id"];
 				$w = $this->worldOf($hid, $id);
 				if($w === null) return $this->err("no_world", $o["tag"] . " сейчас не в открытом мире");
-				if($w["players"] >= $w["max"]) return $this->err("full", "Мир заполнен");
-				if(!$w["joinable"]) return $this->err("invite_only", "Вход только по приглашению");
-				if(isset($this->online[$id])) unset($this->online[$id][4][$hid]);
+				$files = !empty($req["files"]);                 // only downloading the host's mods: not a player
+				$invited = isset($this->online[$id][4][$hid]);
+				if(!$files and $w["players"] >= $w["max"]) return $this->err("full", "Мир заполнен");
+				if(!$w["joinable"] and !$invited and !($files and $w["mode"] === "friends")) return $this->err("invite_only", "Вход только по приглашению");
+				if(!$files and isset($this->online[$id])) unset($this->online[$id][4][$hid]);
 				do{ $lid = mt_rand(1, 0x7fffffff); }while(isset($this->links[$lid]));
 				$h = $this->online[$hid];
-				$this->links[$lid] = [$hid, $id, [$h[1], $h[2]], [$ip, $port], time(), $w["name"]];
+				$this->links[$lid] = [$hid, $id, [$h[1], $h[2]], [$ip, $port], time(), $w["name"], $files];
 				$this->byAddr[$h[1] . ":" . $h[2]] = $lid;
 				$this->byAddr[$ip . ":" . $port] = $lid;
 				$this->poke($hid);

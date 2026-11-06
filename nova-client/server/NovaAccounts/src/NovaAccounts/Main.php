@@ -90,7 +90,7 @@ class Main extends PluginBase{
 			$this->send($address, $port, $this->crypto->hello(substr($packet, 5, 8)));
 			return;
 		}
-		if($op === "\x02"){                                   // relay between the two ends of a game link
+		if($op === "\x02" or $op === "\x06" or $op === "\x07"){   // relay between the two ends of a link (game data, mod files)
 			$this->social->relay($address, $port, $packet);
 			return;
 		}

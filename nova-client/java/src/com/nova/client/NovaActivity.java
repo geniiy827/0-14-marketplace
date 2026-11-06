@@ -320,7 +320,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     }
 
     private void openAccountScreen(String mode) {
-        try { nativeOpenNova(3, mode, accLastTag); } catch (Throwable t) { Log.e(TAG, "account screen", t); }
+        try { nativeOpenNova(3, mode, ""); } catch (Throwable t) { Log.e(TAG, "account screen", t); }   // no prefilled tag: the keyboard could not erase it
     }
 
     /** a button of the account screen: "op\x1ftag\x1fpass\x1fpass2" */

@@ -404,6 +404,16 @@
 - [ ] check on device: buttons drawn over toggles, header button position, join from the friends tab, banner taps,
   UI reload in game (pause screen), RakNetInstance::host port when the world starts.
 - [ ] optional: LAN advertiser on 19132 so a friend's world also shows in the game's own list.
+- alpha17 (after the first device test: world froze joining one way; players 2/2 after leaving; no pause button;
+  prefilled tag could not be erased): pong-confirmed direct path, MTU 1400, player count by game traffic,
+  rate limit floor, tag not prefilled, mod sync (ModSet.java). Pause button: logs added ("ui definitions reloaded",
+  "pause screen served") — reason not found yet.
+- [ ] redstone for mod blocks: Block vtable 18-21/32/34/73/74 (isSignalSource, getDirectSignal, onRedstoneUpdate,
+  getRedstoneProperty), CircuitSystem::create<ProducerComponent>(pos, region, dir) / createComponent + Consumer/
+  PoweredBlock/Capacitor components; Dimension::getCircuitSystem.
+- [ ] dimensions: Dimension::createNew(DimensionId, Level&) only builds 0 Normal / 1 Hell (else null);
+  Level::createDimension, Entity/ServerPlayer::changeDimension, Level::entityChangeDimension, PortalForcer,
+  ChangeDimensionPacket; own one = subclass of NormalDimension (vtable copy, _createGenerator) + id 2+.
 
 ## Plan: remote "LAN" play (later, user's decision 2026-11-06)
 - Server: Genisys (PocketMine fork, PHP) on an MCPE host with plugins. Plugin on the game UDP port: raw packets with
