@@ -16,8 +16,9 @@ final class ApiOps {
     static final int TIP = 11;
     static final int POPUP = 12;
     static final int UI_ACTION = 13;
-    static final int WORLD_BLOCK = 14;
-    static final int WORLD_SET_BLOCK = 15;
-    static final int WORLD_TIME = 16;
-    static final int WORLD_SET_TIME = 17;
+    static final int HUD = 14;
+    static final int WORLD_BLOCK = 15;
+    static final int WORLD_SET_BLOCK = 16;
+    static final int WORLD_TIME = 17;
+    static final int WORLD_SET_TIME = 18;
 }

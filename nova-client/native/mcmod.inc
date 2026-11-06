@@ -170,6 +170,7 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
     #undef FL
 }
 
+static int hud_op(double *a, int n, char *s);
 void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, void *darr, void *jstr) {
     void **f = *(void ***)env;
     double a[16];
@@ -182,6 +183,7 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     static char s[2048];
     jstr_copy(env, jstr, s, sizeof s);
     double out[72];
+    if (op == OP_HUD) { hud_op(a, n, s); return 0; }
     int r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
         : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
         ? sc_op(op, a, n, out) : mm_op(op, a, n, s, out);

@@ -257,3 +257,8 @@ block my_lamp_lit { texture: "textures/on.png" light: 15 redstone: {type: "lamp_
 Делается конвертером `tools/port_rs.py` из `.nbt`-шаблонов Java (блоки переводятся в блоки 0.14 для 4 поворотов,
 сундуки получают лут через `WeighedTreasureItem::addChestItems`, спавнеры — моба). Пример — `mcmod/examples/adventure_craft`
 (перенос Repurposed Structures, LGPL-3.0).
+
+## Ряд иконок на HUD (alpha22)
+`ui.hud("thirst", ["textures/a.png", ...], 1, "right")` — ряд иконок 9x9 над хотбаром, как сердца и голод:
+до 20 картинок мода слева направо; row 1 — над голодом/сердцами, 2 — выше; side "right" (голод) или "left" (сердца).
+`ui.hud("thirst", [])` — убрать. Пример — жажда в `mcmod/examples/adventure_craft`.

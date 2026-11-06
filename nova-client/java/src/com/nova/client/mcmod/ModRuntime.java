@@ -408,6 +408,22 @@ public final class ModRuntime {
             }
             case "world.entities": return new ArrayList<Object>(entities);
             case "ui.toast": host.toast(Interp.str(a.get(0)), Interp.str(a.get(1))); return null;
+            case "ui.hud": {                     // icons of the mod -> nova/mod/<id>/<file>, drawn by libnova (hud.inc)
+                Mod m = modOf(in);
+                StringBuilder sb = new StringBuilder(Interp.str(a.get(0)));
+                Object list = a.get(1);
+                if (list instanceof List) {
+                    int k = 0;
+                    for (Object o : (List<?>) list) {
+                        if (k++ >= 20) break;
+                        String f = o == null ? "" : Interp.str(o);
+                        sb.append('|').append(f.length() == 0 ? "" : f.indexOf('/') < 0 && !f.endsWith(".png") ? f : "nova/mod/" + m.id + "/" + f);
+                    }
+                }
+                double side = "left".equals(Interp.str(a.get(3))) ? 1 : 0;
+                host.nativeApi(ApiOps.HUD, new double[]{a.get(2) instanceof Double ? (Double) a.get(2) : 1, side}, sb.toString());
+                return null;
+            }
             case "data.save": {
                 Mod m = modOf(in);
                 data(m).put(Interp.str(a.get(0)), Json.copy(a.get(1), line));

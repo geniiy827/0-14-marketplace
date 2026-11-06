@@ -659,6 +659,18 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
 
     private byte[] fileData(String path) {
         String np0 = norm(path);
+        // pictures of mods for libnova (ui.hud): nova/mod/<mod id>/<file in the mod>
+        if (np0 != null && np0.startsWith("nova/mod/") && !np0.contains("..")) {
+            String rest = np0.substring(9);
+            int sl = rest.indexOf('/');
+            if (sl > 0) {
+                PackManager.Pack p = PackManager.find(this, "mod-" + rest.substring(0, sl));
+                if (p != null) {
+                    try { return PackManager.readFile(new java.io.File(p.files(), rest.substring(sl + 1))); } catch (Exception e) { return null; }
+                }
+            }
+            return null;
+        }
         // mod blocks: the block atlas grows a strip for their textures, and they need names
         ModBlocks mb = ModBridge.blocks;
         if (mb != null && np0 != null) {

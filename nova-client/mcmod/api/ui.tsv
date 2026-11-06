@@ -4,3 +4,5 @@ ui.tip	text:any	-	native:TIP	wip	Надпись над хотбаром на п�
 ui.popup	title:any, text:any=""	-	native:POPUP	wip	Всплывающее сообщение игры (заголовок + текст)
 ui.toast	title:any, text:any=""	-	java:ui.toast	wip	Уведомление NOVA сверху экрана
 ui.action	text:str	-	native:UI_ACTION	wip	Показать свою кнопку действия (как «Сесть» у лодки) с этой подписью; "" — убрать. Нажатие — событие action
+ui.hud	slot:str, icons:any, row:num=1, side:str="right"	-	java:ui.hud	wip	Ряд иконок 9x9 над хотбаром, как сердца и голод: icons — список картинок мода (до 10, слева направо); row 1 — над голодом/сердцами, 2 — выше; side "right" (сторона голода) или "left" (сердца); [] — убрать
+__hud	slot:str	-	native:HUD	wip	внутреннее: ui.hud

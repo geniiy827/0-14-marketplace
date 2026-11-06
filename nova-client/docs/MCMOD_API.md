@@ -13,6 +13,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `len(value:any)` | num | работает | Длина строки, списка или таблицы |
 | `type(value:any)` | str | работает | Тип значения: number string bool list map fn null |
 | `random(a:any=null, b:any=null)` | num | работает | random() дробное 0..1; random(a, b) целое от a до b включительно (если a и b целые); random(n) целое 0..n |
+| `__hud(slot:str)` | - | в работе | внутреннее: ui.hud |
 
 ## chat
 
@@ -116,6 +117,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `ui.popup(title:any, text:any="")` | - | в работе | Всплывающее сообщение игры (заголовок + текст) |
 | `ui.toast(title:any, text:any="")` | - | в работе | Уведомление NOVA сверху экрана |
 | `ui.action(text:str)` | - | в работе | Показать свою кнопку действия (как «Сесть» у лодки) с этой подписью; "" — убрать. Нажатие — событие action |
+| `ui.hud(slot:str, icons:any, row:num=1, side:str="right")` | - | в работе | Ряд иконок 9x9 над хотбаром, как сердца и голод: icons — список картинок мода (до 10, слева направо); row 1 — над голодом/сердцами, 2 — выше; side "right" (сторона голода) или "left" (сердца); [] — убрать |
 
 ## vec
 

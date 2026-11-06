@@ -1,7 +1,488 @@
-// Adventure Craft. Постройки ставит генератор мира NOVA (structures.bin) в новых чанках, лут - в сундуках.
-// Авторы оригинальных построек - CREDITS.txt.
+// Adventure Craft.
+//  - Постройки: генератор мира NOVA ставит их по structures.bin в новых чанках (авторы - CREDITS.txt).
+//  - Жажда: перенос системы жажды SimpleDifficulty (Charles445, MIT), которая сама сделана по Tough As Nails.
+//    Числа те же, что в SimpleDifficulty: ModConfig.thirst, ThirstEnum, ItemJuice.JuiceEnum.
+// Команды: /adventure - что есть в моде, /thirst - жажда сейчас, /ac give - выдать предметы жажды.
+
+// ================================================================ предметы жажды
+item canteen {
+    name: {ru: "Фляга (пустая)", en: "Canteen"}
+    texture: "textures/canteen.png"
+    stack: 1
+    action: "Набрать воду"
+}
+item canteen_water {
+    name: {ru: "Фляга с водой", en: "Canteen of water"}
+    texture: "textures/canteen.png"
+    stack: 1
+    durability: 3
+    action: "Выпить"
+}
+item canteen_purified {
+    name: {ru: "Фляга с чистой водой", en: "Canteen of purified water"}
+    texture: "textures/canteen.png"
+    stack: 1
+    durability: 3
+    action: "Выпить"
+}
+item purified_water_bottle {
+    name: {ru: "Бутылка чистой воды", en: "Purified water bottle"}
+    texture: "textures/purified_water_bottle.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_apple {
+    name: {ru: "Яблочный сок", en: "Apple juice"}
+    texture: "textures/juice_apple.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_beetroot {
+    name: {ru: "Свекольный сок", en: "Beetroot juice"}
+    texture: "textures/juice_beetroot.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_cactus {
+    name: {ru: "Кактусовый сок", en: "Cactus juice"}
+    texture: "textures/juice_cactus.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_carrot {
+    name: {ru: "Морковный сок", en: "Carrot juice"}
+    texture: "textures/juice_carrot.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_golden_apple {
+    name: {ru: "Сок золотого яблока", en: "Golden apple juice"}
+    texture: "textures/juice_golden_apple.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_golden_carrot {
+    name: {ru: "Сок золотой моркови", en: "Golden carrot juice"}
+    texture: "textures/juice_golden_carrot.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_golden_melon {
+    name: {ru: "Сок сверкающего арбуза", en: "Glistering melon juice"}
+    texture: "textures/juice_golden_melon.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_melon {
+    name: {ru: "Арбузный сок", en: "Melon juice"}
+    texture: "textures/juice_melon.png"
+    stack: 1
+    action: "Выпить"
+}
+item juice_pumpkin {
+    name: {ru: "Тыквенный сок", en: "Pumpkin juice"}
+    texture: "textures/juice_pumpkin.png"
+    stack: 1
+    action: "Выпить"
+}
+
+// ================================================================ числа SimpleDifficulty
+var EXHAUSTION_LIMIT = 4.0        // thirstExhaustionLimit: столько усталости = минус 1 (насыщенность или капля)
+var THIRSTY_STRENGTH = 0.025      // эффект «Жажда» (грязная вода): усталость за тик
+var THIRSTY_TICKS = 600           // 30 секунд
+var EX_ATTACK = 0.3               // удар
+var EX_BREAK = 0.025              // сломать блок
+var EX_SPRINT_JUMP = 0.8          // прыжок на бегу
+var EX_JUMP = 0.2                 // прыжок
+var EX_BASE = 0.01                // движение (за блок): в воздухе
+var EX_SWIM = 0.015               // плавание
+var EX_SPRINT = 0.1               // бег
+var EX_WALK = 0.01                // шаг
+var NO_SPRINT_AT = 6              // при 6 и ниже нельзя бегать
+var HURT_EVERY = 80               // при 0 - урон раз в 4 секунды
+
+// питьё: [жажда, насыщенность, шанс грязной воды]   (ThirstEnum)
+var D_NORMAL = [3, 0.3, 0.75]
+var D_RAIN = [1, 0.05, 0]
+var D_POTION = [2, 0.2, 0]
+var D_PURIFIED = [6, 3.0, 0]
+// соки (JuiceEnum)
+var JUICES = {}
+
+// ================================================================ состояние
+var thirst = 20                   // 0..20
+var sat = 2.0                     // насыщенность жажды (0..thirst)
+var ex = 0.0                      // усталость жажды
+var thirsty = 0                   // тиков эффекта «Жажда»
+var hurtTimer = 0
+var lastPos = null
+var key = ""                      // сохранение: отдельно для каждого мира
+var hudKey = ""
+var act = ""
+var tickN = 0
+var dmg = null                    // EntityDamageSource «голод» (как у игры)
+var active = true                 // жажда работает (не в творческом)
+
+fn juices() {
+    JUICES[str(juice_apple)] = [8, 6.4]
+    JUICES[str(juice_beetroot)] = [10, 8.0]
+    JUICES[str(juice_cactus)] = [9, 2.7]
+    JUICES[str(juice_carrot)] = [8, 4.8]
+    JUICES[str(juice_golden_apple)] = [20, 20.0]
+    JUICES[str(juice_golden_carrot)] = [14, 14.0]
+    JUICES[str(juice_golden_melon)] = [16, 16.0]
+    JUICES[str(juice_melon)] = [8, 4.0]
+    JUICES[str(juice_pumpkin)] = [7, 4.9]
+}
+
+fn save() {
+    if key != "" { data.save(key, [thirst, sat, ex, thirsty]) }
+}
+
+fn creative() {
+    var ld = mc.call("Level::getLevelData()", mc.level())
+    return mc.calli("LevelData::getGameType() const", ld) == 1
+}
+
+// ThirstUtil.takeDrink
+fn drink(d) {
+    if thirst >= 20 and d[0] < 20 {
+        ui.tip("§bТы не хочешь пить")
+        return false
+    }
+    thirst = math.min(20, thirst + d[0])
+    sat = math.min(thirst, sat + d[1])
+    if d[2] > 0 and math.chance(d[2]) {
+        thirsty = THIRSTY_TICKS
+        ui.tip("§2Грязная вода... (жажда)")
+    }
+    hudKey = ""
+    save()
+    return true
+}
+
+fn addEx(v) {
+    if active { ex += v }
+}
+
+// ================================================================ предмет в руке
+fn hand() { return mc.call("Player::getSelectedItem() const", mc.player()) }
+
+fn inventory() { return mem.ptr(mc.player(), 0xda0) }
+
+fn useOne() {                     // минус один предмет из руки
+    var it = hand()
+    if it == 0 { return }
+    var n = mem.ubyte(it, 0)
+    if n > 1 {
+        mem.setByte(it, n - 1)
+    } else {
+        var inv = inventory()
+        mc.call("Inventory::clearSlot(int)", inv, mc.calli("Inventory::getSelectedSlot() const", inv))
+    }
+}
+
+fn give(id, count, aux = 0) {
+    var it = mem.alloc(64)
+    mc.call("ItemInstance::ItemInstance(int, int, int)", it, id, count, aux)
+    mc.call("Inventory::add(ItemInstance&, bool)", inventory(), it, true)
+}
+
+fn replaceHand(id, aux = 0) {      // предмет в руке становится другим (на том же месте)
+    var it = hand()
+    if it == 0 { return }
+    mc.call("ItemInstance::ItemInstance(int, int, int)", it, id, 1, aux)
+}
+
+// ================================================================ вода, на которую смотрит игрок
+fn lookWater() {
+    var p = player.pos()
+    var l = player.look()
+    var x = p.x
+    var y = p.y + 1.62
+    var z = p.z
+    var i = 0
+    while i < 22 {
+        var b = world.block(math.floor(x), math.floor(y), math.floor(z))
+        if b == 8 or b == 9 { return true }
+        if b != 0 and b != 31 and b != 32 and b != 37 and b != 38 and b != 78 and b != 106 and b != 175 { return false }
+        x += l.x * 0.2
+        y += l.y * 0.2
+        z += l.z * 0.2
+        i += 1
+    }
+    return false
+}
+
+fn inRain() {
+    var p = mc.player()
+    return mc.call("Entity::isInWaterOrRain()", p) != 0 and mc.call("Entity::isInWater() const", p) == 0
+}
+
+fn headInWater() {
+    var p = player.pos()
+    var b = world.block(math.floor(p.x), math.floor(p.y + 1.62), math.floor(p.z))
+    return b == 8 or b == 9
+}
+
+// ================================================================ полоска жажды (как в ThirstGui: справа налево)
+fn hud() {
+    if not active {
+        if hudKey != "off" { ui.hud("thirst", []); hudKey = "off" }
+        return
+    }
+    var row = headInWater() ? 2 : 1
+    var s = math.floor(sat)
+    var k = "{thirst}:{s}:{thirsty > 0}:{row}"
+    if k == hudKey { return }
+    hudKey = k
+    var pre = thirsty > 0 ? "textures/thirst/dirty_" : "textures/thirst/"
+    var icons = []
+    var i = 9
+    while i >= 0 {
+        var half = i * 2 + 1
+        var name = "empty"
+        if half < thirst { name = "full" } else if half == thirst { name = "half" }
+        if thirsty == 0 and name != "empty" and half <= s { name = "sat_" + name }
+        icons.add(pre + name + ".png")
+        i -= 1
+    }
+    ui.hud("thirst", icons, row, "right")
+}
+
+// ================================================================ крафты (как игра: Recipes / FurnaceRecipes)
+var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+fn stack(p, id, count, aux = 0) { mc.call("ItemInstance::ItemInstance(int, int, int)", p, id, count, aux) }
+
+fn shaped(result, count, rows, keys) {
+    var book = mc.callAt(mc.sym("Recipes::getInstance()"))
+    var out = mem.alloc(20)
+    stack(out, result, count)
+    if mc.call("Recipes::getRecipeFor(ItemInstance const&)", book, out) != 0 { return }
+    var n = keys.len()
+    var types = mem.alloc(n * 32)
+    var i = 0
+    while i < n {
+        var t = types + i * 32
+        stack(t + 8, keys[i][1], 1, keys[i].len() > 2 ? keys[i][2] : 0)
+        mem.setByte(t + 28, LETTERS.find(keys[i][0]) + 65)
+        i += 1
+    }
+    var vec = mem.alloc(12)
+    mem.setPtr(vec, types)
+    mem.setPtr(vec + 4, types + n * 32)
+    mem.setPtr(vec + 8, types + n * 32)
+    mc.call("Recipes::addShapedRecipe(ItemInstance const&, std::string const&, std::string const&, std::string const&, std::vector<Recipes::Type, std::allocator<Recipes::Type> > const&)",
+            book, out, rows[0], rows[1], rows[2], vec)
+}
+
+var recipesDone = false
+fn recipes() {
+    if recipesDone { return }
+    recipesDone = true
+    var LEATHER = 334
+    var SUGAR = 353
+    shaped(canteen, 1, ["L  ", "LL ", "LLL"], [["L", LEATHER]])
+    shaped(juice_apple, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 260]])
+    shaped(juice_beetroot, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 457]])
+    shaped(juice_cactus, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 81]])
+    shaped(juice_carrot, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 391]])
+    shaped(juice_golden_apple, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 322]])
+    shaped(juice_golden_carrot, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 396]])
+    shaped(juice_golden_melon, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 382]])
+    shaped(juice_melon, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 103]])
+    shaped(juice_pumpkin, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 86]])
+    // печь: бутылка воды -> чистая вода, фляга воды -> фляга чистой воды (RegisterRecipes: addSmelting)
+    var fr = mc.callAt(mc.sym("FurnaceRecipes::getInstance()"))
+    var r1 = mem.alloc(20)
+    stack(r1, purified_water_bottle, 1)
+    mc.call("FurnaceRecipes::addFurnaceRecipeAuxData(short, short, ItemInstance const&)", fr, 373, 0, r1)
+    var r2 = mem.alloc(20)
+    stack(r2, canteen_purified, 1)
+    mc.call("FurnaceRecipes::addFurnaceRecipe(int, ItemInstance const&)", fr, canteen_water, r2)
+}
+
+// ================================================================ ванильное питьё и еда (зелья, молоко, арбуз, супы)
+hook "ItemInstance::useTimeDepleted(Level*, Player*)" (self, level, pl) {
+    var id = mc.calli("ItemInstance::getId() const", self)
+    var aux = mem.short(self, 2)
+    var r = original()
+    if pl == mc.player() and active {
+        if id == 373 { drink(aux == 0 ? D_NORMAL : D_POTION) }      // бутылка воды / зелье
+        else if id == 335 { drink([4, 1.0, 0]) }                      // молоко
+        else if id == 360 { drink([2, 0.5, 0]) }                      // ломтик арбуза
+        else if id == 282 or id == 459 or id == 413 { drink([2, 0.5, 0]) }   // супы
+    }
+    return r
+}
+
+// ================================================================ события
+on world.join(e) {
+    if len(JUICES) == 0 { juices() }
+    key = "thirst_" + str(mc.call("Level::getSeed()", mc.level()))
+    var s = data.load(key, null)
+    if s != null {
+        thirst = s[0]
+        sat = s[1]
+        ex = s[2]
+        thirsty = s[3]
+    } else {
+        thirst = 20
+        sat = 2.0
+        ex = 0
+        thirsty = 0
+    }
+    lastPos = null
+    hudKey = ""
+    act = ""
+    dmg = null
+    recipes()
+}
+
+on world.leave(e) {
+    save()
+    ui.hud("thirst", [])
+}
+
+on player.jump(e) {
+    addEx(mc.call("Mob::isSprinting() const", mc.player()) != 0 ? EX_SPRINT_JUMP : EX_JUMP)
+}
+
+on entity.attack(e) { addEx(EX_ATTACK) }
+
+on block.break(e) { addEx(EX_BREAK) }
+
+on action(e) {
+    var id = player.item()
+    if id == canteen {
+        if lookWater() { replaceHand(canteen_water, 0); ui.tip("§bФляга наполнена") }
+        else { ui.tip("§7Посмотри на воду") }
+        return
+    }
+    if id == canteen_water or id == canteen_purified {
+        if lookWater() and id == canteen_water and player.itemData() > 0 {
+            replaceHand(canteen_water, 0)
+            ui.tip("§bФляга наполнена")
+            return
+        }
+        if drink(id == canteen_water ? D_NORMAL : D_PURIFIED) {
+            var used = player.itemData() + 1
+            if used >= 3 { replaceHand(canteen, 0) } else { mem.setShort(hand() + 2, used) }
+        }
+        return
+    }
+    if id == purified_water_bottle {
+        if drink(D_PURIFIED) { useOne(); give(374, 1) }
+        return
+    }
+    if JUICES.has(str(id)) {
+        var j = JUICES[str(id)]
+        if drink([j[0], j[1], 0]) { useOne(); give(374, 1) }
+        return
+    }
+    // пустая рука: из воды или дождь
+    if act == "Пить" { drink(D_NORMAL) }
+    else if act == "Пить дождь" { drink(D_RAIN) }
+}
+
+on tick(e) {
+    var p = mc.player()
+    if p == null or p == 0 { return }
+    tickN += 1
+    if tickN % 20 == 0 { active = not creative() }
+    if not active { hud(); return }
+
+    // движение (CapabilityThirst.tickUpdate): за каждую сотую блока
+    var pos = player.pos()
+    if lastPos != null {
+        var d = math.dist(pos.x, pos.y, pos.z, lastPos.x, lastPos.y, lastPos.z)
+        if d < 10 and d > 0.001 {
+            var k = EX_BASE
+            if mc.call("Entity::isInWater() const", p) != 0 { k = EX_SWIM }
+            else if player.onGround() {
+                k = mc.call("Mob::isSprinting() const", p) != 0 ? EX_SPRINT : EX_WALK
+            }
+            ex += k * d
+        }
+    }
+    lastPos = pos
+
+    // эффект «Жажда» от грязной воды
+    if thirsty > 0 {
+        thirsty -= 1
+        ex += THIRSTY_STRENGTH
+        if thirsty == 0 { hudKey = "" }
+    }
+
+    // усталость -> насыщенность -> капли
+    if ex > EXHAUSTION_LIMIT {
+        ex -= EXHAUSTION_LIMIT
+        if sat > 0 { sat = math.max(0, sat - 1) } else if thirst > 0 { thirst -= 1 }
+    }
+    if sat > thirst { sat = thirst }
+
+    // при 6 и ниже нельзя бежать
+    if thirst <= NO_SPRINT_AT and mc.call("Mob::isSprinting() const", p) != 0 {
+        mc.call("LocalPlayer::setSprinting(bool)", p, false)
+    }
+
+    // обезвоживание: урон, как от голода (EntityDamageSource 16 = голод), пока здоровья больше 1 сердца
+    if thirst <= 0 {
+        hurtTimer += 1
+        if hurtTimer >= HURT_EVERY {
+            hurtTimer = 0
+            if mc.calli("Mob::getHealth() const", p) > 2 {
+                if dmg == null {
+                    dmg = mem.alloc(32)
+                    mc.call("EntityDamageSource::EntityDamageSource(EntityDamageCause)", dmg, 16)
+                }
+                mc.callAt(mem.ptr(mem.ptr(p), 0x108), p, dmg, 1)        // Entity::hurt (слот 66 vtable)
+                ui.tip("§cОбезвоживание!")
+            }
+        }
+    } else {
+        hurtTimer = 0
+    }
+
+    // своя кнопка: пить из воды (присесть + смотреть на воду) или дождь (смотреть вверх)
+    if tickN % 4 == 0 {
+        var want = ""
+        if player.item() == 0 {
+            if player.sneaking() and lookWater() { want = "Пить" }
+            else if player.pitch() < -75 and inRain() { want = "Пить дождь" }
+        }
+        if want != act {
+            act = want
+            ui.action(want)
+        }
+    }
+
+    hud()
+    if tickN % 100 == 0 { save() }
+}
+
+// ================================================================ команды
 on chat(e) {
-    if e.text != "/adventure" { return }
-    e.cancel()
-    ui.tip("§6Adventure Craft§f: данжи (9 видов), пирамиды (8), башни (5), храм тайги, колодцы, обелиски, хижины ведьм, болотные арки и руины. Ищи в новых чанках.")
+    if e.text == "/adventure" {
+        e.cancel()
+        ui.tip("§6Adventure Craft§f: постройки (113) и жажда. /thirst - жажда, /ac give - предметы")
+    } else if e.text == "/thirst" {
+        e.cancel()
+        chat.send("§bЖажда {thirst}/20, насыщенность {math.roundTo(sat, 1)}, усталость {math.roundTo(ex, 2)}" + (thirsty > 0 ? ", §2грязная вода {math.floor(thirsty / 20)} с" : ""))
+    } else if e.text == "/ac give" {
+        e.cancel()
+        give(canteen, 1)
+        give(canteen_purified, 1)
+        give(purified_water_bottle, 4)
+        give(juice_apple, 2)
+        give(juice_melon, 2)
+        ui.tip("§6Adventure Craft: §fпредметы жажды выданы")
+    } else if e.text == "/thirst 0" or e.text == "/thirst 20" {
+        e.cancel()
+        thirst = e.text == "/thirst 0" ? 0 : 20
+        sat = 0
+        hudKey = ""
+        save()
+    }
 }

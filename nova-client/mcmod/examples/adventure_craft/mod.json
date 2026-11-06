@@ -1,2 +1,2 @@
-{"id": "adventure_craft", "name": "Adventure Craft", "version": "0.1.0", "author": "RCodeStudio", "main": "main.mcs",
- "description": "113 построек с лутом: данжи, пирамиды, башни, храмы, колодцы, хижины ведьм, руины пустынь и болот"}
+{"id": "adventure_craft", "name": "Adventure Craft", "version": "0.2.0", "author": "RCodeStudio", "main": "main.mcs",
+ "description": "113 построек с лутом и система жажды (фляги, чистая вода, соки)"}

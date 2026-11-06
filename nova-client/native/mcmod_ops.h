@@ -12,10 +12,11 @@
 #define OP_TIP 11
 #define OP_POPUP 12
 #define OP_UI_ACTION 13
-#define OP_WORLD_BLOCK 14
-#define OP_WORLD_SET_BLOCK 15
-#define OP_WORLD_TIME 16
-#define OP_WORLD_SET_TIME 17
+#define OP_HUD 14
+#define OP_WORLD_BLOCK 15
+#define OP_WORLD_SET_BLOCK 16
+#define OP_WORLD_TIME 17
+#define OP_WORLD_SET_TIME 18
 #define EV_WORLD_JOIN 1
 #define EV_WORLD_LEAVE 2
 #define EV_TICK 3

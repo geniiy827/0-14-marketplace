@@ -3,3 +3,5 @@ Adventure Craft - постройки перенесены в Minecraft PE 0.14 (
 - YUNG's Extras - YUNGNICKYOUNG - LGPL-3.0 - https://github.com/YUNG-GANG/YUNGs-Extras
 - Towers of the Wild - Idrae - CC BY-NC-SA 4.0 (не для продажи) - https://github.com/Idrae/Towers_Of_The_Wild-1.16.3
 Блоки и предметы заменены на те, что есть в 0.14 (tools/port_rs.py).
+- Жажда: SimpleDifficulty - Charles445 - MIT - https://github.com/Charles445/SimpleDifficulty
+  (механика, числа и текстуры фляги, бутылки чистой воды, соков и капель жажды)
