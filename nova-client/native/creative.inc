@@ -76,14 +76,22 @@ static CTab *ct_tab(int page, int i) {
  * A mod page puts our items in (a new vector each time: the model frees what it holds when the screen closes) */
 static const char *ct_names[4] = {"creative_building_blocks", "creative_decorations", "creative_tools", "creative_miscellaneous"};
 
+static void (*ct_changed)(void *model, int slot);       /* ContainerModel::_onItemChanged: the screen re-reads the slot */
+static void ct_notify(char *m, int before) {
+    int n = *(int *)(m + 0xc);
+    if (before > n) n = before;
+    if (ct_changed) for (int k = 0; k < n; k++) ct_changed(m, k);
+}
 static void ct_put(int i, int page) {
     char *m = ct_cm[i];
     if (!m) return;
+    int before = *(int *)(m + 0xc);
     if (page == 0) {
         if (ct_swapped[i]) {
             *(u32 *)(m + 0xc) = ct_saved[i][0];
             for (int k = 0; k < 3; k++) *(u32 *)(m + 0x14 + 4 * k) = ct_saved[i][1 + k];
             ct_swapped[i] = 0;
+            ct_notify(m, before);
         }
         return;
     }
@@ -108,6 +116,7 @@ static void ct_put(int i, int page) {
     *(u32 *)(m + 0x14) = (u32)arr;
     *(u32 *)(m + 0x18) = (u32)(arr + n * 20);
     *(u32 *)(m + 0x1c) = (u32)(arr + n * 20);
+    ct_notify(m, before);
 }
 static void ct_apply(int page) {
     for (int i = 0; i < 4; i++) ct_put(i, page);
@@ -161,12 +170,32 @@ static void h_iir_update(void *self, void *client, void **ctrl) {
     o_iir_update(self, client, ctrl);
 }
 
-static float ct_rect[4];                             /* arrows control, gui units */
+static float ct_rect[2][4];                          /* the two arrow controls, gui units */
 static void *ct_tb[2];
 static u32 ct_arrow_tex[2][16];
 static int ct_arrow_ok[2];
 static const char *ct_keys[4] = {"craftingScreen.tab.buildingBlocks", "craftingScreen.tab.decorations",
                                  "craftingScreen.tab.tools", "craftingScreen.tab.miscellaneous"};
+
+/* tabs a page does not have: the pictures (parents of nova_ct_icon_<k>) and the buttons (interactive_tabs/<name>) */
+static const char *ct_toggles[4] = {"building_blocks", "decorations", "tools", "miscellaneous"};
+static void ct_vis(char *c, int on) { c[0x30] = (char)((c[0x30] & ~4) | (on << 2)); }
+static void ct_tabs_walk(char *c, int depth, int in_tabs) {
+    if (!c || depth > 24) return;
+    char **it = *(char ***)(c + 0x40), **end = *(char ***)(c + 0x44);
+    for (; it && it < end; it += 2) {
+        char *ch = it[0];
+        if (!ch) continue;
+        const char *nm = sdata(ch + 0xc);
+        if (nm && nm[0] == 'n' && !memcmp(nm, "nova_ct_icon_", 13)) {
+            int k = nm[13] - '0';
+            if (k >= 0 && k < 4) ct_vis(c, ct_page == 0 || ct_tab(ct_page, k) != 0);
+            continue;
+        }
+        if (in_tabs && nm) for (int k = 0; k < 4; k++) if (streq(nm, ct_toggles[k])) ct_vis(ch, ct_page == 0 || ct_tab(ct_page, k) != 0);
+        ct_tabs_walk(ch, depth + 1, nm && streq(nm, "interactive_tabs"));
+    }
+}
 
 /* debug_overlay_renderer controls of inventory_screen.json: returns 1 when it was one of ours */
 static int ct_ui_render(void *client, char *cc) {
@@ -181,45 +210,47 @@ static int ct_ui_render(void *client, char *cc) {
         CTab *t = ct_page > 0 ? ct_tab(ct_page, k) : 0;
         if (ct_page > 0) snprintf(txt, sizeof txt, "%s", t ? t->name : "");
         else loc_into(ct_keys[k], txt, sizeof txt);
-        float col[4] = {0.4f, 0.95f, 0.88f, 1.f};
+        float col[4] = {0.4f, 0.95f, 0.88f, 1.f}, grey[4] = {0.75f, 0.78f, 0.85f, 1.f};
         if (font && txt[0]) draw_text_col(font, x, y, txt, col);
+        if (font && ct_count) {                            /* page number at the right end of the row */
+            char pg[16];
+            snprintf(pg, sizeof pg, "%d/%d", ct_page + 1, ct_pages());
+            int lw = 18;
+            if (f_fontwidth) { u32 st[1]; gstr(st, pg); lw = f_fontwidth(font, st, 1.f, 0); f_strdtor(st); }
+            draw_text_col(font, x + w - lw, y, pg, grey);
+        }
         return 1;
     }
-    if (memcmp(nm + 8, "arrows", 6)) return 1;
-    if (!ct_count) return 1;
+    int b = !memcmp(nm + 8, "next", 4) ? 1 : !memcmp(nm + 8, "prev", 4) ? 0 : -1;
+    if (b < 0 || !ct_count) return 1;
     int want = ct_want;
     if (want >= 0) { ct_want = -1; if (want != ct_page) ct_apply(want); }
-    ct_rect[0] = x; ct_rect[1] = y; ct_rect[2] = w; ct_rect[3] = h;
-    ct_drawn_at = now_ms();
-    int bh = (int)h, bw = bh + 4;
-    int r[8] = {(int)x, (int)y, bw, bh, (int)(x + w) - bw, (int)y, bw, bh};
-    for (int b = 0; b < 2; b++) {
-        if (!ct_tb[b]) ct_tb[b] = tb_new(client, "", 0);
-        if (ct_tb[b]) {
-            int *g = gel(ct_tb[b]);
-            g[0] = r[b * 4]; g[1] = r[b * 4 + 1]; g[2] = r[b * 4 + 2]; g[3] = r[b * 4 + 3];
-            tb_render(ct_tb[b], client, -1, -1);
-        }
-        if (f_gettex && f_blit && f_textures && f_sr) {
-            if (!ct_arrow_ok[b]) {
-                u32 s[1];
-                gstr(s, b ? "gui/newgui/arrowRight.png" : "gui/newgui/arrowLeft.png");
-                for (int j = 0; j < 16; j++) ct_arrow_tex[b][j] = 0;
-                f_gettex(ct_arrow_tex[b], f_textures(client), s, 0);
-                f_strdtor(s);
-                ct_arrow_ok[b] = 1;
-            }
-            int s8 = bh >= 16 ? 8 : 6;
-            int rect[4] = {r[b * 4] + (bw - s8) / 2, r[b * 4 + 1] + (bh - s8) / 2, s8, s8};
-            f_blit(f_sr(), ct_arrow_tex[b], rect);
-        }
+    if (b == 0) {                                          /* once per frame: tabs this page has */
+        char *root = cc;
+        for (int d = 0; d < 40; d++) { char *p = *(char **)(root + 0x38); if (!p) break; root = p; }
+        ct_tabs_walk(root, 0, 0);
     }
-    char label[16];
-    snprintf(label, sizeof label, "%d/%d", ct_page + 1, ct_pages());
-    float white[4] = {1, 1, 1, 1};
-    int lw = 18;
-    if (font && f_fontwidth) { u32 s[1]; gstr(s, label); lw = f_fontwidth(font, s, 1.f, 0); f_strdtor(s); }
-    if (font) draw_text_col(font, x + w / 2 - lw / 2, y + (h - 8) / 2, label, white);
+    ct_rect[b][0] = x; ct_rect[b][1] = y; ct_rect[b][2] = w; ct_rect[b][3] = h;
+    ct_drawn_at = now_ms();
+    if (!ct_tb[b]) ct_tb[b] = tb_new(client, "", 0);
+    if (ct_tb[b]) {
+        int *g = gel(ct_tb[b]);
+        g[0] = (int)x; g[1] = (int)y; g[2] = (int)w; g[3] = (int)h;
+        tb_render(ct_tb[b], client, -1, -1);
+    }
+    if (f_gettex && f_blit && f_textures && f_sr) {
+        if (!ct_arrow_ok[b]) {
+            u32 st[1];
+            gstr(st, b ? "gui/newgui/arrowRight.png" : "gui/newgui/arrowLeft.png");
+            for (int j = 0; j < 16; j++) ct_arrow_tex[b][j] = 0;
+            f_gettex(ct_arrow_tex[b], f_textures(client), st, 0);
+            f_strdtor(st);
+            ct_arrow_ok[b] = 1;
+        }
+        int s8 = h >= 18 ? 12 : 8;
+        int rect[4] = {(int)(x + (w - s8) / 2), (int)(y + (h - s8) / 2), s8, s8};
+        f_blit(f_sr(), ct_arrow_tex[b], rect);
+    }
     return 1;
 }
 
@@ -227,10 +258,9 @@ static int ct_ui_render(void *client, char *cc) {
 static int ct_touch(u32 *w, float scale) {
     if (!ct_count || now_ms() - ct_drawn_at > 300) return 0;          /* only while the screen shows them */
     float x = (short)w[2] / scale, y = (short)w[3] / scale;
-    float bw = ct_rect[3] + 4;
     for (int b = 0; b < 2; b++) {
-        float x0 = b ? ct_rect[0] + ct_rect[2] - bw : ct_rect[0];
-        if (x >= x0 - 3 && x < x0 + bw + 3 && y >= ct_rect[1] - 4 && y < ct_rect[1] + ct_rect[3] + 4) {
+        float *r = ct_rect[b];
+        if (x >= r[0] - 3 && x < r[0] + r[2] + 3 && y >= r[1] - 3 && y < r[1] + r[3] + 3) {
             if ((w[1] & 0xff) == 1) {
                 int n = ct_pages(), p = ct_page + (b ? 1 : -1);
                 if (p < 0) p = n - 1;
@@ -247,6 +277,7 @@ static int patch_slot(u32 vt, int idx, void *fn, void **orig);
 static void creative_init(void *mc) {
     f_fontwidth = dlsym(mc, "_ZNK4Font13getLineLengthERKSsfb");
     ct_cname = dlsym(mc, "_ZNK14ContainerModel22getContainerStringNameEv");
+    ct_changed = dlsym(mc, "_ZN14ContainerModel14_onItemChangedEi");
     ct_bag = dlsym(mc, "_ZN9UIControl14getPropertyBagEv");
     ct_json_at = dlsym(mc, "_ZN4Json5ValueixEPKc");
     ct_json_int = dlsym(mc, "_ZN4Json5ValueC1Ei");

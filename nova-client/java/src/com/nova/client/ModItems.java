@@ -117,7 +117,7 @@ final class ModItems {
                 int kind = 0;
                 switch (toolKind) {
                     case "pickaxe": kind = 1; break; case "axe": kind = 2; break; case "shovel": kind = 3; break;
-                    case "sword": kind = 4; break; case "hoe": kind = 5; break;
+                    case "sword": kind = 4; break; case "hoe": kind = 5; break; case "shears": kind = 10; break;
                     case "": break;
                     default: throw new Exception("tool: \"pickaxe\", \"axe\", \"shovel\", \"sword\" или \"hoe\"");
                 }
@@ -127,8 +127,28 @@ final class ModItems {
                     case "": break;
                     default: throw new Exception("armor: \"helmet\", \"chestplate\", \"leggings\" или \"boots\"");
                 }
+                String itype = p.get("type") == null ? "" : String.valueOf(p.get("type"));
+                if (itype.equals("bow")) kind = 11; else if (itype.equals("bucket")) kind = 12; else if (itype.equals("door")) kind = 13;
+                else if (!itype.isEmpty()) throw new Exception("type: \"bow\", \"bucket\" или \"door\"");
+                double doorBlock = 0;
+                if (kind == 13) {
+                    Double db = rt.customIds.get(m.id + ":" + p.get("door"));
+                    if (db == null) throw new Exception("door: блок-дверь этого мода (block .. { type: \"door\" })");
+                    doorBlock = db;
+                }
+                if (p.get("frames") instanceof List) {         // bow: 3 pulling pictures; bucket: empty, water, lava, milk
+                    List<?> fr = (List<?>) p.get("frames");
+                    for (int k = 0; k < fr.size() && k < 4; k++) {
+                        float[] fuv = new float[4];
+                        icon(dir, String.valueOf(fr.get(k)), "pixel".equals(p.get("size")), fuv);
+                        varData.add((double) id); varData.add(1000.0 + k);
+                        for (float f : fuv) varData.add((double) f);
+                        if (varNames.length() > 0) varNames.append('\u001f');
+                        varNames.append(name);
+                    }
+                }
                 Map<?, ?> tier = p.get("tier") instanceof Map ? (Map<?, ?>) p.get("tier") : new HashMap<String, Object>();
-                double tLevel = num(tier.get("level"), 1), tUses = num(tier.get("uses"), 250), tSpeed = num(tier.get("speed"), 6),
+                double tLevel = kind == 13 ? doorBlock : num(tier.get("level"), 1), tUses = num(tier.get("uses"), kind >= 10 && p.get("durability") instanceof Double ? (Double) p.get("durability") : 250), tSpeed = num(tier.get("speed"), 6),
                        tDamage = num(tier.get("damage"), 2), tEnch = num(tier.get("enchant"), 10);
                 double aDef = 0, aMul = 0, aIdx = -1;
                 if (kind >= 6) {
@@ -151,7 +171,7 @@ final class ModItems {
                     }
                     aIdx = ai;
                 }
-                boolean tool = "tool".equals(p.get("hand")) || "weapon".equals(p.get("hand")) || (kind >= 1 && kind <= 5);
+                boolean tool = "tool".equals(p.get("hand")) || "weapon".equals(p.get("hand")) || (kind >= 1 && kind <= 5) || kind == 10 || kind == 11;
                 int stack = (int) clamp(num(p.get("stack"), tool ? 1 : 64), 1, 64);
                 int dur = (int) clamp(num(p.get("durability"), 0), 0, 32000);
                 Object cat = p.get("category");

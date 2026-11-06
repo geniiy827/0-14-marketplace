@@ -211,3 +211,16 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   (есть классы игры: SlabBlock, StairBlock, ThinFenceBlock, DoorBlock/DoorItem::place, PressurePlateBlock, BowItem, BucketItem;
   нужны текстуры по имени в terrain.meta/items.meta).
 - Не найдено: мультиплеер в 27 (зависание/Server is full - нужен nova_log.txt), кукла (короткие руки, одна нога).
+
+## alpha29
+- Имена вариантов (variants) попадают в глобальные имена скрипта (ModRuntime.startMod: все customIds "mod:имя").
+- Страницы вкладок: после подмены вектора ContainerModel::_onItemChanged(слот) по всем слотам (иначе экран держит старое);
+  пустые вкладки прячутся (бит видимости +0x30: родители nova_ct_icon_k и interactive_tabs/<имя>); стрелки -
+  nova_ct_prev/nova_ct_next снаружи панели, номер страницы в строке названия.
+- Классы игры для блоков модов (type): stairs (StairBlock 0xa0, base), bars (ThinFenceBlock 0xb4), pressure_plate
+  (PressurePlateBlock 0xa0), door (DoorBlock 0xd0, текстуры +0x9c/+0xb4, getResource -> предмет двери).
+  Текстуры по имени: Java добавляет записи nova_<mod>_<файл> в terrain.meta. Предметы: tool "shears" (vtable ShearsItem),
+  type "bow" (BowItem 0x88, кадры +0x40/+0x58/+0x70), "bucket" (BucketItem 0xa0: +0x40 пустое, +0x88 вода, +0x58 лава,
+  +0x70 молоко), "door" (DoorItem 0x48 + хуки useOn/place). Кадры - frames (MVar aux 1000+k).
+- Номера блоков: 210-242, 200-209, 250-254, 29, 33, 34 (51).
+- Плиты Simple Ores - полублоки (box), без двойных плит и верхней установки.

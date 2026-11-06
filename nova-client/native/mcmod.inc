@@ -233,6 +233,8 @@ typedef struct {
     int rs, rs_power, rs_on, rs_off;     /* redstone: 1 source (power), 2 lamp off, 3 lamp on; the other lamp state */
     int harvest, drop, dmin, dmax, xmin, xmax;            /* pickaxe level; drop item and count; experience */
     int ore_count, ore_size, ore_min, ore_max, ore_in;    /* world generation: veins per chunk, size, heights, replaces */
+    int special, sp_base, sp_arg;                         /* the game's own block class: 1 stairs, 2 bars, 3 pressure plate, 4 door */
+    char sp_tex[2][64];                                   /* atlas names (terrain.meta entries NOVA adds for mod textures) */
 } ModBlock;
 static int ct_has(int id);
 static ModBlock mblocks[MB_MAX];
@@ -451,6 +453,91 @@ static u32 *mb_rs_vtable(ModBlock *m) {
     return v;
 }
 
+/* ---- blocks of the game's own classes (stairs, bars, pressure plates, doors): their logic and shapes as they are ---- */
+static void (*mf_stair_ctor)(void *b, void *name, int id, void *base, int data);
+static void (*mf_bars_ctor)(void *b, void *name, int id, void *tex, void *edge, void *mat, int drops);
+static void (*mf_plate_ctor)(void *b, void *name, int id, void *tex, void *mat, int sens);
+static void (*mf_door_ctor)(void *b, void *name, int id, void *mat, int type);
+static void (*mf_texset)(void *out, void *name, int idx);
+static u32 *mb_door_vt;
+static int mb_door_drop(void *b, void *rnd, int data, int fortune) {   /* a mod door drops its door item */
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    return m && m->sp_arg > 0 ? m->sp_arg : 0;
+}
+int Java_com_nova_client_ModBridge_nativeBlockSpecial(void **env, void *cls, void *darr, void *jnames) {
+    void **f = *(void ***)env;
+    if (!darr || mblocks_done) return -1;
+    int n = ((int (*)(void *, void *))f[171])(env, darr);
+    double *d = f_new(n * 8 + 8);
+    ((void (*)(void *, void *, int, int, double *))f[206])(env, darr, 0, n, d);
+    static char names[8192];
+    jstr_copy(env, jnames, names, sizeof names);
+    char *np = names;
+    int done = 0;
+    for (int p = 0; p + 4 <= n; p += 4) {
+        char t[2][64]; int k;
+        for (int j = 0; j < 2; j++) {
+            k = 0;
+            while (*np && *np != '|' && *np != '\x1e') { if (k < 63) t[j][k++] = *np; np++; }
+            t[j][k] = 0;
+            if (*np == '|') np++;
+        }
+        while (*np && *np != '\x1e') np++;
+        if (*np == '\x1e') np++;
+        for (int i = 0; i < mblock_count; i++) {
+            ModBlock *m = &mblocks[i];
+            if (m->id != (int)d[p]) continue;
+            m->special = (int)d[p + 1]; m->sp_base = (int)d[p + 2]; m->sp_arg = (int)d[p + 3];
+            memcpy(m->sp_tex, t, sizeof t);
+            done++;
+        }
+    }
+    return done;
+}
+static int mb_special(ModBlock *m, void *mat) {
+    u32 nm[1], t0[1], t1[1];
+    gstr(nm, m->name); gstr(t0, m->sp_tex[0]); gstr(t1, m->sp_tex[1][0] ? m->sp_tex[1] : m->sp_tex[0]);
+    char *b = 0;
+    if (m->special == 1 && mf_stair_ctor) {
+        void *base = m->sp_base > 0 && m->sp_base < 256 ? mf_blocks[m->sp_base] : 0;
+        if (base) { b = f_new(0xa0); memset(b, 0, 0xa0); mf_stair_ctor(b, nm, m->id, base, 0); }
+    } else if (m->special == 2 && mf_bars_ctor) {
+        b = f_new(0xb4); memset(b, 0, 0xb4); mf_bars_ctor(b, nm, m->id, t0, t1, mat, 1);
+    } else if (m->special == 3 && mf_plate_ctor) {
+        b = f_new(0xa0); memset(b, 0, 0xa0); mf_plate_ctor(b, nm, m->id, t0, mat, m->sp_arg);
+    } else if (m->special == 4 && mf_door_ctor && mf_texset) {
+        b = f_new(0xd0); memset(b, 0, 0xd0); mf_door_ctor(b, nm, m->id, mat, m->sp_base);   /* sp_base: DoorType */
+        mf_texset(b + 0x9c, t0, 0);                           /* lower / upper half */
+        mf_texset(b + 0xb4, t1, 0);
+        if (!mb_door_vt) {
+            u32 *vp = *(u32 **)b;
+            mb_door_vt = f_new(VT_BLOCK_WORDS * 4);
+            for (int i = 0; i < VT_BLOCK_WORDS; i++) mb_door_vt[i] = (vp - 2)[i];
+            mb_door_vt[2 + 48] = (u32)mb_door_drop;
+        }
+        *(u32 **)b = mb_door_vt + 2;
+    }
+    f_strdtor(t0); f_strdtor(t1);
+    if (!b) { f_strdtor(nm); LOGE("mcmod: %s: block class %d unavailable", m->name, m->special); return 0; }
+    mblock_of[m->id] = m;
+    m->block = b;
+    *(float *)(b + 112) = m->hardness;
+    *(float *)(b + 116) = m->resistance > m->hardness * 5 ? m->resistance : m->hardness * 5;
+    if (mf_light_emission) mf_light_emission[m->id] = (unsigned char)(m->light < 0 ? 0 : m->light > 15 ? 15 : m->light);
+    mf_blocks[m->id] = b;
+    ((void (*)(void *))((*(u32 **)b)[94]))(b);                /* Block::init */
+    if (mf_block_setcat) mf_block_setcat(b, 2);
+    if (m->special != 4) {                                    /* a door is placed by its door item */
+        char *it = f_new(64);
+        memset(it, 0, 64);
+        mf_blockitem_ctor(it, nm, m->id - 256);
+        mf_items[m->id] = it;
+        if (mf_item_setcat) mf_item_setcat(it, 2);
+    }
+    f_strdtor(nm);
+    return 1;
+}
+
 static void mcmod_register_blocks(void) {
     if (mblocks_done || !mblock_count) return;
     mblocks_done = 1;
@@ -479,6 +566,7 @@ static void mcmod_register_blocks(void) {
         void *from = m->matfrom > 0 && m->matfrom < 256 ? mf_blocks[m->matfrom] : 0;
         if (!from) from = mf_blocks[1];
         void *mat = *(void **)((char *)from + 84);
+        if (m->special) { if (mb_special(m, mat)) done++; continue; }
         char *b = f_new(0x98);
         for (int k = 0; k < 0x98; k++) b[k] = 0;
         u32 nm[1];
@@ -526,7 +614,7 @@ static void h_init_creative(void) {
     int before = list ? (int)((list[1] - list[0]) / 20) : 0;
     mcmod_register_blocks();
     for (int i = 0; i < mblock_count; i++)
-        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps */
+        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && mblocks[i].special != 4 && !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps */
     mcmod_register_items();
     /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
     if (list) {
@@ -760,6 +848,11 @@ static void mcmod_init(void *mc, u32 base) {
     S(mf_solid, "_ZN5Block6mSolidE");
     S(mf_block_ctor, "_ZN5BlockC1ERKSsiRK8Material");
     S(mf_rand, "_ZN6Random13genrand_int32Ev");
+    S(mf_stair_ctor, "_ZN10StairBlockC1ERKSsiR5Blocki");
+    S(mf_bars_ctor, "_ZN14ThinFenceBlockC1ERKSsiS1_S1_RK8Materialb");
+    S(mf_plate_ctor, "_ZN18PressurePlateBlockC1ERKSsiS1_RK8MaterialNS_11SensitivityE");
+    S(mf_door_ctor, "_ZN9DoorBlockC1ERKSsiRK8MaterialNS_8DoorTypeE");
+    S(mf_texset, "_ZN5Block25getTextureUVCoordinateSetERKSsi");
     S(mf_bs_dim, "_ZN11BlockSource12getDimensionEv");
     S(mf_dim_circuit, "_ZN9Dimension16getCircuitSystemEv");
     S(mf_isclient, "_ZNK5Level12isClientSideEv");

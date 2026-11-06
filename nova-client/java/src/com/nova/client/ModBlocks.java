@@ -38,6 +38,18 @@ import java.util.Map;
 final class ModBlocks {
     static final String TAG = "NOVA.blocks";
     static final int FIRST_ID = 210, LAST_ID = 242;
+    /** block numbers 0.14.3 leaves free: 210..242, 200..209, 250..254 (moving block, observer... came later),
+     *  29, 33, 34 (pistons came in 0.15): 51 */
+    static final int[] POOL = pool();
+    private static int[] pool() {
+        int[] a = new int[51];
+        int k = 0;
+        for (int i = 210; i <= 242; i++) a[k++] = i;
+        for (int i = 200; i <= 209; i++) a[k++] = i;
+        for (int i = 250; i <= 254; i++) a[k++] = i;
+        a[k++] = 29; a[k++] = 33; a[k++] = 34;
+        return a;
+    }
     static final int CUBE = 36;   // box 6, uv 24, rotation 3 (degrees), pivot 3 (block units) - native MB_CUBE
     static final int STRIP_Y = 256, ATLAS_W = 512, ATLAS_H = 512;
 
@@ -69,6 +81,26 @@ final class ModBlocks {
 
     private final Map<String, Double> idsOut = new HashMap<String, Double>();
     Map<String, Double> ids() { return idsOut; }
+
+    /** terrain.meta names of mod textures, for the game's own block classes (bars, plates, doors) */
+    private final Map<String, int[]> named = new java.util.LinkedHashMap<String, int[]>();
+    private String atlasName(String modId, File dir, String ref) throws Exception {
+        String n = ("nova_" + modId + "_" + ref.replaceAll("\\.png$", "")).toLowerCase(Locale.US).replaceAll("[^a-z0-9_]", "_");
+        if (!named.containsKey(n)) named.put(n, pack(dir, ref, null));
+        return n;
+    }
+    final java.util.Set<Integer> doorBlocks = new java.util.HashSet<Integer>();
+    private static final String[] TYPES = {"", "stairs", "bars", "pressure_plate", "door"};
+    /** per special block: id, type, base block (stairs) / door type, sensitivity (plates) / door item; names "a|b\u001e" */
+    final List<Double> specData = new ArrayList<Double>();
+    final StringBuilder specNames = new StringBuilder();
+    private final List<Object[]> doors = new ArrayList<Object[]>();     // {index of the item slot in specData, mod, item name}
+    void doorItems(Map<String, Double> itemIds) {
+        for (Object[] d : doors) {
+            Double id = itemIds.get(((ModRuntime.Mod) d[1]).id + ":" + d[2]);
+            if (id != null) specData.set((Integer) d[0], id);
+        }
+    }
 
     /** per block: id, harvest (pickaxe level 0..3), drop id, drop min, max, xp min, max,
      *  ore count, size, min y, max y, replaces (1 stone / 87 netherrack). Items by name (same mod) must exist. */
@@ -144,9 +176,45 @@ final class ModBlocks {
                 File dir = modDirs.get(m.id);
                 String key = m.id + ":" + name;
                 int id = pickId(ids, key, p.get("id"));
-                if (id < 0) throw new Exception("закончились свободные номера блоков (" + FIRST_ID + ".." + LAST_ID + ")");
+                if (id < 0) throw new Exception("закончились свободные номера блоков (" + POOL.length + "; выключи лишние моды с блоками)");
                 List<Double> one = new ArrayList<Double>();
+                String type = p.get("type") == null ? "" : String.valueOf(p.get("type"));
+                int ti = java.util.Arrays.asList(TYPES).indexOf(type);
+                if (ti < 0) throw new Exception("type: \"stairs\", \"bars\", \"pressure_plate\" или \"door\"");
+                if (ti == 4 && p.get("texture") == null && p.get("textures") instanceof Map) {
+                    Object lo = ((Map<?, ?>) p.get("textures")).get("lower");
+                    if (lo != null) { p = new java.util.HashMap<String, Object>(p); p.remove("textures"); p.put("texture", lo); }
+                }
+                if (ti == 1 && p.get("texture") == null && p.get("base") != null) {
+                    for (Object[] bd : rt.blockDecls())
+                        if (bd[0] == m && String.valueOf(bd[1]).equals(String.valueOf(p.get("base"))) && bd[2] instanceof Map) {
+                            p = new java.util.HashMap<String, Object>(p); p.put("texture", ((Map<?, ?>) bd[2]).get("texture"));
+                        }
+                }
                 build(one, dir, id, p);
+                if (ti > 0) {
+                    double a = 0, b2 = 0;
+                    String t0 = "", t1 = "";
+                    if (ti == 1) {
+                        Double bid = idsOut.get(m.id + ":" + p.get("base"));
+                        if (bid == null) throw new Exception("stairs: base - блок этого мода, объявленный выше");
+                        a = bid;
+                    } else if (ti == 2 || ti == 3) {
+                        t0 = atlasName(m.id, dir, String.valueOf(p.get("texture")));
+                        t1 = p.get("edge") != null ? atlasName(m.id, dir, String.valueOf(p.get("edge"))) : t0;
+                        if (ti == 3) b2 = "mobs".equals(p.get("sensitivity")) ? 1 : 0;
+                    } else {
+                        Map<?, ?> tx = (Map<?, ?>) ((Map<String, Object>) d[2]).get("textures");
+                        if (tx == null || tx.get("lower") == null || tx.get("upper") == null) throw new Exception("door: textures: {lower: .., upper: ..}");
+                        t0 = atlasName(m.id, dir, String.valueOf(tx.get("lower")));
+                        t1 = atlasName(m.id, dir, String.valueOf(tx.get("upper")));
+                        if (p.get("item") != null) doors.add(new Object[]{specData.size() + 3, m, String.valueOf(p.get("item"))});
+                    }
+                    specData.add((double) id); specData.add((double) ti); specData.add(a); specData.add(b2);
+                    if (specNames.length() > 0) specNames.append('\u001e');
+                    specNames.append(t0).append('|').append(t1);
+                    if (ti == 4) doorBlocks.add(id);
+                }
                 // redstone: "source" | {type: "source", power: 1..15} | {type: "lamp", on: "lit_block"} | {type: "lamp_on", off: "unlit_block"}
                 Object rs = p.get("redstone");
                 String rsType = rs instanceof Map ? String.valueOf(((Map<?, ?>) rs).get("type")) : rs == null ? "" : String.valueOf(rs);
@@ -560,12 +628,13 @@ final class ModBlocks {
         }
         Integer have = ids.get(key);
         if (have != null && !usedNow.contains(have)) { usedNow.add(have); return have; }
-        for (int i = FIRST_ID; i <= LAST_ID; i++) {
-            if (usedNow.contains(i) || ids.containsValue(i)) continue;
-            usedNow.add(i);
-            ids.put(key, i);
-            return i;
-        }
+        for (int pass = 0; pass < 2; pass++)              // pass 1: numbers of mods that are off now
+            for (int i : POOL) {
+                if (usedNow.contains(i) || (pass == 0 && ids.containsValue(i))) continue;
+                usedNow.add(i);
+                ids.put(key, i);
+                return i;
+            }
         return -1;
     }
 
@@ -579,6 +648,13 @@ final class ModBlocks {
                     JSONArray u = uvs.getJSONArray(k);
                     u.put(5, u.getInt(5) * ATLAS_H / baseH);
                 }
+            }
+            for (Map.Entry<String, int[]> n : named.entrySet()) {
+                int[] r = n.getValue();
+                JSONObject o = new JSONObject();
+                o.put("name", n.getKey());
+                o.put("uvs", new JSONArray().put(new JSONArray().put(r[0]).put(r[1]).put(r[0] + r[2]).put(r[1] + r[3]).put(ATLAS_W).put(ATLAS_H)));
+                es.put(o);
             }
             return es.toString().getBytes("UTF-8");
         } catch (Exception e) {

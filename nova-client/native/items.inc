@@ -76,7 +76,14 @@ static void mv_setup(char *it);
 static void (*mi_digger_ctor[4])(void *it, void *name, int id, MTier *t);   /* pickaxe, axe, shovel, - */
 static void (*mi_hoe_ctor)(void *it, void *name, int id, MTier t);
 static void (*mi_armor_ctor)(void *it, void *name, int id, int *mat, int render, int slot);
-static u32 *mi_weapon_vt;
+static u32 *mi_weapon_vt, *mi_shears_vt;
+static void (*mi_bow_ctor)(void *it, void *name, int id);
+static void (*mi_bucket_ctor)(void *it, void *name, int id);
+static void (*mi_door_ctor)(void *it, void *name, int id, void *mat, int type);
+static MVar *mv_find_exact(int id, int aux) {
+    for (int i = 0; i < mvar_count; i++) if (mvars[i].id == id && mvars[i].aux == aux) return &mvars[i];
+    return 0;
+}
 
 static char *mi_make(ModItem *m) {
     u32 nm[1];
@@ -106,6 +113,34 @@ static char *mi_make(ModItem *m) {
     } else if (m->kind == 5 && mi_hoe_ctor) {
         it = f_new(0x54); memset(it, 0, 0x54);
         mi_hoe_ctor(it, nm, id, *t);
+    } else if (m->kind == 10 && mi_shears_vt) {              /* registerItem<ShearsItem>: Item + vtable, stack 1, uses */
+        it = f_new(0x40); memset(it, 0, 0x40);
+        mi_ctor(it, nm, (short)id);
+        *(u32 *)it = (u32)(mi_shears_vt + 2);
+        it[4] = 1;
+        if (mi_damage) mi_damage(it, m->uses > 0 ? m->uses : 238);
+    } else if (m->kind == 11 && mi_bow_ctor) {
+        it = f_new(0x88); memset(it, 0, 0x88);
+        mi_bow_ctor(it, nm, id);
+        if (mi_damage && m->uses > 0) mi_damage(it, m->uses);
+        for (int k = 0; k < 3; k++) {                         /* pulling pictures: +0x40, +0x58, +0x70 */
+            MVar *v = mv_find_exact(m->id, 1000 + k);
+            if (v) memcpy(it + 0x40 + 0x18 * k, &v->tex, 0x18);
+        }
+    } else if (m->kind == 12 && mi_bucket_ctor) {
+        it = f_new(0xa0); memset(it, 0, 0xa0);
+        mi_bucket_ctor(it, nm, id);
+        static const int off[4] = {0x40, 0x88, 0x58, 0x70};   /* empty, water, lava, milk */
+        for (int k = 0; k < 4; k++) {
+            MVar *v = mv_find_exact(m->id, 1000 + k);
+            if (v) memcpy(it + off[k], &v->tex, 0x18);
+        }
+    } else if (m->kind == 13 && mi_door_ctor) {               /* places the mod door block m->level */
+        void *db = m->level > 0 && m->level < 256 ? mf_blocks[m->level] : 0;
+        if (db) {
+            it = f_new(0x48); memset(it, 0, 0x48);
+            mi_door_ctor(it, nm, id, *(void **)((char *)db + 84), 0);
+        }
     } else if (m->kind >= 6 && m->kind <= 9 && mi_armor_ctor) {
         int *mat = f_new(24);
         mat[0] = m->durmul > 0 ? m->durmul : 15;
@@ -200,6 +235,10 @@ static void items_init(void *mc, u32 base) {
     S(mi_hoe_ctor, "_ZN7HoeItemC1ERKSsiN4Item4TierE");
     S(mi_armor_ctor, "_ZN9ArmorItemC1ERKSsiRKNS_13ArmorMaterialEi9ArmorSlot");
     S(mi_weapon_vt, "_ZTV10WeaponItem");
+    S(mi_shears_vt, "_ZTV10ShearsItem");
+    S(mi_bow_ctor, "_ZN7BowItemC1ERKSsi");
+    S(mi_bucket_ctor, "_ZN10BucketItemC1ERKSsi");
+    S(mi_door_ctor, "_ZN8DoorItemC1ERKSsiRK8MaterialN9DoorBlock8DoorTypeE");
     #undef S
     GATE(RENDER_ITEM, h_render_item, o_render_item);
     GATE(RENDER_OBJ, h_render_obj, o_render_obj);
@@ -287,7 +326,9 @@ static u64 hc_pick_special(u32 orig, u32 *w) {
     return nh_callw(orig, w);
 }
 
+static void doors_init(void *mc);
 static void armor_init(void *mc) {
+    doors_init(mc);
     void *pa = dlsym(mc, "_ZN19HumanoidMobRenderer12prepareArmorER3Mob9ArmorSlotf");
     void *ps = dlsym(mc, "_ZNK11PickaxeItem17canDestroySpecialEPK5Block");
     LOG("armor: %d, harvest: %d", pa ? nh_hook_c((u32)pa, hc_prepare_armor) : -1, ps ? nh_hook_c((u32)ps, hc_pick_special) : -1);
@@ -335,7 +376,7 @@ static void *mv_desc(void *out, char *it, char *ii) {
     gstr(out, v ? v->name : "?");
     return out;
 }
-static int mv_has(int id) { for (int i = 0; i < mvar_count; i++) if (mvars[i].id == id) return 1; return 0; }
+static int mv_has(int id) { for (int i = 0; i < mvar_count; i++) if (mvars[i].id == id && mvars[i].aux < 1000) return 1; return 0; }
 
 static void mv_setup(char *it) {
     if (!mv_vtable) {
@@ -347,4 +388,27 @@ static void mv_setup(char *it) {
     }
     *(u32 **)it = mv_vtable + 2;
     ((void (*)(void *, int))(mv_vtable[2 + 6]))(it, 1);        /* setStackedByData(true) */
+}
+
+/* a mod door item: DoorItem::useOn picks the game's door block by DoorType and calls DoorItem::place(BlockSource*,
+ * x, y, z, dir, Block*); while a mod door item is used, place() gets the mod's door block */
+static void *mi_door_block;
+static u64 hc_door_useon(u32 orig, u32 *w) {          /* DoorItem::useOn(this, ItemInstance*, Player*, x, y, z, face, ...) */
+    char *it = (char *)w[0];
+    int id = it ? *(unsigned short *)(it + 0x12) : 0;
+    ModItem *m = id >= 256 && id < 512 ? mitem_of[id] : 0;
+    void *keep = mi_door_block;
+    mi_door_block = m && m->kind == 13 && m->level > 0 && m->level < 256 ? mf_blocks[m->level] : 0;
+    u64 r = nh_callw(orig, w);
+    mi_door_block = keep;
+    return r;
+}
+static u64 hc_door_place(u32 orig, u32 *w) {          /* place(BlockSource*, x, y, z, dir, Block*): w[5] the block */
+    if (mi_door_block) w[5] = (u32)mi_door_block;
+    return nh_callw(orig, w);
+}
+static void doors_init(void *mc) {
+    void *u = dlsym(mc, "_ZN8DoorItem5useOnEP12ItemInstanceP6Playeriiiafff");
+    void *p = dlsym(mc, "_ZN8DoorItem5placeEP11BlockSourceiiiiP5Block");
+    LOG("doors: %d %d", u ? nh_hook_c((u32)u, hc_door_useon) : -1, p ? nh_hook_c((u32)p, hc_door_place) : -1);
 }

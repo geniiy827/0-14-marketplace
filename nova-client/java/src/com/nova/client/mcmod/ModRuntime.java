@@ -543,6 +543,12 @@ public final class ModRuntime {
                 if (!d.kind.equals("block") && !d.kind.equals("item"))
                     report(m, new ScriptError("'" + d.kind + "' появится в следующих версиях", d.line));
             }
+            String pre = m.id + ":";                      // names of items by data (variants: [{name: ..}])
+            for (Map.Entry<String, Double> e : customIds.entrySet())
+                if (e.getKey().startsWith(pre)) {
+                    String n = e.getKey().substring(pre.length());
+                    if (!m.in.globals.vars.containsKey(n)) m.in.globals.vars.put(n, e.getValue());
+                }
             for (OverrideDecl o : m.prog.overrides) {
                 Ns ns = groups.get(o.ns);
                 if (ns == null || !ns.members.containsKey(o.name)) {
@@ -675,7 +681,9 @@ public final class ModRuntime {
             }
             n = (int) (double) c;
         }
+        int a = aux instanceof Double ? (int) (double) (Double) aux : 0;
+        if (n >= 65536) { a = n >> 16; n &= 0xffff; }          // an item by data: number + 65536 * data
         if (n <= 0 || n >= 512) throw new ScriptError("рецепт: нет предмета " + Interp.str(id), line);
-        return new int[]{n, aux instanceof Double ? (int) (double) (Double) aux : 0};
+        return new int[]{n, a};
     }
 }

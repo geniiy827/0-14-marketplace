@@ -24,6 +24,7 @@ public final class ModBridge {
     static native int nativeCreativeTabs(String spec);
     static native int nativeArmorTextures(String spec);
     static native int nativeItemVariants(double[] data, String names);
+    static native int nativeBlockSpecial(double[] data, String names);
 
     /** mod blocks of this run (atlas strip, lang lines); null until load() */
     static volatile ModBlocks blocks;
@@ -190,6 +191,12 @@ public final class ModBridge {
                     for (int i = 0; i < vd.length; i++) vd[i] = mi.varData.get(i);
                     try { nativeItemVariants(vd, mi.varNames.toString()); } catch (Throwable t) { Log.e(TAG, "item variants", t); }
                 }
+                if (!mb.specData.isEmpty()) {
+                    mb.doorItems(mi.ids);
+                    double[] sd = new double[mb.specData.size()];
+                    for (int i = 0; i < sd.length; i++) sd[i] = mb.specData.get(i);
+                    try { nativeBlockSpecial(sd, mb.specNames.toString()); } catch (Throwable t) { Log.e(TAG, "special blocks", t); }
+                }
                 try {
                     double[] ex = mb.extra(rt, mi.ids);
                     if (ex.length > 0) nativeBlockExtra(ex);
@@ -235,6 +242,7 @@ public final class ModBridge {
             String key = m.id + ":" + d[1];
             Double id = (Boolean) e[1] ? mb.ids().get(key) : mi.ids.get(key);
             if (id == null) continue;
+            if ((Boolean) e[1] && mb.doorBlocks.contains(id.intValue())) continue;      // a door goes as its door item
             Object rs = p.get("redstone");
             if (rs instanceof java.util.Map && "lamp_on".equals(String.valueOf(((java.util.Map<?, ?>) rs).get("type")))) continue;
             if ("lamp_on".equals(String.valueOf(rs))) continue;

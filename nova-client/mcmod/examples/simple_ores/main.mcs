@@ -203,6 +203,206 @@ block raw_adamantium_block {
     harvest: 2
 }
 
+// ================================================================ отделка: ступени, плиты, решётки, нажимные плиты, двери (классы самой игры)
+block tin_brick_stairs {
+    name: {ru: "Ступени: резное олово", en: "Cut Tin Stairs"}
+    type: "stairs"
+    base: "tin_bricks"
+    hardness: 5
+    resistance: 6
+    harvest: 1
+}
+block tin_brick_slab {
+    name: {ru: "Плита: резное олово", en: "Cut Tin Slab"}
+    texture: "textures/block/tin_bricks.png"
+    box: [0, 0, 0, 16, 8, 16]
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 1
+}
+block mythril_brick_stairs {
+    name: {ru: "Ступени: резной мифрил", en: "Cut Mythril Stairs"}
+    type: "stairs"
+    base: "mythril_bricks"
+    hardness: 5
+    resistance: 6
+    harvest: 2
+}
+block mythril_brick_slab {
+    name: {ru: "Плита: резной мифрил", en: "Cut Mythril Slab"}
+    texture: "textures/block/mythril_bricks.png"
+    box: [0, 0, 0, 16, 8, 16]
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block adamantium_brick_stairs {
+    name: {ru: "Ступени: резной адамантин", en: "Cut Adamantium Stairs"}
+    type: "stairs"
+    base: "adamantium_bricks"
+    hardness: 5
+    resistance: 6
+    harvest: 2
+}
+block adamantium_brick_slab {
+    name: {ru: "Плита: резной адамантин", en: "Cut Adamantium Slab"}
+    texture: "textures/block/adamantium_bricks.png"
+    box: [0, 0, 0, 16, 8, 16]
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block onyx_brick_stairs {
+    name: {ru: "Ступени: ониксовые кирпичи", en: "Onyx Brick Stairs"}
+    type: "stairs"
+    base: "onyx_bricks"
+    hardness: 5
+    resistance: 6
+    harvest: 3
+}
+block onyx_brick_slab {
+    name: {ru: "Плита: ониксовые кирпичи", en: "Onyx Brick Slab"}
+    texture: "textures/block/onyx_bricks.png"
+    box: [0, 0, 0, 16, 8, 16]
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 3
+}
+block copper_bars {
+    name: {ru: "Медная решётка", en: "Copper Bars"}
+    type: "bars"
+    texture: "textures/block/copper_bars.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 1
+}
+block copper_pressure_plate {
+    name: {ru: "Медная нажимная плита", en: "Copper Pressure Plate"}
+    type: "pressure_plate"
+    texture: "textures/block/copper_block.png"
+    sensitivity: "everything"
+    hardness: 0.5
+    sound: "metal"
+}
+block copper_door_block {
+    name: {ru: "Медная дверь", en: "Copper Door"}
+    type: "door"
+    textures: {lower: "textures/block/copper_door_lower.png", upper: "textures/block/copper_door_upper.png"}
+    item: "copper_door"
+    hardness: 5
+    resistance: 5
+    sound: "wood"                 // медную дверь открывают рукой, остальные - редстоуном (как железную)
+}
+block tin_bars {
+    name: {ru: "Оловянная решётка", en: "Tin Bars"}
+    type: "bars"
+    texture: "textures/block/tin_bars.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 1
+}
+block tin_pressure_plate {
+    name: {ru: "Оловянная нажимная плита", en: "Tin Pressure Plate"}
+    type: "pressure_plate"
+    texture: "textures/block/tin_block.png"
+    sensitivity: "everything"
+    hardness: 0.5
+    sound: "metal"
+}
+block tin_door_block {
+    name: {ru: "Оловянная дверь", en: "Tin Door"}
+    type: "door"
+    textures: {lower: "textures/block/tin_door_lower.png", upper: "textures/block/tin_door_upper.png"}
+    item: "tin_door"
+    hardness: 5
+    resistance: 5
+    sound: "metal"                 // медную дверь открывают рукой, остальные - редстоуном (как железную)
+}
+block mythril_bars {
+    name: {ru: "Мифриловая решётка", en: "Mythril Bars"}
+    type: "bars"
+    texture: "textures/block/mythril_bars.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block mythril_pressure_plate {
+    name: {ru: "Мифриловая нажимная плита", en: "Mythril Pressure Plate"}
+    type: "pressure_plate"
+    texture: "textures/block/mythril_block.png"
+    sensitivity: "mobs"
+    hardness: 0.5
+    sound: "metal"
+}
+block mythril_door_block {
+    name: {ru: "Мифриловая дверь", en: "Mythril Door"}
+    type: "door"
+    textures: {lower: "textures/block/mythril_door_lower.png", upper: "textures/block/mythril_door_upper.png"}
+    item: "mythril_door"
+    hardness: 5
+    resistance: 5
+    sound: "metal"                 // медную дверь открывают рукой, остальные - редстоуном (как железную)
+}
+block adamantium_bars {
+    name: {ru: "Адамантиновая решётка", en: "Adamantium Bars"}
+    type: "bars"
+    texture: "textures/block/adamantium_bars.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block adamantium_pressure_plate {
+    name: {ru: "Адамантиновая нажимная плита", en: "Adamantium Pressure Plate"}
+    type: "pressure_plate"
+    texture: "textures/block/adamantium_block.png"
+    sensitivity: "mobs"
+    hardness: 0.5
+    sound: "metal"
+}
+block adamantium_door_block {
+    name: {ru: "Адамантиновая дверь", en: "Adamantium Door"}
+    type: "door"
+    textures: {lower: "textures/block/adamantium_door_lower.png", upper: "textures/block/adamantium_door_upper.png"}
+    item: "adamantium_door"
+    hardness: 5
+    resistance: 5
+    sound: "metal"                 // медную дверь открывают рукой, остальные - редстоуном (как железную)
+}
+block onyx_bars {
+    name: {ru: "Ониксовая решётка", en: "Onyx Bars"}
+    type: "bars"
+    texture: "textures/block/onyx_bars.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 3
+}
+block onyx_pressure_plate {
+    name: {ru: "Ониксовая нажимная плита", en: "Onyx Pressure Plate"}
+    type: "pressure_plate"
+    texture: "textures/block/onyx_block.png"
+    sensitivity: "mobs"
+    hardness: 0.5
+    sound: "metal"
+}
+block onyx_door_block {
+    name: {ru: "Ониксовая дверь", en: "Onyx Door"}
+    type: "door"
+    textures: {lower: "textures/block/onyx_door_lower.png", upper: "textures/block/onyx_door_upper.png"}
+    item: "onyx_door"
+    hardness: 5
+    resistance: 5
+    sound: "metal"                 // медную дверь открывают рукой, остальные - редстоуном (как железную)
+}
+
 // ================================================================ материалы: один номер предмета, вид - по данным (как красители)
 item so_material {
     variants: [
@@ -566,6 +766,89 @@ item onyx_boots {
     armorTexture: "textures/armor/onyx"
 }
 
+// ================================================================ двери, ножницы, луки, ведро
+item copper_door {
+    name: {ru: "Медная дверь", en: "Copper Door"}
+    texture: "textures/item/copper_door.png"
+    type: "door"
+    door: "copper_door_block"
+}
+item copper_shears {
+    name: {ru: "Медные ножницы", en: "Copper Shears"}
+    texture: "textures/item/copper_shears.png"
+    tool: "shears"
+    durability: 185
+}
+item tin_door {
+    name: {ru: "Оловянная дверь", en: "Tin Door"}
+    texture: "textures/item/tin_door.png"
+    type: "door"
+    door: "tin_door_block"
+}
+item tin_shears {
+    name: {ru: "Оловянные ножницы", en: "Tin Shears"}
+    texture: "textures/item/tin_shears.png"
+    tool: "shears"
+    durability: 220
+}
+item mythril_door {
+    name: {ru: "Мифриловая дверь", en: "Mythril Door"}
+    texture: "textures/item/mythril_door.png"
+    type: "door"
+    door: "mythril_door_block"
+}
+item mythril_shears {
+    name: {ru: "Мифриловые ножницы", en: "Mythril Shears"}
+    texture: "textures/item/mythril_shears.png"
+    tool: "shears"
+    durability: 800
+}
+item adamantium_door {
+    name: {ru: "Адамантиновая дверь", en: "Adamantium Door"}
+    texture: "textures/item/adamantium_door.png"
+    type: "door"
+    door: "adamantium_door_block"
+}
+item adamantium_shears {
+    name: {ru: "Адамантиновые ножницы", en: "Adamantium Shears"}
+    texture: "textures/item/adamantium_shears.png"
+    tool: "shears"
+    durability: 1150
+}
+item onyx_door {
+    name: {ru: "Ониксовая дверь", en: "Onyx Door"}
+    texture: "textures/item/onyx_door.png"
+    type: "door"
+    door: "onyx_door_block"
+}
+item onyx_shears {
+    name: {ru: "Ониксовые ножницы", en: "Onyx Shears"}
+    texture: "textures/item/onyx_shears.png"
+    tool: "shears"
+    durability: 3200
+}
+item mythril_bow {
+    name: {ru: "Мифриловый лук", en: "Mythril Bow"}
+    texture: "textures/item/mythril_bow_standby.png"
+    type: "bow"
+    durability: 750
+    frames: ["textures/item/mythril_bow_pulling_0.png", "textures/item/mythril_bow_pulling_1.png", "textures/item/mythril_bow_pulling_2.png"]
+}
+item onyx_bow {
+    name: {ru: "Ониксовый лук", en: "Onyx Bow"}
+    texture: "textures/item/onyx_bow_standby.png"
+    type: "bow"
+    durability: 1000
+    frames: ["textures/item/onyx_bow_pulling_0.png", "textures/item/onyx_bow_pulling_1.png", "textures/item/onyx_bow_pulling_2.png"]
+}
+item copper_bucket {
+    name: {ru: "Медное ведро", en: "Copper Bucket"}
+    texture: "textures/item/copper_bucket.png"
+    type: "bucket"
+    // пустое, с водой, с лавой (медь плавится), с молоком
+    frames: ["textures/item/copper_bucket.png", "textures/item/copper_bucket_water.png", "textures/item/copper_bucket_melting_base.png", "textures/item/copper_bucket.png"]
+}
+
 // ================================================================ крафты (recipe.*: NOVA возвращает их, когда игра заново заполняет книгу рецептов)
 var STICK = 280
 var STRING = 287
@@ -620,6 +903,25 @@ fn recipes() {
     }
     recipe.shaped(mythril_rod, ["I", "I"], {I: mythril_ingot}, 4)
     recipe.shaped(onyx_rod, ["I", "I"], {I: onyx_gem}, 4)
+    // отделка, двери, ножницы, луки, ведро
+    for d in [[copper_ingot, copper_bars, copper_pressure_plate, copper_door, copper_shears, copper_bricks],
+              [tin_ingot, tin_bars, tin_pressure_plate, tin_door, tin_shears, tin_bricks],
+              [mythril_ingot, mythril_bars, mythril_pressure_plate, mythril_door, mythril_shears, mythril_bricks],
+              [adamantium_ingot, adamantium_bars, adamantium_pressure_plate, adamantium_door, adamantium_shears, adamantium_bricks],
+              [onyx_gem, onyx_bars, onyx_pressure_plate, onyx_door, onyx_shears, onyx_bricks]] {
+        recipe.shaped(d[1], ["III", "III"], {I: d[0]}, 16)
+        recipe.shaped(d[2], ["II"], {I: d[0]})
+        recipe.shaped(d[3], ["II", "II", "II"], {I: d[0]}, 3)
+        recipe.shaped(d[4], [" I", "I "], {I: d[0]})
+    }
+    for st in [[tin_bricks, tin_brick_stairs, tin_brick_slab], [mythril_bricks, mythril_brick_stairs, mythril_brick_slab],
+               [adamantium_bricks, adamantium_brick_stairs, adamantium_brick_slab], [onyx_bricks, onyx_brick_stairs, onyx_brick_slab]] {
+        recipe.shaped(st[1], ["B  ", "BB ", "BBB"], {B: st[0]}, 4)
+        recipe.shaped(st[2], ["BBB"], {B: st[0]}, 6)
+    }
+    recipe.shaped(mythril_bow, [" RS", "R S", " RS"], {R: mythril_rod, S: STRING})
+    recipe.shaped(onyx_bow, [" RS", "R S", " RS"], {R: onyx_rod, S: STRING})
+    recipe.shaped(copper_bucket, ["I I", " I "], {I: copper_ingot})
 }
 
 fn give(code, count) {                 // номер предмета + 65536 * данные (предметы по данным)
