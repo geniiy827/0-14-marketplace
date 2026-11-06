@@ -181,6 +181,9 @@ static void st_rot(int *x, int *z, int sx, int sz, int r) {
     *x = a; *z = b;
 }
 
+/* h mod n without a division call (no __aeabi_uidivmod needed) */
+static u32 st_mod(u32 h, u32 n) { return n ? (u32)(((u64)h * n) >> 32) : 0; }
+
 static u32 st_hash(u32 a, u32 b, u32 c) {
     u32 h = a * 0x9E3779B1u ^ (b + 0x7F4A7C15u) * 0x85EBCA77u ^ (c + 0x165667B1u) * 0xC2B2AE3Du;
     h ^= h >> 15; h *= 0x2C1B3C6Du; h ^= h >> 12; h *= 0x297A2D39u; h ^= h >> 15;
@@ -218,7 +221,7 @@ static void st_fill_chest(void *bs, int x, int y, int z, SDef *d, int group, voi
         SLoot *L = &st_loot[d->groups[d->group_at[group] + k]];
         if (!L->vec || !L->n) continue;
         *h = st_hash(*h, k, 77);
-        int rolls = L->rmin + (L->rmax > L->rmin ? (int)(*h % (u32)(L->rmax - L->rmin + 1)) : 0);
+        int rolls = L->rmin + (L->rmax > L->rmin ? (int)st_mod(*h, L->rmax - L->rmin + 1) : 0);
         if (rolls > 0) sf_addchest(rnd, L->vec, container, rolls);
     }
 }
@@ -253,7 +256,7 @@ static int st_place(void *bs, void *rnd, SDef *d, int cx, int cz, u32 h) {
         y0 = 0;
         while (tries-- && !ok) {
             h = st_hash(h, tries, 99);
-            y0 = d->ymin + (d->ymax > d->ymin ? (int)(h % (u32)(d->ymax - d->ymin + 1)) : 0);
+            y0 = d->ymin + (d->ymax > d->ymin ? (int)st_mod(h, d->ymax - d->ymin + 1) : 0);
             ok = 1;
             int open = 0;
             /* solid floor and ceiling everywhere, a few openings in the walls (like MonsterRoomFeature) */
@@ -312,7 +315,7 @@ static int st_place(void *bs, void *rnd, SDef *d, int cx, int cz, u32 h) {
     /* dungeons: chests at random free places along the walls */
     for (int c = 0; c < d->rand_chests && d->ncand > 0; c++) {
         h = st_hash(h, c, 41);
-        u8 *q = d->cand + (h % (u32)d->ncand) * 3;
+        u8 *q = d->cand + st_mod(h, d->ncand) * 3;
         int x = q[0], z = q[2];
         st_rot(&x, &z, d->sx, d->sz, r);
         int wx = x0 + x, wy = y0 + q[1], wz = z0 + z;
@@ -323,14 +326,25 @@ static int st_place(void *bs, void *rnd, SDef *d, int cx, int cz, u32 h) {
     return 1;
 }
 
-static __thread int st_last_x = 0x7fffffff, st_last_z;
+/* chunks done lately: StructureFeature::postProcess runs 3 times per chunk (no __thread: libnova must not need
+ * __emutls_get_address, the game process does not export it and libnova would not load) */
+static int st_recent[64][2];
+static int st_recent_n;
+static volatile int st_lock;
+static int st_first_time(int cx, int cz) {
+    while (!__sync_bool_compare_and_swap(&st_lock, 0, 1)) sched_yield();
+    int fresh = 1;
+    for (int i = 0; i < 64 && i < st_recent_n; i++) if (st_recent[i][0] == cx && st_recent[i][1] == cz) { fresh = 0; break; }
+    if (fresh) { int k = st_recent_n++ & 63; st_recent[k][0] = cx; st_recent[k][1] = cz; }
+    st_lock = 0;
+    return fresh;
+}
 
 static u64 hc_structure_pp(u32 orig, u32 *w) {     /* StructureFeature::postProcess(this, BlockSource*, Random&, cx, cz) */
     u64 ret = nh_callw(orig, w);
     void *bs = (void *)w[1], *rnd = (void *)w[2];
     int cx = (int)w[3], cz = (int)w[4];
-    if (!st_count || !bs || (cx == st_last_x && cz == st_last_z)) return ret;
-    st_last_x = cx; st_last_z = cz;
+    if (!st_count || !bs || !st_first_time(cx, cz)) return ret;
     if (st_loot_ready != 2) {                        /* the loot vectors need the items: built on first use */
         if (__sync_bool_compare_and_swap(&st_loot_ready, 0, 1)) { st_build_loot(); st_loot_ready = 2; }
         else while (st_loot_ready != 2) sched_yield();
@@ -341,11 +355,12 @@ static u64 hc_structure_pp(u32 orig, u32 *w) {     /* StructureFeature::postProc
     void *biome = sf_biome ? sf_biome(bs, pos) : 0;
     int bid = biome ? *(int *)((char *)biome + 0x94) : -1;
     u32 h = st_hash(seed, (u32)cx, (u32)cz);
-    int start = h % (u32)st_count;
+    int start = (int)st_mod(h, st_count);
     for (int k = 0; k < st_count; k++) {             /* every structure gets its own roll; at most one per chunk */
-        SDef *d = &st_defs[(start + k) % st_count];
-        u32 hh = st_hash(h, (u32)((start + k) % st_count), 0x5157);
-        if (hh % (u32)d->chance) continue;
+        int idx = start + k >= st_count ? start + k - st_count : start + k;
+        SDef *d = &st_defs[idx];
+        u32 hh = st_hash(h, (u32)idx, 0x5157);
+        if (st_mod(hh, d->chance)) continue;
         int okb = d->nbio == 0;
         for (int i = 0; i < d->nbio && !okb; i++) if (d->bio[i] == bid) okb = 1;
         if (!okb) continue;

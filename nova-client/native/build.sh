@@ -6,3 +6,5 @@ T="--target=armv7a-linux-androideabi21 -mthumb -mfloat-abi=softfp -mfpu=vfpv3-d1
 for x in c dl log m; do clang-18 $T -w -Wl,-soname,lib$x.so -o stubs/lib$x.so stubs/$x.c; done
 clang-18 $T -O2 -fno-stack-protector -ffreestanding -Wl,--hash-style=both -Wl,-z,max-page-size=4096 \
   -Wl,-soname,libnova.so -o libnova.so nova.c -Lstubs -lc -lm -ldl -llog
+# libnova is loaded by the game process: every symbol it needs must come from libc/libm/libdl/liblog of the phone
+if llvm-nm -D --undefined-only libnova.so | grep -q "__emutls\|__cxa\|_Unwind"; then echo "libnova needs symbols the phone does not have:"; llvm-nm -D --undefined-only libnova.so | grep "__emutls\|__cxa\|_Unwind"; exit 1; fi
