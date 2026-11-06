@@ -635,11 +635,12 @@
     ]
   },
 
-  // NOVA: account button right of the storage button. Its icon is served by Java: the sign-in picture,
-  // or nova_player.png once signed in (re-read with TextureGroup::loadTexture when the state changes).
+  // NOVA: account button right of the storage button. Signed out: a button with the text "Sign in";
+  // signed in: the NOVA player picture. Java serves this file with "visible" swapped (markers /*nova:out*/ and
+  // /*nova:in*/) and reloads the UI definitions when the account changes.
   "account_icon": {
     "type": "image",
-    "texture": "gui/nova/account.png",
+    "texture": "gui/nova/nova_player.png",
     "layer": 3,
     "uv": [ 0, 0 ],
     "uv_size": [ 16, 16 ],
@@ -651,6 +652,7 @@
     "offset": [ "5% + 28px", "-10%" ],
     "anchor_to": "bottom_left",
     "anchor_from": "bottom_left",
+    "visible": false /*nova:in*/,
     "property_bag": {
       "#hyperlink": "nova://account"
     },
@@ -668,6 +670,90 @@
       {
         "pressed@$button_state_pressed_base": {
           "controls": [ { "@start.account_icon": { "alpha": 0.65 } } ]
+        }
+      }
+    ]
+  },
+
+  "signin_button@common.hyperlink_button": {
+    "size": [ 44, 24 ],
+    "offset": [ "5% + 28px", "-10%" ],
+    "anchor_to": "bottom_left",
+    "anchor_from": "bottom_left",
+    "visible": true /*nova:out*/,
+    "property_bag": {
+      "#hyperlink": "nova://account"
+    },
+    "controls": [
+      {
+        "default@$button_state_default_base": {
+          "controls": [ { "@common.button_text": { "text": "nova.start.signin" } } ]
+        }
+      },
+      {
+        "hover@$button_state_hover_base": {
+          "controls": [ { "@common.button_text": { "text": "nova.start.signin" } } ]
+        }
+      },
+      {
+        "pressed@$button_state_pressed_base": {
+          "controls": [ { "@common.button_text": { "text": "nova.start.signin", "alpha": 0.8 } } ]
+        }
+      }
+    ]
+  },
+
+  // NOVA: "Friends" above the storage button: the game's FriendsDiversity picture and the word
+  "friends_face": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      {
+        "icon": {
+          "type": "image",
+          "texture": "gui/newgui/FriendsDiversity.png",
+          "layer": 3,
+          "uv": [ 0, 0 ],
+          "uv_size": [ 14, 14 ],
+          "size": [ 14, 14 ],
+          "offset": [ 5, 0 ],
+          "anchor_from": "left_middle",
+          "anchor_to": "left_middle"
+        }
+      },
+      {
+        "label@common.button_text": {
+          "text": "nova.start.friends",
+          "offset": [ 9, 0 ],
+          "anchor_from": "center",
+          "anchor_to": "center"
+        }
+      }
+    ]
+  },
+
+  "friends_button@common.hyperlink_button": {
+    "size": [ 72, 24 ],
+    "offset": [ "5%", "-10% - 28px" ],
+    "anchor_to": "bottom_left",
+    "anchor_from": "bottom_left",
+    "property_bag": {
+      "#hyperlink": "nova://friends"
+    },
+    "controls": [
+      {
+        "default@$button_state_default_base": {
+          "controls": [ { "@start.friends_face": { } } ]
+        }
+      },
+      {
+        "hover@$button_state_hover_base": {
+          "controls": [ { "@start.friends_face": { } } ]
+        }
+      },
+      {
+        "pressed@$button_state_pressed_base": {
+          "controls": [ { "@start.friends_face": { "alpha": 0.8 } } ]
         }
       }
     ]
@@ -982,6 +1068,12 @@
       },
       {
         "@account_button": { }
+      },
+      {
+        "@signin_button": { }
+      },
+      {
+        "@friends_button": { }
       }
     ],
     "button_mappings": [

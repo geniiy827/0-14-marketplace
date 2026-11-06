@@ -16,7 +16,7 @@ session:
   max-per-account: 10
 
 limits:
-  requests-per-minute-ip: 40
+  requests-per-minute-ip: 600     # many players can share one mobile IP
   login-fails-ip: 10           # per 10 minutes
   login-fails-account: 5       # then the account is locked for lock-minutes
   lock-minutes: 5

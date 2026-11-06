@@ -33,6 +33,8 @@ class Main extends PluginBase{
 	private $store;
 	/** @var Service */
 	private $service;
+	/** @var Social */
+	private $social;
 	/** @var NovaQueryHandler|null */
 	private $handler = null;
 	/** sha1(request) => [time, answer] */
@@ -46,6 +48,7 @@ class Main extends PluginBase{
 		$this->store = new Store($this->getDataFolder() . "accounts.db");
 		$this->service = new Service($this->store, $this->getConfig()->getAll());
 		$this->service->listener = function($what, array $account, $ip){ return $this->fire($what, $account, $ip); };
+		$this->social = new Social($this->service, function($ip, $port, $data){ $this->send($ip, $port, $data); });
 		$this->install();
 		$this->getServer()->getScheduler()->scheduleRepeatingTask(new TickTask($this), 200);
 		$this->getLogger()->info("NOVA accounts: " . $this->store->count() . " accounts, key " . substr(bin2hex($this->crypto->fingerprint()), 0, 16));
@@ -87,6 +90,10 @@ class Main extends PluginBase{
 			$this->send($address, $port, $this->crypto->hello(substr($packet, 5, 8)));
 			return;
 		}
+		if($op === "\x02"){                                   // relay between the two ends of a game link
+			$this->social->relay($address, $port, $packet);
+			return;
+		}
 		if($op !== "\x01") return;
 		// a resent copy of a packet (the answer got lost): the same answer again, not a second login
 		$key = sha1($packet, true);
@@ -98,6 +105,7 @@ class Main extends PluginBase{
 		$open = $this->crypto->open($packet);
 		if($open === null) return;
 		list($req, $enc, $mac) = $open;
+		$req["_port"] = $port;                                // set here, never taken from the client
 		$res = $this->service->handle($req, $address);
 		$out = $this->crypto->seal($res, $enc, $mac);
 		if(count($this->answers) > 2000) foreach($this->answers as $k => $v) if($v[0] < $now - 120) unset($this->answers[$k]);
@@ -134,6 +142,7 @@ class Main extends PluginBase{
 
 	// ------------------------------------------------------------------ API
 	public function getService(){ return $this->service; }
+	public function getSocial(){ return $this->social; }
 
 	private static function clean($a){
 		if($a === null) return null;
@@ -208,7 +217,8 @@ class Main extends PluginBase{
 				foreach($this->store->latest(15) as $a) $sender->sendMessage("#" . $a["id"] . " " . $a["tag"] . ($a["banned"] ? " (бан)" : ""));
 				return true;
 			case "stats":
-				$sender->sendMessage("Аккаунтов: " . $this->store->count());
+				$st = $this->social->stats();
+				$sender->sendMessage("Аккаунтов: " . $this->store->count() . ", в сети: " . $st["online"] . ", игр вместе: " . $st["links"]);
 				return true;
 		}
 		return false;

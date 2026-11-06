@@ -1,0 +1,8 @@
+register -> {"ok":true,"tag":"HostA","id":1,"token":"c482bc77aac271d3f67ffff23faaa52df635795c62a20573e96453fd57e76a97","msg":"Аккаунт HostA создан","n":"e3bf8fa0ce02e8e4bde30a71c6588f74"}
+register -> {"ok":true,"tag":"JoinB","id":2,"token":"4ab9bcb16166b6e2d2cf8965c39f638a5328f1d01846e62b5a0615e8082c2fc9","msg":"Аккаунт JoinB создан","n":"2a9646cec9975f2449433b5a6f96d478"}
+friends.request -> {"ok":true,"msg":"Запрос отправлен: JoinB","n":"49105e7c25b2bd0e63bc308944cb1158"}
+friends.accept -> {"ok":true,"msg":"HostA теперь ваш друг","n":"479cd00e7e111ca7cd4d1e4d91e1feec"}
+friends.list -> {"ok":true,"friends":[{"tag":"HostA","online":true,"world":{"name":"Мир A","mode":"friends","max":5,"players":1,"joinable":true}}],"incoming":[],"outgoing":[],"n":"f22e13d50ff193478f310184cf583b0b"}
+join -> {"ok":true,"link":1818331423,"peer":"127.0.0.1:41711","name":"Мир A","host":"HostA","n":"b8f0810f89104287e3b4e67d1d124567"}
+invite -> {"ok":true,"msg":"Приглашение отправлено: JoinB","n":"02f02c6df35a7eeaecd4e4c26148fd77"}
+relayed 80

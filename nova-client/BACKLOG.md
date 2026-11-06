@@ -396,6 +396,15 @@
 - [ ] held item in hand of other players, armor, sheep colour, villager professions, baby mobs, slime size.
 - [ ] ChatScreen 1:1 (setupPositions: back button 20x20 top right, send button, keyboard toggle).
 
+## alpha16: friends and playing together (docs/MULTIPLAYER.md)
+- Done: Social.php (friends, presence, invite, join, relay), NovaNet (tunnel, punch, relay, links), Social.java,
+  native/net.inc (TButton buttons, "Сеть" header button, join, host hook, UI reload, invite banner), start screen
+  ("Войти" text / player icon, "Друзья" button above storage), pause "Друзья" (only in an opened world).
+- Checked on PC: plugin with the Genisys stub + two NovaNet clients: friends, presence, join, invite, direct/relay echo.
+- [ ] check on device: buttons drawn over toggles, header button position, join from the friends tab, banner taps,
+  UI reload in game (pause screen), RakNetInstance::host port when the world starts.
+- [ ] optional: LAN advertiser on 19132 so a friend's world also shows in the game's own list.
+
 ## Plan: remote "LAN" play (later, user's decision 2026-11-06)
 - Server: Genisys (PocketMine fork, PHP) on an MCPE host with plugins. Plugin on the game UDP port: raw packets with
   our prefix (like Query 0xFE) -> rooms, address exchange for UDP hole punching, relay fallback.

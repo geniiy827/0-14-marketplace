@@ -10,6 +10,7 @@
  * words) -> nh_dispatch(idx, words) -> Java ModBridge.onHook(idx, int[12]) -> long (r0:r1). Java calls the original
  * through nhCallOrig. Everything is softfp: floats travel in core registers / stack words like ints.
  */
+typedef unsigned long long u64;
 void *mmap(void *, size_t, int, int, int, long);
 int cacheflush(long, long, long);
 
@@ -25,6 +26,9 @@ typedef struct {
 } NHook;
 static NHook nh_hooks[NH_MAX];
 static int nh_count;
+/* hooks handled in C (libnova's own features): fn(original, argument words) */
+typedef u64 (*nh_cfn)(u32 orig, u32 *w);
+static nh_cfn nh_c[NH_MAX];
 static void *nh_onhook;                  /* jmethodID ModBridge.onHook(I[I)J */
 static u8 *nh_pool; static u32 nh_pool_used, nh_pool_size;
 static int nh_pool_rwx = -1;             /* 1: pool pages are RWX; 0: every hook gets its own page, sealed RX */
@@ -70,7 +74,6 @@ static int nh_poke_word(u32 addr, u32 v, int code) {
     return 0;
 }
 
-typedef unsigned long long u64;
 typedef u64 (*nh_fn12)(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32);
 static u64 nh_callw(u32 fn, const u32 *w) {
     return ((nh_fn12)fn)(w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9], w[10], w[11]);
@@ -80,6 +83,7 @@ static volatile int nh_depth;     /* recursion guard (approximate across threads
 
 __attribute__((used)) static u64 nh_dispatch(int idx, u32 *w) {
     NHook *h = &nh_hooks[idx];
+    if (h->on && nh_c[idx]) return nh_c[idx](h->orig, w);
     if (!h->on || !mm_ok || !nh_onhook || nh_depth > 24) return nh_callw(h->orig, w);
     void **env = mm_env();
     if (!env) return nh_callw(h->orig, w);
@@ -125,12 +129,33 @@ static void nh_put_thunk(u8 *t, int idx) {
     w[3] = (u32)nh_entry | 1;
 }
 
+static int nh_install(u32 addr, int mode, u32 *sites, int nsites);
+
+/* a hook handled in C: inline only. Returns the index or < 0. */
+static int nh_hook_c(u32 addr, nh_cfn fn) {
+    int idx = nh_install(addr, 1, 0, 0);
+    if (idx >= 0) nh_c[idx] = fn;
+    return idx;
+}
+
 /* JNI: hook the function at runtime address addr. mode 1 inline, 2 sites (int[] of runtime addresses, negative =
  * vtable slot, positive = bl site). Returns hook index or < 0. */
 int Java_com_nova_client_ModBridge_nhHook(void **env, void *cls, int addr, int mode, void *sitesArr) {
     void **f = *(void ***)env;
+    int n = 0;
+    u32 *sites = 0;
+    if (mode != 1) {
+        n = sitesArr ? ((int (*)(void *, void *))f[171])(env, sitesArr) : 0;
+        if (n <= 0) return -105;
+        sites = malloc(n * 4);
+        ((void (*)(void *, void *, int, int, u32 *))f[203])(env, sitesArr, 0, n, sites);      /* GetIntArrayRegion */
+    }
+    return nh_install((u32)addr, mode, sites, n);
+}
+
+static int nh_install(u32 addr0, int mode, u32 *sitesIn, int nsites) {
     if (nh_count >= NH_MAX) return -100;
-    u32 a = (u32)addr & ~1u;
+    u32 a = addr0 & ~1u;
     for (int i = 0; i < nh_count; i++) if (nh_hooks[i].target == a && nh_hooks[i].on) return -101;   /* already hooked */
     int idx = nh_count;
     NHook *h = &nh_hooks[idx];
@@ -157,10 +182,9 @@ int Java_com_nova_client_ModBridge_nhHook(void **env, void *cls, int addr, int m
         h->nsaved = k;
         if (nh_poke_code(a, patch, k)) return -104;
     } else {
-        int n = sitesArr ? ((int (*)(void *, void *))f[171])(env, sitesArr) : 0;
-        if (n <= 0) return -105;
-        h->sites = malloc(n * 4); h->site_old = malloc(n * 4);
-        ((void (*)(void *, void *, int, int, u32 *))f[203])(env, sitesArr, 0, n, h->sites);      /* GetIntArrayRegion */
+        int n = nsites;
+        if (n <= 0 || !sitesIn) return -105;
+        h->sites = sitesIn; h->site_old = malloc(n * 4);
         h->orig = a | 1;
         nh_seal(blk);
         for (int i = 0; i < n; i++) {

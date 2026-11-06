@@ -22,7 +22,9 @@ static int nopt_val[NOPT_MAX];
 static int nopt_radio[NOPT_MAX];        /* radio group (0 = none) */
 static int nopt_steps[NOPT_MAX];        /* step slider: values 1..n */
 static int nopt_role[NOPT_MAX];         /* what the option means (R_*) */
-static char nopt_text[NOPT_MAX][64];
+static char nopt_text[NOPT_MAX][96];      /* text box value; for a button: its text */
+static char nopt_button[NOPT_MAX];        /* 1 = drawn and used as a real button (net.inc) */
+static char nopt_arg[NOPT_MAX][40];       /* what a button is for (a friend's tag) */
 static void (*f_strassign)(void *, const char *);
 static void (*f_i18n)(void *out, void *key);          /* I18n::get -> std::string (sret) */
 
@@ -54,7 +56,7 @@ static OptObj *nopt_new(int type, const char *caption, int role) {
     o->type = type;
     if (o->caption) f_strassign(&o->caption, caption);
     else gstr(&o->caption, caption);
-    nopt_val[i] = 0; nopt_radio[i] = 0; nopt_steps[i] = 0; nopt_role[i] = role; nopt_text[i][0] = 0;
+    nopt_val[i] = 0; nopt_radio[i] = 0; nopt_steps[i] = 0; nopt_role[i] = role; nopt_text[i][0] = 0; nopt_button[i] = 0; nopt_arg[i][0] = 0;
     return o;
 }
 
@@ -123,7 +125,7 @@ static void h_setstring(void *opts, void *opt, void *str) {
         int i = nidx(opt);
         const char *d = sdata(str);
         int n = slen(d);
-        if (n > 63) n = 63;
+        if (n > 95) n = 95;
         for (int k = 0; k < n; k++) nopt_text[i][k] = d[k];
         nopt_text[i][n] = 0;
         return;
@@ -132,13 +134,15 @@ static void h_setstring(void *opts, void *opt, void *str) {
 }
 
 /* ---------------- NOVA screens ------------------------------------------- */
-enum { NOVA_NONE, NOVA_PACKS, NOVA_CREATE, NOVA_ACCOUNT };
+enum { NOVA_NONE, NOVA_PACKS, NOVA_CREATE, NOVA_ACCOUNT, NOVA_FRIENDS, NOVA_NETSET, NOVA_INVITE };
 enum { R_NONE, R_PACK_ON, R_PACK_DEL, R_NAME, R_SEED, R_SURV, R_CREAT, R_INF, R_FLAT, R_OLD,
        R_T_DAWN, R_T_NOON, R_T_DUSK, R_T_NIGHT, R_CYCLE, R_CLEAR, R_RAIN, R_THUNDER,
        R_MOBS, R_SPX, R_SPZ, R_CREATE, R_NEWTEX, R_IMPORT,
-       R_ACC_TAG, R_ACC_PASS, R_ACC_PASS2, R_ACC_LOGIN, R_ACC_TOREG, R_ACC_REG, R_ACC_TOLOGIN, R_ACC_LOGOUT };
+       R_ACC_TAG, R_ACC_PASS, R_ACC_PASS2, R_ACC_LOGIN, R_ACC_TOREG, R_ACC_REG, R_ACC_TOLOGIN, R_ACC_LOGOUT,
+       R_FR_TAG, R_FR_SEND, R_FR_JOIN, R_FR_DEL, R_FR_ACCEPT, R_FR_DECLINE, R_FR_CANCEL,
+       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND };
 
-static int nova_pending, nova_creating, nova_kind, nova_close, nova_ttl;
+static int nova_pending, nova_creating, nova_kind, nova_close, nova_ttl, nova_select = -1;
 static void *nova_screen;
 static char nova_a[4096], nova_b[512];
 static char nova_result[4096];
@@ -220,6 +224,48 @@ static void add_text(void *g, const char *cap, int role, const char *val) {
     f_strdtor(str);
 }
 
+/* a real button (drawn as the game's TButton by net.inc): text from a lang key, arg = what it acts on */
+static void add_button(void *g, const char *textkey, int role, const char *arg) {
+    OptObj *o = nopt_new(0, "", role);
+    int i = nidx(o), n = 0;
+    nopt_button[i] = 1;
+    loc_into(textkey, nopt_text[i], sizeof nopt_text[i]);
+    while (arg && arg[n] && n < 39) { nopt_arg[i][n] = arg[n]; n++; }
+    nopt_arg[i][n] = 0;
+    f_ctoggle(g, o, g_client);
+}
+
+/* the "max players" slider shows its value in its caption (OptionsItem::render reads it every frame) */
+static void netmax_caption(int i) {
+    char t[64], c[80];
+    loc_into("nova.net.max", t, sizeof t);
+    int v = nopt_val[i] + 1, p = 0;
+    while (t[p] && p < 60) { c[p] = t[p]; p++; }
+    c[p++] = ':'; c[p++] = ' ';
+    if (v >= 10) c[p++] = '0' + v / 10;
+    c[p++] = '0' + v % 10;
+    c[p] = 0;
+    f_strassign(&nopts[i].caption, c);
+}
+
+/* nova_a line: fields split by tabs into f (pointers into buf) */
+static int split_line(const char **pp, char *buf, int cap, char **f, int nf) {
+    const char *p = *pp;
+    if (!*p) return 0;
+    int n = 0, k = 0;
+    f[k++] = buf;
+    while (*p && *p != '\n') {
+        if (*p == '\t' && k < nf) { if (n < cap - 1) buf[n++] = 0; f[k++] = buf + n; p++; continue; }
+        if (n < cap - 1) buf[n++] = *p;
+        p++;
+    }
+    buf[n < cap ? n : cap - 1] = 0;
+    if (*p == '\n') p++;
+    *pp = p;
+    for (int j = k; j < nf; j++) f[j] = buf + n;
+    return k;
+}
+
 static int nova_cats(void *scr) {
     if (!nova_creating) return 0;
     nova_screen = scr;
@@ -234,12 +280,20 @@ static int nova_cats(void *scr) {
     *(u32 **)(S + 0xcc) = b;
     int size = *(int *)(S + 0xa4);
     char *hdr = *(char **)(S + 0xa8);                 /* Touch::THeader, text at +0x60 */
-    if (hdr && (nova_kind == NOVA_PACKS || nova_kind == NOVA_ACCOUNT)) {
+    if (hdr && nova_kind != NOVA_CREATE) {
+        static const char *titles[] = {"", "nova.storage.title", "", "nova.acc.title", "nova.fr.title", "nova.net.title", "nova.inv.title"};
         char t[64];
-        loc_into(nova_kind == NOVA_PACKS ? "nova.storage.title" : "nova.acc.title", t, sizeof t);
+        loc_into(titles[nova_kind], t, sizeof t);
         f_strassign(hdr + 0x60, t);
     }
-    if (nova_kind == NOVA_ACCOUNT) {
+    if (nova_kind == NOVA_FRIENDS) {
+        f_createcat(scr, 2, size, 0, 140, 0, 0);      /* "+": add a friend (anvil-plus of the game) */
+        f_createcat(scr, 3, size, 224, 112, 0, 0);    /* friends (FriendsDiversity of the game) */
+    } else if (nova_kind == NOVA_NETSET) {
+        f_createcat(scr, 2, size, 224, 112, 0, 0);
+    } else if (nova_kind == NOVA_INVITE) {
+        f_createcat(scr, 2, size, 224, 112, 0, 0);
+    } else if (nova_kind == NOVA_ACCOUNT) {
         f_createcat(scr, 2, size, 224, 84, 0, 0);     /* one tab */
     } else if (nova_kind == NOVA_PACKS) {
         f_createcat(scr, 2, size, 168, 84, 0, 0);     /* resource packs */
@@ -284,7 +338,7 @@ static int nova_panes(void *scr) {
         if (nova_a[0] == 'P') {
             new_group(p0, nova_a + 1);                       /* the tag (latin only: one font) */
             void *g = new_group(p0, "nova.acc.profile");
-            add_toggle(g, "nova.acc.logout", R_ACC_LOGOUT, 0, 0);
+            add_button(g, "nova.acc.logout", R_ACC_LOGOUT, 0);
         } else if (nova_a[0] == 'R') {
             void *g = new_group(p0, "nova.acc.reg.group");
             add_text(g, "nova.acc.tag", R_ACC_TAG, nova_b);
@@ -292,16 +346,89 @@ static int nova_panes(void *scr) {
             add_text(g, "nova.acc.pass2", R_ACC_PASS2, "");
             new_group(p0, "nova.acc.hint");
             g = new_group(p0, "nova.acc.actions");
-            add_toggle(g, "nova.acc.reg", R_ACC_REG, 0, 0);
-            add_toggle(g, "nova.acc.tologin", R_ACC_TOLOGIN, 0, 0);
+            add_button(g, "nova.acc.reg", R_ACC_REG, 0);
+            add_button(g, "nova.acc.tologin", R_ACC_TOLOGIN, 0);
         } else {
             void *g = new_group(p0, "nova.acc.login.group");
             add_text(g, "nova.acc.tag", R_ACC_TAG, nova_b);
             add_text(g, "nova.acc.pass", R_ACC_PASS, "");
             g = new_group(p0, "nova.acc.actions");
-            add_toggle(g, "nova.acc.login", R_ACC_LOGIN, 0, 0);
-            add_toggle(g, "nova.acc.toreg", R_ACC_TOREG, 0, 0);
+            add_button(g, "nova.acc.login", R_ACC_LOGIN, 0);
+            add_button(g, "nova.acc.toreg", R_ACC_TOREG, 0);
         }
+        push_pane(S, p0);
+    } else if (nova_kind == NOVA_FRIENDS) {
+        /* nova_a lines: "F\ttag\tstatus\t1 joinable", "I\ttag" request to me, "O\ttag" my request; nova_b: tab, tag */
+        void *padd = new_pane(), *plist = new_pane();
+        cards_free();
+        void *g = new_group(padd, "nova.fr.add.group");
+        add_text(g, "nova.acc.tag", R_FR_TAG, nova_b[0] ? nova_b + 1 : "");
+        add_button(g, "nova.fr.send", R_FR_SEND, 0);
+        new_group(padd, "nova.fr.add.hint");
+        const char *p = nova_a;
+        char line[256], *f[4];
+        int n = 0;
+        while (split_line(&p, line, sizeof line, f, 4)) {
+            if (f[0][0] == 'I') {
+                char sub[64];
+                loc_into("nova.fr.wants", sub, sizeof sub);
+                void *c = new_card(plist, f[1], sub, -1);
+                add_button(c, "nova.fr.accept", R_FR_ACCEPT, f[1]);
+                add_button(c, "nova.fr.decline", R_FR_DECLINE, f[1]);
+                n++;
+            } else if (f[0][0] == 'F') {
+                void *c = new_card(plist, f[1], f[2], -1);
+                if (f[3][0] == '1') add_button(c, "nova.fr.join", R_FR_JOIN, f[1]);
+                add_button(c, "nova.fr.remove", R_FR_DEL, f[1]);
+                n++;
+            } else if (f[0][0] == 'O') {
+                char sub[64];
+                loc_into("nova.fr.sent", sub, sizeof sub);
+                void *c = new_card(plist, f[1], sub, -1);
+                add_button(c, "nova.fr.cancel", R_FR_CANCEL, f[1]);
+                n++;
+            }
+        }
+        if (!n) new_group(plist, "nova.fr.none");
+        push_pane(S, padd);
+        push_pane(S, plist);
+        nova_select = nova_b[0] == '0' ? -1 : 1;
+    } else if (nova_kind == NOVA_NETSET) {
+        /* nova_a: "on\tf|i\tmax"; nova_b: the world name */
+        char line[64], *f[3];
+        const char *p = nova_a;
+        split_line(&p, line, sizeof line, f, 3);
+        void *p0 = new_pane();
+        void *g = new_group(p0, nova_b[0] ? nova_b : "nova.net.title");
+        add_toggle(g, "nova.net.on", R_NET_ON, f[0][0] == '1', 0);
+        g = new_group(p0, "nova.net.who");
+        add_toggle(g, "nova.net.friends", R_NET_FRIENDS, f[1][0] != 'i', 5);
+        add_toggle(g, "nova.net.invite", R_NET_INVITE, f[1][0] == 'i', 5);
+        g = new_group(p0, "nova.net.players");
+        OptObj *o = nopt_new(1, "", R_NET_MAX);
+        int i = nidx(o), mx = 0;
+        for (const char *q = f[2]; *q >= '0' && *q <= '9'; q++) mx = mx * 10 + (*q - '0');
+        if (mx < 2 || mx > 10) mx = 5;
+        nopt_steps[i] = 9;                                 /* values 1..9 = 2..10 players */
+        nopt_val[i] = mx - 1;
+        netmax_caption(i);
+        f_cstep(g, o, g_client);
+        new_group(p0, "nova.net.hint");
+        push_pane(S, p0);
+    } else if (nova_kind == NOVA_INVITE) {
+        /* nova_a lines: "tag\tstatus" friends online */
+        void *p0 = new_pane();
+        cards_free();
+        const char *p = nova_a;
+        char line[256], *f[2];
+        int n = 0;
+        while (split_line(&p, line, sizeof line, f, 2)) {
+            if (!f[0][0]) continue;
+            void *c = new_card(p0, f[0], f[1], -1);
+            add_button(c, "nova.inv.send", R_INV_SEND, f[0]);
+            n++;
+        }
+        if (!n) new_group(p0, "nova.inv.none");
         push_pane(S, p0);
     } else {
         void *p0 = new_pane(), *p1 = new_pane(), *p2 = new_pane();
@@ -415,8 +542,33 @@ static void acc_action(int i, const char *op) {
     nova_result_ready = 1;
 }
 
+/* a NOVA button was pressed: "F|op\x1ftag" (friends), "V|tag" (invite) to Java */
+static void button_action(int i) {
+    static const struct { int role; const char *op; } fr[] = {
+        {R_FR_SEND, "request"}, {R_FR_JOIN, "join"}, {R_FR_DEL, "remove"}, {R_FR_ACCEPT, "accept"},
+        {R_FR_DECLINE, "decline"}, {R_FR_CANCEL, "cancel"}};
+    int p = 0;
+    for (int k = 0; k < 6; k++) {
+        if (fr[k].role != nopt_role[i]) continue;
+        p = append(nova_result, p, sizeof nova_result, "F|");
+        p = append(nova_result, p, sizeof nova_result, fr[k].op);
+        p = append(nova_result, p, sizeof nova_result, "\x1f");
+        append(nova_result, p, sizeof nova_result, nopt_role[i] == R_FR_SEND ? role_text(R_FR_TAG) : nopt_arg[i]);
+        nova_result_ready = 1;
+        return;
+    }
+    if (nopt_role[i] == R_INV_SEND) {
+        p = append(nova_result, p, sizeof nova_result, "V|");
+        append(nova_result, p, sizeof nova_result, nopt_arg[i]);
+        loc_into("nova.inv.sent", nopt_text[i], sizeof nopt_text[i]);   /* the button says it was sent */
+        nova_result_ready = 1;
+    }
+}
+
 static void nopt_on_change(int i) {
     if (nopt_role[i] == R_NEWTEX) { tex_want = nopt_val[i]; return; }
+    if (nopt_role[i] == R_NET_MAX) { netmax_caption(i); return; }
+    if (nopt_button[i] && nova_kind != NOVA_ACCOUNT) { nopt_val[i] = 0; button_action(i); return; }
     if (nova_kind == NOVA_ACCOUNT && nopt_val[i]) {
         switch (nopt_role[i]) {
             case R_ACC_LOGIN: acc_action(i, "login"); return;
@@ -444,6 +596,21 @@ static void nova_screen_gone(void *scr) {
     options_closed(scr);
     if (scr != nova_screen) return;
     if (nova_kind == NOVA_PACKS) nova_finish_packs();
+    if (nova_kind == NOVA_NETSET) {                      /* "N|on\x1ff|i\x1fmax" */
+        int p = 0;
+        p = append(nova_result, p, sizeof nova_result, role_val(R_NET_ON) ? "N|1\x1f" : "N|0\x1f");
+        p = append(nova_result, p, sizeof nova_result, role_val(R_NET_INVITE) ? "i\x1f" : "f\x1f");
+        char num[4]; int v = role_val(R_NET_MAX) + 1, k = 0;
+        if (v >= 10) num[k++] = '0' + v / 10;
+        num[k++] = '0' + v % 10; num[k] = 0;
+        append(nova_result, p, sizeof nova_result, num);
+        nova_result_ready = 1;
+    }
+    if ((nova_kind == NOVA_FRIENDS || nova_kind == NOVA_INVITE) && !nova_result_ready) {
+        nova_result[0] = nova_kind == NOVA_FRIENDS ? 'F' : 'V';      /* "F|x" / "V|x": closed */
+        nova_result[1] = '|'; nova_result[2] = 'x'; nova_result[3] = 0;
+        nova_result_ready = 1;
+    }
     if (nova_kind == NOVA_ACCOUNT) {                     /* passwords do not stay in memory */
         for (int i = 0; i < nopt_count; i++)
             if (nopt_role[i] == R_ACC_PASS || nopt_role[i] == R_ACC_PASS2) for (int k = 0; k < 64; k++) nopt_text[i][k] = 0;
@@ -622,6 +789,8 @@ static void fix_font_widths(void *client) {
 
 /* ---------------- per-frame: MinecraftClient::update -------------------- */
 static void mcmod_frame(void *client);
+static void net_frame(void *client);
+static void net_draw(void *client);
 static void (*o_client_update)(void *);
 static void h_client_update(void *client) {
     g_client = client;
@@ -633,6 +802,16 @@ static void h_client_update(void *client) {
         nova_close = 0;
         f_closescreen(nova_screen);
     } else nova_close = 0;
+    if (nova_select >= 0 && nova_screen) {              /* open a NOVA screen on another tab than the first */
+        char *S = nova_screen;
+        int n = (*(u32 *)(S + 0x90) - *(u32 *)(S + 0x8c)) / 8;
+        if (nova_select < n) {
+            f_selectcat(nova_screen, nova_select, 0);
+            ((void (*)(void *))(*(u32 **)nova_screen)[53])(nova_screen);
+        }
+        nova_select = -1;
+    } else if (!nova_screen && !nova_creating) nova_select = -1;
+    net_frame(client);
     if (tex_reload_on && f_textures) {
         tex_reload_on = 0;
         static void *(*f_loadtex)(void *, void *, int, int);
@@ -708,6 +887,7 @@ static void draw_text_col(void *font, float x, float y, const char *txt, float *
 }
 
 static void draw_toast(void *client) {
+    net_draw(client);
     if (!toast_on || !f_fill || !f_sr || !f_guidata || !f_screenw) return;
     long now = now_ms();
     if (toast_drawn_at == now) return;          /* once per frame */
@@ -841,9 +1021,11 @@ static void *new_card(void *pane, const char *title, const char *sub, int icon) 
     c->g = g; c->icon = icon; c->tex_ok = 0;
     int n = 0;
     while (title[n] && n < 63) { c->title[n] = title[n]; n++; }
+    while (n > 0 && (title[n] & 0xc0) == 0x80) n--;          /* never cut a UTF-8 letter in half */
     c->title[n] = 0;
     n = 0;
     while (sub && sub[n] && n < 63) { c->sub[n] = sub[n]; n++; }
+    while (n > 0 && sub && (sub[n] & 0xc0) == 0x80) n--;
     c->sub[n] = 0;
     *(u32 *)g = (u32)(grp_vt + 2);
     return g;

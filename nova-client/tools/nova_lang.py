@@ -100,6 +100,44 @@ _ACC = [
 for _k, _en, _ru in _ACC:
     K.append(_k)
     for _l in T: T[_l].append(_ru if _l == 'ru_RU' else _en)
+# alpha16: friends and playing together
+_NET = [
+ ('nova.start.signin', 'Sign in', 'Войти'),
+ ('nova.start.friends', 'Friends', 'Друзья'),
+ ('nova.pause.friends', 'Friends', 'Друзья'),
+ ('nova.fr.title', 'Friends', 'Друзья'),
+ ('nova.fr.add.group', 'Add a friend', 'Добавить друга'),
+ ('nova.fr.send', 'Send a request', 'Отправить запрос'),
+ ('nova.fr.add.hint', 'Ask your friend for the tag of the NOVA account (it is not the nickname)', 'Спросите у друга тег его аккаунта (это не ник)'),
+ ('nova.fr.wants', 'Wants to be your friend', 'Хочет добавить вас в друзья'),
+ ('nova.fr.accept', 'Accept', 'Принять'),
+ ('nova.fr.decline', 'Decline', 'Отклонить'),
+ ('nova.fr.join', 'Join', 'Подключиться'),
+ ('nova.fr.remove', 'Remove', 'Удалить'),
+ ('nova.fr.sent', 'Request sent', 'Запрос отправлен'),
+ ('nova.fr.cancel', 'Cancel the request', 'Отменить запрос'),
+ ('nova.fr.none', 'No friends yet. Add them on the + tab', 'Друзей пока нет. Добавьте их на вкладке +'),
+ ('nova.fr.signin', 'Sign in to your NOVA account first', 'Сначала войдите в аккаунт'),
+ ('nova.net.button', 'Network', 'Сеть'),
+ ('nova.net.title', 'Network game', 'Сетевая игра'),
+ ('nova.net.on', 'Play with friends', 'Сетевая игра'),
+ ('nova.net.who', 'Who can join', 'Кто может заходить'),
+ ('nova.net.friends', 'Friends can join', 'Друзья могут заходить'),
+ ('nova.net.invite', 'Invited only', 'Только по приглашению'),
+ ('nova.net.players', 'Players', 'Игроки'),
+ ('nova.net.max', 'Max players', 'Максимум игроков'),
+ ('nova.net.hint', 'Friends see the world while you play in it', 'Друзья видят мир, пока вы в нём играете'),
+ ('nova.inv.title', 'Invite friends', 'Пригласить друзей'),
+ ('nova.inv.send', 'Invite', 'Пригласить'),
+ ('nova.inv.sent', 'Invited', 'Приглашение отправлено'),
+ ('nova.inv.none', 'None of your friends is online', 'Никого из друзей нет в сети'),
+ ('nova.ban.invited', 'You are invited', 'Вас пригласили'),
+ ('nova.ban.join', 'Join', 'Войти'),
+ ('nova.ban.no', 'No', 'Нет'),
+]
+for _k, _en, _ru in _NET:
+    K.append(_k)
+    for _l in T: T[_l].append(_ru if _l == 'ru_RU' else _en)
 # import texts now cover mods too
 _ii = K.index('nova.packs.import.sub')
 T['ru_RU'][_ii] = 'Набор ресурсов или мод с этого устройства'

@@ -68,6 +68,15 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     static native int nativeReloadTexture(String name);
     static native int nativeToast(String title, String sub, int icon);
     static native int nativeCrashFile(String path);
+    static native int nativeJoin(String ip, int port);
+    static native int nativeReloadUi(int startScreen);
+    static native String nativeNetState();
+    static native int nativeBanner(String title, String sub, String yes, String no);
+    static native int nativeBannerAnswer();
+
+    private Social social;
+    static int parseInt(String s) { try { return Integer.parseInt(s.trim()); } catch (Exception e) { return 0; } }
+    static long parseLong(String s) { try { return Long.parseLong(s.trim()); } catch (Exception e) { return 0; } }
 
     private static volatile String pendingToastTitle, pendingToastSub;
     private static volatile byte[] toastIcon;
@@ -219,6 +228,10 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
             } else if (r.startsWith("A|")) accountAction(r.substring(2));
             else if (r.startsWith("P|")) applyPacks(r);
             else if (r.startsWith("C|")) createWorld(r.substring(2));
+            else if (r.startsWith("F|")) social.friendsResult(r.substring(2));
+            else if (r.startsWith("V|")) social.inviteResult(r.substring(2));
+            else if (r.startsWith("W|")) social.openNetSettings(r.substring(2));
+            else if (r.startsWith("N|")) social.netSettingsResult(r.substring(2));
 
         } catch (Throwable t) {
             Log.e(TAG, "nova result", t);
@@ -254,9 +267,19 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     }
 
     public static boolean signedIn() { return accToken != null && accToken.length() > 0; }
+    static String accTokenPublic() { return accToken; }
+    AccountClient accClientPublic() throws Exception { return accClient(); }
+    static void accToastPublic(String m) { accToast(m); }
+    void openAccountPublic() { runOnUiThread(new Runnable() { public void run() { openAccount(); } }); }
+    /** the server forgot the session (logged out elsewhere, ban): signed out here too */
+    void sessionLost() {
+        accTag = ""; accToken = "";
+        accSave();
+        accountIconChanged();
+    }
     public static String accountTag() { return signedIn() ? accTag : ""; }
 
-    private AccountClient accClient() throws Exception {
+    private synchronized AccountClient accClient() throws Exception {
         if (accounts == null) {
             java.io.InputStream in = getAssets().open("nova/account_pub.pem");
             String pem = new String(PackManager.readAll(in), "UTF-8");
@@ -365,9 +388,13 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         });
     }
 
+    /** signed in / out: the start screen is built again ("Sign in" text or the player picture), the tunnel follows */
     private void accountIconChanged() {
         String p = accountIconPath;
         try { nativeReloadTexture(p != null ? p : "gui/nova/account.png"); } catch (Throwable ignored) { }
+        try { nativeReloadUi(1); } catch (Throwable ignored) { }
+        Social s = social;
+        if (s != null) s.accountChanged();
     }
 
     /** gui/nova/account.png: the sign-in picture, or nova_player.png when signed in */
@@ -533,8 +560,10 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
             try { nativeTerrainHeight(ModBlocks.ATLAS_H); } catch (Throwable t) { Log.w(TAG, "particles", t); }
         }
         accLoad();                       // before the start screen asks for the account icon
+        social = new Social(this);
         super.onCreate(state);
         accountResume();
+        social.accountChanged();
         // targetSdk 24: storage is a runtime permission; worlds live in games/com.mojang on external storage
         try {
             if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -558,6 +587,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
             public void run() {
                 pollNova();
                 sendPendingToast();
+                if (nativeOk && social != null) social.poll();
                 novaHandler.postDelayed(this, 300);
             }
         }, 1000);
@@ -621,6 +651,13 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
 
     @Override
     public byte[] getFileDataBytes(String path) {
+        byte[] b = fileData(path);
+        String np = norm(path);
+        if (np != null && np.startsWith("ui/")) b = Social.serveUi(np, b);
+        return b;
+    }
+
+    private byte[] fileData(String path) {
         String np0 = norm(path);
         // mod blocks: the block atlas grows a strip for their textures, and they need names
         ModBlocks mb = ModBridge.blocks;
@@ -738,6 +775,10 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
                 if (!openNova(1)) startActivity(new Intent(this, PacksActivity.class));
             } else if (uri.startsWith("nova://account")) {
                 openAccount();
+            } else if (uri.startsWith("nova://friends")) {
+                social.openFriends(-1, null);
+            } else if (uri.startsWith("nova://invite")) {
+                social.openInvite();
             }
             return;
         }

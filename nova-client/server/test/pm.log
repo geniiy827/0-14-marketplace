@@ -1,7 +1,7 @@
 [info] NOVA accounts: 0 accounts, key b32d6f7f5497f808
 event NovaAccounts\event\AccountRegisterEvent
 event NovaAccounts\event\AccountCreatedEvent
-[info] new account Nova_Tester from 127.0.0.1
-event NovaAccounts\event\AccountLoginEvent
-event NovaAccounts\event\AccountLogoutEvent
-real query handler got type 9
+[info] new account HostA from 127.0.0.1
+event NovaAccounts\event\AccountRegisterEvent
+event NovaAccounts\event\AccountCreatedEvent
+[info] new account JoinB from 127.0.0.1

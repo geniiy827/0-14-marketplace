@@ -34,6 +34,11 @@ public final class AccountClient {
     private final SecureRandom rnd = new SecureRandom();
     private long timeOffset;                 // server time - phone time (seconds)
     private boolean helloDone;
+    /** send through another socket (the NOVA tunnel); null = a fresh socket per request */
+    public interface Transport { byte[] exchange(byte[] packet, int tries, int timeoutMs) throws Exception; }
+    private volatile Transport transport;
+    public void setTransport(Transport t) { transport = t; }
+    public volatile String token = "";
 
     public AccountClient(String host, int port, String publicPem) throws Exception {
         this.host = host; this.port = port;
@@ -63,10 +68,10 @@ public final class AccountClient {
     }
     public Result resume(String token) { Map<String, Object> r = req("resume"); r.put("token", token); return call(r); }
     public Result logout(String token) { Map<String, Object> r = req("logout"); r.put("token", token); return call(r); }
-    /** any op of the plugin (or of other plugins through it) */
+    /** any op of the plugin (or of other plugins through it); token null = the client's own */
     public Result op(String op, String token, Map<String, Object> fields) {
         Map<String, Object> r = req(op);
-        if (token != null) r.put("token", token);
+        r.put("token", token != null ? token : this.token);
         if (fields != null) r.putAll(fields);
         return call(r);
     }
@@ -164,6 +169,8 @@ public final class AccountClient {
 
     /** send, wait for one answer starting with FE FD 4E 01 */
     private byte[] exchange(byte[] p, int tries, int timeoutMs) throws Exception {
+        Transport tr = transport;
+        if (tr != null) return tr.exchange(p, tries, timeoutMs);
         InetAddress addr = InetAddress.getByName(host);
         DatagramSocket s = new DatagramSocket();
         try {

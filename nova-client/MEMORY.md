@@ -70,6 +70,13 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
     player+8 = pos (y глаз, ноги = y-1.62), +56 pitch, +60 yaw, +0x16c = BlockSource (region),
     player+0xda0 = Inventory, Level+0x48 = LevelData (время +0x34).
 - UI: `ui_new/*.json` (стартовый экран: кнопка «Хранилище» = hyperlink `nova://packs` → `NovaActivity.launchUri`).
+- Аккаунты (alpha15, docs/ACCOUNTS.md) и игра с друзьями (alpha16, docs/MULTIPLAYER.md): `AccountClient`, `NovaNet`
+  (туннель UDP, P2P + relay), `Social` (экраны друзей/сети/приглашений, баннер), `native/net.inc` (настоящие кнопки
+  в меню NOVA = TButton поверх OptionButton, кнопка «Сеть» в создании мира, joinMultiplayer, хук RakNetInstance::host,
+  перезагрузка JSON UI). Плагин `server/NovaAccounts` (Genisys 0.14, PHP 7.0), сборка `sh tools/build_plugin.sh`
+  (кладёт keys/nova_accounts_private.pem в phar; ключ НИКОГДА не в репо). Тест: server/test/pm_server.php + N.java.
+- Правила дизайна от пользователя: кнопки — настоящие кнопки (не переключатели), иконки — из ассетов игры,
+  меню строит сама игра. Кнопка входа = текст «Войти», после входа — nova_player.png.
 - Строки NOVA: `tools/nova_lang.py`.
 
 ## 4. Гейты (inline-хуки) — tools/so_patch.py

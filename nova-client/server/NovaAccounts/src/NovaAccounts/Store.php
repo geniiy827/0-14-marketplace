@@ -41,6 +41,15 @@ class Store{
 			device TEXT NOT NULL DEFAULT ''
 		)");
 		$this->db->exec("CREATE INDEX IF NOT EXISTS sessions_account ON sessions(account)");
+		// friends: state 0 = request from a to b, 1 = friends (both directions stored)
+		$this->db->exec("CREATE TABLE IF NOT EXISTS friends (
+			a INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+			b INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+			state INTEGER NOT NULL,
+			created INTEGER NOT NULL,
+			PRIMARY KEY (a, b)
+		)");
+		$this->db->exec("CREATE INDEX IF NOT EXISTS friends_b ON friends(b)");
 		$this->set("schema", (string) self::SCHEMA);
 	}
 
@@ -151,6 +160,57 @@ class Store{
 	public function purgeExpired(){
 		$st = $this->db->prepare("DELETE FROM sessions WHERE expires < :n");
 		$st->bindValue(":n", time(), SQLITE3_INTEGER);
+		$st->execute();
+	}
+
+	// ------------------------------------------------------------------ friends
+	private function rows(\SQLite3Stmt $st){
+		$r = $st->execute();
+		$out = [];
+		while($r and ($a = $r->fetchArray(SQLITE3_ASSOC)) !== false) $out[] = $a;
+		return $out;
+	}
+
+	/** [id, tag] of friends / of incoming requests (b = me) / of outgoing requests (a = me) */
+	public function friendList($id, $what){
+		$sql = $what === "friends" ? "SELECT x.id, x.tag FROM friends f JOIN accounts x ON x.id = f.b WHERE f.a = :i AND f.state = 1 ORDER BY x.tag_lc"
+			: ($what === "in" ? "SELECT x.id, x.tag FROM friends f JOIN accounts x ON x.id = f.a WHERE f.b = :i AND f.state = 0 ORDER BY f.created DESC"
+			: "SELECT x.id, x.tag FROM friends f JOIN accounts x ON x.id = f.b WHERE f.a = :i AND f.state = 0 ORDER BY f.created DESC");
+		$st = $this->db->prepare($sql);
+		$st->bindValue(":i", (int) $id, SQLITE3_INTEGER);
+		return $this->rows($st);
+	}
+
+	/** null, 0 (a asked b) or 1 (friends) */
+	public function relation($a, $b){
+		$st = $this->db->prepare("SELECT state FROM friends WHERE a = :a AND b = :b");
+		$st->bindValue(":a", (int) $a, SQLITE3_INTEGER);
+		$st->bindValue(":b", (int) $b, SQLITE3_INTEGER);
+		$r = $this->row($st);
+		return $r === null ? null : (int) $r["state"];
+	}
+
+	public function countRel($id, $state, $outgoing){
+		$st = $this->db->prepare("SELECT COUNT(*) AS n FROM friends WHERE " . ($outgoing ? "a" : "b") . " = :i AND state = :s");
+		$st->bindValue(":i", (int) $id, SQLITE3_INTEGER);
+		$st->bindValue(":s", (int) $state, SQLITE3_INTEGER);
+		$r = $this->row($st);
+		return $r === null ? 0 : (int) $r["n"];
+	}
+
+	public function setRel($a, $b, $state){
+		$st = $this->db->prepare("INSERT OR REPLACE INTO friends (a, b, state, created) VALUES (:a, :b, :s, :c)");
+		$st->bindValue(":a", (int) $a, SQLITE3_INTEGER);
+		$st->bindValue(":b", (int) $b, SQLITE3_INTEGER);
+		$st->bindValue(":s", (int) $state, SQLITE3_INTEGER);
+		$st->bindValue(":c", time(), SQLITE3_INTEGER);
+		$st->execute();
+	}
+
+	public function dropRel($a, $b){
+		$st = $this->db->prepare("DELETE FROM friends WHERE (a = :a AND b = :b) OR (a = :b AND b = :a)");
+		$st->bindValue(":a", (int) $a, SQLITE3_INTEGER);
+		$st->bindValue(":b", (int) $b, SQLITE3_INTEGER);
 		$st->execute();
 	}
 

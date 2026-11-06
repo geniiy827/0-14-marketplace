@@ -133,7 +133,7 @@
       {
         "button_panel": {
           "type": "panel",
-          "size": [ 180, 118 ],
+          "size": [ 180, 146 ] /*nova:panel*/,
           "offset": [ 0, 6 ],
           "anchor_from": "center",
           "anchor_to": "center",
@@ -219,10 +219,40 @@
               }
             },
             {
+              // NOVA: friends of the world opened for them (Java hides it in other worlds: /*nova:...*/ markers)
+              "friends@common.hyperlink_button": {
+                "size": [ "100%", 22 ],
+                "anchor_from": "top_middle",
+                "anchor_to": "top_middle",
+                "offset": [ 0, 80 ],
+                "ignored": false /*nova:net*/,
+                "property_bag": {
+                  "#hyperlink": "nova://invite"
+                },
+                "controls": [
+                  {
+                    "default@common.button_state_default": {
+                      "controls": [ { "@common.button_text": { "text": "nova.pause.friends" } } ]
+                    }
+                  },
+                  {
+                    "hover@common.button_state_hover": {
+                      "controls": [ { "@common.button_text": { "text": "nova.pause.friends", "color": [ 1.0, 1.0, 1.0 ] } } ]
+                    }
+                  },
+                  {
+                    "pressed@common.button_state_pressed": {
+                      "controls": [ { "@common.button_text": { "text": "nova.pause.friends", "color": [ 0.8, 1.0, 0.96 ], "alpha": 0.8 } } ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
               "quit@pauseTrial.pause_button": {
                 "$pressed_button_name": "button.menu_quit",
                 "$button_text": "pauseScreen.quit",
-                "offset": [ 0, 80 ],
+                "offset": [ 0, 108 ] /*nova:quit*/,
                 "controls": [
                   {
                     "default@common.button_state_default": {

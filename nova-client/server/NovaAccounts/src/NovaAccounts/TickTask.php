@@ -10,6 +10,6 @@ class TickTask extends PluginTask{
 		/** @var Main $p */
 		$p = $this->owner;
 		$p->install();
-		if(++$this->n % 30 === 0) $p->getService()->cleanup();
+		if(++$this->n % 30 === 0){ $p->getService()->cleanup(); $p->getSocial()->cleanup(); }
 	}
 }
