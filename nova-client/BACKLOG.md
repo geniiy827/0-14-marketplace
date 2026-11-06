@@ -395,3 +395,9 @@
 - [ ] check on device: player y (feet + 1.62), mob y on Genisys/Nukkit (Nukkit adds height/2 + 0.1 to mob moves!)
 - [ ] held item in hand of other players, armor, sheep colour, villager professions, baby mobs, slime size.
 - [ ] ChatScreen 1:1 (setupPositions: back button 20x20 top right, send button, keyboard toggle).
+
+## Plan: remote "LAN" play (later, user's decision 2026-11-06)
+- Server: Genisys (PocketMine fork, PHP) on an MCPE host with plugins. Plugin on the game UDP port: raw packets with
+  our prefix (like Query 0xFE) -> rooms, address exchange for UDP hole punching, relay fallback.
+- Client: UDP proxy in NOVA; friend sees host's world as a LAN world; host proxy -> 127.0.0.1:19132.
+- Joining via accounts + friends system (not room codes). Start after the accounts design.
