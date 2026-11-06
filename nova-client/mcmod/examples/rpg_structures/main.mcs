@@ -1,0 +1,8 @@
+// RPG: Структуры. Постройки ставит генератор мира NOVA (structures.bin, tools/port_rs.py) в новых чанках.
+// Перенесено из Repurposed Structures (TelepathicGrunt, LGPL-3.0): https://github.com/telepathicgrunt/repurposedstructures
+// /structures - что есть в моде
+on chat(e) {
+    if e.text != "/structures" { return }
+    e.cancel()
+    ui.tip("§6RPG: Структуры§f - колодцы, хижины ведьм, данжи (9 видов), храм тайги, пирамиды (8 видов). Ищи в новых чанках.")
+}

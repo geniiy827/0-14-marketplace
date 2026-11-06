@@ -250,3 +250,10 @@ block my_lamp_lit { texture: "textures/on.png" light: 15 redstone: {type: "lamp_
 ```
 Работает через схемы самой игры (CircuitSystem: ProducerComponent / ConsumerComponent), как блок редстоуна и лампа.
 Крафты: пример в `mcmod/examples/redstone_update/main.mcs`.
+
+## Постройки в генерации мира (alpha19)
+Файл `structures.bin` в корне .mcmod: постройки ставит генератор мира NOVA (native/structs.inc, перехват
+`StructureFeature::postProcess`) в новых чанках. Генерирует хост, друзья получают готовые чанки.
+Делается конвертером `tools/port_rs.py` из `.nbt`-шаблонов Java (блоки переводятся в блоки 0.14 для 4 поворотов,
+сундуки получают лут через `WeighedTreasureItem::addChestItems`, спавнеры — моба). Пример — `mcmod/examples/rpg_structures`
+(перенос Repurposed Structures, LGPL-3.0).

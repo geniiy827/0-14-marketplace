@@ -19,6 +19,7 @@ public final class ModBridge {
     static native double[] nativeApi(int op, double[] args, String strs);
     static native String nativeApiStr(int op, double[] args, String strs);
     static native int nativeDefineBlocks(double[] data, String names);
+    static native int nativeStructures(byte[] data);
 
     /** mod blocks of this run (atlas strip, lang lines); null until load() */
     static volatile ModBlocks blocks;
@@ -175,6 +176,11 @@ public final class ModBridge {
                     try { nativeDefineItems(mi.data, mi.names, mi.actions); } catch (Throwable t) { Log.e(TAG, "native items", t); }
                 }
                 items = mi;
+                for (File d : dirs.values()) {             // structures.bin of mods (tools/port_rs.py): world generation
+                    File sb = new File(d, "structures.bin");
+                    if (!sb.isFile()) continue;
+                    try { nativeStructures(PackManager.readFile(sb)); } catch (Throwable t) { Log.e(TAG, "structures " + d, t); }
+                }
             } else {
                 rt.customIds.putAll(blocks.ids());
                 if (items != null) rt.customIds.putAll(items.ids);
