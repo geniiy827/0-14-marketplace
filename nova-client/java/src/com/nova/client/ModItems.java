@@ -151,7 +151,7 @@ final class ModItems {
                 double tLevel = kind == 13 ? doorBlock : num(tier.get("level"), 1), tUses = num(tier.get("uses"), kind >= 10 && p.get("durability") instanceof Double ? (Double) p.get("durability") : 250), tSpeed = num(tier.get("speed"), 6),
                        tDamage = num(tier.get("damage"), 2), tEnch = num(tier.get("enchant"), 10);
                 double aDef = 0, aMul = 0, aIdx = -1;
-                if (kind >= 6) {
+                if (kind >= 6 && kind <= 9) {
                     aDef = num(p.get("defense"), 2);
                     aMul = num(p.get("durability"), 15);
                     tEnch = num(p.get("enchant"), 10);
@@ -175,7 +175,7 @@ final class ModItems {
                 int stack = (int) clamp(num(p.get("stack"), tool ? 1 : 64), 1, 64);
                 int dur = (int) clamp(num(p.get("durability"), 0), 0, 32000);
                 Object cat = p.get("category");
-                int category = "tools".equals(cat) || (cat == null && (tool || kind >= 6)) ? 3 : "blocks".equals(cat) ? 1 : "decor".equals(cat) ? 2 : 4;
+                int category = "tools".equals(cat) || (cat == null && (tool || (kind >= 6 && kind <= 9))) ? 3 : "blocks".equals(cat) ? 1 : "decor".equals(cat) ? 2 : 4;
                 out.add((double) id);
                 for (float f : uv) out.add((double) f);
                 out.add(handScale);

@@ -296,7 +296,7 @@ static u64 hc_prepare_armor(u32 orig, u32 *w) {     /* prepareArmor(this, Mob&, 
     char *ii = ((char *(*)(void *, int))((*(void ***)mob)[184]))(mob, slot);   /* Mob::getArmor (vtable +0x2e0) */
     char *item = ii ? *(char **)(ii + 0xc) : 0;
     int iid = item ? ev_item_id(ii) : 0;
-    int ri = iid >= 256 && iid < 512 && mitem_of[iid] && mitem_of[iid]->kind >= 6 ? *(int *)(item + 0x48) : -1;
+    int ri = iid >= 256 && iid < 512 && mitem_of[iid] && mitem_of[iid]->kind >= 6 && mitem_of[iid]->kind <= 9 ? *(int *)(item + 0x48) : -1;
     if (ri < 5 || ri >= 5 + ma_count) return nh_callw(orig, w);
     int k = (ri - 5) * 2 + (slot == 2);
     if (!ma_tex) { ma_tex = f_new(MA_MAX * 2 * 16); memset(ma_tex, 0, MA_MAX * 2 * 16); }

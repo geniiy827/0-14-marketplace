@@ -224,3 +224,9 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   +0x70 молоко), "door" (DoorItem 0x48 + хуки useOn/place). Кадры - frames (MVar aux 1000+k).
 - Номера блоков: 210-242, 200-209, 250-254, 29, 33, 34 (51).
 - Плиты Simple Ores - полублоки (box), без двойных плит и верхней установки.
+
+## alpha30
+- ModItems: броня - только kind 6..9 (двери/ножницы/луки/ведро требовали armorTexture).
+- Иконки вкладок: InventoryItemRenderer::update вызывается не каждый кадр -> слот 5 (render) зовёт update для nova_ct_icon_k.
+- После смены страницы, если открытой вкладки нет на странице - показать панель creative_screen_building_blocks.
+- Мультиплеер на alpha29 у пользователя работает.

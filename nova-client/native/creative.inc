@@ -118,9 +118,11 @@ static void ct_put(int i, int page) {
     *(u32 *)(m + 0x1c) = (u32)(arr + n * 20);
     ct_notify(m, before);
 }
+static int ct_fix_tab;                                 /* after a page switch: leave a tab the page does not have */
 static void ct_apply(int page) {
     for (int i = 0; i < 4; i++) ct_put(i, page);
     ct_page = page;
+    ct_fix_tab = 1;
 }
 
 static u64 hc_ct_add(u32 orig, u32 *w) {           /* ContainerManagerModel::_addContainer(this, shared_ptr<ContainerModel>) */
@@ -170,6 +172,16 @@ static void h_iir_update(void *self, void *client, void **ctrl) {
     o_iir_update(self, client, ctrl);
 }
 
+/* the tab pictures: update() runs only when the game thinks something changed, so a page switch would keep the old
+ * picture until a tap - our tab icons are updated on every frame they are drawn */
+static void (*o_iir_render)(void *self, void *client, void **ctrl, int pass);
+static void h_iir_render(void *self, void *client, void **ctrl, int pass) {
+    char *cc = ctrl ? *(char **)ctrl : 0;
+    const char *nm = cc ? sdata(cc + 0xc) : 0;
+    if (pass == 0 && nm && ct_count && nm[0] == 'n' && !memcmp(nm, "nova_ct_icon_", 13)) h_iir_update(self, client, ctrl);
+    o_iir_render(self, client, ctrl, pass);
+}
+
 static float ct_rect[2][4];                          /* the two arrow controls, gui units */
 static void *ct_tb[2];
 static u32 ct_arrow_tex[2][16];
@@ -180,6 +192,9 @@ static const char *ct_keys[4] = {"craftingScreen.tab.buildingBlocks", "craftingS
 /* tabs a page does not have: the pictures (parents of nova_ct_icon_<k>) and the buttons (interactive_tabs/<name>) */
 static const char *ct_toggles[4] = {"building_blocks", "decorations", "tools", "miscellaneous"};
 static void ct_vis(char *c, int on) { c[0x30] = (char)((c[0x30] & ~4) | (on << 2)); }
+static const char *ct_panels[4] = {"creative_screen_building_blocks", "creative_screen_decorations",
+                                   "creative_screen_tools", "creative_screen_miscellaneous"};
+static char *ct_panel[4];
 static void ct_tabs_walk(char *c, int depth, int in_tabs) {
     if (!c || depth > 24) return;
     char **it = *(char ***)(c + 0x40), **end = *(char ***)(c + 0x44);
@@ -193,6 +208,7 @@ static void ct_tabs_walk(char *c, int depth, int in_tabs) {
             continue;
         }
         if (in_tabs && nm) for (int k = 0; k < 4; k++) if (streq(nm, ct_toggles[k])) ct_vis(ch, ct_page == 0 || ct_tab(ct_page, k) != 0);
+        if (nm && nm[0] == 'c') for (int k = 0; k < 4; k++) if (streq(nm, ct_panels[k])) ct_panel[k] = ch;
         ct_tabs_walk(ch, depth + 1, nm && streq(nm, "interactive_tabs"));
     }
 }
@@ -228,7 +244,16 @@ static int ct_ui_render(void *client, char *cc) {
     if (b == 0) {                                          /* once per frame: tabs this page has */
         char *root = cc;
         for (int d = 0; d < 40; d++) { char *p = *(char **)(root + 0x38); if (!p) break; root = p; }
+        for (int k = 0; k < 4; k++) ct_panel[k] = 0;
         ct_tabs_walk(root, 0, 0);
+        if (ct_fix_tab) {                                  /* the open tab is not on this page: show the first one */
+            ct_fix_tab = 0;
+            for (int k = 1; k < 4; k++)
+                if (ct_panel[k] && (ct_panel[k][0x30] & 4) && ct_page > 0 && !ct_tab(ct_page, k) && ct_panel[0]) {
+                    ct_vis(ct_panel[k], 0);
+                    ct_vis(ct_panel[0], 1);
+                }
+        }
     }
     ct_rect[b][0] = x; ct_rect[b][1] = y; ct_rect[b][2] = w; ct_rect[b][3] = h;
     ct_drawn_at = now_ms();
@@ -290,6 +315,6 @@ static void creative_init(void *mc) {
     int ok = add && dtor && ct_cname;
     if (ok) ok = nh_hook_c((u32)add, hc_ct_add) >= 0 && nh_hook_c((u32)dtor, hc_ct_mgr_dtor) >= 0;
     ct_ok = ok;
-    if (vt) patch_slot(vt, 4, h_iir_update, (void **)&o_iir_update);
+    if (vt) { patch_slot(vt, 4, h_iir_update, (void **)&o_iir_update); patch_slot(vt, 5, h_iir_render, (void **)&o_iir_render); }
     LOG("creative tabs: %s, icons %s", ok ? "ok" : "unavailable", vt ? "ok" : "-");
 }
