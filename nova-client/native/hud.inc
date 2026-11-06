@@ -4,11 +4,12 @@
 static int hud_streq(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; } return *a == *b; }
 #define HUD_SLOTS 8
 #define HUD_ICONS 20
-typedef struct { char slot[24]; int row, side, n; short tex[HUD_ICONS]; } HudRow;
+typedef struct { char slot[24]; int row, side, shake, n; u32 last; short tex[HUD_ICONS]; } HudRow;
 static HudRow hud_rows[HUD_SLOTS];
 static struct { char path[96]; u32 tex[16]; int ok; } hud_tex[48];
 static int hud_ntex;
 static long hud_drawn_at;
+static u32 hud_seed = 1;
 static int (*f_showingmenu)(void *client);
 static int (*f_screenh)(void *gd);
 
@@ -43,6 +44,7 @@ static int hud_op(double *a, int n, char *s) {
     h->slot[k] = 0;
     h->row = n > 0 ? (int)a[0] : 1;
     h->side = n > 1 ? (int)a[1] : 0;
+    h->shake = n > 2 ? (int)a[2] : 0;
     h->n = 0;
     char *p = has ? bar + 1 : 0;
     while (p && h->n < HUD_ICONS) {
@@ -74,6 +76,12 @@ static void hud_draw(void *client) {
         HudRow *h = &hud_rows[i];
         if (!h->slot[0]) continue;
         int y = 12 + 10 * h->row;      /* touch layout: hearts top-left, hunger top-right at y 2; row 0 = under them */
+        int jit = 0;                    /* like hunger / ThirstGui: shake on ticks where tick % shake == 0 */
+        if (h->shake > 0) {             /* no division in libnova: count ticks since the last shake */
+            u32 tick = (u32)((unsigned long long)now * 1311 >> 16);   /* ~ now / 50 */
+            if (tick - h->last >= (u32)h->shake) h->last = tick;
+            jit = tick == h->last;      /* the whole tick, like updateCounter */
+        }
         for (int k = 0; k < h->n; k++) {
             int t = h->tex[k];
             if (t < 0) continue;
@@ -86,7 +94,9 @@ static void hud_draw(void *client) {
                 hud_tex[t].ok = 1;
             }
             int x = h->side ? 2 + 8 * k : W - 2 - 9 - 8 * (h->n - 1 - k);
-            int rect[4] = {x, y, 16, 16};               /* pictures are 16x16 (power of two), the icon in its top-left 9x9 */
+            int yy = y;
+            if (jit) { hud_seed = hud_seed * 1103515245u + 12345u; int v = (hud_seed >> 16) & 3; if (v == 3) v = 1; yy += v - 1; }
+            int rect[4] = {x, yy, 16, 16};               /* pictures are 16x16 (power of two), the icon in its top-left 9x9 */
             f_blit(sr, hud_tex[t].tex, rect);
         }
     }

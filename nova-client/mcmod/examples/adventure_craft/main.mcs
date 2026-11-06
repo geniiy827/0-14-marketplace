@@ -98,7 +98,7 @@ var EX_BASE = 0.01                // движение (за блок): в воз
 var EX_SWIM = 0.015               // плавание
 var EX_SPRINT = 0.1               // бег
 var EX_WALK = 0.01                // шаг
-var NO_SPRINT_AT = 6              // при 6 и ниже нельзя бегать
+var EX_HURT = 0.1                 // получил урон (DamageSource.getHungerDamage)
 var HURT_EVERY = 80               // при 0 - урон раз в 4 секунды
 
 // питьё: [жажда, насыщенность, шанс грязной воды]   (ThirstEnum)
@@ -122,6 +122,8 @@ var act = ""
 var tickN = 0
 var dmg = null                    // EntityDamageSource «голод» (как у игры)
 var active = true                 // жажда работает (не в творческом)
+var lastHp = -1
+var selfHurt = false
 
 fn juices() {
     JUICES[str(juice_apple)] = [8, 6.4]
@@ -137,6 +139,14 @@ fn juices() {
 
 fn save() {
     if key != "" { data.save(key, [thirst, sat, ex, thirsty]) }
+}
+
+// сложность мира: 0 мирная, 1 лёгкая, 2 нормальная, 3 сложная (DamageUtil)
+fn difficulty() { return mc.calli("Level::getDifficulty() const", mc.level()) }
+
+fn healthAboveDifficulty(hp) {      // здоровье в половинках сердца
+    var d = difficulty()
+    return d == 3 or (d == 2 and hp > 1) or (d <= 1 and hp > 10)
 }
 
 fn creative() {
@@ -234,7 +244,8 @@ fn hud() {
     }
     var row = headInWater() ? 1 : 0     // под голодом; под водой - ниже пузырьков воздуха
     var s = math.floor(sat)
-    var k = "{thirst}:{s}:{thirsty > 0}:{row}"
+    var shake = sat <= 0 ? thirst * 3 + 1 : 0       // дрожат, как голод: насыщенность 0
+    var k = "{thirst}:{s}:{thirsty > 0}:{row}:{shake}"
     if k == hudKey { return }
     hudKey = k
     var pre = thirsty > 0 ? "textures/thirst/dirty_" : "textures/thirst/"
@@ -248,7 +259,7 @@ fn hud() {
         icons.add(pre + name + ".png")
         i -= 1
     }
-    ui.hud("thirst", icons, row, "right")
+    ui.hud("thirst", icons, row, "right", shake)
 }
 
 // ================================================================ крафты (как игра: Recipes / FurnaceRecipes)
@@ -331,6 +342,7 @@ on world.join(e) {
         thirsty = 0
     }
     lastPos = null
+    lastHp = -1
     hudKey = ""
     act = ""
     dmg = null
@@ -415,25 +427,30 @@ on tick(e) {
     // усталость -> насыщенность -> капли
     if ex > EXHAUSTION_LIMIT {
         ex -= EXHAUSTION_LIMIT
-        if sat > 0 { sat = math.max(0, sat - 1) } else if thirst > 0 { thirst -= 1 }
+        if sat > 0 { sat = math.max(0, sat - 1) }
+        else if thirst > 0 and difficulty() != 0 { thirst -= 1 }      // в мирном капли не тратятся
     }
     if sat > thirst { sat = thirst }
 
-    // при 6 и ниже нельзя бежать
-    if thirst <= NO_SPRINT_AT and mc.call("Mob::isSprinting() const", p) != 0 {
-        mc.call("LocalPlayer::setSprinting(bool)", p, false)
+    // урон усиливает жажду (onLivingHurt), кроме самого обезвоживания
+    var hp = mc.calli("Mob::getHealth() const", p)
+    if lastHp >= 0 and hp < lastHp {
+        if not selfHurt { ex += EX_HURT }
     }
+    lastHp = hp
+    selfHurt = false
 
-    // обезвоживание: урон, как от голода (EntityDamageSource 16 = голод), пока здоровья больше 1 сердца
+    // обезвоживание: урон раз в 4 с; мирная - нет, лёгкая - до 5 сердец, нормальная - до половинки, сложная - насмерть
     if thirst <= 0 {
         hurtTimer += 1
         if hurtTimer >= HURT_EVERY {
             hurtTimer = 0
-            if mc.calli("Mob::getHealth() const", p) > 2 {
+            if difficulty() != 0 and healthAboveDifficulty(hp) {
                 if dmg == null {
                     dmg = mem.alloc(32)
                     mc.call("EntityDamageSource::EntityDamageSource(EntityDamageCause)", dmg, 16)
                 }
+                selfHurt = true
                 mc.callAt(mem.ptr(mem.ptr(p), 0x108), p, dmg, 1)        // Entity::hurt (слот 66 vtable)
                 ui.tip("§cОбезвоживание!")
             }

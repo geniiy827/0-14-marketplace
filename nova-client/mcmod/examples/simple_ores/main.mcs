@@ -1,0 +1,577 @@
+// Simple Ores для NOVA (0.14.3) - перенос мода SimpleOres2 (Sinhika / AleXndrTheGr8st, LGPL-3.0, см. LICENSE-SimpleOres.txt).
+// Медь, олово, мифрил, адамантин и оникс (руда в Аду): руды в генерации мира, слитки, блоки и кирпичи,
+// инструменты и броня с настоящими уровнями игры (Item::Tier, ArmorMaterial). Числа - из SimpleOresConfig.
+// Своя вкладка в творческом инвентаре (стрелки сверху). Команды: /simpleores - что есть в моде, /so give - набор.
+
+// ================================================================ блоки
+block copper_ore {
+    name: {ru: "Медная руда", en: "Copper Ore"}
+    texture: "textures/block/copper_ore.png"
+    hardness: 3
+    resistance: 3
+    harvest: 1                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    ore: {count: 10, size: 8, min: 16, max: 96, in: "stone"}
+}
+block tin_ore {
+    name: {ru: "Оловянная руда", en: "Tin Ore"}
+    texture: "textures/block/tin_ore.png"
+    hardness: 3
+    resistance: 3
+    harvest: 1                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    ore: {count: 10, size: 7, min: 1, max: 90, in: "stone"}
+}
+block mythril_ore {
+    name: {ru: "Мифриловая руда", en: "Mythril Ore"}
+    texture: "textures/block/mythril_ore.png"
+    hardness: 4
+    resistance: 3
+    harvest: 2                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    ore: {count: 8, size: 4, min: 1, max: 48, in: "stone"}
+}
+block adamantium_ore {
+    name: {ru: "Адамантиновая руда", en: "Adamantium Ore"}
+    texture: "textures/block/adamantium_ore.png"
+    hardness: 5
+    resistance: 3
+    harvest: 2                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    ore: {count: 5, size: 4, min: 1, max: 32, in: "stone"}
+}
+block onyx_ore {
+    name: {ru: "Ониксовая руда", en: "Onyx Ore"}
+    texture: "textures/block/onyx_ore.png"
+    hardness: 7
+    resistance: 3
+    harvest: 3                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    drop: "onyx_gem"
+    xp: 1
+    ore: {count: 5, size: 4, min: 10, max: 118, in: "netherrack"}
+}
+block copper_block {
+    name: {ru: "Медный блок", en: "Block of Copper"}
+    texture: "textures/block/copper_block.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 1
+}
+block tin_block {
+    name: {ru: "Оловянный блок", en: "Block of Tin"}
+    texture: "textures/block/tin_block.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 1
+}
+block mythril_block {
+    name: {ru: "Мифриловый блок", en: "Block of Mythril"}
+    texture: "textures/block/mythril_block.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block adamantium_block {
+    name: {ru: "Адамантиновый блок", en: "Block of Adamantium"}
+    texture: "textures/block/adamantium_block.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block onyx_block {
+    name: {ru: "Ониксовый блок", en: "Block of Onyx"}
+    texture: "textures/block/onyx_block.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 3
+}
+block copper_bricks {
+    name: {ru: "Медные кирпичи", en: "Copper Bricks"}
+    texture: "textures/block/copper_bricks.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 1
+}
+block tin_bricks {
+    name: {ru: "Резное олово", en: "Cut Tin"}
+    texture: "textures/block/tin_bricks.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 1
+}
+block mythril_bricks {
+    name: {ru: "Резной мифрил", en: "Cut Mythril"}
+    texture: "textures/block/mythril_bricks.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block adamantium_bricks {
+    name: {ru: "Резной адамантин", en: "Cut Adamantium"}
+    texture: "textures/block/adamantium_bricks.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 2
+}
+block onyx_bricks {
+    name: {ru: "Ониксовые кирпичи", en: "Onyx Bricks"}
+    texture: "textures/block/onyx_bricks.png"
+    hardness: 5
+    resistance: 6
+    sound: "metal"
+    harvest: 3
+}
+
+// ================================================================ слитки
+item copper_ingot {
+    name: {ru: "Медный слиток", en: "Copper Ingot"}
+    texture: "textures/item/copper_ingot.png"
+}
+item tin_ingot {
+    name: {ru: "Оловянный слиток", en: "Tin Ingot"}
+    texture: "textures/item/tin_ingot.png"
+}
+item mythril_ingot {
+    name: {ru: "Мифриловый слиток", en: "Mythril Ingot"}
+    texture: "textures/item/mythril_ingot.png"
+}
+item adamantium_ingot {
+    name: {ru: "Адамантиновый слиток", en: "Adamantium Ingot"}
+    texture: "textures/item/adamantium_ingot.png"
+}
+item onyx_gem {
+    name: {ru: "Оникс", en: "Onyx"}
+    texture: "textures/item/onyx_gem.png"
+}
+
+// ================================================================ инструменты (tier: уровень, прочность, скорость, урон, зачаровываемость)
+item copper_pickaxe {
+    name: {ru: "Медная кирка", en: "Copper Pickaxe"}
+    texture: "textures/item/copper_pickaxe.png"
+    tool: "pickaxe"
+    tier: {level: 1, uses: 185, speed: 4.0, damage: 1, enchant: 8}
+    tabIcon: true
+}
+item copper_axe {
+    name: {ru: "Медный топор", en: "Copper Axe"}
+    texture: "textures/item/copper_axe.png"
+    tool: "axe"
+    tier: {level: 1, uses: 185, speed: 4.0, damage: 1, enchant: 8}
+}
+item copper_shovel {
+    name: {ru: "Медная лопата", en: "Copper Shovel"}
+    texture: "textures/item/copper_shovel.png"
+    tool: "shovel"
+    tier: {level: 1, uses: 185, speed: 4.0, damage: 1, enchant: 8}
+}
+item copper_sword {
+    name: {ru: "Медный меч", en: "Copper Sword"}
+    texture: "textures/item/copper_sword.png"
+    tool: "sword"
+    tier: {level: 1, uses: 185, speed: 4.0, damage: 1, enchant: 8}
+}
+item copper_hoe {
+    name: {ru: "Медная мотыга", en: "Copper Hoe"}
+    texture: "textures/item/copper_hoe.png"
+    tool: "hoe"
+    tier: {level: 1, uses: 185, speed: 4.0, damage: 1, enchant: 8}
+}
+item tin_pickaxe {
+    name: {ru: "Оловянная кирка", en: "Tin Pickaxe"}
+    texture: "textures/item/tin_pickaxe.png"
+    tool: "pickaxe"
+    tier: {level: 1, uses: 220, speed: 3.5, damage: 1, enchant: 8}
+}
+item tin_axe {
+    name: {ru: "Оловянный топор", en: "Tin Axe"}
+    texture: "textures/item/tin_axe.png"
+    tool: "axe"
+    tier: {level: 1, uses: 220, speed: 3.5, damage: 1, enchant: 8}
+}
+item tin_shovel {
+    name: {ru: "Оловянная лопата", en: "Tin Shovel"}
+    texture: "textures/item/tin_shovel.png"
+    tool: "shovel"
+    tier: {level: 1, uses: 220, speed: 3.5, damage: 1, enchant: 8}
+}
+item tin_sword {
+    name: {ru: "Оловянный меч", en: "Tin Sword"}
+    texture: "textures/item/tin_sword.png"
+    tool: "sword"
+    tier: {level: 1, uses: 220, speed: 3.5, damage: 1, enchant: 8}
+}
+item tin_hoe {
+    name: {ru: "Оловянная мотыга", en: "Tin Hoe"}
+    texture: "textures/item/tin_hoe.png"
+    tool: "hoe"
+    tier: {level: 1, uses: 220, speed: 3.5, damage: 1, enchant: 8}
+}
+item mythril_pickaxe {
+    name: {ru: "Мифриловая кирка", en: "Mythril Pickaxe"}
+    texture: "textures/item/mythril_pickaxe.png"
+    tool: "pickaxe"
+    tier: {level: 2, uses: 800, speed: 8.0, damage: 3, enchant: 12}
+}
+item mythril_axe {
+    name: {ru: "Мифриловый топор", en: "Mythril Axe"}
+    texture: "textures/item/mythril_axe.png"
+    tool: "axe"
+    tier: {level: 2, uses: 800, speed: 8.0, damage: 3, enchant: 12}
+}
+item mythril_shovel {
+    name: {ru: "Мифриловая лопата", en: "Mythril Shovel"}
+    texture: "textures/item/mythril_shovel.png"
+    tool: "shovel"
+    tier: {level: 2, uses: 800, speed: 8.0, damage: 3, enchant: 12}
+}
+item mythril_sword {
+    name: {ru: "Мифриловый меч", en: "Mythril Sword"}
+    texture: "textures/item/mythril_sword.png"
+    tool: "sword"
+    tier: {level: 2, uses: 800, speed: 8.0, damage: 3, enchant: 12}
+}
+item mythril_hoe {
+    name: {ru: "Мифриловая мотыга", en: "Mythril Hoe"}
+    texture: "textures/item/mythril_hoe.png"
+    tool: "hoe"
+    tier: {level: 2, uses: 800, speed: 8.0, damage: 3, enchant: 12}
+}
+item adamantium_pickaxe {
+    name: {ru: "Адамантиновая кирка", en: "Adamantium Pickaxe"}
+    texture: "textures/item/adamantium_pickaxe.png"
+    tool: "pickaxe"
+    tier: {level: 2, uses: 1150, speed: 14.0, damage: 3, enchant: 3}
+}
+item adamantium_axe {
+    name: {ru: "Адамантиновый топор", en: "Adamantium Axe"}
+    texture: "textures/item/adamantium_axe.png"
+    tool: "axe"
+    tier: {level: 2, uses: 1150, speed: 14.0, damage: 3, enchant: 3}
+}
+item adamantium_shovel {
+    name: {ru: "Адамантиновая лопата", en: "Adamantium Shovel"}
+    texture: "textures/item/adamantium_shovel.png"
+    tool: "shovel"
+    tier: {level: 2, uses: 1150, speed: 14.0, damage: 3, enchant: 3}
+}
+item adamantium_sword {
+    name: {ru: "Адамантиновый меч", en: "Adamantium Sword"}
+    texture: "textures/item/adamantium_sword.png"
+    tool: "sword"
+    tier: {level: 2, uses: 1150, speed: 14.0, damage: 3, enchant: 3}
+}
+item adamantium_hoe {
+    name: {ru: "Адамантиновая мотыга", en: "Adamantium Hoe"}
+    texture: "textures/item/adamantium_hoe.png"
+    tool: "hoe"
+    tier: {level: 2, uses: 1150, speed: 14.0, damage: 3, enchant: 3}
+}
+item onyx_pickaxe {
+    name: {ru: "Ониксовая кирка", en: "Onyx Pickaxe"}
+    texture: "textures/item/onyx_pickaxe.png"
+    tool: "pickaxe"
+    tier: {level: 3, uses: 3200, speed: 10.0, damage: 5, enchant: 15}
+}
+item onyx_axe {
+    name: {ru: "Ониксовый топор", en: "Onyx Axe"}
+    texture: "textures/item/onyx_axe.png"
+    tool: "axe"
+    tier: {level: 3, uses: 3200, speed: 10.0, damage: 5, enchant: 15}
+}
+item onyx_shovel {
+    name: {ru: "Ониксовая лопата", en: "Onyx Shovel"}
+    texture: "textures/item/onyx_shovel.png"
+    tool: "shovel"
+    tier: {level: 3, uses: 3200, speed: 10.0, damage: 5, enchant: 15}
+}
+item onyx_sword {
+    name: {ru: "Ониксовый меч", en: "Onyx Sword"}
+    texture: "textures/item/onyx_sword.png"
+    tool: "sword"
+    tier: {level: 3, uses: 3200, speed: 10.0, damage: 5, enchant: 15}
+}
+item onyx_hoe {
+    name: {ru: "Ониксовая мотыга", en: "Onyx Hoe"}
+    texture: "textures/item/onyx_hoe.png"
+    tool: "hoe"
+    tier: {level: 3, uses: 3200, speed: 10.0, damage: 5, enchant: 15}
+}
+
+// ================================================================ броня (defense - очки защиты, durability - множитель прочности)
+item copper_helmet {
+    name: {ru: "Медный шлем", en: "Copper Helmet"}
+    texture: "textures/item/copper_helmet.png"
+    armor: "helmet"
+    defense: 2
+    durability: 8
+    enchant: 8
+    armorTexture: "textures/armor/copper"
+}
+item copper_chestplate {
+    name: {ru: "Медный нагрудник", en: "Copper Chestplate"}
+    texture: "textures/item/copper_chestplate.png"
+    armor: "chestplate"
+    defense: 3
+    durability: 8
+    enchant: 8
+    armorTexture: "textures/armor/copper"
+}
+item copper_leggings {
+    name: {ru: "Медные поножи", en: "Copper Leggings"}
+    texture: "textures/item/copper_leggings.png"
+    armor: "leggings"
+    defense: 2
+    durability: 8
+    enchant: 8
+    armorTexture: "textures/armor/copper"
+}
+item copper_boots {
+    name: {ru: "Медные ботинки", en: "Copper Boots"}
+    texture: "textures/item/copper_boots.png"
+    armor: "boots"
+    defense: 1
+    durability: 8
+    enchant: 8
+    armorTexture: "textures/armor/copper"
+}
+item tin_helmet {
+    name: {ru: "Оловянный шлем", en: "Tin Helmet"}
+    texture: "textures/item/tin_helmet.png"
+    armor: "helmet"
+    defense: 2
+    durability: 9
+    enchant: 8
+    armorTexture: "textures/armor/tin"
+}
+item tin_chestplate {
+    name: {ru: "Оловянный нагрудник", en: "Tin Chestplate"}
+    texture: "textures/item/tin_chestplate.png"
+    armor: "chestplate"
+    defense: 3
+    durability: 9
+    enchant: 8
+    armorTexture: "textures/armor/tin"
+}
+item tin_leggings {
+    name: {ru: "Оловянные поножи", en: "Tin Leggings"}
+    texture: "textures/item/tin_leggings.png"
+    armor: "leggings"
+    defense: 2
+    durability: 9
+    enchant: 8
+    armorTexture: "textures/armor/tin"
+}
+item tin_boots {
+    name: {ru: "Оловянные ботинки", en: "Tin Boots"}
+    texture: "textures/item/tin_boots.png"
+    armor: "boots"
+    defense: 1
+    durability: 9
+    enchant: 8
+    armorTexture: "textures/armor/tin"
+}
+item mythril_helmet {
+    name: {ru: "Мифриловый шлем", en: "Mythril Helmet"}
+    texture: "textures/item/mythril_helmet.png"
+    armor: "helmet"
+    defense: 3
+    durability: 22
+    enchant: 12
+    armorTexture: "textures/armor/mythril"
+}
+item mythril_chestplate {
+    name: {ru: "Мифриловый нагрудник", en: "Mythril Chestplate"}
+    texture: "textures/item/mythril_chestplate.png"
+    armor: "chestplate"
+    defense: 5
+    durability: 22
+    enchant: 12
+    armorTexture: "textures/armor/mythril"
+}
+item mythril_leggings {
+    name: {ru: "Мифриловые поножи", en: "Mythril Leggings"}
+    texture: "textures/item/mythril_leggings.png"
+    armor: "leggings"
+    defense: 4
+    durability: 22
+    enchant: 12
+    armorTexture: "textures/armor/mythril"
+}
+item mythril_boots {
+    name: {ru: "Мифриловые ботинки", en: "Mythril Boots"}
+    texture: "textures/item/mythril_boots.png"
+    armor: "boots"
+    defense: 3
+    durability: 22
+    enchant: 12
+    armorTexture: "textures/armor/mythril"
+}
+item adamantium_helmet {
+    name: {ru: "Адамантиновый шлем", en: "Adamantium Helmet"}
+    texture: "textures/item/adamantium_helmet.png"
+    armor: "helmet"
+    defense: 3
+    durability: 28
+    enchant: 3
+    armorTexture: "textures/armor/adamantium"
+}
+item adamantium_chestplate {
+    name: {ru: "Адамантиновый нагрудник", en: "Adamantium Chestplate"}
+    texture: "textures/item/adamantium_chestplate.png"
+    armor: "chestplate"
+    defense: 8
+    durability: 28
+    enchant: 3
+    armorTexture: "textures/armor/adamantium"
+}
+item adamantium_leggings {
+    name: {ru: "Адамантиновые поножи", en: "Adamantium Leggings"}
+    texture: "textures/item/adamantium_leggings.png"
+    armor: "leggings"
+    defense: 6
+    durability: 28
+    enchant: 3
+    armorTexture: "textures/armor/adamantium"
+}
+item adamantium_boots {
+    name: {ru: "Адамантиновые ботинки", en: "Adamantium Boots"}
+    texture: "textures/item/adamantium_boots.png"
+    armor: "boots"
+    defense: 2
+    durability: 28
+    enchant: 3
+    armorTexture: "textures/armor/adamantium"
+}
+item onyx_helmet {
+    name: {ru: "Ониксовый шлем", en: "Onyx Helmet"}
+    texture: "textures/item/onyx_helmet.png"
+    armor: "helmet"
+    defense: 5
+    durability: 45
+    enchant: 15
+    armorTexture: "textures/armor/onyx"
+}
+item onyx_chestplate {
+    name: {ru: "Ониксовый нагрудник", en: "Onyx Chestplate"}
+    texture: "textures/item/onyx_chestplate.png"
+    armor: "chestplate"
+    defense: 11
+    durability: 45
+    enchant: 15
+    armorTexture: "textures/armor/onyx"
+}
+item onyx_leggings {
+    name: {ru: "Ониксовые поножи", en: "Onyx Leggings"}
+    texture: "textures/item/onyx_leggings.png"
+    armor: "leggings"
+    defense: 8
+    durability: 45
+    enchant: 15
+    armorTexture: "textures/armor/onyx"
+}
+item onyx_boots {
+    name: {ru: "Ониксовые ботинки", en: "Onyx Boots"}
+    texture: "textures/item/onyx_boots.png"
+    armor: "boots"
+    defense: 5
+    durability: 45
+    enchant: 15
+    armorTexture: "textures/armor/onyx"
+}
+
+// ================================================================ крафты (как игра: Recipes / FurnaceRecipes)
+var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+var STICK = 280
+
+fn stack(p, id, count, aux = 0) { mc.call("ItemInstance::ItemInstance(int, int, int)", p, id, count, aux) }
+
+fn shaped(result, count, rows, keys) {
+    var book = mc.callAt(mc.sym("Recipes::getInstance()"))
+    var out = mem.alloc(20)
+    stack(out, result, count)
+    if mc.call("Recipes::getRecipeFor(ItemInstance const&)", book, out) != 0 { return }    // уже есть (повторный вход в мир)
+    var n = keys.len()
+    var types = mem.alloc(n * 32)
+    var i = 0
+    while i < n {
+        var t = types + i * 32
+        stack(t + 8, keys[i][1], 1, 0)
+        mem.setByte(t + 28, LETTERS.find(keys[i][0]) + 65)
+        i += 1
+    }
+    var vec = mem.alloc(12)
+    mem.setPtr(vec, types)
+    mem.setPtr(vec + 4, types + n * 32)
+    mem.setPtr(vec + 8, types + n * 32)
+    mc.call("Recipes::addShapedRecipe(ItemInstance const&, std::string const&, std::string const&, std::string const&, std::vector<Recipes::Type, std::allocator<Recipes::Type> > const&)",
+            book, out, rows[0], rows[1], rows[2], vec)
+}
+
+fn smelt(from, to) {
+    var fr = mc.callAt(mc.sym("FurnaceRecipes::getInstance()"))
+    var r = mem.alloc(20)
+    stack(r, to, 1)
+    mc.call("FurnaceRecipes::addFurnaceRecipe(int, ItemInstance const&)", fr, from, r)
+}
+
+// материал: [руда, блок, кирпичи, слиток, инструменты (кирка, топор, лопата, меч, мотыга), броня (шлем, нагрудник, поножи, ботинки)]
+fn sets() {
+    return [
+        [copper_ore, copper_block, copper_bricks, copper_ingot, [copper_pickaxe, copper_axe, copper_shovel, copper_sword, copper_hoe], [copper_helmet, copper_chestplate, copper_leggings, copper_boots]],
+        [tin_ore, tin_block, tin_bricks, tin_ingot, [tin_pickaxe, tin_axe, tin_shovel, tin_sword, tin_hoe], [tin_helmet, tin_chestplate, tin_leggings, tin_boots]],
+        [mythril_ore, mythril_block, mythril_bricks, mythril_ingot, [mythril_pickaxe, mythril_axe, mythril_shovel, mythril_sword, mythril_hoe], [mythril_helmet, mythril_chestplate, mythril_leggings, mythril_boots]],
+        [adamantium_ore, adamantium_block, adamantium_bricks, adamantium_ingot, [adamantium_pickaxe, adamantium_axe, adamantium_shovel, adamantium_sword, adamantium_hoe], [adamantium_helmet, adamantium_chestplate, adamantium_leggings, adamantium_boots]],
+        [onyx_ore, onyx_block, onyx_bricks, onyx_gem, [onyx_pickaxe, onyx_axe, onyx_shovel, onyx_sword, onyx_hoe], [onyx_helmet, onyx_chestplate, onyx_leggings, onyx_boots]]
+    ]
+}
+
+var recipesDone = false
+fn recipes() {
+    if recipesDone { return }
+    recipesDone = true
+    for s in sets() {
+        var I = s[3]
+        smelt(s[0], I)                                                     // руда -> слиток (оникс -> камень)
+        shaped(s[1], 1, ["III", "III", "III"], [["I", I]])                 // 9 слитков -> блок
+        shaped(I, 9, ["B  ", "   ", "   "], [["B", s[1]]])                 // блок -> 9 слитков
+        shaped(s[2], 4, ["BB ", "BB ", "   "], [["B", s[1]]])              // 4 блока -> 4 кирпича
+        var t = s[4]
+        shaped(t[0], 1, ["III", " S ", " S "], [["I", I], ["S", STICK]])
+        shaped(t[1], 1, ["II ", "IS ", " S "], [["I", I], ["S", STICK]])
+        shaped(t[2], 1, [" I ", " S ", " S "], [["I", I], ["S", STICK]])
+        shaped(t[3], 1, [" I ", " I ", " S "], [["I", I], ["S", STICK]])
+        shaped(t[4], 1, ["II ", " S ", " S "], [["I", I], ["S", STICK]])
+        var a = s[5]
+        shaped(a[0], 1, ["III", "I I", "   "], [["I", I]])
+        shaped(a[1], 1, ["I I", "III", "III"], [["I", I]])
+        shaped(a[2], 1, ["III", "I I", "I I"], [["I", I]])
+        shaped(a[3], 1, ["I I", "I I", "   "], [["I", I]])
+    }
+}
+
+fn give(id, count) {
+    var it = mem.alloc(64)
+    stack(it, id, count)
+    mc.call("Inventory::add(ItemInstance&, bool)", mem.ptr(mc.player(), 0xda0), it, true)
+}
+
+on world.join(e) { recipes() }
+
+on chat(e) {
+    if e.text == "/simpleores" {
+        e.cancel()
+        ui.tip("§6Simple Ores§f: медь, олово, мифрил, адамантин, оникс (в Аду). Вкладка - стрелки вверху творческого инвентаря")
+    } else if e.text == "/so give" {
+        e.cancel()
+        for s in sets() {
+            give(s[3], 16)
+            give(s[0], 8)
+        }
+        ui.tip("§6Simple Ores: §fслитки и руды выданы")
+    }
+}

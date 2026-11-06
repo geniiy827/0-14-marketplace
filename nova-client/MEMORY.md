@@ -180,3 +180,20 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Язык должен быть удобен и человеку, и ИИ; справочник функций держать построчно (см. §5).
 
 - ВАЖНО (alpha19 сломалась): в native нельзя `__thread` (нужен __emutls_get_address, которого нет в процессе игры -> libnova не грузится, клиент выглядит как старый). build.sh теперь проверяет. Деление по модулю в горячем коде — через умножение (st_mod).
+
+## alpha26-27 (ноябрь 2026)
+- HUD-картинки модов грузятся игрой через getImageData (не getFileDataBytes), путь может быть с префиксом -> indexOf("nova/mod/").
+- ui.hud(..., shake): дрожание как у голода (hud.inc, без деления).
+- creative.inc: страницы вкладок творческого. mFilteredItems[4] (vector<ItemInstance const*>) подменяются, панели
+  this+0x164+8i -> Touch::InventoryPane::refreshItems; иконки - хук getItemFromType(sret); таблица панелей this+0x200
+  (12 байт, pane +4), выбранная вкладка this+0x268, кнопки вкладок this+0x30. Стрелки - TButton + gui/newgui/arrowLeft|Right.png,
+  касания через hc_touch (net.inc). При D1/ctor экрана - вернуть векторы игры.
+- items.inc: kind 1..5 инструменты (PickaxeItem/HatchetItem/ShovelItem ctor 0x158, WeaponItem собирается вручную 0x48,
+  HoeItem 0x54 Tier по значению), 6..9 броня (ArmorItem 0x50, ArmorMaterial {mul, def x4, ench}, renderIndex 5+k).
+  Tier = {level, uses, float speed, damage, ench}, у DiggerItem указатель на Tier в +0x44.
+  Броня на модели: хук HumanoidMobRenderer::prepareArmor подменяет this+0xd0 (массив TexturePtr по 16 байт).
+  Уровень кирки для блоков модов: хук PickaxeItem::canDestroySpecial.
+- Свободные id предметов 0.14.3: 432-437, 439-456, 467-497, 499-511 (498 = камера, items.json). ModItems.POOL.
+- mcmod.inc: drop/xp через vtable 48/49/63, nativeBlockExtra; руды - structs.inc st_ores (хук StructureFeature::postProcess,
+  Ад = биом 8, netherrack 87).
+- Пример simple_ores (LGPL, SimpleOres2): 15 блоков, 50 предметов.

@@ -316,7 +316,14 @@ static void draw_banner(void *client) {
 }
 
 /* touches on the banner buttons never reach the game */
+static int ct_touch(u32 *w, float scale);          /* creative.inc: page arrows */
 static u64 hc_touch(u32 orig, u32 *w) {          /* Multitouch::feed(button, state, x, y, pointer) */
+    if (g_client && f_guidata && f_guiscale) {
+        void *gd = f_guidata(g_client);
+        float s = gd ? f_guiscale(gd) : 1.f;
+        if (s <= 0) s = 1.f;
+        if (ct_touch(w, s)) return 0;
+    }
     if (ban_on && (w[1] & 0xff) == 1 && g_client && f_guidata && f_guiscale) {
         void *gd = f_guidata(g_client);
         float s = gd ? f_guiscale(gd) : 1.f;

@@ -341,11 +341,72 @@ static int st_first_time(int cx, int cz) {
     return fresh;
 }
 
+/* ores of mod blocks (block "ore"): veins like the game's OreFeature (a line of blobs), replacing stone (1) in the
+ * overworld or netherrack (87) in the nether, deterministic from the seed and the chunk */
+static int st_any_ores(void) {
+    for (int i = 0; i < mblock_count; i++) if (mblocks[i].ore_count > 0 && mblocks[i].block) return 1;
+    return 0;
+}
+static float st_rf(u32 *h) { *h = *h * 1664525u + 1013904223u; return (*h >> 8) * (1.f / 16777216.f); }
+static void st_vein(void *bs, int id, int in, int size, int x, int y, int z, u32 *h) {
+    float a = st_rf(h) * 3.14159265f;
+    float sa = sinf(a) * size / 8.f, ca = cosf(a) * size / 8.f;
+    float x0 = x + sa, x1 = x - sa, z0 = z + ca, z1 = z - ca;
+    float y0 = y + (int)(st_rf(h) * 3) - 2, y1 = y + (int)(st_rf(h) * 3) - 2;
+    for (int i = 0; i <= size; i++) {
+        float t = (float)i / size;
+        float cxf = x0 + (x1 - x0) * t, cyf = y0 + (y1 - y0) * t, czf = z0 + (z1 - z0) * t;
+        float r = st_rf(h) * size / 16.f;
+        float hr = (sinf(3.14159265f * t) + 1.f) * r + 1.f;
+        float rad = hr / 2.f;
+        int ax = (int)floorf(cxf - rad), bx = (int)floorf(cxf + rad);
+        int ay = (int)floorf(cyf - rad), by = (int)floorf(cyf + rad);
+        int az = (int)floorf(czf - rad), bz = (int)floorf(czf + rad);
+        for (int xx = ax; xx <= bx; xx++) {
+            float dx = (xx + .5f - cxf) / rad;
+            if (dx * dx >= 1.f) continue;
+            for (int yy = ay; yy <= by; yy++) {
+                float dy = (yy + .5f - cyf) / rad;
+                if (dx * dx + dy * dy >= 1.f || yy < 1 || yy > 126) continue;
+                for (int zz = az; zz <= bz; zz++) {
+                    float dz = (zz + .5f - czf) / rad;
+                    if (dx * dx + dy * dy + dz * dz >= 1.f) continue;
+                    if (st_get(bs, xx, yy, zz) == in) st_set(bs, xx, yy, zz, id, 0);
+                }
+            }
+        }
+    }
+}
+static void st_ores(void *bs, int cx, int cz, u32 seed, int nether) {
+    for (int i = 0; i < mblock_count; i++) {
+        ModBlock *m = &mblocks[i];
+        if (m->ore_count <= 0 || !m->block) continue;
+        int in = m->ore_in > 0 ? m->ore_in : 1;
+        if ((in == 87) != nether) continue;
+        u32 h = st_hash(seed ^ 0x0BE5u, (u32)cx * 31u + (u32)m->id, (u32)cz);
+        int lo = m->ore_min < 1 ? 1 : m->ore_min, hi = m->ore_max > 126 ? 126 : m->ore_max;
+        if (hi < lo) continue;
+        for (int c = 0; c < m->ore_count; c++) {
+            int x = cx * 16 + (int)(st_rf(&h) * 16), z = cz * 16 + (int)(st_rf(&h) * 16);
+            int y = lo + (int)(st_rf(&h) * (hi - lo + 1));
+            st_vein(bs, m->id, in, m->ore_size > 0 ? m->ore_size : 4, x, y, z, &h);
+        }
+    }
+}
+
 static u64 hc_structure_pp(u32 orig, u32 *w) {     /* StructureFeature::postProcess(this, BlockSource*, Random&, cx, cz) */
     u64 ret = nh_callw(orig, w);
     void *bs = (void *)w[1], *rnd = (void *)w[2];
     int cx = (int)w[3], cz = (int)w[4];
-    if (!st_count || !bs || !st_first_time(cx, cz)) return ret;
+    int ores = st_any_ores();
+    if ((!st_count && !ores) || !bs || !st_first_time(cx, cz)) return ret;
+    if (ores) {
+        void *lv = sf_bslevel ? sf_bslevel(bs) : 0;
+        int pp[3] = {cx * 16 + 8, 64, cz * 16 + 8};
+        void *bm = sf_biome ? sf_biome(bs, pp) : 0;
+        st_ores(bs, cx, cz, lv && sf_seed ? (u32)sf_seed(lv) : 0, bm && *(int *)((char *)bm + 0x94) == 8);
+    }
+    if (!st_count) return ret;
     if (st_loot_ready != 2) {                        /* the loot vectors need the items: built on first use */
         if (__sync_bool_compare_and_swap(&st_loot_ready, 0, 1)) { st_build_loot(); st_loot_ready = 2; }
         else while (st_loot_ready != 2) sched_yield();

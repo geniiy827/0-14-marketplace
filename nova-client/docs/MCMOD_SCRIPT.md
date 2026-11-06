@@ -260,5 +260,50 @@ block my_lamp_lit { texture: "textures/on.png" light: 15 redstone: {type: "lamp_
 
 ## Ряд иконок на HUD (alpha22)
 `ui.hud("thirst", ["textures/a.png", ...], 0, "right")` — ряд иконок над хотбаром (картинки 16x16, иконка 9x9 в левом верхнем углу):
-до 20 картинок мода слева направо; row 0 — под голодом/сердцами, 1 — над ними, 2 — выше; side "right" (голод) или "left" (сердца).
+до 20 картинок мода слева направо; row 0 — под голодом/сердцами, 1 — ещё ряд ниже, 2 — ниже; side "right" (голод) или "left" (сердца).
 `ui.hud("thirst", [])` — убрать. Пример — жажда в `mcmod/examples/adventure_craft`.
+
+## Инструменты и броня игры (alpha27)
+
+Предмет становится настоящим инструментом игры (скорость копания, что может добывать, прочность, урон) или бронёй
+(очки защиты, прочность, вид на игроке):
+
+```
+item mythril_pickaxe {
+    texture: "textures/mythril_pickaxe.png"
+    tool: "pickaxe"                     // "pickaxe" | "axe" | "shovel" | "sword" | "hoe"
+    tier: {level: 2, uses: 800, speed: 8, damage: 3, enchant: 12}   // level: 0 дерево, 1 камень, 2 железо, 3 алмаз
+}
+item mythril_helmet {
+    texture: "textures/mythril_helmet.png"
+    armor: "helmet"                     // "helmet" | "chestplate" | "leggings" | "boots"
+    defense: 3                          // очки защиты (половинки нагрудника)
+    durability: 22                      // множитель прочности, как у ArmorMaterial (железо 15, алмаз 33)
+    enchant: 12
+    armorTexture: "textures/armor/mythril"   // mythril_layer_1.png (шлем, нагрудник, ботинки) и mythril_layer_2.png (поножи), 64x32
+}
+```
+
+## Руды, добыча и выпадение блоков (alpha27)
+
+```
+block mythril_ore {
+    texture: "textures/mythril_ore.png"
+    hardness: 4
+    harvest: 2                          // нужна кирка уровня 2 (железная) и лучше, иначе блок ничего не даёт
+    drop: "mythril_gem"                 // что выпадает (предмет этого мода); {item: "...", count: [1, 3]}
+    xp: [1, 3]                          // опыт
+    ore: {count: 8, size: 4, min: 1, max: 48, in: "stone"}   // генерация: жил на чанк, размер, высоты; in: "stone" | "netherrack"
+}
+```
+
+Руды ставятся в новых чанках, как у игры (OreFeature): в обычном мире вместо камня, в Аду вместо адского камня.
+
+## Вкладки творческого инвентаря (alpha27)
+
+У каждого мода своя вкладка (название мода, иконка - первый блок/предмет). Вверху творческого инвентаря стрелки
+листают страницы: 1 - вкладки игры, дальше - по 4 вкладки модов. Предметы модов во вкладках игры больше не дублируются.
+
+```
+item ruby_sword { tab: {ru: "Оружие", en: "Weapons"}  tabIcon: true  ... }   // своя вкладка мода и её иконка
+```

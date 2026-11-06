@@ -1,0 +1,5 @@
+Simple Ores для NOVA - перенос мода SimpleOres2.
+Оригинал: https://github.com/Sinhika/SimpleOres2 (автор Sinhika, изначально AleXndrTheGr8st).
+Лицензия оригинала: GNU LGPL-3.0 (LICENSE-SimpleOres.txt, вместе с GPL-3.0: LICENSE-GPL.txt).
+Текстуры и числа (SimpleOresConfig, ModArmorMaterials, SimpleOresTiers, worldgen) - из оригинала.
+Высоты руд пересчитаны под мир 0.14 (0..127).

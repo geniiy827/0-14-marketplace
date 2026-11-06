@@ -420,3 +420,9 @@
   our prefix (like Query 0xFE) -> rooms, address exchange for UDP hole punching, relay fallback.
 - Client: UDP proxy in NOVA; friend sees host's world as a LAN world; host proxy -> 127.0.0.1:19132.
 - Joining via accounts + friends system (not room codes). Start after the accounts design.
+
+## После alpha27
+- Simple Ores: луки (мифрил/оникс), ножницы, медное ведро, двери/решётки/ступени/плиты/нажимные плиты, самородки - нет
+  (лимит id предметов 0.14 = 512, особые формы блоков).
+- Проверить на телефоне: стрелки вкладок (позиция в шапке), броня на игроке, генерация руд, уровни кирок.
+- redstone_update: крафты через callAt(sym) (ждёт разрешения).

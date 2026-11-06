@@ -20,6 +20,9 @@ public final class ModBridge {
     static native String nativeApiStr(int op, double[] args, String strs);
     static native int nativeDefineBlocks(double[] data, String names);
     static native int nativeStructures(byte[] data);
+    static native int nativeBlockExtra(double[] data);
+    static native int nativeCreativeTabs(String spec);
+    static native int nativeArmorTextures(String spec);
 
     /** mod blocks of this run (atlas strip, lang lines); null until load() */
     static volatile ModBlocks blocks;
@@ -176,6 +179,16 @@ public final class ModBridge {
                     try { nativeDefineItems(mi.data, mi.names, mi.actions); } catch (Throwable t) { Log.e(TAG, "native items", t); }
                 }
                 items = mi;
+                if (!mi.armorTex.isEmpty()) {
+                    StringBuilder at = new StringBuilder();
+                    for (String t : mi.armorTex) { if (at.length() > 0) at.append('|'); at.append(t); }
+                    try { nativeArmorTextures(at.toString()); } catch (Throwable t) { Log.e(TAG, "armor textures", t); }
+                }
+                try {
+                    double[] ex = mb.extra(rt, mi.ids);
+                    if (ex.length > 0) nativeBlockExtra(ex);
+                } catch (Throwable t) { Log.e(TAG, "block extra", t); }
+                try { nativeCreativeTabs(creativeTabs(rt, mb, mi)); } catch (Throwable t) { Log.e(TAG, "creative tabs", t); }
                 for (File d : dirs.values()) {             // structures.bin of mods (tools/port_rs.py): world generation
                     File sb = new File(d, "structures.bin");
                     if (!sb.isFile()) continue;
@@ -190,5 +203,50 @@ public final class ModBridge {
         } catch (Throwable t) {
             Log.e(TAG, "mod runtime failed", t);
         }
+    }
+
+    /** creative tabs of mods: one per mod (its name, icon = the first entry) unless entries say tab: "Название";
+     *  an entry with tabIcon: true is its tab's icon. Order: as declared in the mod. */
+    static String creativeTabs(ModRuntime rt, ModBlocks mb, ModItems mi) {
+        java.util.List<Object[]> all = new java.util.ArrayList<Object[]>();
+        for (Object[] d : rt.blockDecls()) all.add(new Object[]{d, Boolean.TRUE});
+        for (Object[] d : rt.decls("item")) all.add(new Object[]{d, Boolean.FALSE});
+        java.util.Collections.sort(all, new java.util.Comparator<Object[]>() {
+            public int compare(Object[] a, Object[] b) {
+                Object[] x = (Object[]) a[0], y = (Object[]) b[0];
+                int c = ((ModRuntime.Mod) x[0]).id.compareTo(((ModRuntime.Mod) y[0]).id);
+                return c != 0 ? c : ((Integer) x[3]).compareTo((Integer) y[3]);
+            }
+        });
+        java.util.LinkedHashMap<String, StringBuilder> items = new java.util.LinkedHashMap<String, StringBuilder>();
+        java.util.Map<String, String> icon = new java.util.HashMap<String, String>();
+        java.util.Map<String, String> title = new java.util.HashMap<String, String>();
+        for (Object[] e : all) {
+            Object[] d = (Object[]) e[0];
+            ModRuntime.Mod m = (ModRuntime.Mod) d[0];
+            if (!(d[2] instanceof java.util.Map)) continue;
+            java.util.Map<?, ?> p = (java.util.Map<?, ?>) d[2];
+            String key = m.id + ":" + d[1];
+            Double id = (Boolean) e[1] ? mb.ids().get(key) : mi.ids.get(key);
+            if (id == null) continue;
+            Object rs = p.get("redstone");
+            if (rs instanceof java.util.Map && "lamp_on".equals(String.valueOf(((java.util.Map<?, ?>) rs).get("type")))) continue;
+            if ("lamp_on".equals(String.valueOf(rs))) continue;
+            Object tab = p.get("tab");
+            String tname = tab == null ? m.name : ModBlocks.text(tab, String.valueOf(tab));
+            String tkey = m.id + "\u0000" + tname;
+            StringBuilder b = items.get(tkey);
+            if (b == null) { b = new StringBuilder(); items.put(tkey, b); title.put(tkey, tname); }
+            if (b.length() > 0) b.append(',');
+            b.append(id.intValue());
+            if (!icon.containsKey(tkey) || Boolean.TRUE.equals(p.get("tabIcon"))) icon.put(tkey, String.valueOf(id.intValue()));
+        }
+        StringBuilder out = new StringBuilder();
+        for (java.util.Map.Entry<String, StringBuilder> en : items.entrySet()) {
+            if (out.length() > 0) out.append('\u001e');
+            out.append(title.get(en.getKey()).replace('\u001f', ' ').replace('\u001e', ' '))
+               .append('\u001f').append(icon.get(en.getKey())).append("\u001f0\u001f").append(en.getValue());
+        }
+        return out.toString();
     }
 }

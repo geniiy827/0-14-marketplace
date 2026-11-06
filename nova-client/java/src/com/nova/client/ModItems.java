@@ -35,6 +35,23 @@ import java.util.Map;
 final class ModItems {
     static final String TAG = "NOVA.items";
     static final int FIRST_ID = 470, LAST_ID = 499;
+    /** item numbers the game 0.14.3 leaves free (Item::initItems, items.json; 498 = camera) */
+    static final int[] POOL = pool();
+    private static int[] pool() {
+        List<Integer> l = new ArrayList<Integer>();
+        for (int i = 470; i <= 497; i++) l.add(i);
+        l.add(499);
+        for (int i = 500; i <= 511; i++) l.add(i);
+        for (int i = 467; i <= 469; i++) l.add(i);
+        for (int i = 439; i <= 456; i++) l.add(i);
+        for (int i = 432; i <= 437; i++) l.add(i);
+        int[] a = new int[l.size()];
+        for (int i = 0; i < a.length; i++) a[i] = l.get(i);
+        return a;
+    }
+    /** armor textures: layer 1 / layer 2 per armor material, "nova/mod/<id>/<file>" */
+    final List<String> armorTex = new ArrayList<String>();
+    private final Map<String, Integer> armorIdx = new HashMap<String, Integer>();
     static final int ATLAS = 512, STRIP_Y = 176;
 
     final List<ModBlocks.Extra> extras = new ArrayList<ModBlocks.Extra>();
@@ -75,8 +92,9 @@ final class ModItems {
                 int id = -1;
                 Integer have = saved.get(key);
                 if (have != null && !used.contains(have)) id = have;
-                for (int i = FIRST_ID; id < 0 && i <= LAST_ID; i++) if (!used.contains(i) && !saved.containsValue(i)) id = i;
-                if (id < 0) throw new Exception("закончились свободные номера предметов (" + FIRST_ID + ".." + LAST_ID + ")");
+                for (int i : POOL) if (id < 0 && !used.contains(i) && !saved.containsValue(i)) id = i;
+                if (id < 0) for (int i : POOL) if (id < 0 && !used.contains(i)) id = i;     // numbers of mods that are off
+                if (id < 0) throw new Exception("закончились свободные номера предметов (" + POOL.length + ")");
                 used.add(id);
                 saved.put(key, id);
                 File dir = dirs.get(m.id);
@@ -85,11 +103,52 @@ final class ModItems {
                 boolean pixel = "pixel".equals(p.get("size"));
                 float[] uv = new float[4];
                 double handScale = icon(dir, String.valueOf(tex), pixel, uv);
-                boolean tool = "tool".equals(p.get("hand")) || "weapon".equals(p.get("hand"));
+                // real tools / armor of the game: tool: "pickaxe" | "axe" | "shovel" | "sword" | "hoe", tier: {...}
+                //                               armor: "helmet" | "chestplate" | "leggings" | "boots", defense, ...
+                String toolKind = p.get("tool") == null ? "" : String.valueOf(p.get("tool"));
+                String armorKind = p.get("armor") == null ? "" : String.valueOf(p.get("armor"));
+                int kind = 0;
+                switch (toolKind) {
+                    case "pickaxe": kind = 1; break; case "axe": kind = 2; break; case "shovel": kind = 3; break;
+                    case "sword": kind = 4; break; case "hoe": kind = 5; break;
+                    case "": break;
+                    default: throw new Exception("tool: \"pickaxe\", \"axe\", \"shovel\", \"sword\" или \"hoe\"");
+                }
+                switch (armorKind) {
+                    case "helmet": kind = 6; break; case "chestplate": kind = 7; break;
+                    case "leggings": kind = 8; break; case "boots": kind = 9; break;
+                    case "": break;
+                    default: throw new Exception("armor: \"helmet\", \"chestplate\", \"leggings\" или \"boots\"");
+                }
+                Map<?, ?> tier = p.get("tier") instanceof Map ? (Map<?, ?>) p.get("tier") : new HashMap<String, Object>();
+                double tLevel = num(tier.get("level"), 1), tUses = num(tier.get("uses"), 250), tSpeed = num(tier.get("speed"), 6),
+                       tDamage = num(tier.get("damage"), 2), tEnch = num(tier.get("enchant"), 10);
+                double aDef = 0, aMul = 0, aIdx = -1;
+                if (kind >= 6) {
+                    aDef = num(p.get("defense"), 2);
+                    aMul = num(p.get("durability"), 15);
+                    tEnch = num(p.get("enchant"), 10);
+                    Object at = p.get("armorTexture");
+                    if (at == null) throw new Exception("для брони нужен armorTexture: \"textures/armor/имя\" (имя_layer_1.png и имя_layer_2.png)");
+                    String base = String.valueOf(at).replaceAll("(_layer_[12])?\\.png$", "");
+                    String k = m.id + "|" + base;
+                    Integer ai = armorIdx.get(k);
+                    if (ai == null) {
+                        for (String layer : new String[]{"_layer_1.png", "_layer_2.png"})
+                            if (find(dir, base + layer) == null) throw new Exception("нет картинки " + base + layer);
+                        ai = armorIdx.size();
+                        if (ai >= 16) throw new Exception("слишком много видов брони (16)");
+                        armorIdx.put(k, ai);
+                        armorTex.add("nova/mod/" + m.id + "/" + base + "_layer_1.png");
+                        armorTex.add("nova/mod/" + m.id + "/" + base + "_layer_2.png");
+                    }
+                    aIdx = ai;
+                }
+                boolean tool = "tool".equals(p.get("hand")) || "weapon".equals(p.get("hand")) || (kind >= 1 && kind <= 5);
                 int stack = (int) clamp(num(p.get("stack"), tool ? 1 : 64), 1, 64);
                 int dur = (int) clamp(num(p.get("durability"), 0), 0, 32000);
                 Object cat = p.get("category");
-                int category = "tools".equals(cat) || (cat == null && tool) ? 3 : "blocks".equals(cat) ? 1 : "decor".equals(cat) ? 2 : 4;
+                int category = "tools".equals(cat) || (cat == null && (tool || kind >= 6)) ? 3 : "blocks".equals(cat) ? 1 : "decor".equals(cat) ? 2 : 4;
                 out.add((double) id);
                 for (float f : uv) out.add((double) f);
                 out.add(handScale);
@@ -97,6 +156,8 @@ final class ModItems {
                 out.add((double) stack);
                 out.add((double) dur);
                 out.add((double) category);
+                out.add((double) kind); out.add(tLevel); out.add(tUses); out.add(tSpeed); out.add(tDamage); out.add(tEnch);
+                out.add(aDef); out.add(aIdx); out.add(aMul);
                 String internal = (m.id + "_" + name).toLowerCase(Locale.US).replaceAll("[^a-z0-9_]", "_");
                 if (nm.length() > 0) { nm.append('\u001f'); ac.append('\u001f'); }
                 nm.append(internal);

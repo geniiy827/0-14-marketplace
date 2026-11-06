@@ -70,6 +70,55 @@ final class ModBlocks {
     private final Map<String, Double> idsOut = new HashMap<String, Double>();
     Map<String, Double> ids() { return idsOut; }
 
+    /** per block: id, harvest (pickaxe level 0..3), drop id, drop min, max, xp min, max,
+     *  ore count, size, min y, max y, replaces (1 stone / 87 netherrack). Items by name (same mod) must exist. */
+    double[] extra(ModRuntime rt, Map<String, Double> itemIds) {
+        List<Double> o = new ArrayList<Double>();
+        for (Object[] d : rt.blockDecls()) {
+            ModRuntime.Mod m = (ModRuntime.Mod) d[0];
+            if (!(d[2] instanceof Map)) continue;
+            Map<?, ?> p = (Map<?, ?>) d[2];
+            Double id = idsOut.get(m.id + ":" + d[1]);
+            if (id == null) continue;
+            if (p.get("harvest") == null && p.get("drop") == null && p.get("ore") == null && p.get("xp") == null) continue;
+            try {
+                double drop = 0, dmin = 0, dmax = 0, xmin = 0, xmax = 0;
+                Object dr = p.get("drop");
+                if (dr != null) {
+                    String dn = dr instanceof Map ? String.valueOf(((Map<?, ?>) dr).get("item")) : String.valueOf(dr);
+                    Double di = itemIds.get(m.id + ":" + dn);
+                    if (di == null) di = idsOut.get(m.id + ":" + dn);
+                    if (di == null) di = rt.customIds.get(dn.toLowerCase(Locale.US));
+                    if (di == null) throw new Exception("drop: нет предмета " + dn);
+                    drop = di;
+                    dmin = dmax = 1;
+                    if (dr instanceof Map) {
+                        Object c = ((Map<?, ?>) dr).get("count");
+                        if (c instanceof List && ((List<?>) c).size() == 2) { dmin = num(((List<?>) c).get(0)); dmax = num(((List<?>) c).get(1)); }
+                        else if (c instanceof Double) dmin = dmax = (Double) c;
+                    }
+                }
+                Object xp = p.get("xp");
+                if (xp instanceof List && ((List<?>) xp).size() == 2) { xmin = num(((List<?>) xp).get(0)); xmax = num(((List<?>) xp).get(1)); }
+                else if (xp instanceof Double) xmin = xmax = (Double) xp;
+                double oc = 0, os = 0, oy0 = 0, oy1 = 0, oin = 1;
+                if (p.get("ore") instanceof Map) {
+                    Map<?, ?> ore = (Map<?, ?>) p.get("ore");
+                    oc = num(ore.get("count"), 8); os = num(ore.get("size"), 6);
+                    oy0 = num(ore.get("min"), 1); oy1 = num(ore.get("max"), 64);
+                    oin = "netherrack".equals(ore.get("in")) || "nether".equals(ore.get("in")) ? 87 : 1;
+                }
+                o.add(id); o.add(clamp(num(p.get("harvest"), 0), 0, 3)); o.add(drop); o.add(dmin); o.add(dmax);
+                o.add(xmin); o.add(xmax); o.add(oc); o.add(os); o.add(oy0); o.add(oy1); o.add(oin);
+            } catch (Exception e) {
+                rt.reportLater(m, "block " + d[1] + ": " + e.getMessage(), (Integer) d[3]);
+            }
+        }
+        double[] a = new double[o.size()];
+        for (int i = 0; i < a.length; i++) a[i] = o.get(i);
+        return a;
+    }
+
     /** reads every block declaration; errors are reported to the mod */
     void prepare(Map<String, File> modDirs) {
         try {
@@ -473,7 +522,7 @@ final class ModBlocks {
     private static double num(Object o, double def) { return o instanceof Double ? (Double) o : def; }
     private static double clamp(double v, double lo, double hi) { return Math.max(lo, Math.min(hi, v)); }
 
-    private static String text(Object o, String def) {
+    static String text(Object o, String def) {
         if (o instanceof String) return (String) o;
         if (o instanceof Map) {
             Map<?, ?> m = (Map<?, ?>) o;

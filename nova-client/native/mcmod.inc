@@ -229,7 +229,10 @@ typedef struct {
     char name[64];
     void *block;
     int rs, rs_power, rs_on, rs_off;     /* redstone: 1 source (power), 2 lamp off, 3 lamp on; the other lamp state */
+    int harvest, drop, dmin, dmax, xmin, xmax;            /* pickaxe level; drop item and count; experience */
+    int ore_count, ore_size, ore_min, ore_max, ore_in;    /* world generation: veins per chunk, size, heights, replaces */
 } ModBlock;
+static int ct_has(int id);
 static ModBlock mblocks[MB_MAX];
 static int mblock_count, mblocks_done;
 static ModBlock *mblock_of[256];
@@ -377,6 +380,49 @@ static int mb_rs_lamp_drop(void *b, void *rnd, int data, int fortune) {
     return m && m->rs_off > 0 ? m->rs_off : *((unsigned char *)b + 4);
 }
 
+/* drops: block "drop" (item / block id), count dmin..dmax, experience xmin..xmax */
+static u32 (*mf_rand)(void *rnd);                       /* Random::genrand_int32 */
+static int mb_rand_range(void *rnd, int lo, int hi) {
+    if (hi <= lo || !rnd) return lo;
+    u32 r = mf_rand(rnd);
+    return lo + (int)(((unsigned long long)r * (u32)(hi - lo + 1)) >> 32);
+}
+static int mb_drop_id(void *b, void *rnd, int data, int fortune) {
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    return m && m->drop > 0 ? m->drop : *((unsigned char *)b + 4);
+}
+static int mb_drop_count(void *b, void *rnd, int data, int fortune) {
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    if (!m || m->dmax <= 0) return 1;
+    return mb_rand_range(rnd, m->dmin, m->dmax);
+}
+static int mb_drop_xp(void *b, void *rnd) {
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    return m && m->xmax > 0 ? mb_rand_range(rnd, m->xmin, m->xmax) : 0;
+}
+
+int Java_com_nova_client_ModBridge_nativeBlockExtra(void **env, void *cls, void *darr) {
+    void **f = *(void ***)env;
+    if (!darr) return -1;
+    int n = ((int (*)(void *, void *))f[171])(env, darr);
+    double *d = f_new(n * 8 + 8);
+    ((void (*)(void *, void *, int, int, double *))f[206])(env, darr, 0, n, d);
+    int done = 0;
+    for (int p = 0; p + 12 <= n; p += 12) {
+        int id = (int)d[p];
+        for (int i = 0; i < mblock_count; i++) {
+            ModBlock *m = &mblocks[i];
+            if (m->id != id) continue;
+            m->harvest = (int)d[p + 1]; m->drop = (int)d[p + 2]; m->dmin = (int)d[p + 3]; m->dmax = (int)d[p + 4];
+            m->xmin = (int)d[p + 5]; m->xmax = (int)d[p + 6];
+            m->ore_count = (int)d[p + 7]; m->ore_size = (int)d[p + 8]; m->ore_min = (int)d[p + 9];
+            m->ore_max = (int)d[p + 10]; m->ore_in = (int)d[p + 11];
+            done++;
+        }
+    }
+    return done;
+}
+
 /* a block with redstone gets its own vtable (mb_vtable + the redstone slots) */
 static u32 *mb_rs_vtable(ModBlock *m) {
     if (m->rs == 1 && !rs_src_vt[0]) return 0;
@@ -414,6 +460,11 @@ static void mcmod_register_blocks(void) {
     mb_vtable[2 + 9] = (u32)mb_get_aabb;                    /* outline / pick box */
     mb_vtable[2 + 8] = (u32)mb_add_shapes;                  /* addAABBs (stairs-style multi-box collision) */
     mb_vtable[2 + 10] = (u32)mb_add_shapes;                 /* addCollisionShapes */
+    if (mf_rand) {
+        mb_vtable[2 + 48] = (u32)mb_drop_id;                /* getResource */
+        mb_vtable[2 + 49] = (u32)mb_drop_count;             /* getResourceCount */
+        mb_vtable[2 + 63] = (u32)mb_drop_xp;                /* getExperienceDrop */
+    }
     int done = 0;
     for (int i = 0; i < mblock_count; i++) {
         ModBlock *m = &mblocks[i];
@@ -468,7 +519,7 @@ static void h_init_creative(void) {
     int before = list ? (int)((list[1] - list[0]) / 20) : 0;
     mcmod_register_blocks();
     for (int i = 0; i < mblock_count; i++)
-        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps */
+        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps */
     mcmod_register_items();
     /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
     if (list) {
@@ -701,6 +752,7 @@ static void mcmod_init(void *mc, u32 base) {
     S(mf_light_block, "_ZN5Block11mLightBlockE");
     S(mf_solid, "_ZN5Block6mSolidE");
     S(mf_block_ctor, "_ZN5BlockC1ERKSsiRK8Material");
+    S(mf_rand, "_ZN6Random13genrand_int32Ev");
     S(mf_bs_dim, "_ZN11BlockSource12getDimensionEv");
     S(mf_dim_circuit, "_ZN9Dimension16getCircuitSystemEv");
     S(mf_isclient, "_ZNK5Level12isClientSideEv");

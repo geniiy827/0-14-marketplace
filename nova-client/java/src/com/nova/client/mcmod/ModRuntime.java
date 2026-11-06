@@ -421,7 +421,7 @@ public final class ModRuntime {
                     }
                 }
                 double side = "left".equals(Interp.str(a.get(3))) ? 1 : 0;
-                host.nativeApi(ApiOps.HUD, new double[]{a.get(2) instanceof Double ? (Double) a.get(2) : 0, side}, sb.toString());
+                host.nativeApi(ApiOps.HUD, new double[]{a.get(2) instanceof Double ? (Double) a.get(2) : 0, side, a.size() > 4 && a.get(4) instanceof Double ? (Double) a.get(4) : 0}, sb.toString());
                 return null;
             }
             case "data.save": {
