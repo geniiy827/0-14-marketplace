@@ -220,6 +220,7 @@ fn inRain() {
 }
 
 fn headInWater() {
+    if tickN < 40 { return false }       // первые 2 секунды мир игрока ещё не готов
     var p = player.pos()
     var b = world.block(math.floor(p.x), math.floor(p.y + 1.62), math.floor(p.z))
     return b == 8 or b == 9
@@ -231,7 +232,7 @@ fn hud() {
         if hudKey != "off" { ui.hud("thirst", []); hudKey = "off" }
         return
     }
-    var row = 0                   // под голодом
+    var row = headInWater() ? 1 : 0     // под голодом; под водой - ниже пузырьков воздуха
     var s = math.floor(sat)
     var k = "{thirst}:{s}:{thirsty > 0}:{row}"
     if k == hudKey { return }

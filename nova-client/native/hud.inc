@@ -58,7 +58,7 @@ static int hud_op(double *a, int n, char *s) {
 }
 
 static void hud_draw(void *client) {
-    if (!mm_player() || !f_guidata || !f_screenw || !f_screenh || !f_sr || !f_blit || !f_gettex || !f_textures) return;
+    if (!mm_player() || !f_guidata || !f_screenw || !f_sr || !f_blit || !f_gettex || !f_textures) return;
     long now = now_ms();
     if (hud_drawn_at == now) return;
     hud_drawn_at = now;
@@ -68,12 +68,12 @@ static void hud_draw(void *client) {
     if (!any) return;
     void *gd = f_guidata(client);
     if (!gd) return;
-    int W = f_screenw(gd), H = f_screenh(gd);
+    int W = f_screenw(gd);
     void *sr = f_sr();
     for (int i = 0; i < HUD_SLOTS; i++) {
         HudRow *h = &hud_rows[i];
         if (!h->slot[0]) continue;
-        int y = h->row <= 0 ? H - 30 : H - 48 - 10 * (h->row - 1);   /* 0: under hunger/hearts, 1: over them */
+        int y = 12 + 10 * h->row;      /* touch layout: hearts top-left, hunger top-right at y 2; row 0 = under them */
         for (int k = 0; k < h->n; k++) {
             int t = h->tex[k];
             if (t < 0) continue;
@@ -85,7 +85,7 @@ static void hud_draw(void *client) {
                 f_strdtor(str);
                 hud_tex[t].ok = 1;
             }
-            int x = h->side ? W / 2 - 90 + 8 * k : W / 2 + 90 - 8 * (h->n - k) - 1;
+            int x = h->side ? 2 + 8 * k : W - 2 - 9 - 8 * (h->n - 1 - k);
             int rect[4] = {x, y, 16, 16};               /* pictures are 16x16 (power of two), the icon in its top-left 9x9 */
             f_blit(sr, hud_tex[t].tex, rect);
         }

@@ -19,7 +19,12 @@ static int mm_ok;
 static void (*mf_gd_msg)(void *gd, void *str);
 static void (*mf_gd_tip)(void *gd, void *str);
 static void (*mf_gd_popup)(void *gd, void *a, void *b);
-static unsigned char (*mf_getblock)(void *bs, int x, int y, int z);
+static void (*mf_getblock)(unsigned char *out, void *bs, int x, int y, int z);   /* BlockID is returned through a pointer (sret) */
+static int mm_blockid(void *bs, int x, int y, int z) {
+    unsigned char id = 0;
+    if (bs && mf_getblock && y >= 0 && y <= 127) mf_getblock(&id, bs, x, y, z);
+    return id;
+}
 static unsigned char (*mf_getdata)(void *bs, int x, int y, int z);
 static int (*mf_setblock)(void *bs, int x, int y, int z, const MBlockID *id, unsigned char data, int flags);   /* BlockID goes by pointer (non-trivial type) */
 static void *(*mf_getlevel)(void *bs);
@@ -159,7 +164,8 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
     }
     case OP_WORLD_BLOCK:
         if (!bs) { out[0] = out[1] = 0; return 2; }
-        out[0] = mf_getblock ? mf_getblock(bs, FL(0), FL(1), FL(2)) : 0;
+        if (FL(1) < 0 || FL(1) > 127) { out[0] = out[1] = 0; return 2; }
+        { unsigned char id = 0; if (mf_getblock) mf_getblock(&id, bs, FL(0), FL(1), FL(2)); out[0] = id; }
         out[1] = mf_getdata ? mf_getdata(bs, FL(0), FL(1), FL(2)) : 0;
         return 2;
     case OP_WORLD_SET_BLOCK: {

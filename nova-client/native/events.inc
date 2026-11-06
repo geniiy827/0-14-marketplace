@@ -29,7 +29,7 @@ static int h_gm_use_on(void *gm, void *pl, char *ii, MPos *pos, int face, void *
     if (pl == mm_player() && pos) {
         void *bs = mm_region(pl);
         double a[8] = {pos->x, pos->y, pos->z, (signed char)face,
-                       bs && mf_getblock ? mf_getblock(bs, pos->x, pos->y, pos->z) : 0,
+                       mm_blockid(bs, pos->x, pos->y, pos->z),
                        bs && mf_getdata ? mf_getdata(bs, pos->x, pos->y, pos->z) : 0, ev_item_id(ii), ev_item_aux(ii)};
         if (mm_fire(EV_BLOCK_USE, 0, a, 8)) return 0;
     }
@@ -47,7 +47,7 @@ static int (*o_gm_destroy)(void *gm, void *pl, MPos pos, int face);
 static int h_gm_destroy(void *gm, void *pl, MPos pos, int face) {
     if (pl == mm_player()) {
         void *bs = mm_region(pl);
-        double a[6] = {pos.x, pos.y, pos.z, bs && mf_getblock ? mf_getblock(bs, pos.x, pos.y, pos.z) : 0,
+        double a[6] = {pos.x, pos.y, pos.z, mm_blockid(bs, pos.x, pos.y, pos.z),
                        bs && mf_getdata ? mf_getdata(bs, pos.x, pos.y, pos.z) : 0,
                        ef_selected ? ev_item_id(ef_selected(pl)) : 0};
         if (mm_fire(EV_BLOCK_BREAK, 0, a, 6)) return 0;
