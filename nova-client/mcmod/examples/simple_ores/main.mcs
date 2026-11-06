@@ -10,6 +10,8 @@ block copper_ore {
     hardness: 3
     resistance: 3
     harvest: 1                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    drop: "raw_tin"
+    xp: [1, 3]
     ore: {count: 10, size: 8, min: 16, max: 96, in: "stone"}
 }
 block tin_ore {
@@ -26,6 +28,8 @@ block mythril_ore {
     hardness: 4
     resistance: 3
     harvest: 2                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    drop: "raw_mythril"
+    xp: 0
     ore: {count: 8, size: 4, min: 1, max: 48, in: "stone"}
 }
 block adamantium_ore {
@@ -34,6 +38,8 @@ block adamantium_ore {
     hardness: 5
     resistance: 3
     harvest: 2                  // уровень кирки: 1 каменная, 2 железная, 3 алмазная
+    drop: "raw_adamantium"
+    xp: 0
     ore: {count: 5, size: 4, min: 1, max: 32, in: "stone"}
 }
 block onyx_ore {
@@ -127,26 +133,102 @@ block onyx_bricks {
     harvest: 3
 }
 
-// ================================================================ слитки
-item copper_ingot {
-    name: {ru: "Медный слиток", en: "Copper Ingot"}
-    texture: "textures/item/copper_ingot.png"
+// глубинные руды (в 0.14 нет глубинного сланца: ставятся глубоко в камень, y 1..16)
+block deepslate_tin_ore {
+    name: {ru: "Глубинная оловянная руда", en: "Deepslate Tin Ore"}
+    texture: "textures/block/deepslate_tin_ore.png"
+    hardness: 4.5
+    resistance: 3
+    harvest: 1
+    drop: "raw_tin"
+    ore: {count: 3, size: 4, min: 1, max: 16, in: "stone"}
 }
-item tin_ingot {
-    name: {ru: "Оловянный слиток", en: "Tin Ingot"}
-    texture: "textures/item/tin_ingot.png"
+block deepslate_mythril_ore {
+    name: {ru: "Глубинная мифриловая руда", en: "Deepslate Mythril Ore"}
+    texture: "textures/block/deepslate_mythril_ore.png"
+    hardness: 5.5
+    resistance: 3
+    harvest: 2
+    drop: "raw_mythril"
+    ore: {count: 3, size: 4, min: 1, max: 16, in: "stone"}
 }
-item mythril_ingot {
-    name: {ru: "Мифриловый слиток", en: "Mythril Ingot"}
-    texture: "textures/item/mythril_ingot.png"
+block deepslate_adamantium_ore {
+    name: {ru: "Глубинная адамантиновая руда", en: "Deepslate Adamantium Ore"}
+    texture: "textures/block/deepslate_adamantium_ore.png"
+    hardness: 6.5
+    resistance: 3
+    harvest: 2
+    drop: "raw_adamantium"
+    ore: {count: 3, size: 4, min: 1, max: 16, in: "stone"}
 }
-item adamantium_ingot {
-    name: {ru: "Адамантиновый слиток", en: "Adamantium Ingot"}
-    texture: "textures/item/adamantium_ingot.png"
+block basalt_onyx_ore {
+    name: {ru: "Базальтовая ониксовая руда", en: "Basalt Onyx Ore"}
+    texture: "textures/block/onyx_ore_basalt_side.png"
+    hardness: 7
+    resistance: 3
+    harvest: 3
+    drop: "onyx_gem"
+    xp: 1
+    ore: {count: 2, size: 4, min: 4, max: 40, in: "netherrack"}
 }
-item onyx_gem {
-    name: {ru: "Оникс", en: "Onyx"}
-    texture: "textures/item/onyx_gem.png"
+block blackstone_onyx_ore {
+    name: {ru: "Чернокаменная ониксовая руда", en: "Blackstone Onyx Ore"}
+    texture: "textures/block/onyx_ore_blackstone_side.png"
+    hardness: 7
+    resistance: 3
+    harvest: 3
+    drop: "onyx_gem"
+    xp: 1
+    ore: {count: 2, size: 4, min: 4, max: 40, in: "netherrack"}
+}
+block raw_tin_block {
+    name: {ru: "Блок необработанного олова", en: "Block of Raw Tin"}
+    texture: "textures/block/raw_tin_block.png"
+    hardness: 5
+    resistance: 6
+    harvest: 1
+}
+block raw_mythril_block {
+    name: {ru: "Блок необработанного мифрила", en: "Block of Raw Mythril"}
+    texture: "textures/block/raw_mythril_block.png"
+    hardness: 5
+    resistance: 6
+    harvest: 2
+}
+block raw_adamantium_block {
+    name: {ru: "Блок необработанного адамантина", en: "Block of Raw Adamantium"}
+    texture: "textures/block/raw_adamantium_block.png"
+    hardness: 5
+    resistance: 6
+    harvest: 2
+}
+
+// ================================================================ материалы: один номер предмета, вид - по данным (как красители)
+item so_material {
+    variants: [
+        {name: "copper_ingot", title: {ru: "Медный слиток", en: "Copper Ingot"}, texture: "textures/item/copper_ingot.png"},
+        {name: "tin_ingot", title: {ru: "Оловянный слиток", en: "Tin Ingot"}, texture: "textures/item/tin_ingot.png"},
+        {name: "mythril_ingot", title: {ru: "Мифриловый слиток", en: "Mythril Ingot"}, texture: "textures/item/mythril_ingot.png"},
+        {name: "adamantium_ingot", title: {ru: "Адамантиновый слиток", en: "Adamantium Ingot"}, texture: "textures/item/adamantium_ingot.png"},
+        {name: "onyx_gem", title: {ru: "Оникс", en: "Onyx"}, texture: "textures/item/onyx_gem.png"},
+        {name: "copper_nugget", title: {ru: "Медный самородок", en: "Copper Nugget"}, texture: "textures/item/copper_nugget.png"},
+        {name: "tin_nugget", title: {ru: "Оловянный самородок", en: "Tin Nugget"}, texture: "textures/item/tin_nugget.png"},
+        {name: "mythril_nugget", title: {ru: "Мифриловый самородок", en: "Mythril Nugget"}, texture: "textures/item/mythril_nugget.png"},
+        {name: "adamantium_nugget", title: {ru: "Адамантиновый самородок", en: "Adamantium Nugget"}, texture: "textures/item/adamantium_nugget.png"},
+        {name: "raw_tin", title: {ru: "Необработанное олово", en: "Raw Tin"}, texture: "textures/item/raw_tin.png"},
+        {name: "raw_mythril", title: {ru: "Необработанный мифрил", en: "Raw Mythril"}, texture: "textures/item/raw_mythril.png"},
+        {name: "raw_adamantium", title: {ru: "Необработанный адамантин", en: "Raw Adamantium"}, texture: "textures/item/raw_adamantium.png"},
+        {name: "copper_dust", title: {ru: "Медная пыль", en: "Copper Dust"}, texture: "textures/item/copper_dust.png"},
+        {name: "tin_dust", title: {ru: "Оловянная пыль", en: "Tin Dust"}, texture: "textures/item/tin_dust.png"},
+        {name: "mythril_dust", title: {ru: "Мифриловая пыль", en: "Mythril Dust"}, texture: "textures/item/mythril_dust.png"},
+        {name: "adamantium_dust", title: {ru: "Адамантиновая пыль", en: "Adamantium Dust"}, texture: "textures/item/adamantium_dust.png"},
+        {name: "crushed_copper_ore", title: {ru: "Дроблёная медная руда", en: "Copper Ore Chunks"}, texture: "textures/item/crushed_copper_ore.png"},
+        {name: "crushed_tin_ore", title: {ru: "Дроблёная оловянная руда", en: "Tin Ore Chunks"}, texture: "textures/item/crushed_tin_ore.png"},
+        {name: "crushed_mythril_ore", title: {ru: "Дроблёная мифриловая руда", en: "Mythril Ore Chunks"}, texture: "textures/item/crushed_mythril_ore.png"},
+        {name: "crushed_adamantium_ore", title: {ru: "Дроблёная адамантиновая руда", en: "Adamantium Ore Chunks"}, texture: "textures/item/crushed_adamantium_ore.png"},
+        {name: "mythril_rod", title: {ru: "Мифриловый стержень", en: "Mythril Rod"}, texture: "textures/item/mythril_rod.png"},
+        {name: "onyx_rod", title: {ru: "Ониксовый стержень", en: "Onyx Rod"}, texture: "textures/item/onyx_rod.png"}
+    ]
 }
 
 // ================================================================ инструменты (tier: уровень, прочность, скорость, урон, зачаровываемость)
@@ -484,83 +566,69 @@ item onyx_boots {
     armorTexture: "textures/armor/onyx"
 }
 
-// ================================================================ крафты (как игра: Recipes / FurnaceRecipes)
-var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+// ================================================================ крафты (recipe.*: NOVA возвращает их, когда игра заново заполняет книгу рецептов)
 var STICK = 280
+var STRING = 287
 
-fn stack(p, id, count, aux = 0) { mc.call("ItemInstance::ItemInstance(int, int, int)", p, id, count, aux) }
-
-fn shaped(result, count, rows, keys) {
-    var book = mc.callAt(mc.sym("Recipes::getInstance()"))
-    var out = mem.alloc(20)
-    stack(out, result, count)
-    if mc.call("Recipes::getRecipeFor(ItemInstance const&)", book, out) != 0 { return }    // уже есть (повторный вход в мир)
-    var n = keys.len()
-    var types = mem.alloc(n * 32)
-    var i = 0
-    while i < n {
-        var t = types + i * 32
-        stack(t + 8, keys[i][1], 1, 0)
-        mem.setByte(t + 28, LETTERS.find(keys[i][0]) + 65)
-        i += 1
-    }
-    var vec = mem.alloc(12)
-    mem.setPtr(vec, types)
-    mem.setPtr(vec + 4, types + n * 32)
-    mem.setPtr(vec + 8, types + n * 32)
-    mc.call("Recipes::addShapedRecipe(ItemInstance const&, std::string const&, std::string const&, std::string const&, std::vector<Recipes::Type, std::allocator<Recipes::Type> > const&)",
-            book, out, rows[0], rows[1], rows[2], vec)
-}
-
-fn smelt(from, to) {
-    var fr = mc.callAt(mc.sym("FurnaceRecipes::getInstance()"))
-    var r = mem.alloc(20)
-    stack(r, to, 1)
-    mc.call("FurnaceRecipes::addFurnaceRecipe(int, ItemInstance const&)", fr, from, r)
-}
-
-// материал: [руда, блок, кирпичи, слиток, инструменты (кирка, топор, лопата, меч, мотыга), броня (шлем, нагрудник, поножи, ботинки)]
+// материал: [руда, блок, кирпичи, слиток, самородок, инструменты (кирка, топор, лопата, меч, мотыга), броня (шлем, нагрудник, поножи, ботинки)]
 fn sets() {
     return [
-        [copper_ore, copper_block, copper_bricks, copper_ingot, [copper_pickaxe, copper_axe, copper_shovel, copper_sword, copper_hoe], [copper_helmet, copper_chestplate, copper_leggings, copper_boots]],
-        [tin_ore, tin_block, tin_bricks, tin_ingot, [tin_pickaxe, tin_axe, tin_shovel, tin_sword, tin_hoe], [tin_helmet, tin_chestplate, tin_leggings, tin_boots]],
-        [mythril_ore, mythril_block, mythril_bricks, mythril_ingot, [mythril_pickaxe, mythril_axe, mythril_shovel, mythril_sword, mythril_hoe], [mythril_helmet, mythril_chestplate, mythril_leggings, mythril_boots]],
-        [adamantium_ore, adamantium_block, adamantium_bricks, adamantium_ingot, [adamantium_pickaxe, adamantium_axe, adamantium_shovel, adamantium_sword, adamantium_hoe], [adamantium_helmet, adamantium_chestplate, adamantium_leggings, adamantium_boots]],
-        [onyx_ore, onyx_block, onyx_bricks, onyx_gem, [onyx_pickaxe, onyx_axe, onyx_shovel, onyx_sword, onyx_hoe], [onyx_helmet, onyx_chestplate, onyx_leggings, onyx_boots]]
+        [copper_ore, copper_block, copper_bricks, copper_ingot, copper_nugget, [copper_pickaxe, copper_axe, copper_shovel, copper_sword, copper_hoe], [copper_helmet, copper_chestplate, copper_leggings, copper_boots]],
+        [tin_ore, tin_block, tin_bricks, tin_ingot, tin_nugget, [tin_pickaxe, tin_axe, tin_shovel, tin_sword, tin_hoe], [tin_helmet, tin_chestplate, tin_leggings, tin_boots]],
+        [mythril_ore, mythril_block, mythril_bricks, mythril_ingot, mythril_nugget, [mythril_pickaxe, mythril_axe, mythril_shovel, mythril_sword, mythril_hoe], [mythril_helmet, mythril_chestplate, mythril_leggings, mythril_boots]],
+        [adamantium_ore, adamantium_block, adamantium_bricks, adamantium_ingot, adamantium_nugget, [adamantium_pickaxe, adamantium_axe, adamantium_shovel, adamantium_sword, adamantium_hoe], [adamantium_helmet, adamantium_chestplate, adamantium_leggings, adamantium_boots]],
+        [onyx_ore, onyx_block, onyx_bricks, onyx_gem, null, [onyx_pickaxe, onyx_axe, onyx_shovel, onyx_sword, onyx_hoe], [onyx_helmet, onyx_chestplate, onyx_leggings, onyx_boots]]
     ]
 }
 
-var recipesDone = false
 fn recipes() {
-    if recipesDone { return }
-    recipesDone = true
     for s in sets() {
         var I = s[3]
-        smelt(s[0], I)                                                     // руда -> слиток (оникс -> камень)
-        shaped(s[1], 1, ["III", "III", "III"], [["I", I]])                 // 9 слитков -> блок
-        shaped(I, 9, ["B  ", "   ", "   "], [["B", s[1]]])                 // блок -> 9 слитков
-        shaped(s[2], 4, ["BB ", "BB ", "   "], [["B", s[1]]])              // 4 блока -> 4 кирпича
-        var t = s[4]
-        shaped(t[0], 1, ["III", " S ", " S "], [["I", I], ["S", STICK]])
-        shaped(t[1], 1, ["II ", "IS ", " S "], [["I", I], ["S", STICK]])
-        shaped(t[2], 1, [" I ", " S ", " S "], [["I", I], ["S", STICK]])
-        shaped(t[3], 1, [" I ", " I ", " S "], [["I", I], ["S", STICK]])
-        shaped(t[4], 1, ["II ", " S ", " S "], [["I", I], ["S", STICK]])
-        var a = s[5]
-        shaped(a[0], 1, ["III", "I I", "   "], [["I", I]])
-        shaped(a[1], 1, ["I I", "III", "III"], [["I", I]])
-        shaped(a[2], 1, ["III", "I I", "I I"], [["I", I]])
-        shaped(a[3], 1, ["I I", "I I", "   "], [["I", I]])
+        recipe.smelt(s[0], I)
+        recipe.shaped(s[1], ["III", "III", "III"], {I: I})
+        recipe.shaped(I, ["B"], {B: s[1]}, 9)
+        recipe.shaped(s[2], ["BB", "BB"], {B: s[1]}, 4)
+        if s[4] != null {
+            recipe.shaped(I, ["NNN", "NNN", "NNN"], {N: s[4]})
+            recipe.shaped(s[4], ["I"], {I: I}, 9)
+        }
+        var t = s[5]
+        recipe.shaped(t[0], ["III", " S ", " S "], {I: I, S: STICK})
+        recipe.shaped(t[1], ["II", "IS", " S"], {I: I, S: STICK})
+        recipe.shaped(t[2], ["I", "S", "S"], {I: I, S: STICK})
+        recipe.shaped(t[3], ["I", "I", "S"], {I: I, S: STICK})
+        recipe.shaped(t[4], ["II", " S", " S"], {I: I, S: STICK})
+        var a = s[5 + 1]
+        recipe.shaped(a[0], ["III", "I I"], {I: I})
+        recipe.shaped(a[1], ["I I", "III", "III"], {I: I})
+        recipe.shaped(a[2], ["III", "I I", "I I"], {I: I})
+        recipe.shaped(a[3], ["I I", "I I"], {I: I})
     }
+    // необработанная руда, пыль и дроблёная руда -> слиток; блоки необработанной руды
+    for r in [[raw_tin, tin_ingot, raw_tin_block], [raw_mythril, mythril_ingot, raw_mythril_block], [raw_adamantium, adamantium_ingot, raw_adamantium_block]] {
+        recipe.smelt(r[0], r[1])
+        recipe.shaped(r[2], ["RRR", "RRR", "RRR"], {R: r[0]})
+        recipe.shaped(r[0], ["B"], {B: r[2]}, 9)
+    }
+    for d in [[copper_dust, copper_ingot], [tin_dust, tin_ingot], [mythril_dust, mythril_ingot], [adamantium_dust, adamantium_ingot],
+              [crushed_copper_ore, copper_ingot], [crushed_tin_ore, tin_ingot], [crushed_mythril_ore, mythril_ingot], [crushed_adamantium_ore, adamantium_ingot]] {
+        recipe.smelt(d[0], d[1])
+    }
+    for o in [[deepslate_tin_ore, tin_ingot], [deepslate_mythril_ore, mythril_ingot], [deepslate_adamantium_ore, adamantium_ingot],
+              [basalt_onyx_ore, onyx_gem], [blackstone_onyx_ore, onyx_gem]] {
+        recipe.smelt(o[0], o[1])
+    }
+    recipe.shaped(mythril_rod, ["I", "I"], {I: mythril_ingot}, 4)
+    recipe.shaped(onyx_rod, ["I", "I"], {I: onyx_gem}, 4)
 }
 
-fn give(id, count) {
+fn give(code, count) {                 // номер предмета + 65536 * данные (предметы по данным)
     var it = mem.alloc(64)
-    stack(it, id, count)
+    mc.call("ItemInstance::ItemInstance(int, int, int)", it, code % 65536, count, math.floor(code / 65536))
     mc.call("Inventory::add(ItemInstance&, bool)", mem.ptr(mc.player(), 0xda0), it, true)
 }
 
-on world.join(e) { recipes() }
+on world.join(e) { recipes() }              // NOVA держит их в книге рецептов (повтор - не дубль)
 
 on chat(e) {
     if e.text == "/simpleores" {

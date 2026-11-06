@@ -13,6 +13,8 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `len(value:any)` | num | работает | Длина строки, списка или таблицы |
 | `type(value:any)` | str | работает | Тип значения: number string bool list map fn null |
 | `random(a:any=null, b:any=null)` | num | работает | random() дробное 0..1; random(a, b) целое от a до b включительно (если a и b целые); random(n) целое 0..n |
+| `__recipe(result:num)` | - | в работе | внутреннее: recipe.shaped |
+| `__smelt(input:num)` | - | в работе | внутреннее: recipe.smelt |
 | `__hud(slot:str)` | - | в работе | внутреннее: ui.hud |
 
 ## chat
@@ -108,6 +110,13 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `player.item()` | num | в работе | Номер предмета в руке (0 — пусто) |
 | `player.itemData()` | num | в работе | Данные (aux) предмета в руке |
 | `player.target()` | map | в работе | Куда смотрит игрок: kind 0 — блок (x y z face), 1 — сущность (entity), -1 — ничего |
+
+## recipe
+
+| функция | возвращает | статус | описание |
+|---|---|---|---|
+| `recipe.shaped(result:any, rows:any, keys:any, count:num=1)` | - | в работе | Крафт по форме: rows — до 3 строк по 3 буквы (пробел — пусто), keys — {I: tin_ingot, S: 280} (или [номер, данные]), result — номер или [номер, данные] |
+| `recipe.smelt(input:any, output:any, count:num=1)` | - | в работе | Печь: input -> output (номер или [номер, данные]) |
 
 ## ui
 

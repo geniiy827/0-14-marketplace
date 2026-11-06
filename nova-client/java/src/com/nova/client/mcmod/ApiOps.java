@@ -12,13 +12,15 @@ final class ApiOps {
     static final int PLAYER_ID = 7;
     static final int PLAYER_STATE = 8;
     static final int PLAYER_TARGET = 9;
-    static final int CHAT = 10;
-    static final int TIP = 11;
-    static final int POPUP = 12;
-    static final int UI_ACTION = 13;
-    static final int HUD = 14;
-    static final int WORLD_BLOCK = 15;
-    static final int WORLD_SET_BLOCK = 16;
-    static final int WORLD_TIME = 17;
-    static final int WORLD_SET_TIME = 18;
+    static final int RECIPE = 10;
+    static final int SMELT = 11;
+    static final int CHAT = 12;
+    static final int TIP = 13;
+    static final int POPUP = 14;
+    static final int UI_ACTION = 15;
+    static final int HUD = 16;
+    static final int WORLD_BLOCK = 17;
+    static final int WORLD_SET_BLOCK = 18;
+    static final int WORLD_TIME = 19;
+    static final int WORLD_SET_TIME = 20;
 }

@@ -262,57 +262,18 @@ fn hud() {
     ui.hud("thirst", icons, row, "right", shake)
 }
 
-// ================================================================ крафты (как игра: Recipes / FurnaceRecipes)
-var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-fn stack(p, id, count, aux = 0) { mc.call("ItemInstance::ItemInstance(int, int, int)", p, id, count, aux) }
-
-fn shaped(result, count, rows, keys) {
-    var book = mc.callAt(mc.sym("Recipes::getInstance()"))
-    var out = mem.alloc(20)
-    stack(out, result, count)
-    if mc.call("Recipes::getRecipeFor(ItemInstance const&)", book, out) != 0 { return }
-    var n = keys.len()
-    var types = mem.alloc(n * 32)
-    var i = 0
-    while i < n {
-        var t = types + i * 32
-        stack(t + 8, keys[i][1], 1, keys[i].len() > 2 ? keys[i][2] : 0)
-        mem.setByte(t + 28, LETTERS.find(keys[i][0]) + 65)
-        i += 1
-    }
-    var vec = mem.alloc(12)
-    mem.setPtr(vec, types)
-    mem.setPtr(vec + 4, types + n * 32)
-    mem.setPtr(vec + 8, types + n * 32)
-    mc.call("Recipes::addShapedRecipe(ItemInstance const&, std::string const&, std::string const&, std::string const&, std::vector<Recipes::Type, std::allocator<Recipes::Type> > const&)",
-            book, out, rows[0], rows[1], rows[2], vec)
-}
-
-var recipesDone = false
+// ================================================================ крафты (recipe.*: NOVA возвращает их, когда игра заново заполняет книгу рецептов)
 fn recipes() {
-    if recipesDone { return }
-    recipesDone = true
     var LEATHER = 334
     var SUGAR = 353
-    shaped(canteen, 1, ["L  ", "LL ", "LLL"], [["L", LEATHER]])
-    shaped(juice_apple, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 260]])
-    shaped(juice_beetroot, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 457]])
-    shaped(juice_cactus, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 81]])
-    shaped(juice_carrot, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 391]])
-    shaped(juice_golden_apple, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 322]])
-    shaped(juice_golden_carrot, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 396]])
-    shaped(juice_golden_melon, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 382]])
-    shaped(juice_melon, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 103]])
-    shaped(juice_pumpkin, 1, ["SWF", "   ", "   "], [["S", SUGAR], ["W", purified_water_bottle], ["F", 86]])
+    recipe.shaped(canteen, ["L  ", "LL ", "LLL"], {L: LEATHER})
+    for j in [[juice_apple, 260], [juice_beetroot, 457], [juice_cactus, 81], [juice_carrot, 391], [juice_golden_apple, 322],
+              [juice_golden_carrot, 396], [juice_golden_melon, 382], [juice_melon, 103], [juice_pumpkin, 86]] {
+        recipe.shaped(j[0], ["SWF"], {S: SUGAR, W: purified_water_bottle, F: j[1]})
+    }
     // печь: бутылка воды -> чистая вода, фляга воды -> фляга чистой воды (RegisterRecipes: addSmelting)
-    var fr = mc.callAt(mc.sym("FurnaceRecipes::getInstance()"))
-    var r1 = mem.alloc(20)
-    stack(r1, purified_water_bottle, 1)
-    mc.call("FurnaceRecipes::addFurnaceRecipeAuxData(short, short, ItemInstance const&)", fr, 373, 0, r1)
-    var r2 = mem.alloc(20)
-    stack(r2, canteen_purified, 1)
-    mc.call("FurnaceRecipes::addFurnaceRecipe(int, ItemInstance const&)", fr, canteen_water, r2)
+    recipe.smelt([373, 0], purified_water_bottle)
+    recipe.smelt(canteen_water, canteen_purified)
 }
 
 // ================================================================ ванильное питьё (зелья, молоко, арбуз, супы)

@@ -14,17 +14,11 @@ typedef struct { char name[48]; int icon, icon_aux, n; short id[CT_ITEMS], aux[C
 static CTab ct_tabs[CT_MAX];
 static int ct_count;
 static volatile int ct_page, ct_want = -1;          /* shown page; page asked by a touch (applied on the render thread) */
-static u32 ct_saved[12];                              /* the game's own 4 vectors while ours are in */
-static int ct_swapped;
-static u32 *ct_filtered;                              /* InventoryScreen::mFilteredItems */
-static void (*ct_refresh)(void *pane);
-static void (*ct_ii_ctor0)(void *ii);
-static void *ct_screen;                               /* the creative InventoryScreen being drawn */
+static char *ct_cm[4];                                /* the creative ContainerModels of the open screen */
+static u32 ct_saved[4][4];                            /* their own size + items vector while ours are in */
+static int ct_swapped[4];
+static const char *(*ct_cname)(void *model);          /* ContainerModel::getContainerStringName (std::string const&) */
 static long ct_drawn_at;
-static volatile int ct_rect[8];                       /* arrow buttons, gui units */
-static void *ct_tb[2];
-static u32 ct_arrow_tex[2][16];
-static int ct_arrow_ok[2];
 
 static int (*f_fontwidth)(void *font, void *str, float scale, int b);
 static int ct_num(char **pp) {
@@ -61,26 +55,15 @@ int Java_com_nova_client_ModBridge_nativeCreativeTabs(void **env, void *cls, voi
     return ct_count;
 }
 
+static int ct_ok;                                      /* the pages work: mod items leave the game's tabs */
 static int ct_has(int id) {
+    if (!ct_ok) return 0;
     for (int i = 0; i < ct_count; i++) for (int k = 0; k < ct_tabs[i].n; k++) if (ct_tabs[i].id[k] == id) return 1;
     return 0;
 }
 static int ct_pages(void) { return ct_count ? 1 + (ct_count + 3) / 4 : 1; }
 
-/* the ItemInstances of a tab: made once the items exist (only items the game has: Item::mItems / Block::mBlocks) */
-static void ct_build(CTab *t) {
-    if (t->inst || !sf_item_ctor || !sf_items) return;
-    t->inst = f_new(t->n * 20 + 20);
-    memset(t->inst, 0, t->n * 20 + 20);
-    int m = 0;
-    for (int k = 0; k < t->n; k++) {
-        int id = t->id[k];
-        if (!sf_items[id]) continue;
-        sf_item_ctor(t->inst + m * 20, id, 1, t->aux[k]);
-        m++;
-    }
-    t->n = m;
-}
+
 
 /* category tab i (0..3) of a page */
 static CTab *ct_tab(int page, int i) {
@@ -88,90 +71,136 @@ static CTab *ct_tab(int page, int i) {
     return page > 0 && k >= 0 && k < ct_count ? &ct_tabs[k] : 0;
 }
 
-/* swap the 4 vectors: page 0 = the game's own */
-static void ct_apply(void *scr, int page) {
-    if (!ct_filtered) return;
-    if (page > 0 && !ct_swapped) { for (int i = 0; i < 12; i++) ct_saved[i] = ct_filtered[i]; ct_swapped = 1; }
+/* JSON creative screen (crafting.creative_inventory_screen): CraftingContainerManagerModel::init makes 4 ContainerModels
+ * "creative_building_blocks" / "_decorations" / "_tools" / "_miscellaneous" (size +0xc, std::vector<ItemInstance> +0x14).
+ * A mod page puts our items in (a new vector each time: the model frees what it holds when the screen closes) */
+static const char *ct_names[4] = {"creative_building_blocks", "creative_decorations", "creative_tools", "creative_miscellaneous"};
+
+static void ct_put(int i, int page) {
+    char *m = ct_cm[i];
+    if (!m) return;
     if (page == 0) {
-        if (ct_swapped) { for (int i = 0; i < 12; i++) ct_filtered[i] = ct_saved[i]; ct_swapped = 0; }
-    } else {
-        for (int i = 0; i < 4; i++) {
-            CTab *t = ct_tab(page, i);
-            u32 *v = ct_filtered + 3 * i;
-            if (t) ct_build(t);
-            int n = t ? t->n : 0;
-            /* a fresh pointer array every time: the game may free it (clearPopulatedItems) */
-            u32 *arr = n ? f_new(n * 4) : 0;
-            for (int k = 0; k < n; k++) arr[k] = (u32)(t->inst + k * 20);
-            v[0] = (u32)arr; v[1] = (u32)(arr + n); v[2] = (u32)(arr + n);
+        if (ct_swapped[i]) {
+            *(u32 *)(m + 0xc) = ct_saved[i][0];
+            for (int k = 0; k < 3; k++) *(u32 *)(m + 0x14 + 4 * k) = ct_saved[i][1 + k];
+            ct_swapped[i] = 0;
+        }
+        return;
+    }
+    if (!ct_swapped[i]) {
+        ct_saved[i][0] = *(u32 *)(m + 0xc);
+        for (int k = 0; k < 3; k++) ct_saved[i][1 + k] = *(u32 *)(m + 0x14 + 4 * k);
+        ct_swapped[i] = 1;
+    }
+    CTab *t = ct_tab(page, i);
+    int n = 0;
+    char *arr = 0;
+    if (t && sf_item_ctor && sf_items) {
+        arr = f_new(t->n * 20 + 20);
+        memset(arr, 0, t->n * 20 + 20);
+        for (int k = 0; k < t->n; k++) {
+            if (!sf_items[t->id[k]]) continue;
+            sf_item_ctor(arr + n * 20, t->id[k], 1, t->aux[k]);
+            n++;
         }
     }
+    *(u32 *)(m + 0xc) = n;
+    *(u32 *)(m + 0x14) = (u32)arr;
+    *(u32 *)(m + 0x18) = (u32)(arr + n * 20);
+    *(u32 *)(m + 0x1c) = (u32)(arr + n * 20);
+}
+static void ct_apply(int page) {
+    for (int i = 0; i < 4; i++) ct_put(i, page);
     ct_page = page;
-    if (scr && ct_refresh)
-        for (int i = 0; i < 4; i++) {
-            void *pane = *(void **)((char *)scr + 0x164 + 8 * i);
-            if (pane) ct_refresh(pane);
-        }
 }
 
-/* InventoryPaneType -> creative category 0..3 (or -1): the screen's pane table (this+0x200, 12-byte entries,
- * the pane at +4) against the 4 creative panes (this+0x164, shared_ptr) */
-static int ct_cat_of(void *scr, int type) {
-    char *tb = *(char **)((char *)scr + 0x200), *te = *(char **)((char *)scr + 0x204);
-    if (!tb || type < 0 || (te - tb) / 12 <= type) return -1;
-    void *pane = *(void **)(tb + type * 12 + 4);
-    for (int i = 0; i < 4 && pane; i++) if (*(void **)((char *)scr + 0x164 + 8 * i) == pane) return i;
-    return -1;
-}
-
-static u64 hc_ct_icon(u32 orig, u32 *w) {           /* getItemFromType(ItemInstance* sret, this, type) */
-    void *out = (void *)w[0], *scr = (void *)w[1];
-    if (ct_page > 0 && scr && sf_item_ctor) {
-        int cat = ct_cat_of(scr, (int)w[2]);
-        if (cat >= 0) {
-            CTab *t = ct_tab(ct_page, cat);
-            if (t && t->icon > 0 && t->icon < 512 && sf_items[t->icon]) sf_item_ctor(out, t->icon, 1, t->icon_aux);
-            else if (ct_ii_ctor0) ct_ii_ctor0(out);
-            else sf_item_ctor(out, 0, 0, 0);
-            return (u32)out;
-        }
+static u64 hc_ct_add(u32 orig, u32 *w) {           /* ContainerManagerModel::_addContainer(this, shared_ptr<ContainerModel>) */
+    char *m = w[1] ? *(char **)w[1] : 0;
+    u64 r = nh_callw(orig, w);
+    if (m && ct_cname && ct_count) {
+        const char *nm = sdata(ct_cname(m));
+        for (int i = 0; i < 4; i++)
+            if (nm && streq(nm, ct_names[i])) {
+                ct_cm[i] = m; ct_swapped[i] = 0;
+                if (ct_page > 0) ct_put(i, ct_page);              /* opened again on a mod page */
+            }
     }
+    return r;
+}
+static u64 hc_ct_mgr_dtor(u32 orig, u32 *w) {      /* ~CraftingContainerManagerModel: the game's vectors back first */
+    for (int i = 0; i < 4; i++) { if (ct_cm[i]) ct_put(i, 0); ct_cm[i] = 0; }
     return nh_callw(orig, w);
 }
 
-static void ct_draw(void *scr, void *client) {
-    if (!f_guidata || !f_screenw || !f_sr || !client) return;
-    void *gd = f_guidata(client);
-    if (!gd) return;
-    int W = f_screenw(gd);
-    /* the tab column: Screen tab buttons (this+0x30, shared_ptr<Button>) */
-    char **tb = *(char ***)((char *)scr + 0x30), **te = *(char ***)((char *)scr + 0x34);
-    int tx = 2, ty = 26;
-    if (tb && te > tb && (u32)tb[0] > 0x10000) { int *g = gel(tb[0]); if (g[0] >= 0 && g[0] < W && g[1] > 0 && g[1] < 200) { tx = g[0]; ty = g[1]; } }
-    int h = ty - 6; if (h > 20) h = 20; if (h < 14) h = 14;
-    int y = (ty - h) / 2; if (y < 1) y = 1;
-    int bw = h + 4;
-    int r[8] = {tx, y, bw, h, tx + bw + 2 + 120, y, bw, h};
-    /* page label + the selected tab's name between the arrows */
-    char label[96];
-    int sel = ct_cat_of(scr, *(int *)((char *)scr + 0x268));
-    CTab *t = sel >= 0 ? ct_tab(ct_page, sel) : 0;
-    if (ct_page == 0) snprintf(label, sizeof label, "%d/%d", 1, ct_pages());
-    else snprintf(label, sizeof label, "%d/%d %s", ct_page + 1, ct_pages(), t ? t->name : "");
+/* tab icons: the item renderers nova_ct_icon_<k> (property #item_id_aux = id << 16 | aux) */
+static const int ct_icon0[4] = {2949120, 3080192, 17498112, 19333120};
+static void *(*ct_bag)(void *ctrl);
+static void *(*ct_json_at)(void *v, const char *k);
+static void (*ct_json_int)(void *v, int i);
+static void (*ct_json_set)(void *v, void *from);
+static void (*ct_json_dtor)(void *v);
+static void (*o_iir_update)(void *self, void *client, void **ctrl);
+static void h_iir_update(void *self, void *client, void **ctrl) {
+    char *cc = ctrl ? *(char **)ctrl : 0;
+    const char *nm = cc ? sdata(cc + 0xc) : 0;
+    if (nm && ct_count && ct_bag && ct_json_at && ct_json_int && ct_json_set && ct_json_dtor &&
+        nm[0] == 'n' && !memcmp(nm, "nova_ct_icon_", 13) && nm[13] >= '0' && nm[13] <= '3') {
+        int k = nm[13] - '0', v = ct_icon0[k];
+        if (ct_page > 0) {
+            CTab *t = ct_tab(ct_page, k);
+            v = t && t->icon > 0 ? (t->icon << 16) | (t->icon_aux & 0xffff) : -1;
+        }
+        char *bag = ct_bag(cc);
+        if (bag) {
+            u32 tmp[8];
+            ct_json_int(tmp, v);
+            ct_json_set(ct_json_at(bag + 0x18, "#item_id_aux"), tmp);
+            ct_json_dtor(tmp);
+        }
+    }
+    o_iir_update(self, client, ctrl);
+}
+
+static float ct_rect[4];                             /* arrows control, gui units */
+static void *ct_tb[2];
+static u32 ct_arrow_tex[2][16];
+static int ct_arrow_ok[2];
+static const char *ct_keys[4] = {"craftingScreen.tab.buildingBlocks", "craftingScreen.tab.decorations",
+                                 "craftingScreen.tab.tools", "craftingScreen.tab.miscellaneous"};
+
+/* debug_overlay_renderer controls of inventory_screen.json: returns 1 when it was one of ours */
+static int ct_ui_render(void *client, char *cc) {
+    const char *nm = sdata(cc + 0xc);
+    if (!nm || nm[0] != 'n' || memcmp(nm, "nova_ct_", 8)) return 0;
+    float x = *(float *)(cc + 0x10), y = *(float *)(cc + 0x14), w = *(float *)(cc + 0x18), h = *(float *)(cc + 0x1c);
     void *font = *(void **)((char *)client + 0x7c);
-    int lw = 0;
-    if (font && f_fontwidth) { u32 s[1]; gstr(s, label); lw = f_fontwidth(font, s, 1.f, 0); f_strdtor(s); }
-    if (lw < 24) lw = 24;
-    if (lw > W / 3) lw = W / 3;
-    r[4] = tx + bw + 6 + lw + 6;
-    for (int i = 0; i < 8; i++) ct_rect[i] = r[i];
+    if (!memcmp(nm + 8, "label_", 6)) {
+        int k = nm[14] - '0';
+        if (k < 0 || k > 3) return 1;
+        char txt[96];
+        CTab *t = ct_page > 0 ? ct_tab(ct_page, k) : 0;
+        if (ct_page > 0) snprintf(txt, sizeof txt, "%s", t ? t->name : "");
+        else loc_into(ct_keys[k], txt, sizeof txt);
+        float col[4] = {0.4f, 0.95f, 0.88f, 1.f};
+        if (font && txt[0]) draw_text_col(font, x, y, txt, col);
+        return 1;
+    }
+    if (memcmp(nm + 8, "arrows", 6)) return 1;
+    if (!ct_count) return 1;
+    int want = ct_want;
+    if (want >= 0) { ct_want = -1; if (want != ct_page) ct_apply(want); }
+    ct_rect[0] = x; ct_rect[1] = y; ct_rect[2] = w; ct_rect[3] = h;
+    ct_drawn_at = now_ms();
+    int bh = (int)h, bw = bh + 4;
+    int r[8] = {(int)x, (int)y, bw, bh, (int)(x + w) - bw, (int)y, bw, bh};
     for (int b = 0; b < 2; b++) {
         if (!ct_tb[b]) ct_tb[b] = tb_new(client, "", 0);
-        if (!ct_tb[b]) continue;
-        int *g = gel(ct_tb[b]);
-        g[0] = r[b * 4]; g[1] = r[b * 4 + 1]; g[2] = r[b * 4 + 2]; g[3] = r[b * 4 + 3];
-        tb_render(ct_tb[b], client, -1, -1);
-        if (f_gettex && f_blit && f_textures) {
+        if (ct_tb[b]) {
+            int *g = gel(ct_tb[b]);
+            g[0] = r[b * 4]; g[1] = r[b * 4 + 1]; g[2] = r[b * 4 + 2]; g[3] = r[b * 4 + 3];
+            tb_render(ct_tb[b], client, -1, -1);
+        }
+        if (f_gettex && f_blit && f_textures && f_sr) {
             if (!ct_arrow_ok[b]) {
                 u32 s[1];
                 gstr(s, b ? "gui/newgui/arrowRight.png" : "gui/newgui/arrowLeft.png");
@@ -180,50 +209,28 @@ static void ct_draw(void *scr, void *client) {
                 f_strdtor(s);
                 ct_arrow_ok[b] = 1;
             }
-            int s8 = h >= 18 ? 12 : 8;
-            int rect[4] = {r[b * 4] + (bw - s8) / 2, y + (h - s8) / 2, s8, s8};
+            int s8 = bh >= 16 ? 8 : 6;
+            int rect[4] = {r[b * 4] + (bw - s8) / 2, r[b * 4 + 1] + (bh - s8) / 2, s8, s8};
             f_blit(f_sr(), ct_arrow_tex[b], rect);
         }
     }
+    char label[16];
+    snprintf(label, sizeof label, "%d/%d", ct_page + 1, ct_pages());
     float white[4] = {1, 1, 1, 1};
-    if (font) draw_text_col(font, (float)(tx + bw + 6), (float)(y + (h - 8) / 2), label, white);
+    int lw = 18;
+    if (font && f_fontwidth) { u32 s[1]; gstr(s, label); lw = f_fontwidth(font, s, 1.f, 0); f_strdtor(s); }
+    if (font) draw_text_col(font, x + w / 2 - lw / 2, y + (h - 8) / 2, label, white);
+    return 1;
 }
 
-static u64 hc_ct_render(u32 orig, u32 *w) {         /* InventoryScreen::render(this, mx, my, a) */
-    void *scr = (void *)w[0];
-    int creative = scr && *(void **)((char *)scr + 0x164) != 0;
-    if (creative && ct_count) {
-        int want = ct_want;
-        if (want >= 0) { ct_want = -1; if (want != ct_page) ct_apply(scr, want); }
-        else if (ct_page > 0 && !ct_swapped) ct_apply(scr, ct_page);     /* reopened on a mod page */
-    }
-    u64 ret = nh_callw(orig, w);
-    if (creative && ct_count) {
-        ct_screen = scr;
-        ct_drawn_at = now_ms();
-        ct_draw(scr, *(void **)((char *)scr + 0x14));
-    }
-    return ret;
-}
-
-/* leaving the screen: the game's vectors back before it frees anything (the page is remembered) */
-static u64 hc_ct_dtor(u32 orig, u32 *w) {
-    if ((void *)w[0] == ct_screen) ct_screen = 0;
-    if (ct_swapped) { int keep = ct_page; ct_apply(0, 0); ct_page = keep; }
-    return nh_callw(orig, w);
-}
-static u64 hc_ct_ctor(u32 orig, u32 *w) {
-    if (ct_swapped) { int keep = ct_page; ct_apply(0, 0); ct_page = keep; }
-    return nh_callw(orig, w);
-}
-
-/* touches on the arrows (Multitouch::feed: w[1] state, w[2] x, w[3] y in pixels) */
+/* taps on the arrows (Multitouch::feed: w[1] state, w[2] x, w[3] y in pixels) */
 static int ct_touch(u32 *w, float scale) {
-    if (!ct_screen || !ct_count || now_ms() - ct_drawn_at > 300) return 0;     /* only while it is on screen */
-    int x = (int)((short)w[2] / scale), y = (int)((short)w[3] / scale);
+    if (!ct_count || now_ms() - ct_drawn_at > 300) return 0;          /* only while the screen shows them */
+    float x = (short)w[2] / scale, y = (short)w[3] / scale;
+    float bw = ct_rect[3] + 4;
     for (int b = 0; b < 2; b++) {
-        const volatile int *r = ct_rect + b * 4;
-        if (x >= r[0] - 2 && x < r[0] + r[2] + 2 && y >= r[1] - 4 && y < r[1] + r[3] + 4) {
+        float x0 = b ? ct_rect[0] + ct_rect[2] - bw : ct_rect[0];
+        if (x >= x0 - 3 && x < x0 + bw + 3 && y >= ct_rect[1] - 4 && y < ct_rect[1] + ct_rect[3] + 4) {
             if ((w[1] & 0xff) == 1) {
                 int n = ct_pages(), p = ct_page + (b ? 1 : -1);
                 if (p < 0) p = n - 1;
@@ -236,21 +243,22 @@ static int ct_touch(u32 *w, float scale) {
     return 0;
 }
 
+static int patch_slot(u32 vt, int idx, void *fn, void **orig);
 static void creative_init(void *mc) {
-    ct_filtered = dlsym(mc, "_ZN15InventoryScreen14mFilteredItemsE");
-    ct_refresh = dlsym(mc, "_ZN5Touch13InventoryPane12refreshItemsEv");
-    ct_ii_ctor0 = dlsym(mc, "_ZN12ItemInstanceC1Ev");
-    void *icon = dlsym(mc, "_ZN15InventoryScreen15getItemFromTypeENS_17InventoryPaneTypeE");
-    void *rend = dlsym(mc, "_ZN15InventoryScreen6renderEiif");
-    void *dtor = dlsym(mc, "_ZN15InventoryScreenD1Ev");
     f_fontwidth = dlsym(mc, "_ZNK4Font13getLineLengthERKSsfb");
-    void *ctor = dlsym(mc, "_ZN15InventoryScreenC1ER15MinecraftClient12CraftingTypeRK8BlockPos");
-    int ok = ct_filtered && ct_refresh && icon && rend && dtor && ctor;
-    if (ok) {
-        nh_hook_c((u32)icon, hc_ct_icon);
-        nh_hook_c((u32)rend, hc_ct_render);
-        nh_hook_c((u32)dtor, hc_ct_dtor);
-        nh_hook_c((u32)ctor, hc_ct_ctor);
-    }
-    LOG("creative tabs: %s", ok ? "ok" : "unavailable");
+    ct_cname = dlsym(mc, "_ZNK14ContainerModel22getContainerStringNameEv");
+    ct_bag = dlsym(mc, "_ZN9UIControl14getPropertyBagEv");
+    ct_json_at = dlsym(mc, "_ZN4Json5ValueixEPKc");
+    ct_json_int = dlsym(mc, "_ZN4Json5ValueC1Ei");
+    ct_json_set = dlsym(mc, "_ZN4Json5ValueaSERKS0_");
+    ct_json_dtor = dlsym(mc, "_ZN4Json5ValueD2Ev");
+    void *add = dlsym(mc, "_ZN21ContainerManagerModel13_addContainerESt10shared_ptrI14ContainerModelE");
+    void *dtor = dlsym(mc, "_ZN29CraftingContainerManagerModelD2Ev");
+    if (!dtor) dtor = dlsym(mc, "_ZN29CraftingContainerManagerModelD1Ev");
+    u32 vt = (u32)dlsym(mc, "_ZTV21InventoryItemRenderer");
+    int ok = add && dtor && ct_cname;
+    if (ok) ok = nh_hook_c((u32)add, hc_ct_add) >= 0 && nh_hook_c((u32)dtor, hc_ct_mgr_dtor) >= 0;
+    ct_ok = ok;
+    if (vt) patch_slot(vt, 4, h_iir_update, (void **)&o_iir_update);
+    LOG("creative tabs: %s, icons %s", ok ? "ok" : "unavailable", vt ? "ok" : "-");
 }

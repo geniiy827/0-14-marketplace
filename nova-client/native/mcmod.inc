@@ -183,6 +183,7 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
 }
 
 static int hud_op(double *a, int n, char *s);
+static int rc_op(int op, double *a, int n, char *s);
 void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, void *darr, void *jstr) {
     void **f = *(void ***)env;
     double a[16];
@@ -196,6 +197,7 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     jstr_copy(env, jstr, s, sizeof s);
     double out[72];
     if (op == OP_HUD) { hud_op(a, n, s); return 0; }
+    if (op == OP_RECIPE || op == OP_SMELT) { rc_op(op, a, n, s); return 0; }
     int r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
         : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
         ? sc_op(op, a, n, out) : mm_op(op, a, n, s, out);
@@ -389,7 +391,11 @@ static int mb_rand_range(void *rnd, int lo, int hi) {
 }
 static int mb_drop_id(void *b, void *rnd, int data, int fortune) {
     ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
-    return m && m->drop > 0 ? m->drop : *((unsigned char *)b + 4);
+    return m && m->drop > 0 ? (m->drop & 0xffff) : *((unsigned char *)b + 4);
+}
+static int mb_drop_aux(void *b, unsigned char data) {          /* getSpawnResourcesAuxValue: data of an item by data */
+    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    return m && m->drop > 0 ? (m->drop >> 16) : 0;
 }
 static int mb_drop_count(void *b, void *rnd, int data, int fortune) {
     ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
@@ -464,6 +470,7 @@ static void mcmod_register_blocks(void) {
         mb_vtable[2 + 48] = (u32)mb_drop_id;                /* getResource */
         mb_vtable[2 + 49] = (u32)mb_drop_count;             /* getResourceCount */
         mb_vtable[2 + 63] = (u32)mb_drop_xp;                /* getExperienceDrop */
+        mb_vtable[2 + 107] = (u32)mb_drop_aux;              /* getSpawnResourcesAuxValue */
     }
     int done = 0;
     for (int i = 0; i < mblock_count; i++) {

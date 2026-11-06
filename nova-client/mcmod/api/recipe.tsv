@@ -1,0 +1,5 @@
+# recipe.* — крафты и печь. Игра заново заполняет книгу рецептов при входе в мир (CraftingDataPacket), NOVA сама возвращает рецепты модов.
+recipe.shaped	result:any, rows:any, keys:any, count:num=1	-	java:recipe.shaped	wip	Крафт по форме: rows — до 3 строк по 3 буквы (пробел — пусто), keys — {I: tin_ingot, S: 280} (или [номер, данные]), result — номер или [номер, данные]
+recipe.smelt	input:any, output:any, count:num=1	-	java:recipe.smelt	wip	Печь: input -> output (номер или [номер, данные])
+__recipe	result:num	-	native:RECIPE	wip	внутреннее: recipe.shaped
+__smelt	input:num	-	native:SMELT	wip	внутреннее: recipe.smelt

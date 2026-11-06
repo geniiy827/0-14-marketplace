@@ -23,6 +23,7 @@ public final class ModBridge {
     static native int nativeBlockExtra(double[] data);
     static native int nativeCreativeTabs(String spec);
     static native int nativeArmorTextures(String spec);
+    static native int nativeItemVariants(double[] data, String names);
 
     /** mod blocks of this run (atlas strip, lang lines); null until load() */
     static volatile ModBlocks blocks;
@@ -184,6 +185,11 @@ public final class ModBridge {
                     for (String t : mi.armorTex) { if (at.length() > 0) at.append('|'); at.append(t); }
                     try { nativeArmorTextures(at.toString()); } catch (Throwable t) { Log.e(TAG, "armor textures", t); }
                 }
+                if (!mi.varData.isEmpty()) {
+                    double[] vd = new double[mi.varData.size()];
+                    for (int i = 0; i < vd.length; i++) vd[i] = mi.varData.get(i);
+                    try { nativeItemVariants(vd, mi.varNames.toString()); } catch (Throwable t) { Log.e(TAG, "item variants", t); }
+                }
                 try {
                     double[] ex = mb.extra(rt, mi.ids);
                     if (ex.length > 0) nativeBlockExtra(ex);
@@ -237,8 +243,9 @@ public final class ModBridge {
             String tkey = m.id + "\u0000" + tname;
             StringBuilder b = items.get(tkey);
             if (b == null) { b = new StringBuilder(); items.put(tkey, b); title.put(tkey, tname); }
-            if (b.length() > 0) b.append(',');
-            b.append(id.intValue());
+            java.util.List<Integer> vs = (Boolean) e[1] ? null : mi.variants.get(key);
+            if (vs == null) { if (b.length() > 0) b.append(','); b.append(id.intValue()); }
+            else for (int v : vs) { if (b.length() > 0) b.append(','); b.append(id.intValue()).append(':').append(v); }
             if (!icon.containsKey(tkey) || Boolean.TRUE.equals(p.get("tabIcon"))) icon.put(tkey, String.valueOf(id.intValue()));
         }
         StringBuilder out = new StringBuilder();

@@ -197,3 +197,17 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - mcmod.inc: drop/xp через vtable 48/49/63, nativeBlockExtra; руды - structs.inc st_ores (хук StructureFeature::postProcess,
   Ад = биом 8, netherrack 87).
 - Пример simple_ores (LGPL, SimpleOres2): 15 блоков, 50 предметов.
+
+## alpha28fixver
+- Крафты модов пропадали: клиент чистит книгу рецептов при CraftingDataPacket (ClientNetworkHandler::handle ->
+  Recipes::clearRecipes). recipes.inc держит рецепты модов (recipe.shaped/recipe.smelt) и возвращает их после пакета.
+- Творческий инвентарь 0.14.3 - JSON (CraftingScreenController, crafting.creative_inventory_screen), не InventoryScreen.
+  Страницы: хук ContainerManagerModel::_addContainer (модели creative_*: размер +0xc, vector<ItemInstance> +0x14),
+  ~CraftingContainerManagerModel возвращает векторы игры; иконки вкладок - InventoryItemRenderer::update (слот 4) пишет
+  #item_id_aux контролам nova_ct_icon_<k>; подписи/стрелки - debug_overlay_renderer nova_ct_label_<k>/nova_ct_arrows.
+- Свободные id предметов: + 416-426 (итого 79). Предметы по данным: variants (getIcon слот 50, buildDescriptionName 40).
+- Журнал игры пишется в games/com.mojang/nova_log.txt (logcat своего процесса).
+- Не сделано в Simple Ores: плиты, ступени, решётки, двери, нажимные плиты, ножницы, луки, медное ведро
+  (есть классы игры: SlabBlock, StairBlock, ThinFenceBlock, DoorBlock/DoorItem::place, PressurePlateBlock, BowItem, BucketItem;
+  нужны текстуры по имени в terrain.meta/items.meta).
+- Не найдено: мультиплеер в 27 (зависание/Server is full - нужен nova_log.txt), кукла (короткие руки, одна нога).

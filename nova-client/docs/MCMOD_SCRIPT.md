@@ -307,3 +307,31 @@ block mythril_ore {
 ```
 item ruby_sword { tab: {ru: "Оружие", en: "Weapons"}  tabIcon: true  ... }   // своя вкладка мода и её иконка
 ```
+
+## Крафты и печь: recipe.* (alpha28)
+
+Игра при входе в мир заново заполняет книгу рецептов (CraftingDataPacket), поэтому рецепты, добавленные напрямую
+через Recipes::addShapedRecipe, пропадали. recipe.* хранит рецепты модов в NOVA и возвращает их каждый раз.
+
+```
+on world.join(e) {
+    recipe.shaped(tin_sword, ["I", "I", "S"], {I: tin_ingot, S: 280})       // строки 1..3, ширина 1..3
+    recipe.shaped(tin_ingot, ["B"], {B: tin_block}, 9)                       // последнее - сколько выходит
+    recipe.smelt(tin_ore, tin_ingot)                                         // печь; [номер, данные] тоже можно
+}
+```
+
+## Предметы по данным: variants (alpha28)
+
+Один номер предмета - много предметов (как красители): экономит номера (в 0.14 их всего 512).
+
+```
+item metals {
+    variants: [
+        {name: "tin_ingot", title: {ru: "Оловянный слиток", en: "Tin Ingot"}, texture: "textures/tin_ingot.png"},
+        {name: "tin_nugget", title: {ru: "Оловянный самородок", en: "Tin Nugget"}, texture: "textures/tin_nugget.png"}
+    ]
+}
+```
+Имя варианта в скрипте = номер + 65536 * данные (tin_nugget = номер metals + 65536). recipe.*, drop блоков и вкладки
+понимают это сами.

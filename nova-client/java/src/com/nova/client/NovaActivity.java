@@ -561,6 +561,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         }
         accLoad();                       // before the start screen asks for the account icon
         social = new Social(this);
+        startLog();
         super.onCreate(state);
         accountResume();
         social.accountChanged();
@@ -819,5 +820,22 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() { android.os.Process.killProcess(android.os.Process.myPid()); }
         }, 250);
+    }
+
+    /** the game's log (this app only) -> games/com.mojang/nova_log.txt (+ .1), 2 MB each: send it after a problem
+     *  (a friend's game that does not load, a freeze) - NOVA prints what it does with the network, mods, hooks */
+    private static Process logProc;
+    static void startLog() {
+        if (logProc != null) return;
+        try {
+            java.io.File dir = new java.io.File(android.os.Environment.getExternalStorageDirectory(), "games/com.mojang");
+            dir.mkdirs();
+            java.io.File f = new java.io.File(dir, "nova_log.txt");
+            if (f.isFile()) { java.io.File old = new java.io.File(dir, "nova_log_prev.txt"); old.delete(); f.renameTo(old); }
+            logProc = Runtime.getRuntime().exec(new String[]{"logcat", "-v", "time", "-f", f.getPath(), "-r", "2048", "-n", "1",
+                    "*:I"});
+        } catch (Throwable t) {
+            Log.w("NOVA", "log file", t);
+        }
     }
 }

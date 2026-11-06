@@ -190,7 +190,7 @@
         }
       },
       {
-        "@crafting.building_blocks_icon": {
+        "nova_ct_icon_0@crafting.building_blocks_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -209,7 +209,7 @@
         }
       },
       {
-        "@crafting.building_blocks_icon": {
+        "nova_ct_icon_0@crafting.building_blocks_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -227,7 +227,7 @@
         }
       },
       {
-        "@crafting.decorations_icon": {
+        "nova_ct_icon_1@crafting.decorations_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -245,7 +245,7 @@
         }
       },
       {
-        "@crafting.decorations_icon": {
+        "nova_ct_icon_1@crafting.decorations_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -263,7 +263,7 @@
         }
       },
       {
-        "@crafting.tools_icon": {
+        "nova_ct_icon_2@crafting.tools_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -281,7 +281,7 @@
         }
       },
       {
-        "@crafting.tools_icon": {
+        "nova_ct_icon_2@crafting.tools_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -299,7 +299,7 @@
         }
       },
       {
-        "@crafting.miscellaneous_icon": {
+        "nova_ct_icon_3@crafting.miscellaneous_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -317,7 +317,7 @@
         }
       },
       {
-        "@crafting.miscellaneous_icon": {
+        "nova_ct_icon_3@crafting.miscellaneous_icon": {
           "layer": 6,
           "offset": [ 1, -1 ]
         }
@@ -979,7 +979,7 @@
         "binding_name": "#collection_total_items",
         "binding_name_override": "#maximum_grid_items",
         "binding_type": "collection",
-        "binding_condition": "visibility_changed",
+        "binding_condition": "always",
         "binding_collection_name": "$collection_name"
       }
     ]
@@ -1253,6 +1253,28 @@
     "$grid_list": "crafting.miscellaneous_inventory_grid"
   },
 
+  // NOVA: label of the creative tab (libnova draws it: the game's name on page 1, a mod tab's name on others)
+  "nova_ct_label": {
+    "type": "custom",
+    "renderer": "debug_overlay_renderer",
+    "size": [ 140, 10 ],
+    "anchor_from": "top_left",
+    "anchor_to": "top_left",
+    "offset": [ 11, 8 ],
+    "layer": 101
+  },
+
+  // NOVA: pages of creative tabs (arrows; libnova draws them and takes the taps)
+  "nova_ct_arrows": {
+    "type": "custom",
+    "renderer": "debug_overlay_renderer",
+    "size": [ 70, 18 ],
+    "anchor_from": "top_right",
+    "anchor_to": "bottom_right",
+    "offset": [ -2, -2 ],
+    "layer": 101
+  },
+
   "creative_label": {
     "type": "label",
     "size": [ 1, 1 ],
@@ -1324,11 +1346,8 @@
                       "offset": [ -44, 1 ]
                     }
                   },
-                  {
-                    "@crafting.creative_label": {
-                      "$label_text": "craftingScreen.tab.buildingBlocks"
-                    }
-                  },
+                  { "nova_ct_label_0@crafting.nova_ct_label": { "$label_text": "craftingScreen.tab.buildingBlocks" } },
+                  { "nova_ct_arrows@crafting.nova_ct_arrows": { } },
                   {
                     "@crafting.scroll_content_indent": {
                       "controls": [
@@ -1357,11 +1376,8 @@
                       "offset": [ -44, 1 ]
                     }
                   },
-                  {
-                    "@crafting.creative_label": {
-                      "$label_text": "craftingScreen.tab.decorations"
-                    }
-                  },
+                  { "nova_ct_label_1@crafting.nova_ct_label": { "$label_text": "craftingScreen.tab.decorations" } },
+                  { "nova_ct_arrows@crafting.nova_ct_arrows": { } },
                   {
                     "@crafting.scroll_content_indent": {
                       "controls": [
@@ -1390,11 +1406,8 @@
                       "offset": [ -44, 1 ]
                     }
                   },
-                  {
-                    "@crafting.creative_label": {
-                      "$label_text": "craftingScreen.tab.tools"
-                    }
-                  },
+                  { "nova_ct_label_2@crafting.nova_ct_label": { "$label_text": "craftingScreen.tab.tools" } },
+                  { "nova_ct_arrows@crafting.nova_ct_arrows": { } },
                   {
                     "@crafting.scroll_content_indent": {
                       "controls": [
@@ -1423,11 +1436,8 @@
                       "offset": [ -44, 1 ]
                     }
                   },
-                  {
-                    "@crafting.creative_label": {
-                      "$label_text": "craftingScreen.tab.miscellaneous"
-                    }
-                  },
+                  { "nova_ct_label_3@crafting.nova_ct_label": { "$label_text": "craftingScreen.tab.miscellaneous" } },
+                  { "nova_ct_arrows@crafting.nova_ct_arrows": { } },
                   {
                     "@crafting.scroll_content_indent": {
                       "controls": [

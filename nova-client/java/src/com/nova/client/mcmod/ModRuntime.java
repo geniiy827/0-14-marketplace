@@ -408,6 +408,34 @@ public final class ModRuntime {
             }
             case "world.entities": return new ArrayList<Object>(entities);
             case "ui.toast": host.toast(Interp.str(a.get(0)), Interp.str(a.get(1))); return null;
+            case "recipe.shaped": {              // -> native recipes.inc (put back after the game refills its book)
+                int[] res = idAux(a.get(0), line);
+                StringBuilder sb = new StringBuilder();
+                Object rows = a.get(1);
+                if (!(rows instanceof List) || ((List<?>) rows).isEmpty() || ((List<?>) rows).size() > 3)
+                    throw new ScriptError("recipe.shaped: rows - список из 1..3 строк", line);
+                for (int i = 0; i < 3; i++) {
+                    String r = i < ((List<?>) rows).size() ? Interp.str(((List<?>) rows).get(i)) : "";
+                    if (r.length() > 3) throw new ScriptError("recipe.shaped: строка длиннее 3", line);
+                    sb.append(r.replace('|', ' ')).append('|');
+                }
+                if (!(a.get(2) instanceof Map)) throw new ScriptError("recipe.shaped: keys - {A: номер, ...}", line);
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) a.get(2)).entrySet()) {
+                    String k = String.valueOf(e.getKey());
+                    if (k.length() != 1) throw new ScriptError("recipe.shaped: ключ - одна буква", line);
+                    int[] ia = idAux(e.getValue(), line);
+                    sb.append(k).append(':').append(ia[0]).append(':').append(ia[1]).append('|');
+                }
+                double cnt = a.get(3) instanceof Double ? (Double) a.get(3) : 1;
+                host.nativeApi(ApiOps.RECIPE, new double[]{res[0], cnt, res[1]}, sb.toString());
+                return null;
+            }
+            case "recipe.smelt": {
+                int[] in2 = idAux(a.get(0), line), out = idAux(a.get(1), line);
+                double cnt = a.get(2) instanceof Double ? (Double) a.get(2) : 1;
+                host.nativeApi(ApiOps.SMELT, new double[]{in2[0], in2[1], out[0], cnt, out[1]}, "");
+                return null;
+            }
             case "ui.hud": {                     // icons of the mod -> nova/mod/<id>/<file>, drawn by libnova (hud.inc)
                 Mod m = modOf(in);
                 StringBuilder sb = new StringBuilder(Interp.str(a.get(0)));
@@ -628,5 +656,26 @@ public final class ModRuntime {
         }
         if (name.equals("world.leave")) { inWorld = false; entities.clear(); }
         return cancel[0] ? 1 : 0;
+    }
+
+    /** a recipe part: number, [number, data] or a name */
+    private int[] idAux(Object v, int line) {
+        Object id = v, aux = 0.0;
+        if (v instanceof List && !((List<?>) v).isEmpty()) {
+            id = ((List<?>) v).get(0);
+            if (((List<?>) v).size() > 1) aux = ((List<?>) v).get(1);
+        }
+        int n;
+        if (id instanceof Double) n = (int) (double) (Double) id;
+        else {
+            Double c = customIds.get(Interp.str(id).trim().toLowerCase());
+            if (c == null) {
+                double[] r = host.nativeApi(ApiOps.ITEM_ID, new double[0], Interp.str(id));
+                c = r != null && r.length > 0 ? r[0] : -1;
+            }
+            n = (int) (double) c;
+        }
+        if (n <= 0 || n >= 512) throw new ScriptError("рецепт: нет предмета " + Interp.str(id), line);
+        return new int[]{n, aux instanceof Double ? (int) (double) (Double) aux : 0};
     }
 }

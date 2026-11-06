@@ -21,6 +21,10 @@ typedef struct {
     char name[64], action[64];
     void *item;
 } ModItem;
+#define MV_MAX 256
+typedef struct { int id, aux; TexSet tex; char name[64]; } MVar;
+static MVar mvars[MV_MAX];
+static int mvar_count;
 static ModItem mitems[MI_MAX];
 static int mitem_count, mitems_done, mitem_registered;
 static ModItem *mitem_of[512];
@@ -67,6 +71,8 @@ int Java_com_nova_client_ModBridge_nativeDefineItems(void **env, void *cls, void
     return mitem_count;
 }
 
+static int mv_has(int id);
+static void mv_setup(char *it);
 static void (*mi_digger_ctor[4])(void *it, void *name, int id, MTier *t);   /* pickaxe, axe, shovel, - */
 static void (*mi_hoe_ctor)(void *it, void *name, int id, MTier t);
 static void (*mi_armor_ctor)(void *it, void *name, int id, int *mat, int render, int slot);
@@ -122,9 +128,13 @@ static void mcmod_register_items(void) {
         ModItem *m = &mitems[i];
         if (mf_items[m->id]) { LOGE("mcmod: item id %d is taken, %s skipped", m->id, m->name); continue; }
         if (ref) { m->tex.size[0] = ref->size[0]; m->tex.size[1] = ref->size[1]; m->tex.filler = ref->filler; m->tex.file = ref->file; }
+        if (ref) for (int v = 0; v < mvar_count; v++) if (mvars[v].id == m->id) {
+            TexSet *t = &mvars[v].tex; t->size[0] = ref->size[0]; t->size[1] = ref->size[1]; t->filler = ref->filler; t->file = ref->file;
+        }
         char *it = mi_make(m);
         if (!it) { LOGE("mcmod: item %s: kind %d unavailable", m->name, m->kind); continue; }
         mi_set_icon(it, &m->tex);
+        if (m->kind == 0 && mv_has(m->id)) mv_setup(it);
         if (m->kind == 0) {
             if (m->tool && mi_hand_eq) mi_hand_eq(it);
             if (mi_stack) mi_stack(it, (unsigned char)m->stack);
@@ -281,4 +291,60 @@ static void armor_init(void *mc) {
     void *pa = dlsym(mc, "_ZN19HumanoidMobRenderer12prepareArmorER3Mob9ArmorSlotf");
     void *ps = dlsym(mc, "_ZNK11PickaxeItem17canDestroySpecialEPK5Block");
     LOG("armor: %d, harvest: %d", pa ? nh_hook_c((u32)pa, hc_prepare_armor) : -1, ps ? nh_hook_c((u32)ps, hc_pick_special) : -1);
+}
+
+/* ---- items by data (variants): one item number, a picture and a name per data value, like dyes.
+ * Item::getIcon(aux, frame, inInventory) (slot 50) and Item::buildDescriptionName(ItemInstance const&) (slot 40)
+ * of a vtable copy; stacked by data. ---- */
+static u32 *mv_vtable;
+
+int Java_com_nova_client_ModBridge_nativeItemVariants(void **env, void *cls, void *darr, void *jnames) {
+    void **f = *(void ***)env;
+    if (!darr || mitems_done) return -1;
+    int n = ((int (*)(void *, void *))f[171])(env, darr);
+    double *d = f_new(n * 8 + 8);
+    ((void (*)(void *, void *, int, int, double *))f[206])(env, darr, 0, n, d);
+    static char names[8192];
+    jstr_copy(env, jnames, names, sizeof names);
+    char *np = names;
+    mvar_count = 0;
+    for (int p = 0; p + 6 <= n && mvar_count < MV_MAX; p += 6) {
+        MVar *v = &mvars[mvar_count++];
+        v->id = (int)d[p]; v->aux = (int)d[p + 1];
+        for (int k = 0; k < 4; k++) v->tex.b[k] = (float)d[p + 2 + k];
+        int k = 0;
+        while (*np && *np != '\x1f' && k < 63) v->name[k++] = *np++;
+        v->name[k] = 0;
+        if (*np == '\x1f') np++;
+    }
+    return mvar_count;
+}
+
+static MVar *mv_find(int id, int aux) {
+    MVar *first = 0;
+    for (int i = 0; i < mvar_count; i++)
+        if (mvars[i].id == id) { if (mvars[i].aux == aux) return &mvars[i]; if (!first) first = &mvars[i]; }
+    return first;
+}
+static void *mv_get_icon(char *it, int aux, int frame, int inv) {
+    MVar *v = mv_find(*(unsigned short *)(it + 0x12), aux);
+    return v ? (void *)&v->tex : *(void **)(it + 0x30);         /* Item+0x30: the item's own icon */
+}
+static void *mv_desc(void *out, char *it, char *ii) {
+    MVar *v = mv_find(*(unsigned short *)(it + 0x12), ii ? *(short *)(ii + 2) : 0);
+    gstr(out, v ? v->name : "?");
+    return out;
+}
+static int mv_has(int id) { for (int i = 0; i < mvar_count; i++) if (mvars[i].id == id) return 1; return 0; }
+
+static void mv_setup(char *it) {
+    if (!mv_vtable) {
+        u32 *vp = *(u32 **)it;                                 /* vtable + 8 */
+        mv_vtable = f_new(64 * 4);
+        for (int i = 0; i < 64; i++) mv_vtable[i] = (vp - 2)[i];
+        mv_vtable[2 + 50] = (u32)mv_get_icon;
+        mv_vtable[2 + 40] = (u32)mv_desc;
+    }
+    *(u32 **)it = mv_vtable + 2;
+    ((void (*)(void *, int))(mv_vtable[2 + 6]))(it, 1);        /* setStackedByData(true) */
 }

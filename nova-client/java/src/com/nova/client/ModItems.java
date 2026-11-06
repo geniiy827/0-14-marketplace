@@ -35,7 +35,7 @@ import java.util.Map;
 final class ModItems {
     static final String TAG = "NOVA.items";
     static final int FIRST_ID = 470, LAST_ID = 499;
-    /** item numbers the game 0.14.3 leaves free (Item::initItems, items.json; 498 = camera) */
+    /** item numbers the game 0.14.3 leaves free (every registerItem of Item::initItems, items.json; 498 = camera): 79 */
     static final int[] POOL = pool();
     private static int[] pool() {
         List<Integer> l = new ArrayList<Integer>();
@@ -45,10 +45,15 @@ final class ModItems {
         for (int i = 467; i <= 469; i++) l.add(i);
         for (int i = 439; i <= 456; i++) l.add(i);
         for (int i = 432; i <= 437; i++) l.add(i);
+        for (int i = 416; i <= 426; i++) l.add(i);          // horse armor / lead / name tag / mutton: not in 0.14
         int[] a = new int[l.size()];
         for (int i = 0; i < a.length; i++) a[i] = l.get(i);
         return a;
     }
+    /** items by data: id, aux, u0 v0 u1 v1 per variant; their names (\u001f) */
+    final List<Double> varData = new ArrayList<Double>();
+    final StringBuilder varNames = new StringBuilder();
+    final Map<String, List<Integer>> variants = new HashMap<String, List<Integer>>();
     /** armor textures: layer 1 / layer 2 per armor material, "nova/mod/<id>/<file>" */
     final List<String> armorTex = new ArrayList<String>();
     private final Map<String, Integer> armorIdx = new HashMap<String, Integer>();
@@ -99,6 +104,8 @@ final class ModItems {
                 saved.put(key, id);
                 File dir = dirs.get(m.id);
                 Object tex = p.get("texture");
+                List<?> vars = p.get("variants") instanceof List ? (List<?>) p.get("variants") : null;
+                if (tex == null && vars != null && !vars.isEmpty() && vars.get(0) instanceof Map) tex = ((Map<?, ?>) vars.get(0)).get("texture");
                 if (tex == null) throw new Exception("нужен texture: \"textures/....png\" или имя предмета игры");
                 boolean pixel = "pixel".equals(p.get("size"));
                 float[] uv = new float[4];
@@ -166,6 +173,26 @@ final class ModItems {
                 lang.put("item." + internal + ".name", text(p.get("name"), name));
                 ids.put(key, (double) id);
                 ids.put(name.toLowerCase(Locale.US), (double) id);
+                if (vars != null) {                          // one number, many items by data (like dyes): name = id + 65536 * data
+                    List<Integer> auxes = new ArrayList<Integer>();
+                    for (int v = 0; v < vars.size() && v < 64; v++) {
+                        if (!(vars.get(v) instanceof Map)) throw new Exception("variants: список {name: .., title: .., texture: ..}");
+                        Map<?, ?> vm = (Map<?, ?>) vars.get(v);
+                        String vn = String.valueOf(vm.get("name"));
+                        if (vm.get("name") == null || vm.get("texture") == null) throw new Exception("variants: нужны name и texture");
+                        float[] vuv = new float[4];
+                        icon(dir, String.valueOf(vm.get("texture")), pixel, vuv);
+                        varData.add((double) id); varData.add((double) v);
+                        for (float f : vuv) varData.add((double) f);
+                        if (varNames.length() > 0) varNames.append('\u001f');
+                        varNames.append(text(vm.get("title"), vn).replace('\u001f', ' '));
+                        double code = id + 65536.0 * v;
+                        ids.put(m.id + ":" + vn, code);
+                        ids.put(vn.toLowerCase(Locale.US), code);
+                        auxes.add(v);
+                    }
+                    variants.put(key, auxes);
+                }
                 count++;
             } catch (Exception e) {
                 rt.reportLater(m, "item " + name + ": " + e.getMessage(), line);
