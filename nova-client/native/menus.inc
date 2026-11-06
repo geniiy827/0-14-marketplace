@@ -132,10 +132,11 @@ static void h_setstring(void *opts, void *opt, void *str) {
 }
 
 /* ---------------- NOVA screens ------------------------------------------- */
-enum { NOVA_NONE, NOVA_PACKS, NOVA_CREATE };
+enum { NOVA_NONE, NOVA_PACKS, NOVA_CREATE, NOVA_ACCOUNT };
 enum { R_NONE, R_PACK_ON, R_PACK_DEL, R_NAME, R_SEED, R_SURV, R_CREAT, R_INF, R_FLAT, R_OLD,
        R_T_DAWN, R_T_NOON, R_T_DUSK, R_T_NIGHT, R_CYCLE, R_CLEAR, R_RAIN, R_THUNDER,
-       R_MOBS, R_SPX, R_SPZ, R_CREATE, R_NEWTEX, R_IMPORT };
+       R_MOBS, R_SPX, R_SPZ, R_CREATE, R_NEWTEX, R_IMPORT,
+       R_ACC_TAG, R_ACC_PASS, R_ACC_PASS2, R_ACC_LOGIN, R_ACC_TOREG, R_ACC_REG, R_ACC_TOLOGIN, R_ACC_LOGOUT };
 
 static int nova_pending, nova_creating, nova_kind, nova_close, nova_ttl;
 static void *nova_screen;
@@ -233,12 +234,14 @@ static int nova_cats(void *scr) {
     *(u32 **)(S + 0xcc) = b;
     int size = *(int *)(S + 0xa4);
     char *hdr = *(char **)(S + 0xa8);                 /* Touch::THeader, text at +0x60 */
-    if (hdr && nova_kind == NOVA_PACKS) {
+    if (hdr && (nova_kind == NOVA_PACKS || nova_kind == NOVA_ACCOUNT)) {
         char t[64];
-        loc_into("nova.storage.title", t, sizeof t);
+        loc_into(nova_kind == NOVA_PACKS ? "nova.storage.title" : "nova.acc.title", t, sizeof t);
         f_strassign(hdr + 0x60, t);
     }
-    if (nova_kind == NOVA_PACKS) {
+    if (nova_kind == NOVA_ACCOUNT) {
+        f_createcat(scr, 2, size, 224, 84, 0, 0);     /* one tab */
+    } else if (nova_kind == NOVA_PACKS) {
         f_createcat(scr, 2, size, 168, 84, 0, 0);     /* resource packs */
         f_createcat(scr, 3, size, 196, 112, 0, 0);    /* mods */
         f_createcat(scr, 4, size, 140, 84, 0, 0);     /* import */
@@ -275,6 +278,31 @@ static int nova_panes(void *scr) {
         push_pane(S, p0);
         push_pane(S, pm);
         push_pane(S, p1);
+    } else if (nova_kind == NOVA_ACCOUNT) {
+        /* nova_a: "L" sign in, "R" register, "P<tag>" signed in; nova_b: the tag to prefill */
+        void *p0 = new_pane();
+        if (nova_a[0] == 'P') {
+            new_group(p0, nova_a + 1);                       /* the tag (latin only: one font) */
+            void *g = new_group(p0, "nova.acc.profile");
+            add_toggle(g, "nova.acc.logout", R_ACC_LOGOUT, 0, 0);
+        } else if (nova_a[0] == 'R') {
+            void *g = new_group(p0, "nova.acc.reg.group");
+            add_text(g, "nova.acc.tag", R_ACC_TAG, nova_b);
+            add_text(g, "nova.acc.pass", R_ACC_PASS, "");
+            add_text(g, "nova.acc.pass2", R_ACC_PASS2, "");
+            new_group(p0, "nova.acc.hint");
+            g = new_group(p0, "nova.acc.actions");
+            add_toggle(g, "nova.acc.reg", R_ACC_REG, 0, 0);
+            add_toggle(g, "nova.acc.tologin", R_ACC_TOLOGIN, 0, 0);
+        } else {
+            void *g = new_group(p0, "nova.acc.login.group");
+            add_text(g, "nova.acc.tag", R_ACC_TAG, nova_b);
+            add_text(g, "nova.acc.pass", R_ACC_PASS, "");
+            g = new_group(p0, "nova.acc.actions");
+            add_toggle(g, "nova.acc.login", R_ACC_LOGIN, 0, 0);
+            add_toggle(g, "nova.acc.toreg", R_ACC_TOREG, 0, 0);
+        }
+        push_pane(S, p0);
     } else {
         void *p0 = new_pane(), *p1 = new_pane(), *p2 = new_pane();
         void *g = new_group(p0, "nova.cw.world");
@@ -372,8 +400,32 @@ static void options_closed(void *scr) {
     }
 }
 
+/* account buttons: "A|op\x1ftag\x1fpass\x1fpass2" to Java (the screen stays until Java closes it) */
+static void acc_action(int i, const char *op) {
+    nopt_val[i] = 0;                                     /* a button, not a switch */
+    int p = 0;
+    p = append(nova_result, p, sizeof nova_result, "A|");
+    p = append(nova_result, p, sizeof nova_result, op);
+    p = append(nova_result, p, sizeof nova_result, "\x1f");
+    p = append(nova_result, p, sizeof nova_result, role_text(R_ACC_TAG));
+    p = append(nova_result, p, sizeof nova_result, "\x1f");
+    p = append(nova_result, p, sizeof nova_result, role_text(R_ACC_PASS));
+    p = append(nova_result, p, sizeof nova_result, "\x1f");
+    p = append(nova_result, p, sizeof nova_result, role_text(R_ACC_PASS2));
+    nova_result_ready = 1;
+}
+
 static void nopt_on_change(int i) {
     if (nopt_role[i] == R_NEWTEX) { tex_want = nopt_val[i]; return; }
+    if (nova_kind == NOVA_ACCOUNT && nopt_val[i]) {
+        switch (nopt_role[i]) {
+            case R_ACC_LOGIN: acc_action(i, "login"); return;
+            case R_ACC_REG: acc_action(i, "register"); return;
+            case R_ACC_TOREG: acc_action(i, "toreg"); return;
+            case R_ACC_TOLOGIN: acc_action(i, "tologin"); return;
+            case R_ACC_LOGOUT: acc_action(i, "logout"); return;
+        }
+    }
     if (nopt_role[i] == R_IMPORT && nopt_val[i]) {
         nopt_val[i] = 0;
         nova_result[0] = 'I'; nova_result[1] = 0;   /* Java opens the file picker */
@@ -392,6 +444,11 @@ static void nova_screen_gone(void *scr) {
     options_closed(scr);
     if (scr != nova_screen) return;
     if (nova_kind == NOVA_PACKS) nova_finish_packs();
+    if (nova_kind == NOVA_ACCOUNT) {                     /* passwords do not stay in memory */
+        for (int i = 0; i < nopt_count; i++)
+            if (nopt_role[i] == R_ACC_PASS || nopt_role[i] == R_ACC_PASS2) for (int k = 0; k < 64; k++) nopt_text[i][k] = 0;
+        if (!nova_result_ready) { nova_result[0] = 'A'; nova_result[1] = '|'; nova_result[2] = 'x'; nova_result[3] = 0; nova_result_ready = 1; }
+    }
     cards_free();
     nova_screen = 0;
     nova_kind = NOVA_NONE;
@@ -429,7 +486,22 @@ void *Java_com_nova_client_NovaActivity_nativePollNova(void **env, void *cls) {
     if (!nova_result_ready) return 0;
     nova_result_ready = 0;
     void **fns = *(void ***)env;
-    return ((newutf_fn)fns[167])(env, nova_result);
+    void *r = ((newutf_fn)fns[167])(env, nova_result);
+    for (int i = 0; i < (int)sizeof nova_result && nova_result[i]; i++) nova_result[i] = 0;   /* may hold a password */
+    return r;
+}
+
+/* close the open NOVA screen (from the next frame) */
+int Java_com_nova_client_NovaActivity_nativeCloseNova(void **env, void *cls) { nova_close = 1; return 0; }
+
+static void *(*f_textures)(void *client);
+/* re-read a texture through Java getImageData (mce::TextureGroup::loadTexture, as the skin picker does) */
+static char tex_reload[128];
+static volatile int tex_reload_on;
+int Java_com_nova_client_NovaActivity_nativeReloadTexture(void **env, void *cls, void *name) {
+    jstr_copy(env, name, tex_reload, sizeof tex_reload);
+    tex_reload_on = 1;
+    return 0;
 }
 
 /* ---------------- chunk borders ------------------------------------------ */
@@ -561,6 +633,17 @@ static void h_client_update(void *client) {
         nova_close = 0;
         f_closescreen(nova_screen);
     } else nova_close = 0;
+    if (tex_reload_on && f_textures) {
+        tex_reload_on = 0;
+        static void *(*f_loadtex)(void *, void *, int, int);
+        if (!f_loadtex) f_loadtex = dlsym(dlopen("libminecraftpe.so", 6), "_ZN3mce12TextureGroup11loadTextureERKSs15TextureLocationb");
+        if (f_loadtex) {
+            u32 str[1];
+            gstr(str, tex_reload);
+            f_loadtex(f_textures(client), str, 0, 1);
+            f_strdtor(str);
+        }
+    }
     if (nova_pending && !nova_screen) {
         int kind = nova_pending;
         nova_pending = 0;
@@ -595,7 +678,6 @@ typedef void (*blit_fn)(void *sr, void *tex, int *rect);
 static gettex_fn f_gettex;
 static blit_fn f_blit;
 static void (*f_texdtor)(void *);
-static void *(*f_textures)(void *client);
 static long toast_t0;
 static int toast_on;
 static long toast_drawn_at;

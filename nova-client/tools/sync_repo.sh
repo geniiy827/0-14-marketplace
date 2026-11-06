@@ -9,5 +9,5 @@ rsync -a --delete \
   --exclude re014/ --exclude full.dis --exclude mega/ --exclude nukkit/ --exclude a13/ --exclude hooktest/ \
   --exclude enttest/ --exclude nettest2/ --exclude rtest/ --exclude uitest/ --exclude lighttest/ --exclude sky/ \
   --exclude jsonjava/ --exclude net/ --exclude sdk/ --exclude vid/ --exclude assets_new/nova/symbols.tsv \
-  --exclude keys/ --exclude '*.bin' "$W/" "$R/"
+  --exclude keys/ --exclude genisys/ --exclude raklib/ --exclude 'server/test/c/' --exclude '*.db' --exclude private.pem --exclude '*.bin' "$W/" "$R/"
 cd "$R/.." && git add -A nova-client && git status --short | wc -l | xargs echo "changed files:"

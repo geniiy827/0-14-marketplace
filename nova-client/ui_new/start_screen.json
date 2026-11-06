@@ -635,6 +635,44 @@
     ]
   },
 
+  // NOVA: account button right of the storage button. Its icon is served by Java: the sign-in picture,
+  // or nova_player.png once signed in (re-read with TextureGroup::loadTexture when the state changes).
+  "account_icon": {
+    "type": "image",
+    "texture": "gui/nova/account.png",
+    "layer": 3,
+    "uv": [ 0, 0 ],
+    "uv_size": [ 16, 16 ],
+    "size": [ 16, 16 ]
+  },
+
+  "account_button@common.hyperlink_button": {
+    "size": [ 24, 24 ],
+    "offset": [ "5% + 28px", "-10%" ],
+    "anchor_to": "bottom_left",
+    "anchor_from": "bottom_left",
+    "property_bag": {
+      "#hyperlink": "nova://account"
+    },
+    "controls": [
+      {
+        "default@$button_state_default_base": {
+          "controls": [ { "@start.account_icon": { } } ]
+        }
+      },
+      {
+        "hover@$button_state_hover_base": {
+          "controls": [ { "@start.account_icon": { } } ]
+        }
+      },
+      {
+        "pressed@$button_state_pressed_base": {
+          "controls": [ { "@start.account_icon": { "alpha": 0.65 } } ]
+        }
+      }
+    ]
+  },
+
   "empty_panel": {
     "type": "panel"
   },
@@ -941,6 +979,9 @@
       },
       {
         "@packs_button": { }
+      },
+      {
+        "@account_button": { }
       }
     ],
     "button_mappings": [

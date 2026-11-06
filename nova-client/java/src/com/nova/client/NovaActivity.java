@@ -64,6 +64,8 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     static native int nativeSetDataDir(String dir);
     static native int nativeOpenNova(int kind, String a, String b);
     static native String nativePollNova();
+    static native int nativeCloseNova();
+    static native int nativeReloadTexture(String name);
     static native int nativeToast(String title, String sub, int icon);
     static native int nativeCrashFile(String path);
 
@@ -214,11 +216,176 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
                 pick.addCategory(Intent.CATEGORY_OPENABLE);
                 pick.setType("*/*");
                 startActivityForResult(pick, 7301);
-            } else if (r.startsWith("P|")) applyPacks(r);
+            } else if (r.startsWith("A|")) accountAction(r.substring(2));
+            else if (r.startsWith("P|")) applyPacks(r);
             else if (r.startsWith("C|")) createWorld(r.substring(2));
 
         } catch (Throwable t) {
             Log.e(TAG, "nova result", t);
+        }
+    }
+
+    // ------------------------------------------------------------------ NOVA accounts
+    private static AccountClient accounts;
+    private static volatile String accTag = "", accToken = "", accLastTag = "";
+    private static volatile String accountIconPath;
+    private volatile boolean accBusy;
+
+    private java.io.File accFile() { return new java.io.File(getFilesDir(), "nova/account.properties"); }
+
+    private void accLoad() {
+        try {
+            java.util.Properties p = new java.util.Properties();
+            java.io.FileInputStream in = new java.io.FileInputStream(accFile());
+            p.load(in); in.close();
+            accTag = p.getProperty("tag", ""); accToken = p.getProperty("token", ""); accLastTag = p.getProperty("last", accTag);
+        } catch (Exception ignored) { }
+    }
+
+    private void accSave() {
+        try {
+            java.io.File f = accFile();
+            f.getParentFile().mkdirs();
+            java.util.Properties p = new java.util.Properties();
+            p.setProperty("tag", accTag); p.setProperty("token", accToken); p.setProperty("last", accLastTag);
+            java.io.FileOutputStream o = new java.io.FileOutputStream(f);
+            p.store(o, "NOVA account"); o.close();
+        } catch (Exception e) { Log.w(TAG, "account save", e); }
+    }
+
+    public static boolean signedIn() { return accToken != null && accToken.length() > 0; }
+    public static String accountTag() { return signedIn() ? accTag : ""; }
+
+    private AccountClient accClient() throws Exception {
+        if (accounts == null) {
+            java.io.InputStream in = getAssets().open("nova/account_pub.pem");
+            String pem = new String(PackManager.readAll(in), "UTF-8");
+            in.close();
+            accounts = new AccountClient(AccountClient.HOST, AccountClient.PORT, pem);
+        }
+        return accounts;
+    }
+
+    private void accWorker(final Runnable r) {
+        Thread t = new Thread(new Runnable() { public void run() { try { r.run(); } catch (Throwable e) { Log.e(TAG, "account", e); } } }, "nova-account");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** the server's text as a toast: up to ~28 characters per line */
+    private static void accToast(String msg) {
+        if (msg == null || msg.isEmpty()) return;
+        if (msg.length() <= 28) { postToast(msg, ""); return; }
+        int cut = msg.lastIndexOf(' ', 28);
+        if (cut < 10) cut = 28;
+        postToast(msg.substring(0, cut).trim(), msg.substring(cut).trim());
+    }
+
+    /** start screen account button: only with a connection to the server */
+    private void openAccount() {
+        if (accBusy) return;
+        accBusy = true;
+        accWorker(new Runnable() {
+            public void run() {
+                boolean up = false;
+                try { up = accClient().hello(); } catch (Throwable t) { Log.w(TAG, "account hello", t); }
+                accBusy = false;
+                if (!up) { postToast("@nova.acc.offline", ""); return; }
+                runOnUiThread(new Runnable() { public void run() { openAccountScreen(signedIn() ? "P" + accTag : "L"); } });
+            }
+        });
+    }
+
+    private void openAccountScreen(String mode) {
+        try { nativeOpenNova(3, mode, accLastTag); } catch (Throwable t) { Log.e(TAG, "account screen", t); }
+    }
+
+    /** a button of the account screen: "op\x1ftag\x1fpass\x1fpass2" */
+    private void accountAction(String r) {
+        final String[] f = r.split("\u001f", -1);
+        final String op = f[0];
+        if (op.equals("x")) return;                                   // the screen was closed
+        final String tag = f.length > 1 ? f[1].trim() : "", pass = f.length > 2 ? f[2] : "", pass2 = f.length > 3 ? f[3] : "";
+        if (op.equals("toreg") || op.equals("tologin")) {
+            if (tag.length() > 0) accLastTag = tag;
+            nativeCloseNova();
+            novaHandler.postDelayed(new Runnable() { public void run() { openAccountScreen(op.equals("toreg") ? "R" : "L"); } }, 350);
+            return;
+        }
+        if (accBusy) return;
+        accBusy = true;
+        if (!op.equals("logout")) postToast("@nova.acc.wait", "");
+        accWorker(new Runnable() {
+            public void run() {
+                try {
+                    AccountClient c;
+                    try { c = accClient(); } catch (Exception e) { Log.e(TAG, "account client", e); return; }
+                    String dev = android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL;
+                    if (op.equals("logout")) {
+                        String tok = accToken;
+                        accTag = ""; accToken = "";
+                        accSave();
+                        accountIconChanged();
+                        nativeCloseNova();
+                        try { c.logout(tok); } catch (Throwable ignored) { }
+                        postToast(ru() ? "Вы вышли из аккаунта" : "Signed out", "");
+                        return;
+                    }
+                    AccountClient.Result res = op.equals("register") ? c.register(tag, pass, pass2, dev) : c.login(tag, pass, dev);
+                    if (AccountClient.NET.equals(res.err)) { postToast("@nova.acc.offline", ""); return; }
+                    if (!res.ok) { accToast(res.msg); return; }
+                    accTag = res.str("tag"); accToken = res.str("token"); accLastTag = accTag;
+                    accSave();
+                    accountIconChanged();
+                    nativeCloseNova();
+                    accToast(res.msg);
+                } finally {
+                    accBusy = false;
+                }
+            }
+        });
+    }
+
+    /** on start: is the saved session still valid (ban, logout on another device...) */
+    private void accountResume() {
+        accLoad();
+        if (!signedIn()) return;
+        accWorker(new Runnable() {
+            public void run() {
+                try {
+                    AccountClient.Result r = accClient().resume(accToken);
+                    if (AccountClient.NET.equals(r.err)) return;            // offline: keep the session
+                    if (r.ok) { accTag = r.str("tag"); accSave(); return; }
+                    accTag = ""; accToken = "";
+                    accSave();
+                    accountIconChanged();
+                    accToast(r.msg);
+                } catch (Throwable t) { Log.w(TAG, "account resume", t); }
+            }
+        });
+    }
+
+    private void accountIconChanged() {
+        String p = accountIconPath;
+        try { nativeReloadTexture(p != null ? p : "gui/nova/account.png"); } catch (Throwable ignored) { }
+    }
+
+    /** gui/nova/account.png: the sign-in picture, or nova_player.png when signed in */
+    private int[] accountIcon(String path) {
+        accountIconPath = path;
+        try {
+            java.io.InputStream in = getAssets().open(signedIn() ? "images/gui/nova/nova_player.png" : "images/gui/nova/account.png");
+            Bitmap b = BitmapFactory.decodeStream(in);
+            in.close();
+            if (b == null) return null;
+            int w = b.getWidth(), h = b.getHeight();
+            int[] px = new int[w * h + 2];
+            px[0] = w; px[1] = h;
+            b.getPixels(px, 2, w, 0, 0, w, h);
+            b.recycle();
+            return px;
+        } catch (Throwable t) {
+            return null;
         }
     }
 
@@ -365,7 +532,9 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         if (nativeOk && atlases != null && ModBridge.blocks != null && ModBridge.blocks.hasAtlasStrip()) {
             try { nativeTerrainHeight(ModBlocks.ATLAS_H); } catch (Throwable t) { Log.w(TAG, "particles", t); }
         }
+        accLoad();                       // before the start screen asks for the account icon
         super.onCreate(state);
+        accountResume();
         // targetSdk 24: storage is a runtime permission; worlds live in games/com.mojang on external storage
         try {
             if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -508,6 +677,10 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     @Override
     public int[] getImageData(String path, boolean fromAssets) {
         String np = norm(path);
+        if (np != null && np.endsWith("gui/nova/account.png")) {
+            int[] px = accountIcon(path);
+            if (px != null) return px;
+        }
         if (np != null && np.contains("nova/pack_icon_")) {
             int[] px = packIcon(np);
             if (px != null) return px;
@@ -563,6 +736,8 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         if (uri != null && uri.startsWith("nova://")) {
             if (uri.startsWith("nova://packs")) {
                 if (!openNova(1)) startActivity(new Intent(this, PacksActivity.class));
+            } else if (uri.startsWith("nova://account")) {
+                openAccount();
             }
             return;
         }

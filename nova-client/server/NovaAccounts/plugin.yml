@@ -1,0 +1,16 @@
+name: NovaAccounts
+main: NovaAccounts\Main
+version: 1.0.0
+api: [1.0.0, 1.13.0, 1.14.0, 2.0.0, 3.0.0, 3.0.0-ALPHA1, 3.0.0-ALPHA2, 3.0.0-ALPHA3, 3.0.0-ALPHA4]
+author: RCodeStudio
+description: NOVA Client accounts (player tag + password) with an API for other plugins
+load: STARTUP
+commands:
+  novaacc:
+    description: NOVA accounts admin
+    usage: "/novaacc <info|ban|unban|logoutall|list|stats> [tag] [minutes|0] [reason]"
+    permission: novaaccounts.admin
+permissions:
+  novaaccounts.admin:
+    default: op
+    description: NOVA accounts admin commands

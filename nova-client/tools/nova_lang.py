@@ -77,6 +77,29 @@ for _k, _v in EXTRA.items():
     K.append(_k)
     for _l in _v:
         T[_l].append(_v[_l])
+
+# accounts (alpha15): en for every language except ru
+_ACC = [
+ ('nova.acc.title', 'NOVA Account', 'Аккаунт NOVA'),
+ ('nova.acc.login.group', 'Sign in', 'Вход'),
+ ('nova.acc.reg.group', 'Registration', 'Регистрация'),
+ ('nova.acc.tag', 'Player tag', 'Тег игрока'),
+ ('nova.acc.pass', 'Password', 'Пароль'),
+ ('nova.acc.pass2', 'Repeat password', 'Повтор пароля'),
+ ('nova.acc.actions', 'Actions', 'Действия'),
+ ('nova.acc.login', 'Sign in', 'Войти'),
+ ('nova.acc.toreg', 'No account? Register', 'Нет аккаунта? Зарегистрироваться'),
+ ('nova.acc.reg', 'Register', 'Зарегистрироваться'),
+ ('nova.acc.tologin', 'Have an account? Sign in', 'Уже есть аккаунт? Войти'),
+ ('nova.acc.hint', 'Tag: 3-16 letters, digits or _. It is not your nickname', 'Тег: от 3 до 16 английских букв, цифр или _. Это не ник'),
+ ('nova.acc.profile', 'You are signed in', 'Вы вошли в аккаунт'),
+ ('nova.acc.logout', 'Sign out', 'Выйти из аккаунта'),
+ ('nova.acc.offline', 'No connection to the account server', 'Нет связи с сервером аккаунтов'),
+ ('nova.acc.wait', 'Connecting...', 'Подключение'),
+]
+for _k, _en, _ru in _ACC:
+    K.append(_k)
+    for _l in T: T[_l].append(_ru if _l == 'ru_RU' else _en)
 # import texts now cover mods too
 _ii = K.index('nova.packs.import.sub')
 T['ru_RU'][_ii] = 'Набор ресурсов или мод с этого устройства'

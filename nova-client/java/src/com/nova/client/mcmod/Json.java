@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /** Minimal JSON for data.save/load: numbers, strings, bools, null, lists, maps. */
-final class Json {
+public final class Json {
     private Json() { }
 
     /** deep copy of a storable value; functions are refused */
@@ -28,7 +28,7 @@ final class Json {
         throw new ScriptError("это нельзя сохранить: " + Interp.typeName(v), line);
     }
 
-    static String write(Object v) {
+    public static String write(Object v) {
         StringBuilder b = new StringBuilder();
         write(b, v);
         return b.toString();
@@ -66,7 +66,7 @@ final class Json {
         } else write(b, String.valueOf(v));
     }
 
-    static Object read(String s) {
+    public static Object read(String s) {
         int[] p = {0};
         Object v = value(s, p);
         return v;

@@ -1,0 +1,43 @@
+# NovaAccounts - accounts of NOVA Client. Changes apply after a server restart.
+
+# tag: what friends will search for. Not the nickname.
+tag:
+  min: 3
+  max: 16
+  # names nobody can take (lower case)
+  reserved: [admin, administrator, nova, novaclient, rcodestudio, moderator, support, server, console, root, system]
+password:
+  min: 6
+  max: 64
+  bcrypt-cost: 10
+
+session:
+  days: 30            # how long "remember me" lasts
+  max-per-account: 10
+
+limits:
+  requests-per-minute-ip: 40
+  login-fails-ip: 10           # per 10 minutes
+  login-fails-account: 5       # then the account is locked for lock-minutes
+  lock-minutes: 5
+  registrations-per-hour-ip: 3
+
+# texts the client shows (the server decides them, so you can change them here)
+messages:
+  bad_request: "Ошибка запроса. Обнови NOVA"
+  rate: "Слишком много попыток. Подожди немного"
+  tag_format: "Тег: от {min} до {max} английских букв, цифр или _"
+  tag_reserved: "Этот тег занят"
+  tag_taken: "Этот тег уже занят"
+  pass_short: "Пароль должен быть не короче {min} символов"
+  pass_long: "Пароль слишком длинный"
+  pass_mismatch: "Пароли не совпадают"
+  pass_is_tag: "Пароль не должен совпадать с тегом"
+  wrong: "Неверный тег или пароль"
+  locked: "Слишком много неудачных попыток. Попробуй через {min} мин."
+  banned: "Аккаунт заблокирован{until}{reason}"
+  session: "Нужно войти заново"
+  registered: "Аккаунт {tag} создан"
+  welcome: "Вы вошли как {tag}"
+  logout: "Вы вышли из аккаунта"
+  time: "Неверное время на телефоне"
