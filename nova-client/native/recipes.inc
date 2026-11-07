@@ -18,6 +18,11 @@ static void (*rc_add2)(void *book, void *out, void *r0, void *r1, void *vec);
 static void (*rc_add_furnace)(void *fr, short id, short aux, void *out);
 static int rc_gen = 1;                                 /* +1 each time the book was refilled from the server */
 
+static u32 *(*rc_list_of)(void *book);              /* Recipes::getRecipes() -> vector<Recipe*> */
+static int rc_count_book(void *book) {
+    u32 *v = rc_list_of && book ? rc_list_of(book) : 0;
+    return v ? (int)((v[1] - v[0]) / 4) : -1;
+}
 static void rc_apply(MRecipe *r) {
     if (!sf_item_ctor || !sf_items) return;
     if (r->gen == rc_gen) return;                       /* in the book already */
@@ -53,10 +58,14 @@ static void rc_apply(MRecipe *r) {
     }
     u32 s0[1], s1[1], s2[1];
     gstr(s0, rows[0]); gstr(s1, rows[1]); gstr(s2, rows[2]);
+    int before = rc_count_book(book);
     if (nr == 1 && rc_add1) rc_add1(book, out, s0, vec);
     else if (nr == 2 && rc_add2) rc_add2(book, out, s0, s1, vec);
     else rc_add(book, out, s0, s1, s2, vec);
     f_strdtor(s0); f_strdtor(s1); f_strdtor(s2);
+    LOG("recipe: %d x%d:%d rows %d [%s|%s|%s] keys %d (%c %d:%d) book %d -> %d, found %d", r->out, r->n, r->aux, nr,
+        rows[0], rows[1], rows[2], r->nk, r->key[0], r->kid[0], r->kaux[0], before, rc_count_book(book),
+        rc_find ? rc_find(book, out) != 0 : -1);
 }
 
 static void rc_apply_all(void) {
@@ -116,6 +125,7 @@ static int rc_op(int op, double *a, int n, char *s) {
 static u64 hc_crafting_data(u32 orig, u32 *w) {   /* ClientNetworkHandler::handle(this, guid, CraftingDataPacket*) */
     u64 ret = nh_callw(orig, w);
     rc_gen++;                                            /* the book was cleared and refilled */
+    LOG("recipes: book refilled by the server (%d), mods' recipes back: %d", rc_count_book(rc_book ? rc_book() : 0), rc_count);
     rc_apply_all();
     return ret;
 }
@@ -125,6 +135,7 @@ static void recipes_init(void *mc) {
     rc_furnace = dlsym(mc, "_ZN14FurnaceRecipes11getInstanceEv");
     rc_find = dlsym(mc, "_ZN7Recipes12getRecipeForERK12ItemInstance");
     rc_add = dlsym(mc, "_ZN7Recipes15addShapedRecipeERK12ItemInstanceRKSsS4_S4_RKSt6vectorINS_4TypeESaIS6_EE");
+    rc_list_of = dlsym(mc, "_ZN7Recipes10getRecipesEv");
     rc_add1 = dlsym(mc, "_ZN7Recipes15addShapedRecipeERK12ItemInstanceRKSsRKSt6vectorINS_4TypeESaIS6_EE");
     rc_add2 = dlsym(mc, "_ZN7Recipes15addShapedRecipeERK12ItemInstanceRKSsS4_RKSt6vectorINS_4TypeESaIS6_EE");
     rc_add_furnace = dlsym(mc, "_ZN14FurnaceRecipes23addFurnaceRecipeAuxDataEssRK12ItemInstance");
