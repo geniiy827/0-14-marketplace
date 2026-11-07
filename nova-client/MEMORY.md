@@ -230,3 +230,11 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Иконки вкладок: InventoryItemRenderer::update вызывается не каждый кадр -> слот 5 (render) зовёт update для nova_ct_icon_k.
 - После смены страницы, если открытой вкладки нет на странице - показать панель creative_screen_building_blocks.
 - Мультиплеер на alpha29 у пользователя работает.
+
+## alpha31
+- Вкладки: скрытие с запоминанием прежней видимости (ct_hid), тапы по скрытым кнопкам вкладок глотаются (ct_block).
+- Дверь: верх/низ (грани 0/1) берут Block+0x10 -> тоже наша текстура.
+- Item::mBow / Item::mBucket подменяются на время HudCursorRenderer::render, LocalPlayer::getFieldOfViewModifier,
+  Player::canUseCarriedItemWhileMoving (лук модов) и BucketItem::use/useOn/useTimeDepleted (ведро модов).
+  Имя ведра по содержимому: vtable-копия, слот 40, имена кадров (aux 1000+k).
+- Не сделано: встроенные чары луков Simple Ores (Сила II, у оникса Горение).

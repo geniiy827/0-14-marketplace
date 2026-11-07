@@ -144,7 +144,13 @@ final class ModItems {
                         varData.add((double) id); varData.add(1000.0 + k);
                         for (float f : fuv) varData.add((double) f);
                         if (varNames.length() > 0) varNames.append('\u001f');
-                        varNames.append(name);
+                        String title = text(p.get("name"), name);
+                        if (kind == 12 && k > 0) {             // bucket: the name by contents
+                            boolean ru = "ru".equals(Locale.getDefault().getLanguage());
+                            String[] add = ru ? new String[]{"", " с водой", " с лавой", " с молоком"} : new String[]{"", " of Water", " of Lava", " of Milk"};
+                            title += add[k];
+                        }
+                        varNames.append(title.replace('\u001f', ' '));
                     }
                 }
                 Map<?, ?> tier = p.get("tier") instanceof Map ? (Map<?, ?>) p.get("tier") : new HashMap<String, Object>();

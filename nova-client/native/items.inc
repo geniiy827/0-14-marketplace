@@ -77,6 +77,8 @@ static void (*mi_digger_ctor[4])(void *it, void *name, int id, MTier *t);   /* p
 static void (*mi_hoe_ctor)(void *it, void *name, int id, MTier t);
 static void (*mi_armor_ctor)(void *it, void *name, int id, int *mat, int render, int slot);
 static u32 *mi_weapon_vt, *mi_shears_vt;
+static u32 *mi_bucket_vt;
+static void *mi_bucket_desc(void *out, char *it, char *ii);
 static void (*mi_bow_ctor)(void *it, void *name, int id);
 static void (*mi_bucket_ctor)(void *it, void *name, int id);
 static void (*mi_door_ctor)(void *it, void *name, int id, void *mat, int type);
@@ -135,6 +137,13 @@ static char *mi_make(ModItem *m) {
             MVar *v = mv_find_exact(m->id, 1000 + k);
             if (v) memcpy(it + off[k], &v->tex, 0x18);
         }
+        if (!mi_bucket_vt) {                                  /* its name by contents */
+            u32 *vp = *(u32 **)it;
+            mi_bucket_vt = f_new(64 * 4);
+            for (int i = 0; i < 64; i++) mi_bucket_vt[i] = (vp - 2)[i];
+            mi_bucket_vt[2 + 40] = (u32)mi_bucket_desc;
+        }
+        *(u32 **)it = mi_bucket_vt + 2;
     } else if (m->kind == 13 && mi_door_ctor) {               /* places the mod door block m->level */
         void *db = m->level > 0 && m->level < 256 ? mf_blocks[m->level] : 0;
         if (db) {
@@ -327,8 +336,10 @@ static u64 hc_pick_special(u32 orig, u32 *w) {
 }
 
 static void doors_init(void *mc);
+static void bowbucket_init(void *mc);
 static void armor_init(void *mc) {
     doors_init(mc);
+    bowbucket_init(mc);
     void *pa = dlsym(mc, "_ZN19HumanoidMobRenderer12prepareArmorER3Mob9ArmorSlotf");
     void *ps = dlsym(mc, "_ZNK11PickaxeItem17canDestroySpecialEPK5Block");
     LOG("armor: %d, harvest: %d", pa ? nh_hook_c((u32)pa, hc_prepare_armor) : -1, ps ? nh_hook_c((u32)ps, hc_pick_special) : -1);
@@ -411,4 +422,62 @@ static void doors_init(void *mc) {
     void *u = dlsym(mc, "_ZN8DoorItem5useOnEP12ItemInstanceP6Playeriiiafff");
     void *p = dlsym(mc, "_ZN8DoorItem5placeEP11BlockSourceiiiiP5Block");
     LOG("doors: %d %d", u ? nh_hook_c((u32)u, hc_door_useon) : -1, p ? nh_hook_c((u32)p, hc_door_place) : -1);
+}
+
+/* ---- the game checks "is it THE bow / THE bucket" by pointer (Item::mBow, Item::mBucket): crosshair, zoom and
+ * walking while drawing (HudCursorRenderer::render, LocalPlayer::getFieldOfViewModifier,
+ * Player::canUseCarriedItemWhileMoving); a bucket filled / emptied / drunk becomes ItemInstance(Item::mBucket).
+ * While such a function runs for a mod bow / bucket, the pointer is the mod item. ---- */
+static void **mi_mbow, **mi_mbucket;
+static void *(*mi_local_player)(void *client);
+static void *(*mi_selected)(void *player);
+static int mi_kind_of(void *item) {
+    if (!item) return -1;
+    int id = *(unsigned short *)((char *)item + 0x12);
+    return id >= 256 && id < 512 && mitem_of[id] && mf_items[id] == item ? mitem_of[id]->kind : -1;
+}
+static void *mi_hand(void *player) {
+    char *ii = player && mi_selected ? mi_selected(player) : 0;
+    return ii ? *(void **)(ii + 0xc) : 0;
+}
+static u64 mi_with(void **slot, void *item, u32 orig, u32 *w) {
+    void *keep = *slot;
+    *slot = item;
+    u64 r = nh_callw(orig, w);
+    *slot = keep;
+    return r;
+}
+static u64 hc_bow_hud(u32 orig, u32 *w) {
+    void *it = g_client && mi_local_player ? mi_hand(mi_local_player(g_client)) : 0;
+    return mi_mbow && mi_kind_of(it) == 11 ? mi_with(mi_mbow, it, orig, w) : nh_callw(orig, w);
+}
+static u64 hc_bow_player(u32 orig, u32 *w) {
+    void *it = mi_hand((void *)w[0]);
+    return mi_mbow && mi_kind_of(it) == 11 ? mi_with(mi_mbow, it, orig, w) : nh_callw(orig, w);
+}
+static u64 hc_bucket(u32 orig, u32 *w) {            /* BucketItem::use / useOn / useTimeDepleted (this first) */
+    void *it = (void *)w[0];
+    return mi_mbucket && mi_kind_of(it) == 12 ? mi_with(mi_mbucket, it, orig, w) : nh_callw(orig, w);
+}
+/* the bucket's name by what is in it (frame names from the mod: empty, water, lava, milk) */
+static void *mi_bucket_desc(void *out, char *it, char *ii) {
+    int aux = ii ? *(short *)(ii + 2) : 0;
+    int f = aux == 8 || aux == 9 ? 1 : aux == 10 || aux == 11 ? 2 : aux == 1 ? 3 : 0;
+    MVar *v = mv_find_exact(*(unsigned short *)(it + 0x12), 1000 + f);
+    gstr(out, v ? v->name : "?");
+    return out;
+}
+static void bowbucket_init(void *mc) {
+    mi_mbow = dlsym(mc, "_ZN4Item4mBowE");
+    mi_mbucket = dlsym(mc, "_ZN4Item7mBucketE");
+    mi_local_player = dlsym(mc, "_ZN15MinecraftClient14getLocalPlayerEv");
+    mi_selected = dlsym(mc, "_ZNK6Player15getSelectedItemEv");
+    const char *bow[2] = {"_ZN11LocalPlayer22getFieldOfViewModifierEv", "_ZNK6Player28canUseCarriedItemWhileMovingEv"};
+    const char *bk[3] = {"_ZN10BucketItem3useER12ItemInstanceR6Player", "_ZN10BucketItem5useOnEP12ItemInstanceP6Playeriiiafff",
+                         "_ZN10BucketItem15useTimeDepletedEP12ItemInstanceP5LevelP6Player"};
+    void *h = dlsym(mc, "_ZN17HudCursorRenderer6renderER15MinecraftClientRSt10shared_ptrI9UIControlEi");
+    if (h && mi_mbow && mi_selected && mi_local_player) nh_hook_c((u32)h, hc_bow_hud);
+    for (int i = 0; i < 2; i++) { void *a = dlsym(mc, bow[i]); if (a && mi_mbow && mi_selected) nh_hook_c((u32)a, hc_bow_player); }
+    for (int i = 0; i < 3; i++) { void *a = dlsym(mc, bk[i]); if (a && mi_mbucket) nh_hook_c((u32)a, hc_bucket); }
+    LOG("bow/bucket: %p %p", mi_mbow, mi_mbucket);
 }

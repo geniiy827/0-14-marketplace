@@ -118,6 +118,7 @@ static void ct_put(int i, int page) {
     *(u32 *)(m + 0x1c) = (u32)(arr + n * 20);
     ct_notify(m, before);
 }
+static void ct_hid_forget(void);
 static int ct_fix_tab;                                 /* after a page switch: leave a tab the page does not have */
 static void ct_apply(int page) {
     for (int i = 0; i < 4; i++) ct_put(i, page);
@@ -140,6 +141,7 @@ static u64 hc_ct_add(u32 orig, u32 *w) {           /* ContainerManagerModel::_ad
 }
 static u64 hc_ct_mgr_dtor(u32 orig, u32 *w) {      /* ~CraftingContainerManagerModel: the game's vectors back first */
     for (int i = 0; i < 4; i++) { if (ct_cm[i]) ct_put(i, 0); ct_cm[i] = 0; }
+    ct_hid_forget();
     return nh_callw(orig, w);
 }
 
@@ -191,7 +193,26 @@ static const char *ct_keys[4] = {"craftingScreen.tab.buildingBlocks", "craftingS
 
 /* tabs a page does not have: the pictures (parents of nova_ct_icon_<k>) and the buttons (interactive_tabs/<name>) */
 static const char *ct_toggles[4] = {"building_blocks", "decorations", "tools", "miscellaneous"};
-static void ct_vis(char *c, int on) { c[0x30] = (char)((c[0x30] & ~4) | (on << 2)); }
+/* hiding a control the game also shows/hides itself (front/back pictures of a tab): remember what it was and give it
+ * back when the tab is on the page again (forcing "visible" would show both pictures of a tab) */
+#define CT_HID 64
+static char *ct_hid[CT_HID];
+static char ct_hid_was[CT_HID];
+static int ct_hid_n;
+static float ct_block[4][4];                           /* rects of hidden tab buttons: taps there are swallowed */
+static int ct_block_n;
+static void ct_vis(char *c, int on) {
+    int i;
+    for (i = 0; i < ct_hid_n; i++) if (ct_hid[i] == c) break;
+    if (!on) {
+        if (i == ct_hid_n && ct_hid_n < CT_HID) { ct_hid[ct_hid_n] = c; ct_hid_was[ct_hid_n] = c[0x30] & 4; ct_hid_n++; }
+        c[0x30] &= ~4;
+    } else if (i < ct_hid_n) {
+        c[0x30] = (char)((c[0x30] & ~4) | ct_hid_was[i]);
+        ct_hid[i] = ct_hid[--ct_hid_n]; ct_hid_was[i] = ct_hid_was[ct_hid_n];
+    }
+}
+static void ct_hid_forget(void) { ct_hid_n = 0; ct_block_n = 0; }
 static const char *ct_panels[4] = {"creative_screen_building_blocks", "creative_screen_decorations",
                                    "creative_screen_tools", "creative_screen_miscellaneous"};
 static char *ct_panel[4];
@@ -207,7 +228,14 @@ static void ct_tabs_walk(char *c, int depth, int in_tabs) {
             if (k >= 0 && k < 4) ct_vis(c, ct_page == 0 || ct_tab(ct_page, k) != 0);
             continue;
         }
-        if (in_tabs && nm) for (int k = 0; k < 4; k++) if (streq(nm, ct_toggles[k])) ct_vis(ch, ct_page == 0 || ct_tab(ct_page, k) != 0);
+        if (in_tabs && nm) for (int k = 0; k < 4; k++) if (streq(nm, ct_toggles[k])) {
+            int on = ct_page == 0 || ct_tab(ct_page, k) != 0;
+            ct_vis(ch, on);
+            if (!on && ct_block_n < 4) {
+                float *r = ct_block[ct_block_n++];
+                r[0] = *(float *)(ch + 0x10); r[1] = *(float *)(ch + 0x14); r[2] = *(float *)(ch + 0x18); r[3] = *(float *)(ch + 0x1c);
+            }
+        }
         if (nm && nm[0] == 'c') for (int k = 0; k < 4; k++) if (streq(nm, ct_panels[k])) ct_panel[k] = ch;
         ct_tabs_walk(ch, depth + 1, nm && streq(nm, "interactive_tabs"));
     }
@@ -245,13 +273,14 @@ static int ct_ui_render(void *client, char *cc) {
         char *root = cc;
         for (int d = 0; d < 40; d++) { char *p = *(char **)(root + 0x38); if (!p) break; root = p; }
         for (int k = 0; k < 4; k++) ct_panel[k] = 0;
+        ct_block_n = 0;
         ct_tabs_walk(root, 0, 0);
         if (ct_fix_tab) {                                  /* the open tab is not on this page: show the first one */
             ct_fix_tab = 0;
             for (int k = 1; k < 4; k++)
                 if (ct_panel[k] && (ct_panel[k][0x30] & 4) && ct_page > 0 && !ct_tab(ct_page, k) && ct_panel[0]) {
-                    ct_vis(ct_panel[k], 0);
-                    ct_vis(ct_panel[0], 1);
+                    ct_panel[k][0x30] &= ~4;                  /* the game's own tab switch shows them again */
+                    ct_panel[0][0x30] |= 4;
                 }
         }
     }
@@ -283,6 +312,10 @@ static int ct_ui_render(void *client, char *cc) {
 static int ct_touch(u32 *w, float scale) {
     if (!ct_count || now_ms() - ct_drawn_at > 300) return 0;          /* only while the screen shows them */
     float x = (short)w[2] / scale, y = (short)w[3] / scale;
+    for (int i = 0; i < ct_block_n; i++) {
+        float *r = ct_block[i];
+        if (x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3]) return 1;
+    }
     for (int b = 0; b < 2; b++) {
         float *r = ct_rect[b];
         if (x >= r[0] - 3 && x < r[0] + r[2] + 3 && y >= r[1] - 3 && y < r[1] + r[3] + 3) {

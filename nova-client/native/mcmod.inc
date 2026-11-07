@@ -509,6 +509,7 @@ static int mb_special(ModBlock *m, void *mat) {
         b = f_new(0xd0); memset(b, 0, 0xd0); mf_door_ctor(b, nm, m->id, mat, m->sp_base);   /* sp_base: DoorType */
         mf_texset(b + 0x9c, t0, 0);                           /* lower / upper half */
         mf_texset(b + 0xb4, t1, 0);
+        mf_texset(b + 0x10, t0, 0);                           /* top and bottom faces (getTexture: face 0/1 -> +0x10) */
         if (!mb_door_vt) {
             u32 *vp = *(u32 **)b;
             mb_door_vt = f_new(VT_BLOCK_WORDS * 4);
