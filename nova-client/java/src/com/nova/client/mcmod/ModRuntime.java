@@ -59,6 +59,12 @@ public final class ModRuntime {
     private final List<String> pendingReports = new ArrayList<String>();
     /** mod blocks: "modid:name" and plain "name" -> block id (set by ModBlocks) */
     public final Map<String, Double> customIds = new HashMap<String, Double>();
+    /** numbers of items by data (variants, packed plain items): for scripts such an item is number + 65536 * data */
+    public final java.util.Set<Integer> carriers = new java.util.HashSet<Integer>();
+    /** what a script sees for the item (id, data) */
+    public double itemCode(double id, double data) {
+        return carriers.contains((int) id) ? id + 65536.0 * (((int) data) & 0x7fff) : id;
+    }
 
     /** block declarations of every parsed mod: {Mod, name, props map, line} */
     public List<Object[]> blockDecls() { return decls("block"); }
@@ -227,7 +233,12 @@ public final class ModRuntime {
             fn = new Callable() {
                 public Object call(Interp in, List<Object> args, int line) {
                     List<Object> a = check(name, ps, args, line);
-                    return callNative(name, str, op, idx, sub, keys, ret, ps, a, line);
+                    Object r = callNative(name, str, op, idx, sub, keys, ret, ps, a, line);
+                    if (r instanceof Double && !carriers.isEmpty() && name.equals("player.item") && carriers.contains((int) (double) (Double) r)) {
+                        double[] st = host.nativeApi(op, new double[0], "");            // PLAYER_STATE: [.., item, itemData]
+                        if (st != null && st.length > 3) return itemCode((Double) r, st[3]);
+                    }
+                    return r;
                 }
             };
         } else if (impl.startsWith("java:")) {
@@ -408,6 +419,50 @@ public final class ModRuntime {
             }
             case "world.entities": return new ArrayList<Object>(entities);
             case "ui.toast": host.toast(Interp.str(a.get(0)), Interp.str(a.get(1))); return null;
+            // ---- host <-> players (libnova modnet.inc: nativeApiStr 1000 + op) ----
+            case "host.isMe": return "1".equals(host.nativeApiStr(1001, null, ""));
+            case "host.send":
+                return host.nativeApiStr(1002, null, netBody(modOf(in), a.get(0), a.get(1), line)) != null;
+            case "players.send":
+                return host.nativeApiStr(1003, null, netName(a.get(0)) + "\u001f" + netBody(modOf(in), a.get(1), a.get(2), line)) != null;
+            case "players.sendAll":
+                return host.nativeApiStr(1003, null, "*\u001f" + netBody(modOf(in), a.get(0), a.get(1), line)) != null;
+            case "players.list": {
+                String r = host.nativeApiStr(1004, null, "");
+                List<Object> l = new ArrayList<Object>();
+                if (r != null && !r.isEmpty()) for (String n : r.split("\u001f")) l.add(n);
+                return l;
+            }
+            case "players.hurt":
+                return host.nativeApiStr(1005, new double[]{Interp.num(a.get(1), line), Interp.num(a.get(2), line)}, netName(a.get(0))) != null;
+            case "players.heal":
+                return host.nativeApiStr(1006, new double[]{Interp.num(a.get(1), line)}, netName(a.get(0))) != null;
+            case "players.teleport":
+                return host.nativeApiStr(1007, new double[]{Interp.num(a.get(1), line), Interp.num(a.get(2), line), Interp.num(a.get(3), line)}, netName(a.get(0))) != null;
+            case "players.give": {
+                int[] ia = idAux(a.get(1), line);
+                return host.nativeApiStr(1008, new double[]{ia[0], Interp.num(a.get(2), line), ia[1]}, netName(a.get(0))) != null;
+            }
+            case "player.name": { String r = host.nativeApiStr(1011, null, ""); return r == null ? "" : r; }
+            case "player.give": {                           // the host's own player (single player too)
+                String me = host.nativeApiStr(1011, null, "");
+                if (me == null || !"1".equals(host.nativeApiStr(1001, null, ""))) return false;
+                int[] ia = idAux(a.get(0), line);
+                return host.nativeApiStr(1008, new double[]{ia[0], Interp.num(a.get(1), line), ia[1]}, me) != null;
+            }
+            case "players.pos": case "players.health": {
+                String r = host.nativeApiStr(1009, null, netName(a.get(0)));
+                boolean pos = j.equals("players.pos");
+                if (r == null) return pos ? null : (Object) (-1.0);
+                String[] q = r.split("\u001f");
+                if (q.length < 4) return pos ? null : (Object) (-1.0);
+                if (!pos) return Double.parseDouble(q[3]);
+                Map<String, Object> v = new LinkedHashMap<String, Object>();
+                v.put("x", Double.parseDouble(q[0]) / 100); v.put("y", Double.parseDouble(q[1]) / 100); v.put("z", Double.parseDouble(q[2]) / 100);
+                return v;
+            }
+            case "players.tell":
+                return host.nativeApiStr(1010, null, netName(a.get(0)) + "\u001f" + Interp.str(a.get(1)).replace('\u001f', ' ')) != null;
             case "recipe.shaped": {              // -> native recipes.inc (put back after the game refills its book)
                 int[] res = idAux(a.get(0), line);
                 StringBuilder sb = new StringBuilder();
@@ -624,14 +679,31 @@ public final class ModRuntime {
             }
         }
 
+        if (!carriers.isEmpty() && e.get("item") instanceof Double && carriers.contains((int) (double) (Double) e.get("item"))) {
+            Object dv = e.get("itemData");                  // items by data: e.item is the same number scripts know them by
+            double data = dv instanceof Double ? (Double) dv : 0;
+            if (dv == null) {
+                double[] st = host.nativeApi(ApiOps.PLAYER_STATE, new double[0], "");
+                if (st != null && st.length > 3) data = st[3];
+            }
+            e.put("item", itemCode((Double) e.get("item"), data));
+        }
         e.put("name", name);
         if (ApiTable.EVENTS[ev - 1][2].equals("yes")) {
             e.put("cancel", new Callable() {
                 public Object call(Interp in, List<Object> args, int line) { cancel[0] = true; return null; }
             });
         }
+        String onlyMod = null;                          // host.receive / client.receive: for one mod, data is a value
+        if (name.equals("host.receive") || name.equals("client.receive")) {
+            onlyMod = String.valueOf(e.remove("mod"));
+            Object d = e.get("data");
+            try { e.put("data", d == null || "".equals(d) ? null : Json.read(String.valueOf(d))); }
+            catch (Exception bad) { return 0; }
+        }
         for (final Mod m : mods) {
             if (m.prog == null) continue;
+            if (onlyMod != null && !onlyMod.equals(m.id)) continue;
             for (final OnEvent h : m.prog.events) {
                 if (!h.event.equals(name)) continue;
                 final Map<String, Object> ee = e;
@@ -686,4 +758,13 @@ public final class ModRuntime {
         if (n <= 0 || n >= 512) throw new ScriptError("рецепт: нет предмета " + Interp.str(id), line);
         return new int[]{n, a};
     }
+
+    /** a mod message on the wire: mod 0x1f channel 0x1f JSON (the receiver's mod with the same id gets it) */
+    private String netBody(Mod m, Object channel, Object data, int line) {
+        String ch = Interp.str(channel).replace('\u001f', ' ');
+        String js = Json.write(Json.copy(data, line));
+        if (js.length() > 4000) throw new ScriptError("сообщение слишком большое (" + js.length() + " > 4000 символов): дели на части", line);
+        return m.id + "\u001f" + ch + "\u001f" + js;
+    }
+    private static String netName(Object player) { return Interp.str(player).replace('\u001f', ' '); }
 }

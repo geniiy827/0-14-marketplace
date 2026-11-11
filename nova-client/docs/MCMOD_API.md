@@ -41,6 +41,13 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `entity.scale(e:num)` | num | в работе | Размер (1 = обычный) |
 | `entity.setScale(e:num, s:num)` | - | в работе | Изменить размер (0.05..16): хитбокс, глаза, шаг, прыжок, скорость, модель — всё вместе |
 
+## host
+
+| функция | возвращает | статус | описание |
+|---|---|---|---|
+| `host.isMe()` | bool | в работе | true, если этот игрок — хост мира (и в одиночной игре) |
+| `host.send(channel:str, data:any=null)` | bool | в работе | Отправить хосту сообщение мода: у хоста сработает on host.receive(e). data — число, строка, список или {..} |
+
 ## item
 
 | функция | возвращает | статус | описание |
@@ -110,6 +117,23 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `player.item()` | num | в работе | Номер предмета в руке (0 — пусто) |
 | `player.itemData()` | num | в работе | Данные (aux) предмета в руке |
 | `player.target()` | map | в работе | Куда смотрит игрок: kind 0 — блок (x y z face), 1 — сущность (entity), -1 — ничего |
+| `player.give(item:any, count:num=1)` | bool | в работе | Дать себе предмет (в одиночной игре и хосту; гостю в чужом мире — false: выдаёт хост через players.give) |
+| `player.name()` | str | в работе | Имя игрока |
+
+## players
+
+| функция | возвращает | статус | описание |
+|---|---|---|---|
+| `players.send(player:str, channel:str, data:any=null)` | bool | в работе | ХОСТ: отправить игроку (по имени): у него сработает on client.receive(e) |
+| `players.sendAll(channel:str, data:any=null)` | bool | в работе | ХОСТ: отправить всем игрокам (и себе) |
+| `players.list()` | list | в работе | ХОСТ: имена игроков в мире |
+| `players.hurt(player:str, amount:num, cause:num=0)` | bool | в работе | ХОСТ: нанести игроку урон (половинки сердца). cause — причина: 0 обычный, 16 голод |
+| `players.heal(player:str, amount:num)` | bool | в работе | ХОСТ: вылечить игрока |
+| `players.teleport(player:str, x:num, y:num, z:num)` | bool | в работе | ХОСТ: переместить игрока (y — ноги) |
+| `players.give(player:str, item:any, count:num=1)` | bool | в работе | ХОСТ: дать игроку предмет (падает ему под ноги и подбирается) |
+| `players.pos(player:str)` | any | в работе | ХОСТ: позиция игрока {x, y, z} или null |
+| `players.health(player:str)` | num | в работе | ХОСТ: здоровье игрока (половинки сердца), -1 если нет такого |
+| `players.tell(player:str, text:str)` | bool | в работе | ХОСТ: строка в чат одному игроку |
 
 ## recipe
 
@@ -176,3 +200,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `on entity.attack(e)` | target,type,item | да | в работе | Игрок ударил сущность (e.target — её номер, e.type — тип). e.cancel() — без удара |
 | `on entity.use(e)` | target,type,item | да | в работе | Игрок тапнул по сущности (сесть в лодку, покормить...). e.cancel() — отменить |
 | `on action(e)` | item | - | в работе | Нажата своя кнопка действия (ui.action или action у предмета мода); e.item — предмет в руке |
+| `on host.receive(e)` | $mod,$channel,$player,$data | - | в работе | У ХОСТА: игрок прислал сообщение мода (host.send). e.player — имя игрока, e.channel, e.data |
+| `on client.receive(e)` | $mod,$channel,$data | - | в работе | У ИГРОКА: хост прислал сообщение мода (players.send / players.sendAll). e.channel, e.data |
+| `on players.join(e)` | $player | - | в работе | У ХОСТА: игрок вошёл в мир (e.player — имя) |
+| `on players.leave(e)` | $player | - | в работе | У ХОСТА: игрок вышел (e.player — имя) |

@@ -14,3 +14,5 @@ player.onGround	-	bool	native:PLAYER_STATE#1	wip	Игрок стоит на зе
 player.item	-	num	native:PLAYER_STATE#2	wip	Номер предмета в руке (0 — пусто)
 player.itemData	-	num	native:PLAYER_STATE#3	wip	Данные (aux) предмета в руке
 player.target	-	map	native:PLAYER_TARGET:kind,x,y,z,face,entity	wip	Куда смотрит игрок: kind 0 — блок (x y z face), 1 — сущность (entity), -1 — ничего
+player.give	item:any, count:num=1	bool	java:player.give	wip	Дать себе предмет (в одиночной игре и хосту; гостю в чужом мире — false: выдаёт хост через players.give)
+player.name	-	str	java:player.name	wip	Имя игрока

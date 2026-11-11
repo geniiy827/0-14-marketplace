@@ -252,15 +252,18 @@ public final class ModBridge {
             StringBuilder b = items.get(tkey);
             if (b == null) { b = new StringBuilder(); items.put(tkey, b); title.put(tkey, tname); }
             java.util.List<Integer> vs = (Boolean) e[1] ? null : mi.variants.get(key);
-            if (vs == null) { if (b.length() > 0) b.append(','); b.append(id.intValue()); }
+            long code = (long) (double) id;                   // an item by data: number + 65536 * data
+            String one = (code & 0xffff) + (code >= 65536 ? ":" + (code >> 16) : "");
+            if (vs == null) { if (b.length() > 0) b.append(','); b.append(one); }
             else for (int v : vs) { if (b.length() > 0) b.append(','); b.append(id.intValue()).append(':').append(v); }
-            if (!icon.containsKey(tkey) || Boolean.TRUE.equals(p.get("tabIcon"))) icon.put(tkey, String.valueOf(id.intValue()));
+            if (!icon.containsKey(tkey) || Boolean.TRUE.equals(p.get("tabIcon")))
+                icon.put(tkey, (code & 0xffff) + "\u001f" + (code >> 16));
         }
         StringBuilder out = new StringBuilder();
         for (java.util.Map.Entry<String, StringBuilder> en : items.entrySet()) {
             if (out.length() > 0) out.append('\u001e');
             out.append(title.get(en.getKey()).replace('\u001f', ' ').replace('\u001e', ' '))
-               .append('\u001f').append(icon.get(en.getKey())).append("\u001f0\u001f").append(en.getValue());
+               .append('\u001f').append(icon.get(en.getKey())).append('\u001f').append(en.getValue());
         }
         return out.toString();
     }

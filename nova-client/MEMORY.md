@@ -238,3 +238,20 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   Player::canUseCarriedItemWhileMoving (лук модов) и BucketItem::use/useOn/useTimeDepleted (ведро модов).
   Имя ведра по содержимому: vtable-копия, слот 40, имена кадров (aux 1000+k).
 - Не сделано: встроенные чары луков Simple Ores (Сила II, у оникса Горение).
+
+## alpha33 (Opus/Fable, ноябрь 2026)
+- modnet.inc: связь хост<->игроки через TextPacket игры. Игрок->хост: type 1 "/nv!mod\x1fchan\x1fjson" (хук
+  ServerNetworkHandler::handle(TextPacket) забирает, игрок по guid _getPlayer); хост->игрок: type 0 "\x02nv!..." через
+  PacketSender слот 3 send(guid=Player+0xd08, packet); хук ClientNetworkHandler::handle(TextPacket). Хост = !Level::isClientSide.
+  nativeApiStr(1000+op). Свой канал "nova": tp (движение - клиентское в 0.14). Ограничение 60 сообщений/с.
+  События host.receive/client.receive (только моду с тем же id, data - JSON), players.join/leave (onReady_ClientGeneration / onDisconnect).
+  API host.*, players.*, player.give/name. Adventure Craft: урон обезвоживания наносит хост.
+- Простые предметы упаковываются в "items_N" носители (ModItems.packPlain), rt.carriers: player.item()/события дают id+65536*data.
+  mvars до 4096, поиск по индексу mv_first/mv_n.
+- Вкладки: выбор первой вкладки через TabComponent::selectTab(VisualTree) (компоненты UIControl +0x4c маска, +0x50 массив),
+  после смены видимости VisualTree(+0x50 ScreenView)+8 |= 7 (setDirty) - хуки ScreenView::setupAndRender/render ловят ScreenView.
+- Дверь: верх/низ - текстура "edge:" (столбцы 13..15 нижней половины, размноженные).
+- Ножницы модов: Item::mShears подменяется в Sheep/MushroomCow/SnowGolem и playerDestroy листвы/травы/лиан.
+- Луки: хук EnchantUtils::getEnchantLevel (19 сила, 21 огонь, 22 бесконечность) по power/flame/infinity.
+- tools/check_mods.sh: прогон всех примеров модов на ПК (mcmod/test/ModCheck.java), build_java.sh падает при ошибке javac.
+- Медная руда без drop (в моде нет сырой меди), оловянная -> raw_tin.

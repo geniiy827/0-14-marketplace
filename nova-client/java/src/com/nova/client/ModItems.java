@@ -76,6 +76,46 @@ final class ModItems {
 
     boolean hasAtlasStrip() { return !extras.isEmpty(); }
 
+    /** The game has 512 item numbers and about 80 are free. Plain items (a picture and a name: no tool, armor, durability,
+     *  action button, own stack size) do not need a number each: all plain items of a mod share one number and differ by
+     *  data, like dyes - so a mod can have thousands. Scripts do not notice: the item's name is number + 65536 * data,
+     *  and player.item(), events, recipes, drops, tabs speak the same. pack: false keeps an item on its own number. */
+    private List<Object[]> packPlain(List<Object[]> decls) {
+        List<Object[]> out = new ArrayList<Object[]>();
+        Map<String, Object[]> carrier = new java.util.LinkedHashMap<String, Object[]>();
+        for (Object[] d : decls) {
+            if (!(d[2] instanceof Map)) { out.add(d); continue; }
+            Map<?, ?> p = (Map<?, ?>) d[2];
+            boolean plain = p.get("variants") == null && p.get("tool") == null && p.get("armor") == null && p.get("type") == null
+                    && p.get("durability") == null && p.get("action") == null && p.get("hand") == null && p.get("stack") == null
+                    && p.get("frames") == null && p.get("size") == null && p.get("tabIcon") == null && p.get("category") == null
+                    && !Boolean.FALSE.equals(p.get("pack")) && p.get("texture") != null;
+            if (!plain) { out.add(d); continue; }
+            ModRuntime.Mod m = (ModRuntime.Mod) d[0];
+            String tab = p.get("tab") == null ? "" : String.valueOf(p.get("tab"));
+            String ck = m.id + "\u0000" + tab;
+            Object[] c = carrier.get(ck);
+            if (c == null || ((List<?>) ((Map<?, ?>) c[2]).get("variants")).size() >= MAX_VARIANTS) {
+                Map<String, Object> cp = new java.util.LinkedHashMap<String, Object>();
+                cp.put("variants", new ArrayList<Object>());
+                if (p.get("tab") != null) cp.put("tab", p.get("tab"));
+                int n = 0;
+                for (Object[] o : out) if (o[0] == m && String.valueOf(o[1]).startsWith("items_")) n++;
+                c = new Object[]{m, "items_" + n, cp, d[3]};
+                carrier.put(ck, c);
+                out.add(c);                                   // where the first plain item stood (order in the tab)
+            }
+            Map<String, Object> v = new java.util.LinkedHashMap<String, Object>();
+            v.put("name", d[1]);
+            v.put("title", p.get("name") == null ? d[1] : p.get("name"));
+            v.put("texture", p.get("texture"));
+            @SuppressWarnings("unchecked") List<Object> vs = (List<Object>) ((Map<?, ?>) c[2]).get("variants");
+            vs.add(v);
+        }
+        return out;
+    }
+    static final int MAX_VARIANTS = 1024;
+
     void prepare(Map<String, File> dirs) {
         try {
             layout = new JSONObject(new String(readAsset("textures/items.layout.json"), "UTF-8"));
@@ -86,7 +126,7 @@ final class ModItems {
         java.util.Set<Integer> used = new java.util.HashSet<Integer>();
         List<Double> out = new ArrayList<Double>();
         StringBuilder nm = new StringBuilder(), ac = new StringBuilder();
-        for (Object[] d : rt.decls("item")) {
+        for (Object[] d : packPlain(rt.decls("item"))) {
             ModRuntime.Mod m = (ModRuntime.Mod) d[0];
             String name = (String) d[1];
             int line = (Integer) d[3];
@@ -154,6 +194,11 @@ final class ModItems {
                     }
                 }
                 Map<?, ?> tier = p.get("tier") instanceof Map ? (Map<?, ?>) p.get("tier") : new HashMap<String, Object>();
+                if (kind == 11) {                              // a bow's built-in enchantments
+                    Map<String, Object> bt = new HashMap<String, Object>();
+                    bt.put("level", num(p.get("power"), 0)); bt.put("damage", Boolean.TRUE.equals(p.get("flame")) ? 1.0 : 0.0);
+                    bt.put("enchant", num(p.get("infinity"), 0)); tier = bt;
+                }
                 double tLevel = kind == 13 ? doorBlock : num(tier.get("level"), 1), tUses = num(tier.get("uses"), kind >= 10 && p.get("durability") instanceof Double ? (Double) p.get("durability") : 250), tSpeed = num(tier.get("speed"), 6),
                        tDamage = num(tier.get("damage"), 2), tEnch = num(tier.get("enchant"), 10);
                 double aDef = 0, aMul = 0, aIdx = -1;
@@ -201,7 +246,7 @@ final class ModItems {
                 ids.put(name.toLowerCase(Locale.US), (double) id);
                 if (vars != null) {                          // one number, many items by data (like dyes): name = id + 65536 * data
                     List<Integer> auxes = new ArrayList<Integer>();
-                    for (int v = 0; v < vars.size() && v < 64; v++) {
+                    for (int v = 0; v < vars.size() && v < MAX_VARIANTS; v++) {
                         if (!(vars.get(v) instanceof Map)) throw new Exception("variants: список {name: .., title: .., texture: ..}");
                         Map<?, ?> vm = (Map<?, ?>) vars.get(v);
                         String vn = String.valueOf(vm.get("name"));
@@ -218,6 +263,7 @@ final class ModItems {
                         auxes.add(v);
                     }
                     variants.put(key, auxes);
+                    rt.carriers.add(id);
                 }
                 count++;
             } catch (Exception e) {

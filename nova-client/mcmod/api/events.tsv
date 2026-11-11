@@ -11,3 +11,7 @@ item.use	item,itemData	yes	wip	Игрок использует предмет в
 entity.attack	target,type,item	yes	wip	Игрок ударил сущность (e.target — её номер, e.type — тип). e.cancel() — без удара
 entity.use	target,type,item	yes	wip	Игрок тапнул по сущности (сесть в лодку, покормить...). e.cancel() — отменить
 action	item	no	wip	Нажата своя кнопка действия (ui.action или action у предмета мода); e.item — предмет в руке
+host.receive	$mod,$channel,$player,$data	no	wip	У ХОСТА: игрок прислал сообщение мода (host.send). e.player — имя игрока, e.channel, e.data
+client.receive	$mod,$channel,$data	no	wip	У ИГРОКА: хост прислал сообщение мода (players.send / players.sendAll). e.channel, e.data
+players.join	$player	no	wip	У ХОСТА: игрок вошёл в мир (e.player — имя)
+players.leave	$player	no	wip	У ХОСТА: игрок вышел (e.player — имя)

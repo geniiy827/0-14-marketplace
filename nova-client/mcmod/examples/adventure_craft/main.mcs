@@ -120,10 +120,10 @@ var key = ""                      // сохранение: отдельно дл
 var hudKey = ""
 var act = ""
 var tickN = 0
-var dmg = null                    // EntityDamageSource «голод» (как у игры)
 var active = true                 // жажда работает (не в творческом)
 var lastHp = -1
-var selfHurt = false
+var selfHurt = 0                  // тиков ждём урон от обезвоживания (его наносит хост)
+var lastAsk = {}                  // у хоста: когда игрок последний раз получал этот урон
 
 fn juices() {
     JUICES[str(juice_apple)] = [8, 6.4]
@@ -192,7 +192,7 @@ fn useOne() {                     // минус один предмет из р�
     }
 }
 
-fn give(id, count, aux = 0) {
+fn give(id, count, aux = 0) {      // себе в инвентарь (игра сама сообщает хосту об изменении слотов)
     var it = mem.alloc(64)
     mc.call("ItemInstance::ItemInstance(int, int, int)", it, id, count, aux)
     mc.call("Inventory::add(ItemInstance&, bool)", inventory(), it, true)
@@ -304,11 +304,24 @@ on world.join(e) {
     }
     lastPos = null
     lastHp = -1
+    selfHurt = 0
     hudKey = ""
     act = ""
-    dmg = null
     recipes()
 }
+
+// ================================================================ хост: урон от обезвоживания игрокам
+// Жажду каждый игрок считает у себя, а здоровье в мире общее и его ведёт хост: игрок присылает "dehydrate",
+// хост проверяет сложность, здоровье и частоту (не чаще раза в 3 секунды) и наносит урон «от голода» (причина 16).
+on host.receive(e) {
+    if e.channel != "dehydrate" { return }
+    if lastAsk.has(e.player) and tickN - lastAsk[e.player] < 60 { return }
+    lastAsk[e.player] = tickN
+    var hp = players.health(e.player)
+    if difficulty() != 0 and hp > 0 and healthAboveDifficulty(hp) { players.hurt(e.player, 1, 16) }
+}
+
+on players.leave(e) { lastAsk.remove(e.player) }
 
 on world.leave(e) {
     save()
@@ -396,25 +409,20 @@ on tick(e) {
     // урон усиливает жажду (onLivingHurt), кроме самого обезвоживания
     var hp = mc.calli("Mob::getHealth() const", p)
     if lastHp >= 0 and hp < lastHp {
-        if not selfHurt { ex += EX_HURT }
+        if selfHurt <= 0 { ex += EX_HURT }
+        else { ui.tip("§cОбезвоживание!") }
     }
     lastHp = hp
-    selfHurt = false
+    if selfHurt > 0 { selfHurt -= 1 }
 
     // обезвоживание: урон раз в 4 с; мирная - нет, лёгкая - до 5 сердец, нормальная - до половинки, сложная - насмерть
     if thirst <= 0 {
         hurtTimer += 1
         if hurtTimer >= HURT_EVERY {
             hurtTimer = 0
-            if difficulty() != 0 and healthAboveDifficulty(hp) {
-                if dmg == null {
-                    dmg = mem.alloc(32)
-                    mc.call("EntityDamageSource::EntityDamageSource(EntityDamageCause)", dmg, 16)
-                }
-                selfHurt = true
-                mc.callAt(mem.ptr(mem.ptr(p), 0x108), p, dmg, 1)        // Entity::hurt (слот 66 vtable)
-                ui.tip("§cОбезвоживание!")
-            }
+            // урон наносит хост мира (у гостя свой урон не засчитался бы): просим его; в одиночной игре хост - мы сами
+            selfHurt = 40
+            host.send("dehydrate")
         }
     } else {
         hurtTimer = 0

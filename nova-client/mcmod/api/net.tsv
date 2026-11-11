@@ -1,0 +1,13 @@
+# host.* / players.* — связь хоста и игроков. Моды работают у каждого игрока сами по себе; хост — тот, чей это мир (в одиночной игре хост — ты). Всё, что должно быть одинаково у всех или что решает сервер (урон, выдача предметов), делает хост.
+host.isMe	-	bool	java:host.isMe	wip	true, если этот игрок — хост мира (и в одиночной игре)
+host.send	channel:str, data:any=null	bool	java:host.send	wip	Отправить хосту сообщение мода: у хоста сработает on host.receive(e). data — число, строка, список или {..}
+players.send	player:str, channel:str, data:any=null	bool	java:players.send	wip	ХОСТ: отправить игроку (по имени): у него сработает on client.receive(e)
+players.sendAll	channel:str, data:any=null	bool	java:players.sendAll	wip	ХОСТ: отправить всем игрокам (и себе)
+players.list	-	list	java:players.list	wip	ХОСТ: имена игроков в мире
+players.hurt	player:str, amount:num, cause:num=0	bool	java:players.hurt	wip	ХОСТ: нанести игроку урон (половинки сердца). cause — причина: 0 обычный, 16 голод
+players.heal	player:str, amount:num	bool	java:players.heal	wip	ХОСТ: вылечить игрока
+players.teleport	player:str, x:num, y:num, z:num	bool	java:players.teleport	wip	ХОСТ: переместить игрока (y — ноги)
+players.give	player:str, item:any, count:num=1	bool	java:players.give	wip	ХОСТ: дать игроку предмет (падает ему под ноги и подбирается)
+players.pos	player:str	any	java:players.pos	wip	ХОСТ: позиция игрока {x, y, z} или null
+players.health	player:str	num	java:players.health	wip	ХОСТ: здоровье игрока (половинки сердца), -1 если нет такого
+players.tell	player:str, text:str	bool	java:players.tell	wip	ХОСТ: строка в чат одному игроку

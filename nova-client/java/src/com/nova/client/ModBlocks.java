@@ -207,7 +207,8 @@ final class ModBlocks {
                         Map<?, ?> tx = (Map<?, ?>) ((Map<String, Object>) d[2]).get("textures");
                         if (tx == null || tx.get("lower") == null || tx.get("upper") == null) throw new Exception("door: textures: {lower: .., upper: ..}");
                         t0 = atlasName(m.id, dir, String.valueOf(tx.get("lower")));
-                        t1 = atlasName(m.id, dir, String.valueOf(tx.get("upper")));
+                        t1 = atlasName(m.id, dir, String.valueOf(tx.get("upper")))
+                           + "|" + atlasName(m.id, dir, "edge:" + tx.get("lower"));
                         if (p.get("item") != null) doors.add(new Object[]{specData.size() + 3, m, String.valueOf(p.get("item"))});
                     }
                     specData.add((double) id); specData.add((double) ti); specData.add(a); specData.add(b2);
@@ -398,12 +399,25 @@ final class ModBlocks {
         String key = (dir == null ? "" : dir.getPath()) + "|" + ref;
         int[] have = packed.get(key);
         if (have != null) return have;
-        if (png == null) png = find(dir, ref);
+        boolean edge = ref.startsWith("edge:");            // a door's top and bottom: its edge strip, tiled
+        if (png == null) png = find(dir, edge ? ref.substring(5) : ref);
         if (png == null) throw new Exception("нет картинки " + ref);
         BitmapFactory.Options op = new BitmapFactory.Options();
         op.inPremultiplied = false;
         Bitmap bm = BitmapFactory.decodeByteArray(png, 0, png.length, op);
         if (bm == null) throw new Exception("не удалось прочитать картинку " + ref);
+        if (edge) {
+            // the game draws the top of a door as a slice of a whole texture, and which slice depends on how the door
+            // stands; Java doors use columns 13..15 of the lower half there. Tile them: any slice is the door's edge.
+            int bw = bm.getWidth(), bh = bm.getHeight(), c0 = bw * 13 / 16, cn = Math.max(1, bw - c0);
+            Bitmap t = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);
+            for (int y = 0; y < bh; y++) for (int x = 0; x < bw; x++) {
+                int px = bm.getPixel(c0 + x % cn, y);
+                if ((px >>> 24) < 128) px = bm.getPixel(c0 + x % cn, bh - 1);          // no holes in an edge
+                t.setPixel(x, y, px | 0xff000000);
+            }
+            bm = t;
+        }
         int w = bm.getWidth(), h = bm.getHeight();
         if (w > 256 || h > 256) {
             double k = 256.0 / Math.max(w, h);

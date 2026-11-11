@@ -59,10 +59,7 @@ block emerald_lamp_lit {
     redstone: {type: "lamp_on", off: "emerald_lamp"}
 }
 
-// ---------------------------------------------------------------- крафты
-// Так рецепты добавляет сама игра (Recipes::_addFenceRecipes): vector<Recipes::Type> + Recipes::addShapedRecipe.
-// Recipes::Type = 32 байта: +0 Item*, +4 Block*, +8 ItemInstance (20 байт), +28 буква.
-var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+// ---------------------------------------------------------------- крафты (recipe.*: NOVA держит их в книге рецептов игры)
 var REDSTONE = 331
 var QUARTZ = 406
 var EMERALD = 388
@@ -70,30 +67,11 @@ var STONE = 1
 var GLOWSTONE = 89
 var LAMP = 123          // лампа игры
 
-fn stack(p, id, count) { mc.call("ItemInstance::ItemInstance(int, int, int)", p, id, count, 0) }
-
-// rows: 3 строки по 3 символа (пробел = пусто), keys: [["R", id], ...]
+// rows: строки по 3 символа (пробел = пусто), keys: [["R", id], ...]
 fn shaped(result, count, rows, keys) {
-    if type(result) != "number" { return }
-    var book = mc.call("Recipes::getInstance()")
-    var out = mem.alloc(20)
-    stack(out, result, count)
-    if mc.call("Recipes::getRecipeFor(ItemInstance const&)", book, out) != 0 { return }   // уже есть (второй вход в мир)
-    var n = keys.len()
-    var types = mem.alloc(n * 32)
-    var i = 0
-    while i < n {
-        var t = types + i * 32
-        stack(t + 8, keys[i][1], 1)
-        mem.setByte(t + 28, LETTERS.find(keys[i][0]) + 65)
-        i += 1
-    }
-    var vec = mem.alloc(12)
-    mem.setPtr(vec, types)
-    mem.setPtr(vec + 4, types + n * 32)
-    mem.setPtr(vec + 8, types + n * 32)
-    mc.call("Recipes::addShapedRecipe(ItemInstance const&, std::string const&, std::string const&, std::string const&, std::vector<Recipes::Type, std::allocator<Recipes::Type> > const&)",
-            book, out, rows[0], rows[1], rows[2], vec)
+    var k = {}
+    for p in keys { k[p[0]] = p[1] }
+    recipe.shaped(result, rows, k, count)
 }
 
 on world.join(e) {
@@ -106,10 +84,7 @@ on world.join(e) {
 
 // ---------------------------------------------------------------- /redstone: выдать всё
 fn give(id, count) {
-    if type(id) != "number" { ui.tip("§cне зарегистрирован: {id}"); return }
-    var it = mem.alloc(64)
-    stack(it, id, count)
-    mc.call("Inventory::add(ItemInstance&, bool)", mem.ptr(mc.player(), 0xda0), it, true)
+    if not player.give(id, count) { ui.tip("§cвыдавать может только хост мира") }
 }
 
 on chat(e) {

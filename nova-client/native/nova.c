@@ -1143,6 +1143,7 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "hud.inc"
 #include "creative.inc"
 #include "recipes.inc"
+#include "modnet.inc"
 
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
@@ -1172,6 +1173,7 @@ __attribute__((constructor)) static void nova_init(void) {
     hud_init(mc);
     creative_init(mc);
     recipes_init(mc);
+    modnet_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }

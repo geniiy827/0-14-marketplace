@@ -21,10 +21,11 @@ typedef struct {
     char name[64], action[64];
     void *item;
 } ModItem;
-#define MV_MAX 256
+#define MV_MAX 4096
 typedef struct { int id, aux; TexSet tex; char name[64]; } MVar;
 static MVar mvars[MV_MAX];
 static int mvar_count;
+static int mv_indexed;
 static ModItem mitems[MI_MAX];
 static int mitem_count, mitems_done, mitem_registered;
 static ModItem *mitem_of[512];
@@ -356,7 +357,7 @@ int Java_com_nova_client_ModBridge_nativeItemVariants(void **env, void *cls, voi
     int n = ((int (*)(void *, void *))f[171])(env, darr);
     double *d = f_new(n * 8 + 8);
     ((void (*)(void *, void *, int, int, double *))f[206])(env, darr, 0, n, d);
-    static char names[8192];
+    static char names[MV_MAX * 40];
     jstr_copy(env, jnames, names, sizeof names);
     char *np = names;
     mvar_count = 0;
@@ -369,14 +370,29 @@ int Java_com_nova_client_ModBridge_nativeItemVariants(void **env, void *cls, voi
         v->name[k] = 0;
         if (*np == '\x1f') np++;
     }
+    mv_indexed = 0;
     return mvar_count;
 }
 
+/* the variants of an item stand together, data 0, 1, 2...: found by index (thousands of items by data are fine) */
+static short mv_first[512], mv_n[512];
+static void mv_index(void) {
+    for (int i = 0; i < 512; i++) { mv_first[i] = -1; mv_n[i] = 0; }
+    for (int i = 0; i < mvar_count; i++) {
+        int id = mvars[i].id;
+        if (id < 0 || id >= 512 || mvars[i].aux >= 1000) continue;
+        if (mv_first[id] < 0) mv_first[id] = (short)i;
+        mv_n[id]++;
+    }
+    mv_indexed = 1;
+}
 static MVar *mv_find(int id, int aux) {
-    MVar *first = 0;
-    for (int i = 0; i < mvar_count; i++)
-        if (mvars[i].id == id) { if (mvars[i].aux == aux) return &mvars[i]; if (!first) first = &mvars[i]; }
-    return first;
+    if (!mv_indexed) mv_index();
+    if (id < 0 || id >= 512 || mv_first[id] < 0) return 0;
+    MVar *v = &mvars[mv_first[id]];
+    if (aux >= 0 && aux < mv_n[id] && v[aux].id == id && v[aux].aux == aux) return v + aux;
+    for (int i = 0; i < mv_n[id]; i++) if (v[i].id == id && v[i].aux == aux) return v + i;
+    return v;
 }
 static void *mv_get_icon(char *it, int aux, int frame, int inv) {
     MVar *v = mv_find(*(unsigned short *)(it + 0x12), aux);
@@ -387,7 +403,7 @@ static void *mv_desc(void *out, char *it, char *ii) {
     gstr(out, v ? v->name : "?");
     return out;
 }
-static int mv_has(int id) { for (int i = 0; i < mvar_count; i++) if (mvars[i].id == id && mvars[i].aux < 1000) return 1; return 0; }
+static int mv_has(int id) { if (!mv_indexed) mv_index(); return id >= 0 && id < 512 && mv_first[id] >= 0; }
 
 static void mv_setup(char *it) {
     if (!mv_vtable) {
@@ -467,7 +483,51 @@ static void *mi_bucket_desc(void *out, char *it, char *ii) {
     gstr(out, v ? v->name : "?");
     return out;
 }
+/* shears of mods: sheep, mooshrooms, snow golems, leaves, grass, vines check Item::mShears by pointer */
+static void **mi_mshears;
+static u64 hc_shears_w1(u32 orig, u32 *w) {        /* X(this, Player&/Player*, ...) */
+    void *it = mi_hand((void *)w[1]);
+    return mi_mshears && mi_kind_of(it) == 10 ? mi_with(mi_mshears, it, orig, w) : nh_callw(orig, w);
+}
+static u64 hc_shears_w2(u32 orig, u32 *w) {        /* std::string getInteractText(sret, this, Player&) */
+    void *it = mi_hand((void *)w[2]);
+    return mi_mshears && mi_kind_of(it) == 10 ? mi_with(mi_mshears, it, orig, w) : nh_callw(orig, w);
+}
+/* bows of mods with built-in enchantments (item "power", "flame", "infinity" chance in %), as Simple Ores' bows:
+ * EnchantUtils::getEnchantLevel(type, ItemInstance const&) answers for them; 19 power, 21 flame, 22 infinity */
+static u32 mi_seed = 12345;
+static u64 hc_enchant_level(u32 orig, u32 *w) {
+    u64 r = nh_callw(orig, w);
+    char *ii = (char *)w[1];
+    void *it = ii ? *(void **)(ii + 0xc) : 0;
+    if (mi_kind_of(it) != 11) return r;
+    ModItem *m = mitem_of[*(unsigned short *)((char *)it + 0x12)];
+    int type = (int)w[0], lv = (int)r;
+    if (type == 19 && m->level > lv) lv = m->level;
+    if (type == 21 && m->damage > lv) lv = 1;
+    if (type == 22 && m->ench > 0 && lv == 0) {
+        mi_seed = mi_seed * 1103515245u + 12345u;
+        if ((int)((mi_seed >> 16) % 100) < m->ench) lv = 1;
+    }
+    return (u32)lv;
+}
 static void bowbucket_init(void *mc) {
+    mi_mshears = dlsym(mc, "_ZN4Item7mShearsE");
+    const char *sh1[10] = {"_ZN11MushroomCow15canInteractWithER6Player", "_ZN11MushroomCow18interactWithPlayerER6Player",
+        "_ZN5Sheep15canInteractWithER6Player", "_ZN9SnowGolem15canInteractWithER6Player", "_ZN5Sheep18interactWithPlayerER6Player",
+        "_ZN9SnowGolem18interactWithPlayerER6Player", "_ZN8DeadBush13playerDestroyEP6PlayerRK8BlockPosi",
+        "_ZN9LeafBlock13playerDestroyEP6PlayerRK8BlockPosi", "_ZN9TallGrass13playerDestroyEP6PlayerRK8BlockPosi",
+        "_ZN9VineBlock13playerDestroyEP6PlayerRK8BlockPosi"};
+    const char *sh1b[3] = {"_ZN16DoublePlantBlock13playerDestroyEP6PlayerRK8BlockPosi",
+        "_ZN16DoublePlantBlock17playerWillDestroyER6PlayerRK8BlockPosi", "_ZN13TripWireBlock17playerWillDestroyER6PlayerRK8BlockPosi"};
+    const char *sh2[3] = {"_ZN11MushroomCow15getInteractTextER6Player", "_ZN9SnowGolem15getInteractTextER6Player", "_ZN5Sheep15getInteractTextER6Player"};
+    if (mi_mshears) {
+        for (int i = 0; i < 10; i++) { void *a = dlsym(mc, sh1[i]); if (a) nh_hook_c((u32)a, hc_shears_w1); }
+        for (int i = 0; i < 3; i++) { void *a = dlsym(mc, sh1b[i]); if (a) nh_hook_c((u32)a, hc_shears_w1); }
+        for (int i = 0; i < 3; i++) { void *a = dlsym(mc, sh2[i]); if (a) nh_hook_c((u32)a, hc_shears_w2); }
+    }
+    void *el = dlsym(mc, "_ZN12EnchantUtils15getEnchantLevelEiRK12ItemInstance");
+    if (el) nh_hook_c((u32)el, hc_enchant_level);
     mi_mbow = dlsym(mc, "_ZN4Item4mBowE");
     mi_mbucket = dlsym(mc, "_ZN4Item7mBucketE");
     mi_local_player = dlsym(mc, "_ZN15MinecraftClient14getLocalPlayerEv");

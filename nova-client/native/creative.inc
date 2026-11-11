@@ -119,11 +119,15 @@ static void ct_put(int i, int page) {
     ct_notify(m, before);
 }
 static void ct_hid_forget(void);
+static void (*ct_select_tab)(void *tabComponent, void *visualTree);
+static u32 *ct_tab_vt;
 static int ct_fix_tab;                                 /* after a page switch: leave a tab the page does not have */
+static int ct_dirty;
 static void ct_apply(int page) {
     for (int i = 0; i < 4; i++) ct_put(i, page);
     ct_page = page;
     ct_fix_tab = 1;
+    ct_dirty = 1;
 }
 
 static u64 hc_ct_add(u32 orig, u32 *w) {           /* ContainerManagerModel::_addContainer(this, shared_ptr<ContainerModel>) */
@@ -201,8 +205,9 @@ static char ct_hid_was[CT_HID];
 static int ct_hid_n;
 static float ct_block[4][4];                           /* rects of hidden tab buttons: taps there are swallowed */
 static int ct_block_n;
+static char *ct_view;                                  /* the ScreenView being drawn (setupAndRender); +0x50 VisualTree* */
 static void ct_vis(char *c, int on) {
-    int i;
+    int i, was = c[0x30] & 4;
     for (i = 0; i < ct_hid_n; i++) if (ct_hid[i] == c) break;
     if (!on) {
         if (i == ct_hid_n && ct_hid_n < CT_HID) { ct_hid[ct_hid_n] = c; ct_hid_was[ct_hid_n] = c[0x30] & 4; ct_hid_n++; }
@@ -211,11 +216,12 @@ static void ct_vis(char *c, int on) {
         c[0x30] = (char)((c[0x30] & ~4) | ct_hid_was[i]);
         ct_hid[i] = ct_hid[--ct_hid_n]; ct_hid_was[i] = ct_hid_was[ct_hid_n];
     }
+    if ((c[0x30] & 4) != was) ct_dirty = 1;
 }
 static void ct_hid_forget(void) { ct_hid_n = 0; ct_block_n = 0; }
 static const char *ct_panels[4] = {"creative_screen_building_blocks", "creative_screen_decorations",
                                    "creative_screen_tools", "creative_screen_miscellaneous"};
-static char *ct_panel[4];
+static char *ct_panel[4], *ct_tabctl[4];
 static void ct_tabs_walk(char *c, int depth, int in_tabs) {
     if (!c || depth > 24) return;
     char **it = *(char ***)(c + 0x40), **end = *(char ***)(c + 0x44);
@@ -228,8 +234,10 @@ static void ct_tabs_walk(char *c, int depth, int in_tabs) {
             if (k >= 0 && k < 4) ct_vis(c, ct_page == 0 || ct_tab(ct_page, k) != 0);
             continue;
         }
-        if (in_tabs && nm) for (int k = 0; k < 4; k++) if (streq(nm, ct_toggles[k])) {
+        /* the tab buttons (type "tab", 21 x 20, no picture of their own) */
+        if (nm && *(float *)(ch + 0x18) < 40.f) for (int k = 0; k < 4; k++) if (streq(nm, ct_toggles[k])) {
             int on = ct_page == 0 || ct_tab(ct_page, k) != 0;
+            ct_tabctl[k] = ch;
             ct_vis(ch, on);
             if (!on && ct_block_n < 4) {
                 float *r = ct_block[ct_block_n++];
@@ -272,17 +280,25 @@ static int ct_ui_render(void *client, char *cc) {
     if (b == 0) {                                          /* once per frame: tabs this page has */
         char *root = cc;
         for (int d = 0; d < 40; d++) { char *p = *(char **)(root + 0x38); if (!p) break; root = p; }
-        for (int k = 0; k < 4; k++) ct_panel[k] = 0;
+        for (int k = 0; k < 4; k++) { ct_panel[k] = 0; ct_tabctl[k] = 0; }
         ct_block_n = 0;
         ct_tabs_walk(root, 0, 0);
-        if (ct_fix_tab) {                                  /* the open tab is not on this page: show the first one */
+        char *tree = ct_view ? *(char **)(ct_view + 0x50) : 0;
+        if (ct_fix_tab) {                                  /* the open tab is not on this page: the game switches to the first */
             ct_fix_tab = 0;
+            ct_dirty = 1;
             for (int k = 1; k < 4; k++)
-                if (ct_panel[k] && (ct_panel[k][0x30] & 4) && ct_page > 0 && !ct_tab(ct_page, k) && ct_panel[0]) {
-                    ct_panel[k][0x30] &= ~4;                  /* the game's own tab switch shows them again */
-                    ct_panel[0][0x30] |= 4;
+                if (ct_panel[k] && (ct_panel[k][0x30] & 4) && ct_page > 0 && !ct_tab(ct_page, k) && ct_tabctl[0] && tree && ct_select_tab) {
+                    /* TabComponent of the first tab button: UIControl +0x4c component bits, +0x50 component pointers */
+                    u32 mask = *(u32 *)(ct_tabctl[0] + 0x4c), n = 0;
+                    void **comp = *(void ***)(ct_tabctl[0] + 0x50);
+                    for (u32 m = mask; m; m &= m - 1) n++;
+                    for (u32 j = 0; comp && j < n && j < 32; j++)
+                        if (comp[j] && *(u32 **)comp[j] == ct_tab_vt + 2) { ct_select_tab(comp[j], tree); break; }
+                    break;
                 }
         }
+        if (ct_dirty && tree) { *(u32 *)(tree + 8) |= 7; ct_dirty = 0; }   /* VisualTree::setDirty(true) */
     }
     ct_rect[b][0] = x; ct_rect[b][1] = y; ct_rect[b][2] = w; ct_rect[b][3] = h;
     ct_drawn_at = now_ms();
@@ -331,8 +347,21 @@ static int ct_touch(u32 *w, float scale) {
     return 0;
 }
 
+static u64 hc_ct_view(u32 orig, u32 *w) {          /* ScreenView::setupAndRender(this, UIScreenContext&) */
+    char *keep = ct_view;
+    ct_view = (char *)w[0];
+    u64 r = nh_callw(orig, w);
+    ct_view = keep;
+    return r;
+}
 static int patch_slot(u32 vt, int idx, void *fn, void **orig);
 static void creative_init(void *mc) {
+    ct_select_tab = dlsym(mc, "_ZN12TabComponent9selectTabER10VisualTree");
+    ct_tab_vt = dlsym(mc, "_ZTV12TabComponent");
+    void *sv = dlsym(mc, "_ZN10ScreenView14setupAndRenderER15UIScreenContext");
+    if (sv) nh_hook_c((u32)sv, hc_ct_view);
+    sv = dlsym(mc, "_ZN10ScreenView6renderER13ScreenContext");
+    if (sv) nh_hook_c((u32)sv, hc_ct_view);
     f_fontwidth = dlsym(mc, "_ZNK4Font13getLineLengthERKSsfb");
     ct_cname = dlsym(mc, "_ZNK14ContainerModel22getContainerStringNameEv");
     ct_changed = dlsym(mc, "_ZN14ContainerModel14_onItemChangedEi");

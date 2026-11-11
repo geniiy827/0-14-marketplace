@@ -82,9 +82,9 @@ static int mm_fire(int ev, const char *text, const double *a, int n) {
     if (((int (*)(void *, int))f[19])(env, 8) != 0) return 0;                      /* PushLocalFrame */
     void *js = 0;
     if (text) {
-        char buf[1024];
+        char buf[6144];                                   /* mod messages (host.receive) carry a payload */
         int k = 0;
-        while (text[k] && k < 1023) { buf[k] = text[k]; k++; }
+        while (text[k] && k < 6143) { buf[k] = text[k]; k++; }
         buf[k] = 0;
         mm_clean_utf(buf);
         js = ((void *(*)(void *, const char *))f[167])(env, buf);
@@ -207,7 +207,10 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     return arr;
 }
 
-void *Java_com_nova_client_ModBridge_nativeApiStr(void **env, void *cls, int op, void *darr, void *jstr) { return 0; }
+static void *net_api(void **env, int op, void *darr, void *jstr);
+void *Java_com_nova_client_ModBridge_nativeApiStr(void **env, void *cls, int op, void *darr, void *jstr) {
+    return op >= 1000 ? net_api(env, op - 1000, darr, jstr) : 0;          /* 1000+: host <-> players (modnet.inc) */
+}
 
 /* ---------------- mod blocks ----------------
  * nativeDefineBlocks(double[] data, String names): per block
@@ -234,7 +237,7 @@ typedef struct {
     int harvest, drop, dmin, dmax, xmin, xmax;            /* pickaxe level; drop item and count; experience */
     int ore_count, ore_size, ore_min, ore_max, ore_in;    /* world generation: veins per chunk, size, heights, replaces */
     int special, sp_base, sp_arg;                         /* the game's own block class: 1 stairs, 2 bars, 3 pressure plate, 4 door */
-    char sp_tex[2][64];                                   /* atlas names (terrain.meta entries NOVA adds for mod textures) */
+    char sp_tex[3][64];                                   /* atlas names (terrain.meta entries NOVA adds for mod textures) */
 } ModBlock;
 static int ct_has(int id);
 static ModBlock mblocks[MB_MAX];
@@ -475,8 +478,8 @@ int Java_com_nova_client_ModBridge_nativeBlockSpecial(void **env, void *cls, voi
     char *np = names;
     int done = 0;
     for (int p = 0; p + 4 <= n; p += 4) {
-        char t[2][64]; int k;
-        for (int j = 0; j < 2; j++) {
+        char t[3][64]; int k;
+        for (int j = 0; j < 3; j++) {
             k = 0;
             while (*np && *np != '|' && *np != '\x1e') { if (k < 63) t[j][k++] = *np; np++; }
             t[j][k] = 0;
@@ -509,7 +512,12 @@ static int mb_special(ModBlock *m, void *mat) {
         b = f_new(0xd0); memset(b, 0, 0xd0); mf_door_ctor(b, nm, m->id, mat, m->sp_base);   /* sp_base: DoorType */
         mf_texset(b + 0x9c, t0, 0);                           /* lower / upper half */
         mf_texset(b + 0xb4, t1, 0);
-        mf_texset(b + 0x10, t0, 0);                           /* top and bottom faces (getTexture: face 0/1 -> +0x10) */
+        if (m->sp_tex[2][0]) {                                /* top and bottom faces (getTexture: face 0/1 -> +0x10): the edge */
+            u32 t2[1];
+            gstr(t2, m->sp_tex[2]);
+            mf_texset(b + 0x10, t2, 0);
+            f_strdtor(t2);
+        }
         if (!mb_door_vt) {
             u32 *vp = *(u32 **)b;
             mb_door_vt = f_new(VT_BLOCK_WORDS * 4);
