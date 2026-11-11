@@ -1,0 +1,56 @@
+name: Build Wall Kickers Ultimate
+
+on:
+  push:
+    branches: [main]
+    paths: ['wkultimate/**', '.github/workflows/wkultimate.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wkultimate
+    steps:
+      - name: Refuse to run in a public repository
+        if: ${{ !github.event.repository.private }}
+        run: |
+          echo "::error::Repository is public. Make it private before building/publishing the modded game."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Python deps
+        run: pip install pillow
+
+      - name: Build APK
+        run: python3 build.py --preview
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WallKickersUltimate
+          path: |
+            wkultimate/out/*.apk
+            wkultimate/out/preview.png
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: wku-${{ github.run_number }}
+          name: Wall Kickers Ultimate ${{ github.run_number }}
+          files: wkultimate/out/*.apk
+          make_latest: false
