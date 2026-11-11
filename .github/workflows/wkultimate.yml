@@ -2,7 +2,7 @@ name: Build Wall Kickers Ultimate
 
 on:
   push:
-    branches: [main]
+    branches: [main, wkultimate]
     paths: ['wkultimate/**', '.github/workflows/wkultimate.yml']
   workflow_dispatch:
 
