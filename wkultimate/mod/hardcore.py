@@ -5,6 +5,7 @@
 * 'D' variants: spike-ball chunks with an extra ball in anti-phase (more saws)
 * the late-game ramp is kept, but late recipes lean on X/D variants
 Tune the numbers in CONFIG below.
+Z variants: saw/spike "grinder" on the outer face of the target wall (off the player path)
 T variants: same chunk, hazards phase-shifted so the natural arrival time is NOT safe
 """
 import copy, struct, random
@@ -17,6 +18,11 @@ CONFIG = dict(
     # phase by a fraction of its period -> you have to wait / rush / count the timing.
     timing_shifts=(0.25, 0.5),
     timing_share={'intro': 0.0, 'easy': 0.5, 'med': 0.65, 'hard': 0.8},
+    # Z variants ("grinder walls"): the target wall gets a spike strip and saws grinding up and
+    # down on its OUTER side.  The player only ever touches the inner face, so it is survivable,
+    # it just looks (and feels) awful.  Registered as clear-area blocks so other chunks avoid it.
+    zone_share={'intro': 0.0, 'easy': 0.5, 'med': 0.75, 'hard': 0.9},
+    zone_saw_period=1.6,
     floor_boost=4,        # floor recipes: floor chunk weights x4 so floor runs still happen
     hard_min_level=8,     # hard recipes start here (orig 10)
     med_min_level=4,      # medium recipes start here (orig 5)
@@ -75,6 +81,34 @@ def make_timing(s, newid, frac):
 def phased(s):
     return bool(s['spikeBalls'] or s['pathWalls'] or s['electric'] or s['flipSync'])
 
+ZONE_WALLS = ('walls', 'electric', 'crumbling', 'conveyors')
+def zone_ok(s):
+    if not s['tags'] or 'floor' in s['tags'] or 'endoflevel' in s['tags'] or 'startoflevel' in s['tags']:
+        return False
+    if s['name'].startswith(('bouncy', 'flip')) or s['bouncy'] or s['flipping'] or s['floors']:
+        return False
+    ex, ey, d = s['exit']
+    xs = {w[0] for k in ZONE_WALLS for w in s[k]}
+    return d == -1 and ex > 40 and xs == {ex}
+
+def _saw(x, y, length, period, phase):
+    head = struct.pack('<ffIffff', x, y, 0, period, phase, 0.5, 0.0)
+    return dict(head=head, flag=(1, 1), len=float(length), pts=[(0.0, 0.0, 0.0), (float(length), 0.0, float(length))])
+
+def make_zone(s, newid, period):
+    t = copy.deepcopy(s); t['id'] = newid(); t['name'] = s['name'] + 'Z'
+    W = s['exit'][0]
+    spans = [(w[1], w[2]) for k in ZONE_WALLS for w in s[k] if w[0] == W]
+    y1, y2 = min(a for a, b in spans), max(b for a, b in spans)
+    t['spikes'] = t['spikes'] + [(W + 7, W + 7, y1, y2)]
+    L = max(4.0, (y2 - y1) - 16)
+    sx = W + 28
+    t['spikeBalls'] = t['spikeBalls'] + [_saw(sx, y1 + 8, L, period, 0.0)]
+    if L >= 60:
+        t['spikeBalls'].append(_saw(sx, y1 + 8, L, period, period / 2))
+    t['blocks'] = t['blocks'] + [(W + 3, y1 - 22, sx + 22, y2 + 22)]
+    return t
+
 def make_double(s, newid):
     t = copy.deepcopy(s); t['id'] = newid(); t['name'] = s['name'] + 'D'
     extra = []
@@ -113,10 +147,12 @@ def apply(data, cfg=CONFIG, log=print):
     for src in list(base) + list(fast.values()):
         if phased(src):
             timing[src['name']] = [make_timing(src, newid, f) for f in cfg['timing_shifts']]
-    data.scn += list(fast.values()) + list(dbl.values()) + [t for v in timing.values() for t in v]
+    pool = list(base) + list(fast.values()) + [t for v in timing.values() for t in v]
+    zone = {x['name']: make_zone(x, newid, cfg['zone_saw_period']) for x in pool if zone_ok(x)}
+    data.scn += list(fast.values()) + list(dbl.values()) + [t for v in timing.values() for t in v] + list(zone.values())
     data.byname = {x['name']: x for x in data.scn}; data.byid = {x['id']: x for x in data.scn}
     log(f'variants: {len(fast)} fast (X), {len(dbl)} double-ball (D), '
-        f'{sum(map(len, timing.values()))} phase-shifted (T)')
+        f'{sum(map(len, timing.values()))} phase-shifted (T), {len(zone)} grinder-wall (Z)')
     hz = {g: [s['name'] for s in base if group(s['name']) == g] for g in
           ('spikeball', 'electric', 'path', 'flipping', 'conveyor', 'crumbling', 'bouncy')}
     # ---- recipes
@@ -126,15 +162,21 @@ def apply(data, cfg=CONFIG, log=print):
         own = [n for n in orig if group(n) != 'plain']
         owng = {group(n) for n in own}
         acc = {}
-        ts = cfg['timing_share'][tier]
+        ts = cfg['timing_share'][tier]; zs = cfg['zone_share'][tier]
+        def put(n, w):
+            if n in zone and zs > 0:
+                acc[n] = acc.get(n, 0) + w * (1 - zs)
+                acc[n + 'Z'] = acc.get(n + 'Z', 0) + w * zs
+            else:
+                acc[n] = acc.get(n, 0) + w
         def add(n, w):
             if w <= 0 or n not in data.byname: return
             vs = timing.get(n)
             if vs and ts > 0:
-                acc[n] = acc.get(n, 0) + w * (1 - ts)
-                for v in vs: acc[v['name']] = acc.get(v['name'], 0) + w * ts / len(vs)
+                put(n, w * (1 - ts))
+                for v in vs: put(v['name'], w * ts / len(vs))
             else:
-                acc[n] = acc.get(n, 0) + w
+                put(n, w)
         for n, w in orig.items():
             g = group(n)
             if g == 'plain': add(n, W['plain'])

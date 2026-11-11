@@ -15,7 +15,7 @@ from mod import hardcore
 from patches import java_manifest
 
 BUILD = dict(
-    version='2.1-timing',
+    version='2.2-grinder',
     package='com.kumobius.android.walljumpes',
     label='Wall Kickers Ultimate',
     difficulty='hardcore',          # 'hardcore' | 'vanilla'

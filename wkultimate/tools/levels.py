@@ -30,7 +30,7 @@ class Data:
         rest, out, o = self.rest, [], 0
         while o + 4 <= len(rest):
             c = struct.unpack_from('<I', rest, o)[0]
-            if 0 < c < 300 and o + 4 + 12 * c <= len(rest) and all(
+            if 0 < c < 5000 and o + 4 + 12 * c <= len(rest) and all(
                     rest[o + 4 + 12 * k:o + 12 + 12 * k] in self.byid for k in range(c)):
                 out.append((o, c)); o += 4 + 12 * c
             else:
