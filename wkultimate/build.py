@@ -15,11 +15,12 @@ from mod import hardcore
 from patches import java_manifest
 
 BUILD = dict(
-    version='2.0-hardcore',
+    version='2.1-timing',
     package='com.kumobius.android.walljumpes',
     label='Wall Kickers Ultimate',
     difficulty='hardcore',          # 'hardcore' | 'vanilla'
     native_trampoline=False,        # experimental native patch (arm64 only)
+    native_tweaks=True,             # arm64: longer electric chains (patches/native_tweaks.py)
 )
 TOOLS = {
     'apktool.jar': 'https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar',
@@ -61,6 +62,10 @@ def main():
         shutil.rmtree(WORK, ignore_errors=True); os.makedirs(WORK)
         sh('java', '-jar', tool('apktool.jar'), 'd', '-f', '-o', dec, ORIG, stdout=subprocess.DEVNULL)
         java_manifest.apply(dec, BUILD['package'], BUILD['label'])
+        if BUILD['native_tweaks']:
+            so = os.path.join(dec, 'lib/arm64-v8a/libKumoGame.so')
+            sh(sys.executable, os.path.join(HERE, 'patches/native_tweaks.py'), so, so + '.new')
+            os.replace(so + '.new', so)
         if BUILD['native_trampoline']:
             so = os.path.join(dec, 'lib/arm64-v8a/libKumoGame.so')
             sh(sys.executable, os.path.join(HERE, 'patches/native_trampoline.py'), so, so + '.new')

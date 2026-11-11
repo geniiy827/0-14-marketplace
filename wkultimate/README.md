@@ -13,7 +13,7 @@
 Локально (нужны Java 17 и Python 3):
 
 ```
-pip install pillow          # только для --preview
+pip install pillow keystone-engine
 python3 build.py            # -> out/WallKickersUltimate-<версия>.apk
 python3 build.py --data-only --preview   # быстро: только WJScenarios.dat + картинка всех кусков
 ```

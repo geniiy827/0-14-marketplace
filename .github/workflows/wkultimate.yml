@@ -34,7 +34,7 @@ jobs:
           python-version: '3.12'
 
       - name: Python deps
-        run: pip install pillow
+        run: pip install pillow keystone-engine
 
       - name: Build APK
         run: python3 build.py --preview

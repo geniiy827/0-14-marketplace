@@ -5,12 +5,18 @@
 * 'D' variants: spike-ball chunks with an extra ball in anti-phase (more saws)
 * the late-game ramp is kept, but late recipes lean on X/D variants
 Tune the numbers in CONFIG below.
+T variants: same chunk, hazards phase-shifted so the natural arrival time is NOT safe
 """
 import copy, struct, random
 
 CONFIG = dict(
     fast_time=0.8,        # X variants: timings x0.8  (=25% faster)
     fast_conveyor=1.35,   # X variants: conveyor speed multiplier
+    # T variants: the game normally phases every timed hazard so that a player who just keeps
+    # jumping arrives exactly in the safe window ("autopilot").  T variants shift the hazard
+    # phase by a fraction of its period -> you have to wait / rush / count the timing.
+    timing_shifts=(0.25, 0.5),
+    timing_share={'intro': 0.0, 'easy': 0.5, 'med': 0.65, 'hard': 0.8},
     floor_boost=4,        # floor recipes: floor chunk weights x4 so floor runs still happen
     hard_min_level=8,     # hard recipes start here (orig 10)
     med_min_level=4,      # medium recipes start here (orig 5)
@@ -52,6 +58,23 @@ def make_fast(s, newid, f, fc):
     for p in t['spikeBalls']: p['head'] = _scale_head(p['head'], 3, f)
     return t
 
+def _shift_head(head, idx_period, frac):
+    h = bytearray(head)
+    per, ph = struct.unpack_from('<ff', h, 4 * idx_period)
+    struct.pack_into('<f', h, 4 * idx_period + 4, (ph + frac * per) % per if per else ph)
+    return bytes(h)
+
+def make_timing(s, newid, frac):
+    t = copy.deepcopy(s); t['id'] = newid(); t['name'] = s['name'] + 'T%d' % round(frac * 100)
+    t['electric'] = [(x, a, b, p, (ph + frac * p) % p) for x, a, b, p, ph in t['electric']]
+    t['flipSync'] = [(x, a, b, p, (ph + frac * p) % p) for x, a, b, p, ph in t['flipSync']]
+    for p in t['pathWalls']: p['head'] = _shift_head(p['head'], 4, frac)
+    for p in t['spikeBalls']: p['head'] = _shift_head(p['head'], 3, frac)
+    return t
+
+def phased(s):
+    return bool(s['spikeBalls'] or s['pathWalls'] or s['electric'] or s['flipSync'])
+
 def make_double(s, newid):
     t = copy.deepcopy(s); t['id'] = newid(); t['name'] = s['name'] + 'D'
     extra = []
@@ -86,9 +109,14 @@ def apply(data, cfg=CONFIG, log=print):
             fast[s['name']] = make_fast(s, newid, cfg['fast_time'], cfg['fast_conveyor'])
         if s['spikeBalls']:
             dbl[s['name']] = make_double(s, newid)
-    data.scn += list(fast.values()) + list(dbl.values())
+    timing = {}
+    for src in list(base) + list(fast.values()):
+        if phased(src):
+            timing[src['name']] = [make_timing(src, newid, f) for f in cfg['timing_shifts']]
+    data.scn += list(fast.values()) + list(dbl.values()) + [t for v in timing.values() for t in v]
     data.byname = {x['name']: x for x in data.scn}; data.byid = {x['id']: x for x in data.scn}
-    log(f'variants: {len(fast)} fast (X), {len(dbl)} double-ball (D)')
+    log(f'variants: {len(fast)} fast (X), {len(dbl)} double-ball (D), '
+        f'{sum(map(len, timing.values()))} phase-shifted (T)')
     hz = {g: [s['name'] for s in base if group(s['name']) == g] for g in
           ('spikeball', 'electric', 'path', 'flipping', 'conveyor', 'crumbling', 'bouncy')}
     # ---- recipes
@@ -98,8 +126,15 @@ def apply(data, cfg=CONFIG, log=print):
         own = [n for n in orig if group(n) != 'plain']
         owng = {group(n) for n in own}
         acc = {}
+        ts = cfg['timing_share'][tier]
         def add(n, w):
-            if w > 0 and n in data.byname: acc[n] = acc.get(n, 0) + w
+            if w <= 0 or n not in data.byname: return
+            vs = timing.get(n)
+            if vs and ts > 0:
+                acc[n] = acc.get(n, 0) + w * (1 - ts)
+                for v in vs: acc[v['name']] = acc.get(v['name'], 0) + w * ts / len(vs)
+            else:
+                acc[n] = acc.get(n, 0) + w
         for n, w in orig.items():
             g = group(n)
             if g == 'plain': add(n, W['plain'])
