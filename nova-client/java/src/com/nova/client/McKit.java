@@ -379,7 +379,7 @@ public final class McKit {
             else if (pressed) tint = kind == DANGER ? 0xFF8E3442 : BTN_PRESS;
             else tint = kind == PRIMARY ? BTN_PRIMARY : (kind == DANGER ? BTN_DANGER : BTN);
             Rect r = new Rect(0, 0, getWidth(), getHeight());
-            nine(cv, tex(getContext(), "gui/newgui/NormalButtonStroke.png"), new Rect(0, 0, 12, 12), 4, r, s, tint, 255);
+            nine(cv, tex(getContext(), "gui/nova/btn_square.png"), new Rect(0, 0, 12, 12), 4, r, s, tint, 255);
             int h = s / 2;
             String t = Text.ellipsize(label, getWidth() / h - 12);
             int color = !isEnabled() ? 0xFFA0A8BC : (pressed ? 0xFFE0FFFA : WHITE);

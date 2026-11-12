@@ -33,7 +33,7 @@
 
   "button_state_default": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],

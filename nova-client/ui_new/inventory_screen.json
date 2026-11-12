@@ -1146,7 +1146,7 @@
                 "layer": 1,
                 "size": [ "100%-2px", "100%-2px" ],
                 "nineslice_size": 4.0,
-                "texture": "gui/newgui/NormalButtonStroke.png",
+                "texture": "gui/nova/btn_square.png",
                 "uv": [ 0, 0 ],
                 "uv_size": [ 12, 12 ],
                 "color": [ 0.4, 0.95, 0.88, 1.0 ]

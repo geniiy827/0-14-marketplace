@@ -774,6 +774,7 @@ static int nova_panes(void *scr);
 static void h_setbool(void *opts, void *opt, int v);
 static void *opt_chunks;
 static void *newtex_option(void);
+static void *v015_option(void);
 static void *opt_sprint;
 static int last_pane_doll = -1;  /* doll toggle state the NOVA pane was built with */
 
@@ -865,6 +866,10 @@ static void *build_nova_pane(void *client) {
         void *g2 = f_cgroup(pane, str, 1);
         f_strdtor(str);
         f_ctoggle(g2, newtex_option(), client);
+        gstr(str, "options.group.nova.versions");      /* the hybrid client: later versions, by a restart */
+        void *g3 = f_cgroup(pane, str, 1);
+        f_strdtor(str);
+        f_ctoggle(g3, v015_option(), client);
     }
     last_pane_doll = doll | (f3 << 1);
     return pane;

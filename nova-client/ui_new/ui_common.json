@@ -188,7 +188,7 @@
   // Desktop-style button (was the 200x20 stone strip from gui.png)
   "button_state": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "layer": 2,
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
@@ -837,7 +837,7 @@
 
   "normal_button": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonNoStroke.png",
+    "texture": "gui/nova/btn_square_flat.png",
     "layer": 1,
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
@@ -847,7 +847,7 @@
 
   "normal_stroke_button": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "layer": 1,
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
@@ -1023,7 +1023,7 @@
 
   "screen_close_state": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],
@@ -1234,7 +1234,7 @@
   "scrollbar_box_image": {
     "type": "image",
     "nineslice_size": 4.0,
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],
     "layer": 4,

@@ -13,7 +13,7 @@
   "dark_thin_button": {
     "type": "image",
     "nineslice_size": 4.0,
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],
     "color": [ 0.47, 0.53, 0.68, 1.0 ],
@@ -23,7 +23,7 @@
   "normal_stroke_button": {
     "type": "image",
     "nineslice_size": 4.0,
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],
     "color": [ 0.36, 0.41, 0.54, 1.0 ],
@@ -33,7 +33,7 @@
   "hover_thin_stroke_button": {
     "type": "image",
     "nineslice_size": 4.0,
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],
     "color": [ 0.34, 0.8, 0.82, 1.0 ]
@@ -42,7 +42,7 @@
   "hover_thin_button": {
     "type": "image",
     "nineslice_size": 4.0,
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],
     "color": [ 0.34, 0.8, 0.82, 1.0 ]
@@ -51,7 +51,7 @@
   "pressed_thin_stroke_button": {
     "type": "image",
     "nineslice_size": 4.0,
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 12 ],
     "color": [ 0.24, 0.62, 0.66, 1.0 ]

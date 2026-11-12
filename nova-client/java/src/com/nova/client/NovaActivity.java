@@ -22,6 +22,27 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     private static volatile EntityRegistry entities;
     private static volatile AtlasBuilder atlases;
     static native int nativeSetTexMode(int on);
+    static native int nativeSetVersion(int v);
+
+    /** the version this run plays as (the hybrid client): 14 = 0.14.3, 15 = with what 0.15.10 added. files/nova_version */
+    static int playVersion = 14;
+    private int versionPref() {
+        try {
+            String v = new String(PackManager.readFile(new java.io.File(getFilesDir(), "nova_version")), "UTF-8").trim();
+            return v.equals("15") ? 15 : 14;
+        } catch (Throwable t) {
+            return 14;
+        }
+    }
+    private void setVersionPref(int v) {
+        try {
+            java.io.FileOutputStream o = new java.io.FileOutputStream(new java.io.File(getFilesDir(), "nova_version"));
+            o.write(String.valueOf(v).getBytes("UTF-8"));
+            o.close();
+        } catch (Throwable t) {
+            Log.w(TAG, "version pref", t);
+        }
+    }
 
     private boolean newTexturesPref() {
         try {
@@ -217,7 +238,8 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         try {
             if (r.startsWith("R")) {
                 setNewTexturesPref(r.length() > 1 && r.charAt(1) == '1');
-                android.widget.Toast.makeText(this, ru() ? "Применяем текстуры: перезапуск…" : "Applying textures: restarting…",
+                if (r.length() > 2) setVersionPref(r.charAt(2) == '1' ? 15 : 14);
+                android.widget.Toast.makeText(this, ru() ? "Применяем настройки: перезапуск…" : "Applying settings: restarting…",
                         android.widget.Toast.LENGTH_SHORT).show();
                 final android.app.Activity self = this;
                 novaHandler.postDelayed(new Runnable() { public void run() { restartGame(self); } }, 800);
@@ -539,6 +561,9 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
             atlases = new AtlasBuilder(entities, newTex);
             if (nativeOk) {
                 try { nativeSetTexMode(newTex ? 1 : 0); } catch (Throwable t) { Log.w(TAG, "tex mode", t); }
+                playVersion = versionPref();
+                try { nativeSetVersion(playVersion); } catch (Throwable t) { Log.w(TAG, "version", t); }
+                Log.i(TAG, "plays as version 0." + playVersion);
                 try { nativeSetDataDir(getFilesDir().getAbsolutePath()); } catch (Throwable t) { Log.w(TAG, "data dir", t); }
                 handleCrashReport();
                 byte[] mobs = entities.mobsJson();          // also collects per-face UVs

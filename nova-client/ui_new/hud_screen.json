@@ -215,7 +215,7 @@
 
   "hotbar_slot_image": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonNoStroke.png",
+    "texture": "gui/nova/btn_square_flat.png",
     "size": [ 20, 22 ],
     "layer": 1,
     "alpha": 0.62,

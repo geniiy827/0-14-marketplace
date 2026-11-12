@@ -72,6 +72,14 @@ EXTRA = {
                      'fr_FR': 'Les mods démarrent en entrant dans un monde', 'it_IT': 'Le mod partono entrando in un mondo',
                      'pt_BR': 'Os mods iniciam ao entrar em um mundo', 'ja_JP': 'ワールドに入るとMODが動きます', 'ko_KR': '월드에 들어가면 모드가 시작됩니다',
                      'zh_CN': '进入世界后模组生效', 'zh_TW': '進入世界後模組生效'},
+ # versions (alpha35): the hybrid client switches on what later versions added
+ 'options.group.nova.versions': {'en_US': 'Versions', 'ru_RU': 'Версии', 'de_DE': 'Versionen', 'es_ES': 'Versiones',
+                     'fr_FR': 'Versions', 'it_IT': 'Versioni', 'pt_BR': 'Versões', 'ja_JP': 'バージョン', 'ko_KR': '버전',
+                     'zh_CN': '版本', 'zh_TW': '版本'},
+ 'nova.opt.v015': {'en_US': 'Version 0.15 (restarts)', 'ru_RU': 'Версия 0.15 (перезапуск)', 'de_DE': 'Version 0.15 (Neustart)',
+                   'es_ES': 'Versión 0.15 (reinicia)', 'fr_FR': 'Version 0.15 (redémarre)', 'it_IT': 'Versione 0.15 (riavvio)',
+                   'pt_BR': 'Versão 0.15 (reinicia)', 'ja_JP': 'バージョン 0.15 (再起動)', 'ko_KR': '버전 0.15 (재시작)',
+                   'zh_CN': '版本 0.15 (重启)', 'zh_TW': '版本 0.15 (重啟)'},
 }
 for _k, _v in EXTRA.items():
     K.append(_k)

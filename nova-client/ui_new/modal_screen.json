@@ -4,7 +4,7 @@
   // Dialog window: brown stone -> dark slate card with mint top line
   "modal_background_image": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/nova/btn_square.png",
     "layer": 1,
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],

@@ -140,7 +140,7 @@ enum { R_NONE, R_PACK_ON, R_PACK_DEL, R_NAME, R_SEED, R_SURV, R_CREAT, R_INF, R_
        R_MOBS, R_SPX, R_SPZ, R_CREATE, R_NEWTEX, R_IMPORT,
        R_ACC_TAG, R_ACC_PASS, R_ACC_PASS2, R_ACC_LOGIN, R_ACC_TOREG, R_ACC_REG, R_ACC_TOLOGIN, R_ACC_LOGOUT,
        R_FR_TAG, R_FR_SEND, R_FR_JOIN, R_FR_DEL, R_FR_ACCEPT, R_FR_DECLINE, R_FR_CANCEL,
-       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND, R_FR_MODS, R_NET_MODS };
+       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND, R_FR_MODS, R_NET_MODS, R_V015 };
 
 static int nova_pending, nova_creating, nova_kind, nova_close, nova_ttl, nova_select = -1;
 static void *nova_screen;
@@ -523,9 +523,21 @@ static void *newtex_option(void) {
     return o;
 }
 
+/* "0.15" switch (the hybrid client: what 0.15.10 added is switched on): also applied by a restart.
+ * nova_version = the version this run plays as (14 or 15), from Java (files/nova_version). */
+static int nova_version = 14, ver_want = -1;
+int Java_com_nova_client_NovaActivity_nativeSetVersion(void *env, void *cls, int v) { nova_version = v; return 0; }
+static void *v015_option(void) {                       /* after newtex_option (that one starts the list) */
+    OptObj *o = nopt_new(0, "nova.opt.v015", R_V015);
+    nopt_val[nidx(o)] = ver_want >= 0 ? ver_want : nova_version >= 15;
+    return o;
+}
+
 static void options_closed(void *scr) {
-    if (scr == last_screen && tex_want >= 0 && tex_want != tex_active) {
-        nova_result[0] = 'R'; nova_result[1] = '0' + tex_want; nova_result[2] = 0;
+    if (scr != last_screen) return;
+    int tex = tex_want >= 0 ? tex_want : tex_active, ver = ver_want >= 0 ? ver_want : nova_version >= 15;
+    if (tex != tex_active || ver != (nova_version >= 15)) {      /* "R<textures><0.15>": Java saves both, restarts */
+        nova_result[0] = 'R'; nova_result[1] = '0' + tex; nova_result[2] = '0' + ver; nova_result[3] = 0;
         nova_result_ready = 1;
     }
 }
@@ -570,6 +582,7 @@ static void button_action(int i) {
 
 static void nopt_on_change(int i) {
     if (nopt_role[i] == R_NEWTEX) { tex_want = nopt_val[i]; return; }
+    if (nopt_role[i] == R_V015) { ver_want = nopt_val[i]; return; }
     if (nopt_role[i] == R_NET_MAX) { netmax_caption(i); return; }
     if (nopt_button[i] && nova_kind != NOVA_ACCOUNT) { nopt_val[i] = 0; button_action(i); return; }
     if (nova_kind == NOVA_ACCOUNT && nopt_val[i]) {
