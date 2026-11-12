@@ -113,12 +113,22 @@ class GLB:
         return len(self.j["cameras"]) - 1
 
     def animation(self, name, times, channels):
-        """channels: list of (node, path, values ndarray)"""
-        inp = self.accessor(np.asarray(times, np.float32).reshape(-1, 1), "SCALAR", minmax=True)
+        """channels: list of (node, path, values ndarray[, own times]).
+        A channel may carry its own times (used for hard cuts: a duplicated key 1 ms before
+        the jump keeps LINEAR interpolation from inventing in-between frames)."""
+        shared = self.accessor(np.asarray(times, np.float32).reshape(-1, 1), "SCALAR", minmax=True)
+        own = {}
         anim = {"name": name, "samplers": [], "channels": []}
-        for node, path, vals in channels:
+        for ch in channels:
+            node, path, vals = ch[:3]
             typ = "VEC4" if path == "rotation" else "VEC3"
             out = self.accessor(vals, typ)
+            inp = shared
+            if len(ch) > 3:
+                key = np.asarray(ch[3], np.float32).tobytes()
+                if key not in own:
+                    own[key] = self.accessor(np.asarray(ch[3], np.float32).reshape(-1, 1), "SCALAR", minmax=True)
+                inp = own[key]
             anim["samplers"].append({"input": inp, "output": out, "interpolation": "LINEAR"})
             anim["channels"].append({"sampler": len(anim["samplers"]) - 1, "target": {"node": node, "path": path}})
         self.j["animations"].append(anim)

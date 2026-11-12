@@ -36,6 +36,7 @@ BLOCK_RU = {"сено": "hay", "верстак": "crafting", "динамит": "
             "листва": "leaves", "шерсть": "wool", "золото": "gold", "алмаз": "diamond", "песок": "sand",
             "земля": "dirt", "розовый": "wool_pink", "красный": "wool_red", "ель": "spruce", "кирпичи": "stonebrick"}
 TRANSPARENT = {"leaves", "glass", "water", "cactus"}
+PANES = {"f:iron_bars", "f:glass_pane"}
 CUTOUT_BLOCKS = {"leaves", "glass", "door_top", "door_bot", "cactus"}
 SPRITES = {"flower_red", "flower_yellow", "tallgrass", "torch", "wheat", "flower_blue", "flower_white", "flower_pink",
            "rose_bush", "flower_tulip"}
@@ -511,6 +512,9 @@ class World:
         opaque, water, cut = [], [], []
         CUT = CUTOUT_BLOCKS
         for (x, y, z), b in B.items():
+            if b in PANES:
+                cut.extend(self._pane(x, y, z, b))
+                continue
             tiles = BLOCKS.get(b) or (b,) * 3
             for (dx, dy, dz), ti in dirs:
                 nb = (x + dx, y + dy, z + dz)
@@ -531,7 +535,7 @@ class World:
 
     def _occ(self, p):
         b = self.blocks.get(p)
-        return 1 if b is not None and b not in ("water", "glass") else 0
+        return 1 if b is not None and b not in ("water", "glass") and b not in PANES else 0
 
     def _face(self, x, y, z, n, tile, b):
         dx, dy, dz = n
@@ -574,6 +578,35 @@ class World:
         for k in (0, 3, 2, 0, 2, 1):
             p = cs[k]
             out.append((p[0], p[1] + wy, p[2], dx, dy, dz, uvs[k][0], uvs[k][1], aos[k]))
+        return out
+
+    def _pane(self, x, y, z, b):
+        """Iron bars / panes: thin vertical planes through the block centre that reach towards
+        neighbouring panes or solid blocks (like Minecraft); a lone pane is a cross."""
+        B = self.blocks
+        def link(p):
+            return p in B and (B[p] in PANES or B[p] not in TRANSPARENT)
+        e, w_, s_, n_ = link((x + 1, y, z)), link((x - 1, y, z)), link((x, y, z + 1)), link((x, y, z - 1))
+        if not (e or w_ or s_ or n_):
+            e = w_ = s_ = n_ = True
+        if (e or w_) and not (s_ or n_):
+            e = w_ = True          # a straight wall along X spans the whole block
+        if (s_ or n_) and not (e or w_):
+            s_ = n_ = True
+        u0, v0, u1, v1 = tile_uv(b)
+        um = (u0 + u1) / 2
+        cx, cz = x + 0.5, z + 0.5
+        out = []
+        def quad(a, c, ua, ub, nrm):
+            cs = [(a[0], y + 1, a[1]), (c[0], y + 1, c[1]), (c[0], y, c[1]), (a[0], y, a[1])]
+            uvs = [(ua, v0), (ub, v0), (ub, v1), (ua, v1)]
+            for k in (0, 3, 2, 0, 2, 1):
+                p = cs[k]
+                out.append((p[0], p[1], p[2], nrm[0], nrm[1], nrm[2], uvs[k][0], uvs[k][1], 1.0))
+        if w_: quad((x, cz), (cx, cz), u0, um, (0, 0, 1))
+        if e:  quad((cx, cz), (x + 1, cz), um, u1, (0, 0, 1))
+        if n_: quad((cx, z), (cx, cz), u0, um, (1, 0, 0))
+        if s_: quad((cx, cz), (cx, z + 1), um, u1, (1, 0, 0))
         return out
 
     def _sprite(self, x, y, z, t):

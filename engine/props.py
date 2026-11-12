@@ -24,6 +24,13 @@ def block_prop(block):
     """unit cube (1 block), base at y=0, centred; uses the world atlas uvs."""
     tiles = W.BLOCKS.get(block) or (block,) * 3
     v = []
+    if block in getattr(W, "PANES", ()):
+        # iron bars / pane: one thin plane along X, both sides
+        u0, v0, u1, v1 = W.tile_uv(tiles[1])
+        uv = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+        v += _quad([(-0.5, 1, 0), (0.5, 1, 0), (0.5, 0, 0), (-0.5, 0, 0)], uv, (0, 0, 1))
+        v += _quad([(0.5, 1, 0), (-0.5, 1, 0), (-0.5, 0, 0), (0.5, 0, 0)], uv[1::-1] + uv[:1:-1], (0, 0, -1))
+        return np.array(v, np.float32)
     x0, x1, y0, y1, z0, z1 = -0.5, 0.5, 0.0, 1.0, -0.5, 0.5
     faces = [((0, 1, 0), [(x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1)], 0),
              ((0, -1, 0), [(x0, y0, z1), (x1, y0, z1), (x1, y0, z0), (x0, y0, z0)], 2),

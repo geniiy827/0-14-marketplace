@@ -46,7 +46,11 @@ void main(){ vec4 t=texture(tex,v_uv); if(t.a<0.5) discard; f=vec4(t.rgb*v_c.rgb
             a = g.animations[0]
             for ch in a.channels:
                 smp = a.samplers[ch.sampler]
-                anim.setdefault(ch.target.node, {})[ch.target.path] = acc(g, blob, smp.output)[frame]
+                # sample by time (channels may carry extra keys at hard cuts)
+                ts = acc(g, blob, smp.input).reshape(-1); vs = acc(g, blob, smp.output)
+                tt = frame / float(tr.get("fps", 15)) + 1e-4
+                k = int(np.searchsorted(ts, tt, side="right") - 1); k = max(0, min(k, len(vs) - 1))
+                anim.setdefault(ch.target.node, {})[ch.target.path] = vs[k]
         for ni, nd in enumerate(g.nodes):
             t = anim.get(ni, {}).get("translation", nd.translation or [0, 0, 0])
             r = anim.get(ni, {}).get("rotation", nd.rotation or [0, 0, 0, 1])

@@ -86,7 +86,13 @@ def load_mob(kind, texture=None, tint=None):
         if b["name"] == "body" and kind in QUAD_BODY:
             rest = (math.pi / 2, 0, 0)
         parts[b["name"]] = dict(pivot=pivot, verts=v, rest=rest, parent=b.get("parent"))
-    if kind == "sheep":
-        # draw wool shell slightly inflated using the same texture region (sheep.tga holds the wool too)
-        pass
+    if kind == "sheep" and "body" in parts:
+        # geometry.sheep has only the inflated wool shell on the body; the sheep itself lives in
+        # geometry.sheep.sheared (uv 28,8). Add that inner body so the wool is not hollow/floating.
+        sh = next((g for g in gj["minecraft:geometry"] if g["description"]["identifier"].endswith("sheared")), None)
+        bb = next((b for b in (sh or {}).get("bones", []) if b["name"] == "body"), None)
+        for c in (bb or {}).get("cubes", []):
+            ox, oy, oz = c["origin"]; w, h, dd = c["size"]; u, v = c["uv"]
+            inner = box(-(ox + w), oy, -(oz + dd), -ox, oy + h, -oz, u, v, w, h, dd, 0.0, tex=float(TS))
+            parts["body"]["verts"] = np.concatenate([inner, parts["body"]["verts"]])
     return parts, tex

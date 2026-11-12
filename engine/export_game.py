@@ -289,6 +289,7 @@ class Exporter:
             rec_face.append(faces)
             rec_cam.append((tuple(eye), tuple(tgt), fov, t - sc["t0"]))
         frames = len(rec_cam)
+        rec_cam = clean_camera(rec_cam)
         times = np.arange(frames, dtype=np.float32) / self.fps
         # ---- glb: static nodes for every part that ever appears, animated TRS
         g = GLB()
@@ -329,13 +330,26 @@ class Exporter:
                     ts.append(t_); rs.append(r_); ss.append(s_)
                 else:
                     ts.append(last[0]); rs.append(last[1]); ss.append(np.zeros(3))
-            chans += [(ni, "translation", np.array(ts)), (ni, "rotation", fix_quat_continuity(rs)), (ni, "scale", np.array(ss))]
+            ts, rs, ss = np.array(ts), fix_quat_continuity(rs), np.array(ss)
+            # hard breaks: appear/disappear (scale 0 <-> visible) and teleports (> 0.9 block per frame)
+            brk = [k for k in range(1, frames)
+                   if (ss[k].min() < 1e-6) != (ss[k - 1].min() < 1e-6) or np.linalg.norm(ts[k] - ts[k - 1]) > 0.9]
+            chans += stepped(ni, times, brk, ts, rs, ss)
         cts, crs = [], []
         for eye, tgt, fov, _ in rec_cam:
             V = look_at(eye, tgt)
             t_, r_, _ = decompose(np.linalg.inv(V))
             cts.append(t_); crs.append(r_)
-        chans += [(cam_node, "translation", np.array(cts)), (cam_node, "rotation", fix_quat_continuity(crs))]
+        cts, crs = np.array(cts), fix_quat_continuity(crs)
+        # camera cuts: a jump of the eye or a sharp turn between two samples
+        cuts = []
+        for k in range(1, frames):
+            e0, e1 = np.array(rec_cam[k - 1][0]), np.array(rec_cam[k][0])
+            d0 = np.array(rec_cam[k - 1][1]) - e0; d1 = np.array(rec_cam[k][1]) - e1
+            ang = math.degrees(math.acos(np.clip(np.dot(d0, d1) / (np.linalg.norm(d0) * np.linalg.norm(d1) + 1e-9), -1, 1)))
+            if np.linalg.norm(e1 - e0) > 0.8 or ang > 25 or abs(rec_cam[k][2] - rec_cam[k - 1][2]) > 6:
+                cuts.append(k)
+        chans += stepped(cam_node, times, cuts, cts, crs, None)
         g.animation("main", times, chans)
         g.save(os.path.join(self.out, "scenes", f"{sid}.glb"))
         # ---- side tracks
@@ -343,6 +357,7 @@ class Exporter:
         sd = np.array(env["sun"], float); sd /= np.linalg.norm(sd)
         side = dict(fps=self.fps, frames=frames, duration=round(frames / self.fps, 3),
                     fov=[round(c[2], 2) for c in rec_cam],
+                    cuts=cuts,
                     face={self.cids[n]: [f.get(self.cids[n], 0) for f in rec_face] for n in tl.cast
                           if self.rig(n).get("faces")},
                     subtitles=[dict(t0=round(s["t0"] - sc["t0"], 2), t1=round(s["t1"] - sc["t0"], 2),
@@ -384,6 +399,60 @@ class Exporter:
 
 
 # ---------------------------------------------------------------- menu rigs
+def _cam_breaks(rc, pos_thr, ang_thr, fov_thr=3.0):
+    br = []
+    for k in range(1, len(rc)):
+        e0, e1 = np.array(rc[k - 1][0]), np.array(rc[k][0])
+        d0 = np.array(rc[k - 1][1]) - e0; d1 = np.array(rc[k][1]) - e1
+        ang = math.degrees(math.acos(np.clip(np.dot(d0, d1) / (np.linalg.norm(d0) * np.linalg.norm(d1) + 1e-9), -1, 1)))
+        if np.linalg.norm(e1 - e0) > pos_thr or ang > ang_thr or abs(rc[k][2] - rc[k - 1][2]) > fov_thr:
+            br.append(k)
+    return br
+
+
+def clean_camera(rc, min_len=8):
+    """Remove camera 'flashes': shots shorter than min_len samples (≈0.5 s at 15 fps) — the
+    director's first frame before it settles, a new framing it starts in the last frames of a scene,
+    or a 1-3 frame detour before a cut. Such samples hold the neighbouring shot instead."""
+    rc = [list(c) for c in rc]
+    n = len(rc)
+    if n < 2:
+        return rc
+    for _ in range(3):
+        br = _cam_breaks(rc, 0.35, 9.0)
+        seg = [0] + br + [n]
+        changed = False
+        for a, b in zip(seg[:-1], seg[1:]):
+            if b - a >= min_len or b - a == n:
+                continue
+            src = b if a == 0 else a - 1          # first shot -> copy the next one, else hold the previous
+            if src >= n:
+                continue
+            for k in range(a, b):
+                rc[k][0], rc[k][1], rc[k][2] = rc[src][0], rc[src][1], rc[src][2]
+            changed = True
+        if not changed:
+            break
+    return [tuple(c) for c in rc]
+
+
+def stepped(node, times, brk, ts, rs, ss):
+    """TRS channels; at every break frame k a copy of frame k-1 is keyed 1 ms before k,
+    so LINEAR playback switches instantly instead of sliding through an in-between pose."""
+    if not brk:
+        out = [(node, "translation", ts), (node, "rotation", rs)]
+        return out + ([(node, "scale", ss)] if ss is not None else [])
+    tt, idx = [], []
+    bs = set(brk)
+    for k in range(len(times)):
+        if k in bs:
+            tt.append(times[k] - 0.001); idx.append(k - 1)
+        tt.append(times[k]); idx.append(k)
+    tt = np.array(tt, np.float32)
+    out = [(node, "translation", ts[idx], tt), (node, "rotation", rs[idx], tt)]
+    return out + ([(node, "scale", ss[idx], tt)] if ss is not None else [])
+
+
 def export_mob_rig(kind, path, tint=None):
     """Hierarchical rig for runtime procedural animation (main menu animals).
     Root node 'rig' (scale 1/16, model px units). Each bone = node at its pivot with rest rotation;
