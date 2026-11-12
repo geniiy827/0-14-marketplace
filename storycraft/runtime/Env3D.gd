@@ -49,8 +49,15 @@ func _on_settings(k: String) -> void:
 	if k == "shadows":
 		apply_shadows()
 
+## Тени «выкл» не выключают shadow_enabled целиком: в рендерере Compatibility направленный свет
+## без теней считается по другому пути и мир становится заметно темнее. Поэтому при «выкл» тени остаются
+## включены, но невидимы (opacity 0) и с крошечной дальностью — карта теней почти пустая и дешёвая,
+## а освещение такое же, как с тенями.
 func apply_shadows() -> void:
-	sun.shadow_enabled = bool(Settings.get_value("shadows", true))
+	var on := bool(Settings.get_value("shadows", true))
+	sun.shadow_enabled = true
+	sun.shadow_opacity = 1.0 if on else 0.0
+	sun.directional_shadow_max_distance = 30.0 if on else 0.1
 
 static func _c(a, def: Color) -> Color:
 	if a is Array and a.size() >= 3:

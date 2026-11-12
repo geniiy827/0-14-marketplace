@@ -16,14 +16,29 @@ env:
 jobs:
   plugin:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Genisys работает на PHP 7 — проверяем на 7.0 (самая старая), 7.2 и 7.4
+        php: ['7.0', '7.2', '7.4']
     steps:
       - uses: actions/checkout@v4
-      - name: Build StoryCraft.phar
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: zip, zlib, sockets, json
+          ini-values: phar.readonly=0
+      - name: Lint (PHP ${{ matrix.php }})
         run: |
           php -v
-          for f in storycraft-plugin/StoryCraft/src/rcode/storycraft/*.php; do php -l "$f"; done
-          php -d phar.readonly=0 storycraft-plugin/tools/build_phar.php StoryCraft.phar
+          for f in storycraft-plugin/StoryCraft/src/rcode/storycraft/*.php storycraft-plugin/tools/*.php; do php -l "$f"; done
+      - name: HTTP test (PHP ${{ matrix.php }})
+        run: bash storycraft-plugin/tools/ci_test.sh
+      - name: Build StoryCraft.phar
+        if: matrix.php == '7.0'
+        run: php -d phar.readonly=0 storycraft-plugin/tools/build_phar.php StoryCraft.phar
       - uses: actions/upload-artifact@v4
+        if: matrix.php == '7.0'
         with:
           name: StoryCraft-plugin
           path: |

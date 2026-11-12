@@ -62,6 +62,43 @@ func _run(mode: String) -> void:
 			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, true)
 			await wait(4.0)
 			print("FPS episode ", await _measure(5.0))
+		"shadows":
+			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
+			Router.go("main_menu", {}, false)
+			await wait(1.0)
+			var bg = Router.menu_bg
+			bg.set_process(false)
+			for m in bg.mobs:
+				m.root.set_process(false)
+			Settings.set_value("shadows", true)
+			await wait(0.3)
+			await shot("sh_on")
+			Settings.set_value("shadows", false)
+			await wait(0.3)
+			await shot("sh_off")
+			Settings.set_value("shadows", true)
+		"sheep":
+			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
+			Router.go("main_menu", {}, false)
+			await wait(1.0)
+			var bg = Router.menu_bg
+			bg.set_process(false)
+			Router.current.visible = false
+			for m in bg.mobs:
+				if m.kind == "sheep":
+					var p0: Vector3 = m.root.global_position
+					bg.cam.near = 0.05
+					var fwd: Vector3 = m.root.global_transform.basis.z
+					var side: Vector3 = m.root.global_transform.basis.x
+					bg.cam.global_position = p0 + fwd * 1.6 + side * 1.4 + Vector3(0, 1.0, 0)
+					bg.cam.look_at(p0 + Vector3(0, 0.6, 0))
+					await wait(0.3)
+					await shot("sheep")
+					bg.cam.global_position = p0 - side * 2.0 + Vector3(0, 0.5, 0)
+					bg.cam.look_at(p0 + Vector3(0, 0.6, 0))
+					await wait(0.3)
+					await shot("sheep_side")
+					break
 		"orbit":
 			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
 			Router.go("main_menu", {}, false)
