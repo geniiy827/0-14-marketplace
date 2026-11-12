@@ -109,9 +109,8 @@ jobs:
           mkdir -p build
           # 1) ставим gradle-шаблон Android (флаг работает только вместе с экспортом)
           timeout 1500 ~/godot/godot --headless --verbose --path . --install-android-build-template --export-debug "Android" build/StoryCraft.apk > /tmp/export1.log 2>&1 || true
-          grep -i -E "error|android|gradle|build" /tmp/export1.log | grep -v "^\s*$" | tail -60
-          ls -la android android/build 2>&1 | head -30
-          M=android/build/AndroidManifest.xml
+          grep -E "gradle|BUILD|rror" /tmp/export1.log | tail -15
+          M=android/build/src/main/AndroidManifest.xml
           test -f $M
           # 2) сервер игры — обычный HTTP без TLS: разрешаем cleartext-трафик
           sed -i 's/<application/<application android:usesCleartextTraffic="true"/' $M
