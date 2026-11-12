@@ -33,21 +33,23 @@
 
   "button_state_default": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonStroke.png",
-    "nineslice_size": 4.0,
+    "texture": "gui/nova/btn.png",
+    "nineslice_size": 2.0,
     "uv": [ 0, 0 ],
-    "uv_size": [ 12, 12 ],
-    "color": [ 0.47, 0.53, 0.68, 1.0 ],
-    "alpha": 0.92
+    "uv_size": [ 6, 6 ],
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "alpha": 1.0
   },
 
   "button_state_hover@button_state_default": {
-    "color": [ 0.34, 0.8, 0.82, 1.0 ],
+    "texture": "gui/nova/btn_hover.png",
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "alpha": 1.0
   },
 
   "button_state_pressed@button_state_default": {
-    "color": [ 0.24, 0.62, 0.66, 1.0 ],
+    "texture": "gui/nova/btn_pressed.png",
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "alpha": 1.0
   },
 
@@ -68,7 +70,7 @@
     "uv": [ 199, 206 ],
     "uv_size": [ 38, 20 ],
     "size": [ 38, 20 ],
-    "color": [ 0.55, 1.0, 0.92, 1.0 ]
+    "color": [ 0.92, 0.92, 0.92, 1.0 ]
   },
 
   "toggle_unchecked_state": {
@@ -79,7 +81,7 @@
     "uv": [ 160, 206 ],
     "uv_size": [ 38, 20 ],
     "size": [ 38, 20 ],
-    "color": [ 0.62, 0.66, 0.8, 1.0 ]
+    "color": [ 0.72, 0.72, 0.72, 1.0 ]
   },
 
   "toggle_checked_hovered_state": {
@@ -95,7 +97,7 @@
           "nineslice_size": 3.0,
           "uv": [ 160, 226 ],
           "uv_size": [ 38, 20 ],
-          "color": [ 0.4, 0.95, 0.88, 1.0 ]
+          "color": [ 1.0, 1.0, 0.63, 1.0 ]
         }
       }
     ]
@@ -114,7 +116,7 @@
           "nineslice_size": 3.0,
           "uv": [ 199, 226 ],
           "uv_size": [ 38, 20 ],
-          "color": [ 0.4, 0.95, 0.88, 1.0 ]
+          "color": [ 1.0, 1.0, 0.63, 1.0 ]
         }
       }
     ]

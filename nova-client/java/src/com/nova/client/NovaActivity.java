@@ -117,6 +117,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         if (f.exists()) {
             try {
                 byte[] data = PackManager.readFile(f);
+                Log.e(TAG, "previous run crashed:\n" + new String(data, "UTF-8"));     // into nova_log.txt as well
                 try {
                     android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                     cm.setPrimaryClip(android.content.ClipData.newPlainText("NOVA crash", new String(data, "UTF-8")));
@@ -652,8 +653,13 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
 
     @Override
     public byte[] getFileDataBytes(String path) {
-        byte[] b = fileData(path);
         String np = norm(path);
+        // state of this client for libnova's 1.1.5 screens (native/nui_game.inc): read once a second
+        if (np != null && np.equals("nova/state.txt")) {
+            try { return ("signed=" + (signedIn() ? 1 : 0) + "\ntag=" + accountTag() + "\n").getBytes("UTF-8"); }
+            catch (Exception e) { return null; }
+        }
+        byte[] b = fileData(path);
         if (np != null && np.startsWith("ui/")) b = Social.serveUi(np, b);
         return b;
     }

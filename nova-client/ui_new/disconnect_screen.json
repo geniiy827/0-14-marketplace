@@ -12,7 +12,7 @@
 
   "disconnect_text@disconnect.disconnect_screen_text": {
     "offset": [ 0, -27 ],
-    "color": [ 0.75, 0.8, 0.9, 1.0 ],
+    "color": [ 0.86, 0.86, 0.86, 1.0 ],
     "text": "#disconnect_text",
     "wrap": true,
     "bindings": [
@@ -92,7 +92,7 @@
           "controls": [
             {
               "@disconnect.ok_button_text": {
-                "color": [ 0.4, 0.95, 0.88, 1.0 ]
+                "color": [ 1.0, 1.0, 0.63, 1.0 ]
               }
             }
           ]
@@ -103,7 +103,7 @@
           "controls": [
             {
               "@disconnect.ok_button_text": {
-                "color": [ 0.4, 0.95, 0.88, 1.0 ],
+                "color": [ 1.0, 1.0, 0.63, 1.0 ],
                 "alpha": 0.65
               }
             }

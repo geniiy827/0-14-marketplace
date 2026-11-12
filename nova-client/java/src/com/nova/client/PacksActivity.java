@@ -18,7 +18,7 @@ import java.util.List;
 /** "Наборы ресурсов": library of .mcres packs — on/off, priority, delete, import. Minecraft-styled. */
 public class PacksActivity extends Activity {
     private static final int REQ_PICK = 4101;
-    private static final int ROW_ON = 0xFF5E98A4;
+    private static final int ROW_ON = 0xFFB0B0B0;
 
     private LinearLayout list;
     private LinearLayout banner;
@@ -66,7 +66,7 @@ public class PacksActivity extends Activity {
         banner = new LinearLayout(this);
         banner.setOrientation(LinearLayout.HORIZONTAL);
         banner.setGravity(Gravity.CENTER_VERTICAL);
-        banner.setBackgroundDrawable(new McKit.PanelDrawable(this, 0xFF9784CF, 245));
+        banner.setBackgroundDrawable(new McKit.PanelDrawable(this, 0xFFFFFFFF, 245));
         banner.setPadding(8 * s, 4 * s, 5 * s, 4 * s);
         banner.addView(new McKit.Text(this, "Изменения применятся после перезапуска игры", McKit.WHITE),
                 new LinearLayout.LayoutParams(0, -2, 1));

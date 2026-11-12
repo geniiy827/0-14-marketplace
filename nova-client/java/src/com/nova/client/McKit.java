@@ -34,19 +34,19 @@ import java.util.Map;
 public final class McKit {
     private McKit() { }
 
-    // ---------------------------------------------------------------- palette (ARGB tints)
-    public static final int BTN = 0xFF7887AD;        // slate button      [0.47,0.53,0.68]
-    public static final int BTN_HOVER = 0xFF57CCD1;  // teal              [0.34,0.80,0.82]
-    public static final int BTN_PRESS = 0xFF3D9EA8;  // deep teal
-    public static final int BTN_PRIMARY = 0xFF4FB9BD;
+    // ---------------------------------------------------------------- palette (ARGB tints; classic Minecraft look)
+    public static final int BTN = 0xFFC6C6C6;        // classic grey button
+    public static final int BTN_HOVER = 0xFFC0C9FF;  // 1.1.5 lavender hover
+    public static final int BTN_PRESS = 0xFF9EA9EE;  // 1.1.5 pressed
+    public static final int BTN_PRIMARY = 0xFFC6C6C6;
     public static final int BTN_DANGER = 0xFFC4505F;
-    public static final int PANEL = 0xFF707D9E;      // window body       [0.44,0.49,0.62]
-    public static final int FIELD = 0xFF9EB8FF;      // inset field tint  [0.62,0.72,1.00]
-    public static final int ACCENT = 0xFF66F2E0;
-    public static final int VIOLET = 0xFFAD85FF;
+    public static final int PANEL = 0xFFFFFFFF;      // window body: the grey classic panel untinted
+    public static final int FIELD = 0xFFFFFFFF;      // inset field: classic dark inset untinted
+    public static final int ACCENT = 0xFFFFFFA0;
+    public static final int VIOLET = 0xFFFFFF55;
     public static final int WHITE = 0xFFFFFFFF;
-    public static final int GRAY = 0xFFC9D0E2;
-    public static final int DIM = 0xFF9AA4BE;
+    public static final int GRAY = 0xFFD0D0D0;
+    public static final int DIM = 0xFFA0A0A0;
     public static final int RED = 0xFFFF7A86;
     public static final int GOLD = 0xFFFFE27A;
 
@@ -269,9 +269,9 @@ public final class McKit {
                 Rect dst = new Rect(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2);
                 cv.drawBitmap(pano, null, dst, p);
             } else {
-                cv.drawColor(0xFF1A2236);
+                cv.drawColor(0xFF2A2A2A);
             }
-            p.setColor(0x8C141A2C);
+            p.setColor(0x8C101010);
             cv.drawRect(r, p);
         }
         @Override public void setAlpha(int a) { }
@@ -374,15 +374,14 @@ public final class McKit {
         }
 
         @Override protected void onDraw(Canvas cv) {
-            int tint;
-            if (!isEnabled()) tint = 0xFF5A6278;
-            else if (pressed) tint = kind == DANGER ? 0xFF8E3442 : BTN_PRESS;
-            else tint = kind == PRIMARY ? BTN_PRIMARY : (kind == DANGER ? BTN_DANGER : BTN);
+            // the classic 1.1.5 button pictures (tools/classic_gui.py): grey, lavender when pressed, grey-dark when off
+            String pic = !isEnabled() ? "gui/nova/btn_locked.png" : (pressed ? "gui/nova/btn_pressed.png" : "gui/nova/btn.png");
+            int tint = kind == DANGER && isEnabled() ? 0xFFFF9C9C : WHITE;
             Rect r = new Rect(0, 0, getWidth(), getHeight());
-            nine(cv, tex(getContext(), "gui/newgui/NormalButtonStroke.png"), new Rect(0, 0, 12, 12), 4, r, s, tint, 255);
+            nine(cv, tex(getContext(), pic), new Rect(0, 0, 6, 6), 2, r, s, tint, 255);
             int h = s / 2;
             String t = Text.ellipsize(label, getWidth() / h - 12);
-            int color = !isEnabled() ? 0xFFA0A8BC : (pressed ? 0xFFE0FFFA : WHITE);
+            int color = !isEnabled() ? 0xFFA0A0A0 : (pressed ? 0xFFFFFFA0 : WHITE);
             float x = (getWidth() - Font.width(t) * h) / 2f;
             float y = (getHeight() - 16 * h) / 2f + (pressed ? s : 0);
             Font.draw(cv, t, x, y, h, color, true);
@@ -415,7 +414,7 @@ public final class McKit {
         @Override protected void onDraw(Canvas cv) {
             Rect src = on ? new Rect(199, 206, 237, 226) : new Rect(160, 206, 198, 226);
             image(cv, tex(getContext(), "gui/touchgui.png"), src, new Rect(0, 0, getWidth(), getHeight()),
-                    on ? 0xFF8CFFEB : 0xFFB0B8D0, 255);
+                    0xFFFFFFFF, 255);
         }
     }
 

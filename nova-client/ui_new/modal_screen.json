@@ -4,12 +4,12 @@
   // Dialog window: brown stone -> dark slate card with mint top line
   "modal_background_image": {
     "type": "image",
-    "texture": "gui/newgui/NormalButtonStroke.png",
+    "texture": "gui/newgui/dialog-background-atlas.png",
     "layer": 1,
     "nineslice_size": 4.0,
-    "uv": [ 0, 0 ],
-    "uv_size": [ 12, 12 ],
-    "color": [ 0.36, 0.41, 0.54, 1.0 ],
+    "uv": [ 0, 80 ],
+    "uv_size": [ 16, 16 ],
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "controls": [
       {
         "top_line@common.accent_line": {
@@ -30,7 +30,7 @@
     "layer": 1,
     "uv": [ 0, 0 ],
     "uv_size": [ 1, 1 ],
-    "color": [ 0.05, 0.07, 0.15, 1.0 ]
+    "color": [ 0.08, 0.08, 0.08, 1.0 ]
   },
 
   "modal_title_text": {
@@ -44,7 +44,7 @@
     "text": "#modal_title_text",
     "alignment": "top_left",
     "shadow": true,
-    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "color": [ 1.0, 1.0, 0.63, 1.0 ],
     "bindings": [
       {
         "binding_name": "$modal_title_text",
@@ -63,7 +63,7 @@
     "layer": 2,
     "text": "#modal_label_text",
     "alignment": "top_left",
-    "color": [ 0.86, 0.9, 0.98, 1.0 ],
+    "color": [ 0.97, 0.97, 0.97, 1.0 ],
     "bindings": [
       {
         "binding_name": "$modal_label_text",
@@ -115,7 +115,7 @@
             {
               "@common.button_text": {
                 "text": "#modal_button_text",
-                "color": [ 0.4, 0.95, 0.88 ],
+                "color": [ 1.0, 1.0, 1.0 ],
                 "bindings": [
                   {
                     "binding_name": "$modal_button_text",
@@ -133,7 +133,7 @@
             {
               "@common.button_text": {
                 "text": "#modal_button_text",
-                "color": [ 0.4, 0.95, 0.88 ],
+                "color": [ 1.0, 1.0, 1.0 ],
                 "alpha": 0.65,
                 "bindings": [
                   {

@@ -233,7 +233,7 @@
     "layer": 10,
     "size": [ 40, 30 ],
     "text": "#item_name",
-    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "color": [ 1.0, 1.0, 0.63, 1.0 ],
     "anchor_from": "top_middle",
     "anchor_to": "top_middle",
     "shadow": false,
@@ -393,7 +393,7 @@
             {
               "@common.button_text": {
                 "text": "<",
-                "color": [ 0.4, 0.95, 0.88 ]
+                "color": [ 1.0, 1.0, 1.0 ]
               }
             }
           ]
@@ -405,7 +405,7 @@
             {
               "@common.button_text": {
                 "text": "<",
-                "color": [ 0.4, 0.95, 0.88 ],
+                "color": [ 1.0, 1.0, 1.0 ],
                 "alpha": 0.65
               }
             }
@@ -488,7 +488,7 @@
     "nineslice_size": 2.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 7, 7 ],
-    "color": [ 0.42, 0.47, 0.62, 1.0 ]
+    "color": [ 0.51, 0.51, 0.51, 1.0 ]
   },
 
   "export_button_hover": {
@@ -497,7 +497,7 @@
     "nineslice_size": 2.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 7, 7 ],
-    "color": [ 0.36, 0.86, 0.86, 1.0 ]
+    "color": [ 0.77, 0.77, 0.77, 1.0 ]
   },
 
   "export_button_pressed": {
@@ -506,12 +506,12 @@
     "nineslice_size": 2.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 7, 7 ],
-    "color": [ 0.24, 0.6, 0.62, 1.0 ]
+    "color": [ 0.53, 0.53, 0.53, 1.0 ]
   },
 
   "export_text@common.button_text": {
     "text": "Export Portfolio",
-    "color": [ 0.95, 0.97, 1.0, 1.0 ],
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "shadow": false,
     "offset": [ 0, 1 ],
     "anchor_from": "center",

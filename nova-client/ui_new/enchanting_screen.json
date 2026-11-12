@@ -186,7 +186,7 @@
     "alignment": "center",
     "text": "container.enchant",
     "shadow": true,
-    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "color": [ 1.0, 1.0, 0.63, 1.0 ],
     "layer": 2
   },
 

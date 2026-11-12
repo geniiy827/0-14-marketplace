@@ -28,7 +28,7 @@
     "alignment": "top_left",
     "text": "???",
     "shadow": true,
-    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "color": [ 1.0, 1.0, 0.63, 1.0 ],
     "layer": 1
   },
 
@@ -131,7 +131,7 @@
   "plus_sign_icon": {
     "type": "image",
     "texture": "gui/newgui/anvil-plus.png",
-    "color": [ 0.62, 0.7, 0.95, 1.0 ],
+    "color": [ 0.76, 0.76, 0.76, 1.0 ],
     "size": [ 12, 12 ],
     "uv": [ 0, 0 ],
     "uv_size": [ 13, 13 ]
@@ -140,7 +140,7 @@
   "arrow_icon": {
     "type": "image",
     "texture": "gui/newgui/anvil-arrow.png",
-    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "color": [ 1.0, 1.0, 0.63, 1.0 ],
     "size": [ 16, 11 ],
     "uv": [ 0, 0 ],
     "uv_size": [ 22, 15 ]

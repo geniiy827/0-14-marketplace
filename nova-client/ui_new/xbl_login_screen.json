@@ -173,7 +173,7 @@
                       "controls": [
                         {
                           "@xbl_login.play_button_text": {
-                            "color": [ 0.4, 0.95, 0.88 ]
+                            "color": [ 1.0, 1.0, 0.2 ]
                           }
                         }
                       ]
@@ -184,7 +184,7 @@
                       "controls": [
                         {
                           "@xbl_login.play_button_text": {
-                            "color": [ 0.4, 0.95, 0.88 ],
+                            "color": [ 1.0, 1.0, 0.2 ],
                             "alpha": 0.65
                           }
                         }

@@ -29,7 +29,7 @@
     "size": [ 20, 13 ],
     "uv": [ 73, 20 ],
     "uv_size": [ 22, 15 ],
-    "color": [ 0.45, 0.52, 0.7, 1.0 ]
+    "color": [ 0.56, 0.56, 0.56, 1.0 ]
   },
 
   "furnace_arrow_full_image": {
@@ -41,7 +41,7 @@
     "size": [ 20, 13 ],
     "uv": [ 73, 36 ],
     "uv_size": [ 22, 15 ],
-    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "color": [ 1.0, 1.0, 0.63, 1.0 ],
     "nineslice_size": 0.0,
     "clip_direction": "left",
     "bindings": [
@@ -90,7 +90,7 @@
     "alignment": "center",
     "text": "container.furnace",
     "shadow": true,
-    "color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "color": [ 1.0, 1.0, 0.63, 1.0 ],
     "layer": 2
   },
 

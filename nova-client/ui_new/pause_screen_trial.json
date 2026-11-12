@@ -33,24 +33,27 @@
       },
       {
         "pressed@common.button_state_pressed": {
-          "controls": [ { "@common.button_text": { "text": "$button_text", "color": [ 0.8, 1.0, 0.96 ], "alpha": 0.8 } } ]
+          "controls": [ { "@common.button_text": { "text": "$button_text", "color": [ 1.0, 1.0, 1.0 ], "alpha": 0.8 } } ]
         }
       }
     ]
   },
 
   "resume_state@common-classic.button_state_default": {
-    "color": [ 0.31, 0.72, 0.74, 1.0 ],
+    "texture": "gui/nova/btn.png",
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "alpha": 1.0
   },
 
   "resume_state_hover@common-classic.button_state_default": {
-    "color": [ 0.36, 0.86, 0.8, 1.0 ],
+    "texture": "gui/nova/btn_hover.png",
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "alpha": 1.0
   },
 
   "resume_state_pressed@common-classic.button_state_default": {
-    "color": [ 0.22, 0.55, 0.58, 1.0 ],
+    "texture": "gui/nova/btn_pressed.png",
+    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "alpha": 1.0
   },
 
@@ -71,7 +74,7 @@
     "uv_size": [ 1, 1 ],
     "size": [ "100%", "100%" ],
     "layer": 0,
-    "color": [ 0.05, 0.07, 0.15, 1.0 ],
+    "color": [ 0.08, 0.08, 0.08, 1.0 ],
     "alpha": 0.38
   },
 
@@ -141,16 +144,16 @@
             {
               "card": {
                 "type": "image",
-                "texture": "gui/newgui/NormalButtonStroke.png",
+                "texture": "gui/newgui/dialog-background-atlas.png",
                 "nineslice_size": 4.0,
-                "uv": [ 0, 0 ],
-                "uv_size": [ 12, 12 ],
+                "uv": [ 0, 80 ],
+                "uv_size": [ 16, 16 ],
                 "size": [ "100%+16px", "100%+16px" ],
                 "anchor_from": "center",
                 "anchor_to": "center",
                 "layer": 0,
-                "color": [ 0.22, 0.26, 0.38, 1.0 ],
-                "alpha": 0.9,
+                "color": [ 1.0, 1.0, 1.0, 1.0 ],
+                "alpha": 1.0,
                 "offset": "@pauseTrial.anim_card_in"
               }
             },
@@ -163,7 +166,7 @@
                 "layer": 2,
                 "text": "menu.game",
                 "shadow": true,
-                "color": [ 0.4, 0.95, 0.88 ],
+                "color": [ 1.0, 1.0, 0.2 ],
                 "alpha": "@common.anim_fade_in",
                 "anchor_from": "top_middle",
                 "anchor_to": "top_middle"
@@ -242,7 +245,7 @@
                   },
                   {
                     "pressed@common.button_state_pressed": {
-                      "controls": [ { "@common.button_text": { "text": "nova.pause.friends", "color": [ 0.8, 1.0, 0.96 ], "alpha": 0.8 } } ]
+                      "controls": [ { "@common.button_text": { "text": "nova.pause.friends", "color": [ 1.0, 1.0, 1.0 ], "alpha": 0.8 } } ]
                     }
                   }
                 ]

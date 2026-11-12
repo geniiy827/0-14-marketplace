@@ -255,3 +255,19 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Луки: хук EnchantUtils::getEnchantLevel (19 сила, 21 огонь, 22 бесконечность) по power/flame/infinity.
 - tools/check_mods.sh: прогон всех примеров модов на ПК (mcmod/test/ModCheck.java), build_java.sh падает при ошибке javac.
 - Медная руда без drop (в моде нет сырой меди), оловянная -> raw_tin.
+
+## alpha34 — снова классический стиль (ноябрь 2026)
+- Пользователь передумал насчёт «гибрида» (1.1.5 + мульти-версии): основа остаётся 0.14, меню 1.1.5 не переносим.
+  Движок NUI (`native/nui.inc`, `nui_game.inc`, `tools/nui_preview/`, `tools/ui115_assets.py`) лежит, но в сборку
+  НЕ включён (из nova.c/creative.inc/net.inc убран). `tools/nui_preview` умеет рисовать и 0.14-JSON (ui_new) —
+  удобно смотреть экраны на ПК (см. ниже).
+- Синяя тема NOVA убрана: `tools/classic_ui.py ui_new` (разовая правка, как recolor.py): кнопки = картинки 1.1.5
+  `gui/nova/btn.png / btn_hover / btn_pressed / btn_locked` (6x6, nineslice 2, из ButtonWithBorder*.png 1.1.5,
+  `tools/classic_gui.py`), панели = серый dialog-background-atlas (uv 0,80 16x16), палитра mint/violet/slate ->
+  жёлтый/серые. Текст на кнопках: тёмно-серый без тени, в hover/pressed белый (`common.button_text`).
+  Java-экраны: палитра McKit классическая, McKit.Button рисует те же btn*.png.
+- Логотип: `intro/title.bbmodel` = новая модель пользователя (та же геометрия, новый шрифт/текстура).
+  `tools/gen_title.py` рисует из меша интро `assets_new/images/gui/title.png` (камера интро, отсечение задних граней
+  обязательно — у Title Generator вывернутые кубы-обводки); build.sh пересобирает title и иконку, если bbmodel новее.
+- Превью 0.14-экрана на ПК: собрать дерево /tmp/r014 (ui/ = ui_orig+ui_new, gui/ из images + `*.png.png` симлинки,
+  font/), `nui_preview /tmp/r014 widths.txt <lang> start.start_screen 427 240` -> render.py.
