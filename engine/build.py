@@ -32,7 +32,7 @@ MATERIALS = {
     "гравий": "f:gravel", "бедрок": "f:bedrock", "губка": "f:sponge", "сено": "hay", "верстак": "crafting",
     "печь": "furnace", "тнт": "tnt", "динамит": "tnt", "тыква": "pumpkin", "арбуз": "melon", "кактус": "cactus",
     "книжная_полка": "bookshelf", "полка": "bookshelf", "вода": "water", "крыша": "roof", "шерсть": "wool",
-    "терракота": "f:hardened_clay", "лампа": "f:redstone_lamp_on", "нотный_блок": "f:noteblock",
+    "терракота": "f:hardened_clay", "прутья": "f:iron_bars", "решётка": "f:iron_bars", "решетка": "f:iron_bars", "лампа": "f:redstone_lamp_on", "нотный_блок": "f:noteblock",
     "слизь": "f:slime_block", "эндерняк": "f:end_stone", "мицелий": "f:mycelium/0",
 }
 for i, c in enumerate(COLORS_RU):
@@ -352,9 +352,14 @@ def apply(world, cmd, base_dir):
     elif op == "пол":
         x1, z1 = _nums(pos[0]); x2, z2 = _nums(pos[1]); y = int(kv.get("высота", -1))
         X, _, Z = box3((x1, 0, z1), (x2, 0, z2))
+        fl = getattr(world, "_floor", None)
+        if fl is None:
+            fl = world._floor = {}
         for x in X:
             for z in Z:
                 put(x, y, z, mat)
+                if y < 2:
+                    fl[(x, z)] = y + 1
         world.sprites = [s for s in world.sprites if not (s[0] in X and s[2] in Z and s[1] == y + 1)]
     elif op == "стена":
         x1, z1 = _nums(pos[0]); x2, z2 = _nums(pos[1]); h = int(kv.get("высота", 3)); y0 = int(kv.get("от", 0))
@@ -363,6 +368,14 @@ def apply(world, cmd, base_dir):
             u = k / max(1, n - 1)
             x, z = int(round(x1 + (x2 - x1) * u)), int(round(z1 + (z2 - z1) * u))
             for y in range(y0, y0 + h):
+                put(x, y, z, mat)
+    elif op in ("решётка", "решетка", "забор", "колонны"):
+        x1, z1 = _nums(pos[0]); x2, z2 = _nums(pos[1]); h = int(kv.get("высота", 3)); step = int(kv.get("шаг", 2))
+        n = int(max(abs(x2 - x1), abs(z2 - z1))) + 1
+        for k in range(0, n, max(1, step)):
+            u = k / max(1, n - 1)
+            x, z = int(round(x1 + (x2 - x1) * u)), int(round(z1 + (z2 - z1) * u))
+            for y in range(int(kv.get("от", 0)), int(kv.get("от", 0)) + h):
                 put(x, y, z, mat)
     elif op in ("коробка", "комната", "здание", "дом"):
         # hollow building: walls of material, floor, flat roof, door and windows

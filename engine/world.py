@@ -396,6 +396,11 @@ class World:
         return gc[k]
 
     def _terrain(self, x, z):
+        fl = getattr(self, "_floor", None)
+        if fl:
+            k = (int(math.floor(x)), int(math.floor(z)))
+            if k in fl:
+                return float(fl[k])
         if self.preset in ("city", "город"):
             return float(self.height.get((int(math.floor(x)), int(math.floor(z))), 0)) if math.hypot(x, z) > 29 else 0.0
         return float(self.height.get((int(math.floor(x)), int(math.floor(z))), 0)) \

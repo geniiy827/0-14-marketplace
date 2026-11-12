@@ -395,7 +395,8 @@ class Renderer:
     @staticmethod
     def mob_matrices(pose, ch):
         g = pose.get
-        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ Rx(g("r_p", 0)) @ S(g("scale", 1.0) / 16) @ T(0, g("oy", 0), 0)
+        W_ = np.diag([g("width", 1.0), 1.0, g("width", 1.0), 1.0]).astype(np.float32)
+        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ Rx(g("r_p", 0)) @ W_ @ S(g("scale", 1.0) / 16) @ T(0, g("oy", 0), 0)
         M = {}
         bones = ch["bones"]
         legs4 = all(k in bones for k in ("leg0", "leg1", "leg2", "leg3")) and "leg4" not in bones
@@ -498,7 +499,8 @@ class Renderer:
     def part_matrices(pose, pivots):
         """pose: dict with x,y,z,yaw and joint angles (radians)."""
         g = pose.get
-        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ Rx(g("r_p", 0)) @ S(1 / 16 * 0.9375 * g("scale", 1.0))
+        W_ = np.diag([g("width", 1.0), 1.0, g("width", 1.0), 1.0]).astype(np.float32)
+        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ Rx(g("r_p", 0)) @ W_ @ S(1 / 16 * 0.9375 * g("scale", 1.0))
         root = root @ T(g("ox", 0) * 16, g("oy", 0), 0)
         bp = pivots["body"]
         body_m = root @ T(*bp) @ Ry(g("b_y", 0)) @ Rx(g("b_p", 0)) @ Rz(g("b_r", 0)) @ T(*[-c for c in bp])

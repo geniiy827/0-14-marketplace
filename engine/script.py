@@ -60,10 +60,13 @@ ALIASES = {
     "wobble": "качается шатается wobble",
     "resize": "размер растет растёт уменьшается увеличивается resize",
     "attach": "крепится цепляется прилипает attach",
+    "widen": "толстеет разжирел ширина худеет widen",
+    "turnaway": "отворачивается отвернулся отвернулась turnaway",
     "detach": "отцепляется отпадает detach",
     "effect": "эффект effect",
+    "sound": "звук sound",
 }
-ITEMS = {"записк": "paper", "бумаг": "paper", "сено": "hayblock/1", "ящик": "crafting_table/1", "коробк": "crafting_table/1", "тыкв": "pumpkin/1",
+ITEMS = {"пицц": "pizza", "записк": "paper", "бумаг": "paper", "сено": "hayblock/1", "ящик": "crafting_table/1", "коробк": "crafting_table/1", "тыкв": "pumpkin/1",
          "дротик": "arrow", "сумк": "leather", "пакет": "paper", "сундук": "crafting_table/1",
          "банк": "potion_bottle_empty", "бутыл": "potion_bottle_empty", "ведр": "bucket", "яблок": "apple",
          "хлеб": "bread", "торт": "cake", "рыб": "fish_raw_cod", "книг": "book_normal", "кост": "bone",
@@ -77,7 +80,7 @@ SOUNDS_RU = {"взрыв": "random_explode", "дверь": "random_door_open", "
              "житель": "mob_villager_idle", "хм": "mob_villager_idle", "ведьма": "mob_witch_ambient", "крипер": "random_fuse",
              "гром": "ambient_weather_thunder", "стекло": "random_glass", "поп": "random_pop", "еда": "random_eat",
              "сундук": "random_chestopen", "гав": "mob_wolf_bark", "бее": "mob_sheep_say", "зомби": "mob_zombie_say",
-             "дождь": "ambient_weather_rain", "фейерверк": "random_explode", "лава": "liquid_lavapop", "всплеск": "random_splash",
+             "дождь": "ambient_weather_rain", "смыв": "liquid_water", "вода": "liquid_water", "чавк": "random_eat", "фейерверк": "random_explode", "лава": "liquid_lavapop", "всплеск": "random_splash",
              "лук": "random_bow", "наковальня": "random_anvil_land", "паук": "mob_spider_say", "скелет": "mob_skeleton_say",
              "эндермен": "mob_endermen_scream", "кот": "mob_cat_meow", "огонь": "fire_ignite", "стрела": "random_bowhit"}
 ACT = {}
@@ -107,7 +110,7 @@ class Timeline:
         self.speech, self.sfx, self.shots, self.scenes = [], [], [], []
         self.vis, self.items, self.lies, self.particles, self.music_plan = [], [], [], [], []
         self.poses = []
-        self.attach, self.scales = [], []
+        self.attach, self.scales, self.widths = [], [], []
         self.duration = 0.0
 
 
@@ -155,7 +158,8 @@ def parse(path):
                 kind = MOB_RU.get(norm(opts.get("тип", opts.get("type", "корова"))), "cow")
                 p = opts.get("место", opts.get("pos", "0,0")).split(",")
                 cast[name] = dict(name=name, mob=kind, pos=(float(p[0]), float(p[1])), color=opts.get("цвет", "#dddddd"),
-                                  voice=None, pitch=None, rate=None, skin=None, texture=opts.get("текстура"),
+                                  voice=opts.get("голос"), pitch=opts.get("тон"), rate=opts.get("скорость"), skin=None,
+                                  texture=opts.get("текстура"),
                                   lift=float(opts.get("высота", 0)), scale=float(opts.get("размер", 1)),
                                   hidden=norm(opts.get("скрыт", "нет")) in ("да", "yes"))
                 if "поворот" in opts:
@@ -348,6 +352,10 @@ class Compiler:
                     break
             tl.poses.append(dict(char=subj, t=t0, name=nm))
             return t0 + (num or 0.6)
+        if kind == "sound":
+            for tk in getattr(self, "last_tokens", []):
+                tl.sfx.append((t0, SOUNDS_RU.get(tk, tk), 1.0))
+            return t0
         if kind == "effect":
             toks = getattr(self, "last_tokens", [])
             nm = next((x for x in toks if x in self.lib.effects), None)
@@ -403,6 +411,22 @@ class Compiler:
                 P.append(dict(kind="zzz", t0=t0 + 0.5, t1=t0 + (num or 3.0), char=subj))
                 return t0 + (num or 1.0)
             return t0 + (num or 0.9)
+        if kind == "widen":
+            tl.widths.append(dict(char=subj, t=t0, v=num or (1.0 if "худеет" in getattr(self, "last_tokens", []) else 1.8)))
+            tl.sfx.append((t0, "random_burp" if (num or 1.8) > 1.01 else "random_pop", 0.9))
+            return t0 + 0.6
+        if kind == "turnaway":
+            sx, sz = self.pos[subj]
+            if target:
+                tx, tz = self.target_xz(target) or (sx, sz - 1)
+            elif self.crowd and subj in self.crowd["names"]:
+                tx, tz = self.crowd["c"]
+            else:
+                tx, tz = sx, sz + 1
+            ang = math.atan2(sx - tx, sz - tz)
+            tl.faces.append(dict(char=subj, t=t0, target=("yaw", ang)))
+            tl.looks.append(dict(char=subj, t=t0, target=("yaw", ang)))
+            return t0 + 0.6
         if kind == "resize":
             tl.scales.append(dict(char=subj, t=t0, v=num or 1.0))
             tl.sfx.append((t0, "random_pop", 0.6))
@@ -558,22 +582,27 @@ class Compiler:
             sk_dir = os.path.join(os.path.dirname(os.path.abspath(self.path)), opts.get("скины", "skins/crowd"))
             skins = sorted(glob.glob(os.path.join(sk_dir, "*.png")))
             cc = [float(v) for v in opts.get("центр", "0,0").split(",")]
-            self.crowd = dict(world=opts.get("мир", "город"), R=float(opts.get("радиус", 8)), c=cc, names=[])
+            self.crowd = dict(world=opts.get("мир", "город"), R=float(opts.get("радиус", 8)), c=cc, names=[],
+                              watch=norm(opts.get("стоят", "нет")) in ("да", "yes"))
             rr = _r.Random(7)
             placed = []
             for i in range(cnt):
                 nm = f"Прохожая{i + 1}"
                 for _try in range(60):
-                    a = rr.uniform(0, 6.28); rad = rr.uniform(3.5, self.crowd["R"])
+                    a = rr.uniform(0, 6.28)
+                    rad = rr.uniform(max(3.5, self.crowd["R"] - 2.5) if norm(opts.get("стоят", "нет")) == "да" else 3.5, self.crowd["R"])
                     q = (cc[0] + rad * math.cos(a), cc[1] + rad * math.sin(a))
                     if all(math.hypot(q[0] - o[0], q[1] - o[1]) > 1.5 for o in placed) and \
                             all((math.floor(q[0] + dx_), 0, math.floor(q[1] + dz_)) not in self.world_factory(opts.get("мир", "город")).blocks
                                 for dx_ in (-0.3, 0.3) for dz_ in (-0.3, 0.3)):
                         break
                 placed.append(q)
-                tl.cast[nm] = dict(name=nm, skin=skins[i % len(skins)], voice="anna", pitch=None, rate=None,
-                                   color="#ffb0d0", pos=(cc[0] + rad * math.cos(a), cc[1] + rad * math.sin(a)),
-                                   hidden=True, extra=True, yaw=rr.uniform(-3, 3))
+                px_, pz_ = cc[0] + rad * math.cos(a), cc[1] + rad * math.sin(a)
+                watch = norm(opts.get("стоят", "нет")) in ("да", "yes")
+                vv = ["anna", "victoria", "irina", "tatiana", "elena", "arina"]
+                tl.cast[nm] = dict(name=nm, skin=skins[i % len(skins)], voice=vv[i % len(vv)], pitch=None, rate=None,
+                                   color="#ffb0d0", pos=(px_, pz_), hidden=True, extra=True,
+                                   yaw=math.atan2(cc[0] - px_, cc[1] - pz_) if watch else rr.uniform(-3, 3))
                 self.pos[nm] = tl.cast[nm]["pos"]
                 self.crowd["names"].append(nm)
         else:
@@ -626,7 +655,7 @@ class Compiler:
                     addr = last_speaker if last_speaker in others else (
                         min(others, key=lambda n: math.dist(self.pos[n], self.pos[who])) if others else None)
                     cfg = tl.cast[who]
-                    if cfg.get("mob"):
+                    if cfg.get("mob") and not cfg.get("voice"):
                         from .mobs import SOUNDS
                         from .audio import game_sound
                         import numpy as _np
@@ -639,7 +668,8 @@ class Compiler:
                     clean = re.sub(r"\s+", " ", re.sub(r"\[[^\]]*\]", " ", text)).strip()
                     pan = 0.0
                     tl.speech.append(dict(char=who, t0=st, t1=st + dur, audio=audio,
-                                          env=envelope(audio) if not cfg.get("mob") else [0.0], text=clean, pan=pan))
+                                          env=envelope(audio) if not (cfg.get("mob") and not cfg.get("voice")) else [0.0],
+                                          text=clean, pan=pan))
                     if addr:
                         tl.looks.append(dict(char=who, t=t, target=("char", addr)))
                         tl.faces.append(dict(char=who, t=t, target=("char", addr)))
@@ -727,11 +757,18 @@ class Compiler:
                         end = t
                         kinds = []
                         movers = 0
+                        parts_ = []
                         for part in body.split(";"):
+                            pt = part.strip()
+                            if norm(pt).startswith("толпа ") and self.crowd:
+                                parts_ += [nm + pt[5:] for nm in self.crowd["names"]]
+                            else:
+                                parts_.append(pt)
+                        for part in parts_:
                             if not part.strip():
                                 continue
                             subj, kind, target, num = self.parse_action(part.strip(), None)
-                            if subj is None and kind == "effect":
+                            if subj is None and kind in ("effect", "sound"):
                                 subj = names[0]
                             if subj is None:
                                 raise ValueError(f"Кто делает действие? «{part}»")
@@ -767,7 +804,7 @@ class Compiler:
             for sh in merged:
                 tl.shots.append(dict(t0=sh[0], t1=sh[1], spec=sh[2], participants=sorted(participants)))
             t += 0.3
-            if crowd_here:  # extras wander around the plaza for the whole scene
+            if crowd_here and not self.crowd.get("watch"):  # extras wander around the plaza for the whole scene
                 import random as _r
                 rr = _r.Random(int(s0 * 10) + 3)
                 c0 = self.crowd["c"]; R = self.crowd["R"]

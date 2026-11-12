@@ -6,7 +6,16 @@ in frame and not hidden by blocks or other characters. Inside a shot the camera 
 """
 import math
 
-TRANSP = ("water", "glass", "leaves")
+from .mobs import EYE
+
+
+def eye_h(p):
+    sc = p.get("scale", 1.0)
+    if p.get("mob"):
+        return EYE.get(p["mob"], 1.0) * sc
+    return (0.45 if abs(p.get("r_p", 0)) > 0.7 else 1.5) * sc
+
+TRANSP = ("water", "glass")  # see-through for the camera (leaves are not)
 
 VARIANTS = {  # (side, extra angle, distance multiplier, extra height)
     "close": [(1, 0, 1, 0), (1, 0.35, 1, 0), (1, -0.35, 1, 0), (1, 0, 1.35, 0.25), (-1, 0, 1, 0), (-1, 0.3, 1.2, 0.2),
@@ -57,7 +66,7 @@ class Director:
 
     def desired(self, kind, a, b, P, group, t, sh, var, u, extra=None):
         side_s, dang, dmul, dh = var
-        head = lambda p: (p["x"], p["y"] + (0.45 if abs(p.get("r_p", 0)) > 0.7 else 1.5) * p.get("scale", 1.0), p["z"])
+        head = lambda p: (p["x"], p["y"] + eye_h(p), p["z"])
         cx = sum(p["x"] for p in group) / len(group)
         cz = sum(p["z"] for p in group) / len(group)
         cy = sum(p["y"] for p in group) / len(group)
@@ -116,14 +125,15 @@ class Director:
             r1 = _rot(dx, dz, spread_ang + dang); r2 = _rot(dx, dz, -spread_ang + dang)
             side_dir = r1 if (r1[0] * nx + r1[1] * nz) > (r2[0] * nx + r2[1] * nz) else r2
             hx, hy, hz = head(A)
-            sc = A.get("scale", 1.0)
+            sc = A.get("scale", 1.0) if not A.get("mob") else max(0.5, eye_h(A) / 1.5)
+            big = eye_h(A) * 1.05 if A.get("mob") else 0.0
             if kind == "close":
-                d = 2.05 * (1 - 0.05 * u) * dmul * sc
+                d = max(2.05 * sc, big * 2.4 + 0.8) * (1 - 0.05 * u) * dmul
                 return (hx + side_dir[0] * d, hy + 0.08 + dh, hz + side_dir[1] * d), (hx, hy - 0.12 * sc, hz), 36
             if kind == "medium":
-                d = 3.9 * (1 - 0.05 * u) * dmul * sc
-                low = abs(A.get("r_p", 0)) > 0.7
-                cy_ = A["y"] + (0.35 if low else 1.05) * sc
+                d = max(3.9 * sc, big * 3.2 + 1.5) * (1 - 0.05 * u) * dmul
+                low = abs(A.get("r_p", 0)) > 0.7 or (A.get("mob") and eye_h(A) < 1.0)
+                cy_ = A["y"] + ((0.35 if low else 1.05) * sc if not A.get("mob") else eye_h(A) * 0.8)
                 return (A["x"] + side_dir[0] * d, cy_ + 0.4 * sc + dh + (0.6 if low else 0), A["z"] + side_dir[1] * d), \
                     (A["x"], cy_, A["z"]), 42
             if Bp is None:
@@ -150,15 +160,21 @@ class Director:
 
     # ------------------------------------------------------------ scoring
     def solid(self, p):
+        from .world import TRANSPARENT
         b = self.world.blocks.get((math.floor(p[0]), math.floor(p[1]), math.floor(p[2])))
-        return b is not None and b not in TRANSP
+        return b is not None and b not in TRANSP and not (b in TRANSPARENT and b not in ("leaves", "cactus"))
+
+    def thin(self, p):
+        from .world import TRANSPARENT
+        b = self.world.blocks.get((math.floor(p[0]), math.floor(p[1]), math.floor(p[2])))
+        return b is not None and b in TRANSPARENT and b not in ("leaves", "cactus", "water")
 
     def visibility(self, eye, tgt, fov, who, P):
         """problems seeing `who` from eye: returns (in_frame, blocked_by_block, blocked_by_char_name)."""
         if who not in P:
             return True, False, None
         A = P[who]
-        h = (A["x"], A["y"] + (0.45 if abs(A.get("r_p", 0)) > 0.7 else 1.5) * A.get("scale", 1.0), A["z"])
+        h = (A["x"], A["y"] + eye_h(A), A["z"])
         f = [tgt[i] - eye[i] for i in range(3)]
         fl = math.sqrt(sum(c * c for c in f)) or 1
         f = [c / fl for c in f]
@@ -178,6 +194,8 @@ class Director:
         n = max(2, int(vl * 5))
         blocked = False
         by_char = None
+        self.thin_count = 0
+        last_thin = None
         for i in range(1, n):
             k = i / n
             p = (eye[0] + v[0] * k, eye[1] + v[1] * k, eye[2] + v[2] * k)
@@ -185,10 +203,14 @@ class Director:
                 break
             if self.solid(p):
                 blocked = True
+            elif self.thin(p):
+                cell = (math.floor(p[0]), math.floor(p[1]), math.floor(p[2]))
+                if cell != last_thin:
+                    self.thin_count += 1; last_thin = cell
             for c in P.values():
                 if c["name"] == who or c.get("attach") or c.get("prop"):
                     continue
-                hgt = (0.45 if abs(c.get("r_p", 0)) > 0.7 else 1.9) * c.get("scale", 1.0)
+                hgt = (0.45 if abs(c.get("r_p", 0)) > 0.7 else (eye_h(c) + 0.3 if c.get("mob") else 1.9 * c.get("scale", 1.0)))
                 if math.hypot(p[0] - c["x"], p[2] - c["z"]) < 0.3 * c.get("scale", 1.0) and \
                         c["y"] - 0.1 < p[1] < c["y"] + hgt:
                     by_char = c["name"]
@@ -199,7 +221,9 @@ class Director:
         if self.solid(eye):
             s -= 6
         for c in P.values():
-            if math.hypot(eye[0] - c["x"], eye[2] - c["z"]) < 0.45 and c["y"] - 0.2 < eye[1] < c["y"] + 2.0:
+            rad = max(0.45, eye_h(c) * 1.05) if c.get("mob") else 0.45 * c.get("scale", 1.0)
+            top = (eye_h(c) * 2.1 if c.get("mob") else 2.0 * c.get("scale", 1.0))
+            if math.hypot(eye[0] - c["x"], eye[2] - c["z"]) < rad + 0.3 and c["y"] - 0.2 < eye[1] < c["y"] + top:
                 s -= 4
         names = {w_[0] for w_ in focus}
         for c in P.values():  # someone else's back filling the frame
@@ -212,7 +236,7 @@ class Director:
                     s -= (1.9 - dd) * 1.5
         for who, w in focus:
             fr, bl, ch = self.visibility(eye, tgt, fov, who, P)
-            s += w * ((0 if fr else -1.2) + (-0.9 if bl else 0) + (-0.8 if ch else 0))
+            s += w * ((0 if fr else -1.2) + (-0.9 if bl else 0) + (-0.8 if ch else 0) - 0.12 * min(6, self.thin_count))
         return s
 
     # ------------------------------------------------------------ per frame

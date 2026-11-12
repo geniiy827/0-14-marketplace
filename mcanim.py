@@ -250,7 +250,8 @@ class Film:
                     sits=[s for s in tl.sits if s["t"] < sc["t1"]],
                     extra=[[v for v in tl.vis if v["t"] < sc["t1"]], [v for v in tl.items if v["t"] < sc["t1"]],
                            [v for v in tl.lies if v["t"] < sc["t1"]], [p for p in tl.particles if inr(p["t0"], p["t1"])],
-                           [v for v in tl.poses if v["t"] < sc["t1"]]],
+                           [v for v in tl.poses if v["t"] < sc["t1"]], [v for v in tl.widths if v["t"] < sc["t1"]],
+                           [v for v in tl.scales if v["t"] < sc["t1"]], [v for v in tl.attach if v["t"] < sc["t1"]]],
                     speech=[(s["char"], s["t0"], s["t1"], s["text"]) for s in tl.speech if inr(s["t0"], s["t1"])],
                     title=[tl.title, tl.subtitle, tl.subs, tl.end_text, tl.duration])
         blob = json.dumps(data, sort_keys=True, default=str).encode()

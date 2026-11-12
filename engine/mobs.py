@@ -31,7 +31,9 @@ SOUNDS = {"cow": "mob_cow_say", "pig": "mob_pig_say", "chicken": "mob_chicken_sa
           "ghast": "mob_ghast_moan", "blaze": "mob_blaze_breathe", "zombie_pigman": "mob_zombiepig_zpig",
           "zombie_villager": "mob_zombie_say", "wither_skeleton": "mob_skeleton_say", "mooshroom": "mob_cow_say",
           "silverfish": "mob_silverfish_say", "magma_cube": "mob_magmacube_small", "snow_golem": "random_pop"}
-EYE = {"cow": 1.25, "pig": 0.8, "chicken": 0.6, "sheep": 1.2, "wolf": 0.75}
+EYE = {"cow": 1.25, "pig": 0.8, "chicken": 0.6, "sheep": 1.2, "wolf": 0.75, "slime": 0.25, "magma_cube": 0.25,
+       "spider": 0.55, "cave_spider": 0.4, "creeper": 1.4, "enderman": 2.6, "iron_golem": 2.4, "bat": 0.3, "rabbit": 0.4,
+       "ocelot": 0.6, "silverfish": 0.15, "ghast": 2.0, "squid": 0.5, "snow_golem": 1.6, "villager": 1.55, "witch": 1.55}
 
 
 def load_mob(kind, texture=None):

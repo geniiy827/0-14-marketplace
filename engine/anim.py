@@ -210,6 +210,7 @@ class CharSim:
         self.mob = tl.cast[name].get("mob")
         self.attach = sorted([v for v in tl.attach if v["char"] == name], key=lambda v: v["t"])
         self.scales = sorted([v for v in tl.scales if v["char"] == name], key=lambda v: v["t"])
+        self.widths = sorted([v for v in tl.widths if v["char"] == name], key=lambda v: v["t"])
         self.base_lift = tl.cast[name].get("lift", 0.0)
         self.base_scale = tl.cast[name].get("scale", 1.0)
         self.hidden0 = tl.cast[name].get("hidden", False)
@@ -270,6 +271,16 @@ class CharSim:
                 break
         return s
 
+    def width_at(self, t):
+        s = 1.0
+        for e in self.widths:
+            if t >= e["t"] + 0.6:
+                s = e["v"]
+            elif t >= e["t"]:
+                s = s + (e["v"] - s) * smooth((t - e["t"]) / 0.6)
+                break
+        return s
+
     def target_point(self, tgt, t, poses_xz):
         if tgt is None:
             return None
@@ -278,7 +289,10 @@ class CharSim:
             p = poses_xz.get(tgt[1])
             if p is None:
                 return None
-            return (p[0], self.world.ground(p[0], p[1]) + 1.55 + p[2], p[1])
+            from .mobs import EYE
+            c_ = self.tl.cast.get(tgt[1], {})
+            eh = (EYE.get(c_.get("mob"), 1.0) if c_.get("mob") else 1.55) * c_.get("scale", 1.0)
+            return (p[0], self.world.ground(p[0], p[1]) + eh + p[2], p[1])
         if kind == "point":
             x, z = tgt[1]
             return (x, self.world.ground(x, z) + 1.2, z)
@@ -455,9 +469,12 @@ class CharSim:
         att = self.latest(self.attach, t)
         P["lift"] += self.lift_at(t)
         P["scale"] = self.scale_at(t)
+        P["width"] = self.width_at(t)
+        if self.mob in ("slime", "magma_cube") and moving:  # slimes hop instead of walking
+            P["oy"] += 7 * abs(sin(dist / 0.9 * PI))
         P["attach"] = (att["to"], att["slot"]) if att and att["to"] else None
         P.update(name=self.name, x=x + P["ox"] * cos(self.yaw), y=gy + P["lift"], z=z - P["ox"] * sin(self.yaw),
-                 yaw=self.yaw + P["yaw_off"], mouth=0 if self.mob else mouth, blink=blink, hidden=hidden,
+                 yaw=self.yaw + P["yaw_off"], mouth=0 if self.mob else mouth, blink=blink, hidden=hidden, mob=self.mob,
                  item=(it["item"] if it else None), t=t)
         P["ox"] = 0
         self.last = P
