@@ -739,10 +739,15 @@ static void draw_with(float r, float g, float b) {
     f_tdraw(g_tess, line_mat);
 }
 
+static void v15_render(void *client, float *cam, float a);
 static void h_nametags(void *lr, float a) {
     o_nametags(lr, a);
     void *client = g_client;
     if (!client || !f_campos || !f_tbegin) return;
+    {   /* blocks pistons are moving (v015.inc) */
+        char *p0 = *(char **)((char *)client + 0x120);
+        if (p0) { float c0[3]; f_campos(c0, lr, a, p0); v15_render(client, c0, a); }
+    }
     void *opts = f_getoptions(client);
     if (!opts || !f_getbool(opts, opt_f3) || !f_getbool(opts, opt_chunks)) return;
     char *pl = *(char **)((char *)client + 0x120);

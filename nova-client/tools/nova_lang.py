@@ -80,6 +80,10 @@ EXTRA = {
                    'es_ES': 'Versión 0.15 (reinicia)', 'fr_FR': 'Version 0.15 (redémarre)', 'it_IT': 'Versione 0.15 (riavvio)',
                    'pt_BR': 'Versão 0.15 (reinicia)', 'ja_JP': 'バージョン 0.15 (再起動)', 'ko_KR': '버전 0.15 (재시작)',
                    'zh_CN': '版本 0.15 (重启)', 'zh_TW': '版本 0.15 (重啟)'},
+ # 0.15 blocks (alpha36)
+ 'tile.piston.name': {'en_US': 'Piston', 'ru_RU': 'Поршень', 'de_DE': 'Kolben', 'es_ES': 'Pistón', 'fr_FR': 'Piston', 'it_IT': 'Pistone', 'pt_BR': 'Pistão', 'ja_JP': 'ピストン', 'ko_KR': '피스톤', 'zh_CN': '活塞', 'zh_TW': '活塞'},
+ 'tile.sticky_piston.name': {'en_US': 'Sticky Piston', 'ru_RU': 'Липкий поршень', 'de_DE': 'Klebriger Kolben', 'es_ES': 'Pistón pegajoso', 'fr_FR': 'Piston collant', 'it_IT': 'Pistone appiccicoso', 'pt_BR': 'Pistão grudento', 'ja_JP': '粘着ピストン', 'ko_KR': '끈끈이 피스톤', 'zh_CN': '粘性活塞', 'zh_TW': '黏性活塞'},
+ 'tile.slime.name': {'en_US': 'Slime Block', 'ru_RU': 'Блок слизи', 'de_DE': 'Schleimblock', 'es_ES': 'Bloque de slime', 'fr_FR': 'Bloc de slime', 'it_IT': 'Blocco di slime', 'pt_BR': 'Bloco de slime', 'ja_JP': 'スライムブロック', 'ko_KR': '슬라임 블록', 'zh_CN': '粘液块', 'zh_TW': '史萊姆方塊'},
 }
 for _k, _v in EXTRA.items():
     K.append(_k)

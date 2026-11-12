@@ -162,6 +162,7 @@ final class ModBlocks {
             Log.e(TAG, "no block layout", t);
             return;
         }
+        if (NovaActivity.playVersion >= 15) builtin015();
         Map<String, Integer> ids = loadIds();
         List<Double> out = new ArrayList<Double>();
         List<Object[]> rsRefs = new ArrayList<Object[]>();
@@ -629,6 +630,30 @@ final class ModBlocks {
         return m;
     }
 
+    /** pictures of the blocks 0.15 added (native/v015.inc looks them up by these terrain.meta names) */
+    static final String[] V015_TEX = {"piston_side", "piston_top_normal", "piston_top_sticky", "piston_bottom", "piston_inner", "slime"};
+    private void builtin015() {
+        for (String n : V015_TEX) {
+            try { named.put(n, pack(null, "nova/v015/blocks/" + n + ".png", null)); }
+            catch (Exception e) { Log.e(TAG, "0.15 texture " + n, e); }
+        }
+        // the arm's rod: the side picture turned a quarter, so its wooden band runs along the rod
+        try {
+            byte[] png = readAsset("nova/v015/blocks/piston_side.png");
+            Bitmap b = BitmapFactory.decodeByteArray(png, 0, png.length);
+            android.graphics.Matrix rm = new android.graphics.Matrix();
+            rm.postRotate(90);
+            Bitmap r = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), rm, false);
+            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+            r.compress(Bitmap.CompressFormat.PNG, 100, o);
+            named.put("piston_rod", pack(null, "builtin:piston_rod", o.toByteArray()));
+        } catch (Exception e) { Log.e(TAG, "0.15 rod texture", e); }
+    }
+    /** block numbers 0.15 uses itself (pistons, the arm, slime, the moving block): not for mods then */
+    static boolean reserved(int id) {
+        return NovaActivity.playVersion >= 15 && (id == 29 || id == 33 || id == 34 || id == 165 || id == 250);
+    }
+
     private void saveIds(Map<String, Integer> m) {
         try { PackManager.writeText(idFile(), new JSONObject(m).toString(2)); } catch (Exception ignored) { }
     }
@@ -638,13 +663,13 @@ final class ModBlocks {
     private int pickId(Map<String, Integer> ids, String key, Object want) {
         if (want instanceof Double) {
             int w = (int) (double) (Double) want;
-            if (w >= 1 && w <= 255 && !usedNow.contains(w)) { usedNow.add(w); ids.put(key, w); return w; }
+            if (w >= 1 && w <= 255 && !usedNow.contains(w) && !reserved(w)) { usedNow.add(w); ids.put(key, w); return w; }
         }
         Integer have = ids.get(key);
-        if (have != null && !usedNow.contains(have)) { usedNow.add(have); return have; }
+        if (have != null && !usedNow.contains(have) && !reserved(have)) { usedNow.add(have); return have; }
         for (int pass = 0; pass < 2; pass++)              // pass 1: numbers of mods that are off now
             for (int i : POOL) {
-                if (usedNow.contains(i) || (pass == 0 && ids.containsValue(i))) continue;
+                if (usedNow.contains(i) || reserved(i) || (pass == 0 && ids.containsValue(i))) continue;
                 usedNow.add(i);
                 ids.put(key, i);
                 return i;

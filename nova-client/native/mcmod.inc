@@ -219,7 +219,7 @@ void *Java_com_nova_client_ModBridge_nativeApiStr(void **env, void *cls, int op,
  *   6 faces x (u0 v0 u1 v1)    classic: texture of each face; model: particles (face 0)
  *   ncubes, then per cube: x0 y0 z0 x1 y1 z1, 6 faces x (u0 v0 u1 v1) (u0 < 0: no face)
  * faces: 0 down, 1 up, 2 north (-z), 3 south (+z), 4 west (-x), 5 east (+x). UVs are atlas 0..1. */
-#define MB_MAX 64
+#define MB_MAX 96
 #define MB_CUBE 36   /* box 6, uv 24, rotation x y z (degrees), pivot x y z (block units) */
 typedef struct { float b[4]; unsigned short size[2]; void *filler; void *file; } TexSet;   /* TextureUVCoordinateSet */
 typedef struct {
@@ -571,6 +571,7 @@ static void mcmod_register_blocks(void) {
     int done = 0;
     for (int i = 0; i < mblock_count; i++) {
         ModBlock *m = &mblocks[i];
+        if (m->special >= 10) continue;                      /* 0.15 blocks (v015.inc) are made there */
         if (mf_blocks[m->id] && mf_items[m->id]) { LOGE("mcmod: block id %d is taken, %s skipped", m->id, m->name); continue; }
         void *from = m->matfrom > 0 && m->matfrom < 256 ? mf_blocks[m->matfrom] : 0;
         if (!from) from = mf_blocks[1];
@@ -615,15 +616,19 @@ static void mcmod_register_blocks(void) {
 }
 
 static void mcmod_register_items(void);
+static void v15_register(void);
+static void v15_model(ModBlock *m, int data);
 static char **mf_creative_list;               /* std::vector<ItemInstance>: begin, end, cap */
 static void (*o_init_creative)(void);
 static void h_init_creative(void) {
     o_init_creative();
     char **list = mf_creative_list;
     int before = list ? (int)((list[1] - list[0]) / 20) : 0;
+    v15_register();                                          /* what 0.15 added, when the client plays as 0.15 */
     mcmod_register_blocks();
     for (int i = 0; i < mblock_count; i++)
-        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && mblocks[i].special != 4 && !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps */
+        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && mblocks[i].special != 4 && mblocks[i].special != 12 &&
+            mblocks[i].special != 13 && !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps, arms */
     mcmod_register_items();
     /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
     if (list) {
@@ -764,6 +769,7 @@ static void mb_emit(void *t, ModBlock *m, float px, float py, float pz, float br
     for (int i = 0; i < n; i++) mb_put(t, qs[order[i]], quv[order[i]], qsh[order[i]], alpha, px, py, pz, 0);
 }
 
+static void v15_model(ModBlock *m, int data);
 static ModBlock *mb_model_of_id(int id) {
     ModBlock *m = (id > 0 && id < 256) ? mblock_of[id] : 0;
     return m && m->kind == 1 && m->block && m->ncubes ? m : 0;
@@ -777,6 +783,7 @@ static int h_tess(void *bt, void *block, MPos *pos, unsigned char data, int b) {
     if (!t || !mf_tess_color || !mf_tess_vertex || !mf_bt_light || !mf_touv || !mf_tex1) return o_tess(bt, block, pos, data, b);
     { unsigned char lc[8] = {0}; float luv[2] = {0, 0};     /* same light setup as the start of tessellateInWorld */
       mf_bt_light(lc, bt, pos); mf_touv(luv, lc); mf_tex1(bt, luv); }
+    if (m->special >= 10) v15_model(m, data);                /* pistons: the model of this facing / state */
     mb_emit(t, m, (float)pos->x, (float)pos->y, (float)pos->z, 1.f, 1.f, 0);
     return 1;
 }
@@ -785,6 +792,7 @@ static int h_tess(void *bt, void *block, MPos *pos, unsigned char data, int b) {
 static void (*o_append)(void *bt, unsigned char *fb);
 static void h_append(void *bt, unsigned char *fb) {
     ModBlock *m = fb ? mb_model_of_id(fb[0]) : 0;
+    if (m && m->special >= 10) v15_model(m, fb[1] ? fb[1] : 1);   /* an item (data 0): the piston points up */
     void *t = *(void **)((char *)bt + 0x2cc);
     if (!m || !t || !mf_tess_addoff) { o_append(bt, fb); return; }
     char *b = bt;
@@ -801,6 +809,7 @@ static void h_gui(void *bt, unsigned char *fb, void *tex, float bright, float al
     ModBlock *m = fb ? mb_model_of_id(fb[0]) : 0;
     void *t = *(void **)((char *)bt + 0x2cc);
     if (!m || !t || !mf_tess_begin || !mf_tess_draw || !mf_tess_instance) { o_gui(bt, fb, tex, bright, alpha); return; }
+    if (m->special >= 10) v15_model(m, fb[1] ? fb[1] : 1);   /* the icon: a piston pointing up */
     char *b = bt;
     char keep = b[1];
     b[0x28] = 1; b[1] = 0;

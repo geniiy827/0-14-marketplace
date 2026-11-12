@@ -104,7 +104,14 @@
 - alpha35: квадратные кнопки вместо скруглённых (gui/nova/btn_square.png, btn_square_flat.png; цвета темы те же);
   переключатель «Версия 0.15 (перезапуск)» во вкладке NOVA (группа «Версии», R_V015 в menus.inc) -> Java пишет
   files/nova_version (14/15), перезапуск; при старте nativeSetVersion -> nova_version в libnova, NovaActivity.playVersion.
-  СОДЕРЖИМОГО 0.15 ПОКА НЕТ - переключатель только включает режим.
+- alpha36 (НЕ проверено на телефоне): native/v015.inc - поршни 33, липкие 29, рука 34, движущийся блок 250, слизь 165
+  (только при версии 15). Модели - кубы mcmod (v15_model выбирает по data: facing 0..5 как в 0.15, бит 8 выдвинут /
+  липкая рука), текстуры из 0.15 (assets/nova/v015/blocks, Java ModBlocks.builtin015 кладёт в полосу атласа под
+  именами), питание - ConsumerComponent как у лампы (rs_lamp_vt), движение: план как в Java (12 блоков, слизь тянет
+  соседей, растения ломаются), блоки уезжают в 250, через 2 тика (BlockTickingQueue) встают; анимация - меши
+  BlockTessellator::getMeshForBlock через FallingBlockRenderer из h_nametags. Сущности сдвигаются Entity::move.
+  НЕ сделано: блоки-сущности (сундуки) не двигаются; анимация только у хоста (клиентам - BlockEventPacket/modnet);
+  звуки tile.piston.* в 0.14 нет (добавить ogg из 0.15); наблюдатель; клиенты 0.14 на хосте 0.15 - неизвестные id.
 - План 0.15.10 (Friendly Update), свой код по поведению оригинала (справка: vers/0-15-10, символы экспортированы:
   PistonBlock, PistonBlockEntity, MovingBlockEntity, Horse (112 функций), ObserverBlock...):
   1. поршни + липкие поршни + блок слизи (толкание до 12 блоков, блоки-сущности, MovingBlock, рендер движения)
