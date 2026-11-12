@@ -1,0 +1,670 @@
+{
+ "id": "02_dont_sleep",
+ "number": 2,
+ "title": "Не спи",
+ "description": "В дверь стучит девушка, которая здесь уже три дня. Ночь на Сиде 404 не кончается.",
+ "start": "knock",
+ "variables": {
+  "retry": "",
+  "found": 0,
+  "misses": 0
+ },
+ "nodes": {
+  "knock": {
+   "type": "scene",
+   "scene": "knock",
+   "next": "door_choice",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "door_choice": {
+   "type": "choice",
+   "background": "knock_loop",
+   "prompt": "За дверью девушка. Открыть?",
+   "speaker": "lina",
+   "timer": 8,
+   "timeout": 1,
+   "options": [
+    {
+     "text": "Открыть дверь",
+     "goto": "kira_in",
+     "remember": "Кира запомнила, что ты открыл",
+     "actions": [
+      {
+       "set": {
+        "adv.kira_trust": true
+       }
+      }
+     ]
+    },
+    {
+     "text": "Не открывать",
+     "goto": "kira_window",
+     "remember": "Кира запомнила, что ты не открыл",
+     "actions": [
+      {
+       "set": {
+        "adv.kira_trust": false
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "kira_in": {
+   "type": "scene",
+   "scene": "kira_in",
+   "next": "kira_talk"
+  },
+  "kira_window": {
+   "type": "scene",
+   "scene": "kira_window",
+   "next": "kira_talk"
+  },
+  "kira_talk": {
+   "type": "scene",
+   "scene": "kira_talk",
+   "next": "lamps"
+  },
+  "lamps": {
+   "type": "minigame",
+   "background": "well_loop",
+   "kind": "sequence",
+   "on_enter": [
+    {
+     "checkpoint": true
+    },
+    {
+     "say": {
+      "who": "toha",
+      "text": "На колодце пульт с лампами. Запомни порядок и повтори.",
+      "time": 2.6
+     }
+    }
+   ],
+   "params": {
+    "items": [
+     "Красная",
+     "Жёлтая",
+     "Зелёная",
+     "Синяя",
+     "Жёлтая",
+     "Красная"
+    ],
+    "show": true,
+    "title": "Повтори порядок ламп"
+   },
+   "success": [
+    {
+     "sfx": "random_click"
+    },
+    {
+     "goto": "descend"
+    }
+   ],
+   "fail": [
+    {
+     "sfx": "random_fizz"
+    },
+    {
+     "flash": "#ff3030"
+    },
+    {
+     "say": {
+      "who": "kira",
+      "text": "Замкнуло! Он услышал!",
+      "time": 1.6
+     }
+    },
+    {
+     "wait": 1.0
+    },
+    {
+     "set": {
+      "retry": "lamps"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "descend": {
+   "type": "scene",
+   "scene": "descend",
+   "next": "mine_walk"
+  },
+  "mine_walk": {
+   "type": "scene",
+   "scene": "mine_walk",
+   "next": "wake",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "wake": {
+   "type": "choice",
+   "background": "sleep_loop",
+   "prompt": "Гром засыпает!",
+   "speaker": "lina",
+   "timer": 5,
+   "timeout": 2,
+   "options": [
+    {
+     "text": "Врезать Грому",
+     "goto": "wake_hit",
+     "remember": "Гром запомнил этот удар"
+    },
+    {
+     "text": "Трясти за плечи",
+     "goto": "wake_tap"
+    },
+    {
+     "text": "Пусть поспит минутку",
+     "goto": "sleep_lose"
+    }
+   ]
+  },
+  "wake_tap": {
+   "type": "minigame",
+   "background": "sleep_loop",
+   "kind": "tap_fast",
+   "params": {
+    "taps": 22,
+    "time": 5,
+    "title": "Буди его! Тапай!",
+    "bar_color": "#ff8a5a"
+   },
+   "success": [
+    {
+     "goto": "wake_hit"
+    }
+   ],
+   "fail": [
+    {
+     "goto": "sleep_lose"
+    }
+   ]
+  },
+  "wake_hit": {
+   "type": "scene",
+   "scene": "wake_hit",
+   "next": "fork_a"
+  },
+  "sleep_lose": {
+   "type": "scene",
+   "scene": "sleep_lose",
+   "next": "lose",
+   "on_enter": [
+    {
+     "set": {
+      "retry": "sleep"
+     }
+    },
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    }
+   ]
+  },
+  "fork_a": {
+   "type": "scene",
+   "scene": "fork_a",
+   "next": "diff",
+   "on_enter": [
+    {
+     "checkpoint": true
+    },
+    {
+     "set": {
+      "found": 0,
+      "misses": 0
+     }
+    }
+   ]
+  },
+  "diff": {
+   "type": "interact",
+   "background": "fork_b_loop",
+   "hint": "Тоннель изменился. Найди 3 отличия",
+   "timeout": 30,
+   "timer_visible": true,
+   "on_enter": [
+    {
+     "flash": "#000000"
+    },
+    {
+     "sfx": "portal_portal"
+    }
+   ],
+   "hotspots": [
+    {
+     "id": "furnace",
+     "pos": [
+      -1.0,
+      0.5,
+      -6.2
+     ],
+     "radius": 60,
+     "hidden": true,
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "add": {
+        "found": 1
+       }
+      },
+      {
+       "say": {
+        "who": "kira",
+        "text": "Печка исчезла.",
+        "time": 1.6
+       }
+      },
+      {
+       "if": "found >= 3",
+       "then": [
+        {
+         "goto": "fork_done"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "tnt",
+     "pos": [
+      1.6,
+      0.5,
+      -6.5
+     ],
+     "radius": 60,
+     "hidden": true,
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "add": {
+        "found": 1
+       }
+      },
+      {
+       "say": {
+        "who": "toha",
+        "text": "Тротил! Его не было!",
+        "time": 1.6
+       }
+      },
+      {
+       "if": "found >= 3",
+       "then": [
+        {
+         "goto": "fork_done"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "pumpkin",
+     "pos": [
+      -1.4,
+      0.5,
+      -3.6
+     ],
+     "radius": 60,
+     "hidden": true,
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "add": {
+        "found": 1
+       }
+      },
+      {
+       "say": {
+        "who": "grom",
+        "text": "Тыква. Она на меня смотрит.",
+        "time": 1.6
+       }
+      },
+      {
+       "if": "found >= 3",
+       "then": [
+        {
+         "goto": "fork_done"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "him",
+     "pos": [
+      -4.2,
+      1.6,
+      -2.0
+     ],
+     "radius": 40,
+     "hidden": true,
+     "on_tap": [
+      {
+       "say": {
+        "who": "kira",
+        "text": "Не смотри в боковой тоннель!",
+        "time": 1.4
+       }
+      },
+      {
+       "wait": 0.8
+      },
+      {
+       "set": {
+        "retry": "fork"
+       }
+      },
+      {
+       "goto": "caught"
+      }
+     ]
+    }
+   ],
+   "on_miss": [
+    {
+     "add": {
+      "misses": 1
+     }
+    },
+    {
+     "vibrate": 40
+    },
+    {
+     "shake": 0.15
+    },
+    {
+     "if": "misses == 2",
+     "then": [
+      {
+       "say": {
+        "who": "grom",
+        "text": "Последний шанс, ребят...",
+        "time": 1.4
+       }
+      }
+     ]
+    },
+    {
+     "if": "misses >= 3",
+     "then": [
+      {
+       "set": {
+        "retry": "fork"
+       }
+      },
+      {
+       "goto": "caught"
+      }
+     ]
+    }
+   ],
+   "on_timeout": [
+    {
+     "set": {
+      "retry": "fork"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "fork_done": {
+   "type": "scene",
+   "scene": "fork_done",
+   "next": "cavein"
+  },
+  "cavein": {
+   "type": "scene",
+   "scene": "cavein",
+   "next": "dig",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "dig": {
+   "type": "minigame",
+   "background": "dig_loop",
+   "kind": "tap_fast",
+   "params": {
+    "taps": 35,
+    "time": 7,
+    "title": "Откапывай Грома!",
+    "bar_color": "#a89c8c"
+   },
+   "success": [
+    {
+     "goto": "dug"
+    }
+   ],
+   "fail": [
+    {
+     "say": {
+      "who": "grom",
+      "text": "Воздух... кончается...",
+      "time": 1.6
+     }
+    },
+    {
+     "wait": 1.0
+    },
+    {
+     "set": {
+      "retry": "dig"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "dug": {
+   "type": "scene",
+   "scene": "dug",
+   "next": "bridge",
+   "on_exit": [
+    {
+     "set": {
+      "adv.saved_grom": true
+     }
+    }
+   ]
+  },
+  "bridge": {
+   "type": "minigame",
+   "background": "bridge_loop",
+   "kind": "timing",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ],
+   "params": {
+    "zone": [
+     0.42,
+     0.58
+    ],
+    "speed": 1.3,
+    "rounds": 3,
+    "title": "Прыгай, когда доска качнётся к тебе"
+   },
+   "success": [
+    {
+     "goto": "crossed"
+    }
+   ],
+   "fail": [
+    {
+     "sfx": "liquid_lavapop"
+    },
+    {
+     "flash": "#ff6a00"
+    },
+    {
+     "say": {
+      "who": "lina",
+      "text": "Мост рухнул!",
+      "time": 1.2
+     }
+    },
+    {
+     "wait": 0.8
+    },
+    {
+     "set": {
+      "retry": "bridge"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "crossed": {
+   "type": "scene",
+   "scene": "crossed",
+   "next": "lighthouse"
+  },
+  "lighthouse": {
+   "type": "scene",
+   "scene": "lighthouse",
+   "next": "end"
+  },
+  "end": {
+   "type": "end",
+   "title": "Не спи",
+   "text": "Вы выбрались к маяку. {'Кира тебе доверяет.' if adv.kira_trust else 'Кира тебе не доверяет.'} Но пятый всё ещё в списке.",
+   "ending": "lighthouse",
+   "unlock_next": true
+  },
+  "caught": {
+   "type": "scene",
+   "scene": "caught",
+   "next": "lose",
+   "on_enter": [
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    },
+    {
+     "shake": 0.6
+    }
+   ]
+  },
+  "lose": {
+   "type": "overlay",
+   "background": "lose_loop",
+   "dim": 0.55,
+   "widgets": [
+    {
+     "id": "t",
+     "kind": "text",
+     "text": "{'ГРОМ УСНУЛ' if retry == 'sleep' else 'ОН ВАС НАШЁЛ'}",
+     "rect": [
+      0.2,
+      0.3,
+      0.6,
+      0.12
+     ],
+     "size": 48,
+     "color": "#ff4040",
+     "anim": "shake"
+    },
+    {
+     "id": "s",
+     "kind": "text",
+     "text": "{'Правило 2: не спи.' if retry == 'sleep' else ('Не смотри на него.' if retry == 'fork' else 'Попробуй ещё раз.')}",
+     "rect": [
+      0.2,
+      0.44,
+      0.6,
+      0.08
+     ],
+     "size": 24,
+     "color": "#ffffff"
+    },
+    {
+     "id": "again",
+     "kind": "button",
+     "text": "Попробовать снова",
+     "rect": [
+      0.36,
+      0.62,
+      0.28,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "if": "retry == 'lamps'",
+       "then": [
+        {
+         "goto": "lamps"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'sleep'",
+       "then": [
+        {
+         "goto": "mine_walk"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'fork'",
+       "then": [
+        {
+         "goto": "fork_a"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'dig'",
+       "then": [
+        {
+         "goto": "cavein"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'bridge'",
+       "then": [
+        {
+         "goto": "bridge"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

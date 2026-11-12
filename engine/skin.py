@@ -34,7 +34,9 @@ def analyze_face(arr, eye_rows=None, mouth_row=None):
         if not rows:
             rows = [r for r in range(3, 7)
                     if min(_dist(face[r, c], skin) for c in (1, 2, 5, 6)) > 90]
-            rows = rows[:1] or [4]
+            if not rows:      # no eyes at all (faceless skin): never draw lids
+                return dict(skin=skin, eye_rows=[], mouth_row=mouth_row if mouth_row is not None else 6)
+            rows = rows[:1]
         top, bot = min(rows), max(rows)
         # anime-style lashes: dark row right above eyes with skin above it
         if top >= 2 and all(face[top - 1, c].sum() < 200 for c in (1, 6)) \
@@ -58,7 +60,7 @@ def face_variants(arr, info):
     for closed in (0, 1):
         for mouth in (0, 1, 2):
             a = arr.copy()
-            if closed:
+            if closed and rows:
                 for r in rows:
                     for c in (1, 2, 5, 6):
                         a[8 + r, 8 + c, :3] = skin

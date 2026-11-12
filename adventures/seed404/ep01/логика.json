@@ -1,0 +1,787 @@
+{
+ "id": "01_player4",
+ "number": 1,
+ "title": "Игрок 4",
+ "description": "Новый сервер без описания. Пинг — ноль. В списке игроков на одного больше, чем вас.",
+ "start": "intro",
+ "variables": {
+  "retry": "",
+  "found": 0,
+  "misses": 0,
+  "code_fails": 0
+ },
+ "nodes": {
+  "intro": {
+   "type": "scene",
+   "scene": "intro",
+   "next": "choose"
+  },
+  "choose": {
+   "type": "choice",
+   "background": "choose_loop",
+   "prompt": "Куда идём?",
+   "speaker": "lina",
+   "timer": 12,
+   "timeout": 0,
+   "options": [
+    {
+     "text": "В деревню, там свет",
+     "goto": "village"
+    },
+    {
+     "text": "К костру на холме",
+     "goto": "fire_walk",
+     "remember": "Гром запомнил, что ты не боишься"
+    }
+   ],
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "fire_walk": {
+   "type": "scene",
+   "scene": "fire_walk",
+   "next": "fire_qte"
+  },
+  "fire_qte": {
+   "type": "minigame",
+   "background": "chase_loop",
+   "kind": "swipe",
+   "params": {
+    "directions": [
+     "left",
+     "up",
+     "right",
+     "up",
+     "left"
+    ],
+    "time_each": 1.1,
+    "title": "Беги! Повторяй свайпы"
+   },
+   "success": [
+    {
+     "goto": "fire_escape"
+    }
+   ],
+   "fail": [
+    {
+     "set": {
+      "retry": "choose"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "fire_escape": {
+   "type": "scene",
+   "scene": "fire_escape",
+   "next": "village",
+   "on_exit": [
+    {
+     "set": {
+      "adv.met_him_early": true
+     }
+    }
+   ]
+  },
+  "village": {
+   "type": "scene",
+   "scene": "village",
+   "next": "look_a"
+  },
+  "look_a": {
+   "type": "scene",
+   "scene": "look_a",
+   "next": "diff",
+   "on_enter": [
+    {
+     "checkpoint": true
+    },
+    {
+     "set": {
+      "found": 0,
+      "misses": 0,
+      "f_pumpkin": false,
+      "f_chicken": false,
+      "f_door": false
+     }
+    }
+   ]
+  },
+  "diff": {
+   "type": "interact",
+   "background": "look_b_loop",
+   "hint": "Что изменилось? Найди 3 отличия",
+   "on_enter": [
+    {
+     "flash": "#000000"
+    },
+    {
+     "sfx": "portal_portal"
+    }
+   ],
+   "hotspots": [
+    {
+     "id": "pumpkin",
+     "pos": [
+      4.5,
+      1.5,
+      3.5
+     ],
+     "radius": 70,
+     "hidden": true,
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "add": {
+        "found": 1
+       }
+      },
+      {
+       "say": {
+        "who": "lina",
+        "text": "Тыква пропала.",
+        "time": 1.6
+       }
+      },
+      {
+       "if": "found >= 3",
+       "then": [
+        {
+         "goto": "diff_found"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "chicken",
+     "pos": [
+      2.4,
+      0.4,
+      0.6
+     ],
+     "radius": 60,
+     "hidden": true,
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "add": {
+        "found": 1
+       }
+      },
+      {
+       "say": {
+        "who": "toha",
+        "text": "Курица переместилась к колодцу.",
+        "time": 1.8
+       }
+      },
+      {
+       "if": "found >= 3",
+       "then": [
+        {
+         "goto": "diff_found"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "door",
+     "pos": [
+      -4.5,
+      1.0,
+      -2.5
+     ],
+     "radius": 70,
+     "hidden": true,
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "add": {
+        "found": 1
+       }
+      },
+      {
+       "say": {
+        "who": "grom",
+        "text": "Дверь замуровали! Камнем!",
+        "time": 1.8
+       }
+      },
+      {
+       "if": "found >= 3",
+       "then": [
+        {
+         "goto": "diff_found"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "him",
+     "pos": [
+      -4.2,
+      1.6,
+      -10.5
+     ],
+     "radius": 45,
+     "hidden": true,
+     "on_tap": [
+      {
+       "say": {
+        "who": "lina",
+        "text": "Не смотри на него...",
+        "time": 1.4
+       }
+      },
+      {
+       "wait": 1.0
+      },
+      {
+       "set": {
+        "retry": "look"
+       }
+      },
+      {
+       "goto": "caught"
+      }
+     ]
+    }
+   ],
+   "timeout": 40,
+   "timer_visible": true,
+   "on_miss": [
+    {
+     "add": {
+      "misses": 1
+     }
+    },
+    {
+     "vibrate": 40
+    },
+    {
+     "shake": 0.15
+    },
+    {
+     "if": "misses == 1",
+     "then": [
+      {
+       "say": {
+        "who": "toha",
+        "text": "Нет, это было и раньше.",
+        "time": 1.4
+       }
+      }
+     ]
+    },
+    {
+     "if": "misses == 2",
+     "then": [
+      {
+       "say": {
+        "who": "grom",
+        "text": "Ещё одна ошибка — и он нас заметит!",
+        "time": 1.8
+       }
+      }
+     ]
+    },
+    {
+     "if": "misses >= 3",
+     "then": [
+      {
+       "set": {
+        "retry": "look"
+       }
+      },
+      {
+       "goto": "caught"
+      }
+     ]
+    }
+   ],
+   "on_timeout": [
+    {
+     "set": {
+      "retry": "look"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "diff_found": {
+   "type": "scene",
+   "scene": "diff_found",
+   "next": "note"
+  },
+  "note": {
+   "type": "overlay",
+   "background": "chest_loop",
+   "dim": 0.45,
+   "on_enter": [
+    {
+     "checkpoint": true
+    },
+    {
+     "set": {
+      "code_fails": 0
+     }
+    }
+   ],
+   "widgets": [
+    {
+     "id": "paper",
+     "kind": "panel",
+     "rect": [
+      0.3,
+      0.12,
+      0.4,
+      0.62
+     ],
+     "anim": "pop"
+    },
+    {
+     "id": "t1",
+     "kind": "text",
+     "text": "Сундук не для гостей.",
+     "rect": [
+      0.32,
+      0.18,
+      0.36,
+      0.08
+     ],
+     "size": 26,
+     "color": "#3b2a12"
+    },
+    {
+     "id": "t2",
+     "kind": "text",
+     "text": "404 — это не ошибка.\nДопиши, сколько вас\nна самом деле.",
+     "rect": [
+      0.32,
+      0.3,
+      0.36,
+      0.26
+     ],
+     "size": 24,
+     "color": "#3b2a12"
+    },
+    {
+     "id": "t3",
+     "kind": "text",
+     "text": "— П.",
+     "rect": [
+      0.5,
+      0.58,
+      0.16,
+      0.08
+     ],
+     "size": 22,
+     "color": "#6b4a22",
+     "align": "right"
+    },
+    {
+     "id": "ok",
+     "kind": "button",
+     "text": "Ввести код",
+     "rect": [
+      0.4,
+      0.78,
+      0.2,
+      0.09
+     ],
+     "on_tap": [
+      {
+       "goto": "code"
+      }
+     ]
+    }
+   ]
+  },
+  "code": {
+   "type": "minigame",
+   "background": "chest_loop",
+   "kind": "code",
+   "params": {
+    "length": 4,
+    "answer": "4044",
+    "title": "Кодовый замок",
+    "hint": "404 + сколько вас?"
+   },
+   "success": [
+    {
+     "sfx": "random_chestopen"
+    },
+    {
+     "goto": "chest_open"
+    }
+   ],
+   "fail": [
+    {
+     "add": {
+      "code_fails": 1
+     }
+    },
+    {
+     "shake": 0.3
+    },
+    {
+     "vibrate": 80
+    },
+    {
+     "if": "code_fails >= 2",
+     "then": [
+      {
+       "say": {
+        "who": "grom",
+        "text": "Он рядом! Я слышу шаги!",
+        "time": 1.6
+       }
+      },
+      {
+       "wait": 1.2
+      },
+      {
+       "set": {
+        "retry": "code"
+       }
+      },
+      {
+       "goto": "caught"
+      }
+     ],
+     "else": [
+      {
+       "say": {
+        "who": "toha",
+        "text": "Не то. Нас ведь не трое... В списке было четверо.",
+        "time": 2.4
+       }
+      },
+      {
+       "goto": "code"
+      }
+     ]
+    }
+   ]
+  },
+  "chest_open": {
+   "type": "scene",
+   "scene": "chest_open",
+   "next": "rules"
+  },
+  "rules": {
+   "type": "overlay",
+   "background": "chest_loop",
+   "dim": 0.5,
+   "widgets": [
+    {
+     "id": "book",
+     "kind": "panel",
+     "rect": [
+      0.22,
+      0.08,
+      0.56,
+      0.76
+     ],
+     "anim": "slide_up"
+    },
+    {
+     "id": "h",
+     "kind": "text",
+     "text": "ПРАВИЛА СИДА 404",
+     "rect": [
+      0.25,
+      0.12,
+      0.5,
+      0.08
+     ],
+     "size": 30,
+     "color": "#3b2a12"
+    },
+    {
+     "id": "r",
+     "kind": "text",
+     "text": "1. Если тебя зовут по имени — не оборачивайся.\n2. Не спи. Мир меняется, пока ты не смотришь.\n3. Если вас стало больше — один из вас не вы.\n4. Не смотри ему в лицо. У него его нет.",
+     "rect": [
+      0.25,
+      0.24,
+      0.5,
+      0.44
+     ],
+     "size": 22,
+     "color": "#3b2a12",
+     "align": "left"
+    },
+    {
+     "id": "close",
+     "kind": "button",
+     "text": "Закрыть книгу",
+     "rect": [
+      0.38,
+      0.72,
+      0.24,
+      0.09
+     ],
+     "on_tap": [
+      {
+       "goto": "call"
+      }
+     ]
+    }
+   ]
+  },
+  "call": {
+   "type": "scene",
+   "scene": "call",
+   "next": "turn",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "turn": {
+   "type": "choice",
+   "background": "call_loop",
+   "prompt": "Голос Тохи за спиной зовёт Лину",
+   "speaker": "lina",
+   "timer": 6,
+   "timeout": 0,
+   "options": [
+    {
+     "text": "Обернуться",
+     "goto": "turn_lose"
+    },
+    {
+     "text": "Не оборачиваться",
+     "goto": "run",
+     "remember": "Лина помнит правила",
+     "actions": [
+      {
+       "set": {
+        "adv.rules": true
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "turn_lose": {
+   "type": "scene",
+   "scene": "turn_lose",
+   "next": "caught",
+   "on_enter": [
+    {
+     "set": {
+      "retry": "call"
+     }
+    }
+   ]
+  },
+  "run": {
+   "type": "scene",
+   "scene": "run",
+   "next": "run_qte",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "run_qte": {
+   "type": "minigame",
+   "background": "run_loop",
+   "kind": "swipe",
+   "params": {
+    "directions": [
+     "up",
+     "right",
+     "up",
+     "left",
+     "up",
+     "up"
+    ],
+    "time_each": 1.0,
+    "title": "К двери! Свайпы!"
+   },
+   "success": [
+    {
+     "goto": "door"
+    }
+   ],
+   "fail": [
+    {
+     "set": {
+      "retry": "run"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "door": {
+   "type": "minigame",
+   "background": "door_loop",
+   "kind": "hold",
+   "params": {
+    "time": 5,
+    "title": "Держите дверь! Не отпускай палец"
+   },
+   "on_enter": [
+    {
+     "shake": 0.2
+    }
+   ],
+   "success": [
+    {
+     "goto": "end_scene"
+    }
+   ],
+   "fail": [
+    {
+     "set": {
+      "retry": "run"
+     }
+    },
+    {
+     "goto": "caught"
+    }
+   ]
+  },
+  "end_scene": {
+   "type": "scene",
+   "scene": "end_scene",
+   "next": "end"
+  },
+  "end": {
+   "type": "end",
+   "title": "Игрок 5",
+   "text": "Вы пережили первую ночь. Но в списке игроков теперь пятеро.",
+   "ending": "door",
+   "unlock_next": true
+  },
+  "caught": {
+   "type": "scene",
+   "scene": "caught",
+   "next": "lose",
+   "on_enter": [
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    },
+    {
+     "shake": 0.6
+    }
+   ]
+  },
+  "lose": {
+   "type": "overlay",
+   "background": "lose_loop",
+   "dim": 0.55,
+   "widgets": [
+    {
+     "id": "t",
+     "kind": "text",
+     "text": "ОН ВАС НАШЁЛ",
+     "rect": [
+      0.2,
+      0.3,
+      0.6,
+      0.12
+     ],
+     "size": 48,
+     "color": "#ff4040",
+     "anim": "shake"
+    },
+    {
+     "id": "s",
+     "kind": "text",
+     "text": "{'Не оборачивайся, когда зовут.' if retry == 'call' else ('Не смотри на него.' if retry == 'look' else 'Попробуй ещё раз.')}",
+     "rect": [
+      0.2,
+      0.44,
+      0.6,
+      0.08
+     ],
+     "size": 24,
+     "color": "#ffffff"
+    },
+    {
+     "id": "again",
+     "kind": "button",
+     "text": "Попробовать снова",
+     "rect": [
+      0.36,
+      0.62,
+      0.28,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "if": "retry == 'choose'",
+       "then": [
+        {
+         "goto": "choose"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'look'",
+       "then": [
+        {
+         "goto": "look_a"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'code'",
+       "then": [
+        {
+         "goto": "note"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'call'",
+       "then": [
+        {
+         "goto": "call"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'run'",
+       "then": [
+        {
+         "goto": "run"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

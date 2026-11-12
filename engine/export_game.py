@@ -204,6 +204,8 @@ class Exporter:
         worlds = {}
         for si, sc in enumerate(tl.scenes):
             sid = sc.get("sid") or f"s{si + 1}"
+            if sid.startswith("cover"):
+                continue          # кадры для обложек: только для --stills, в игру не идут
             wid = self.export_world(sc.get("world"))
             worlds[wid] = dict(glb=f"worlds/{wid}.glb", meta=f"worlds/{wid}.json")
             info = self.export_scene(sc, sid, wid)

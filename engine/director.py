@@ -67,6 +67,8 @@ class Director:
     def desired(self, kind, a, b, P, group, t, sh, var, u, extra=None):
         side_s, dang, dmul, dh = var
         head = lambda p: (p["x"], p["y"] + eye_h(p), p["z"])
+        if not group:   # nobody visible in this shot (e.g. everyone just vanished): look at whoever exists
+            group = list(P.values())[:1] or [dict(name="", x=0.0, y=0.0, z=0.0, yaw=0.0)]
         cx = sum(p["x"] for p in group) / len(group)
         cz = sum(p["z"] for p in group) / len(group)
         cy = sum(p["y"] for p in group) / len(group)
