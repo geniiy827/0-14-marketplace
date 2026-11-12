@@ -159,7 +159,7 @@ def parse(path):
                 p = opts.get("место", opts.get("pos", "0,0")).split(",")
                 cast[name] = dict(name=name, mob=kind, pos=(float(p[0]), float(p[1])), color=opts.get("цвет", "#dddddd"),
                                   voice=opts.get("голос"), pitch=opts.get("тон"), rate=opts.get("скорость"), skin=None,
-                                  texture=opts.get("текстура"),
+                                  texture=opts.get("текстура"), tint=opts.get("оттенок"),
                                   lift=float(opts.get("высота", 0)), scale=float(opts.get("размер", 1)),
                                   hidden=norm(opts.get("скрыт", "нет")) in ("да", "yes"))
                 if "поворот" in opts:
@@ -634,7 +634,11 @@ class Compiler:
                                 participants.add(c)
             participants = participants or set(names)
             for n, cc in tl.cast.items():  # background mobs live only in the main location
-                if cc.get("mob") and n not in participants and not cc.get("hidden"):
+                if not cc.get("mob") or cc.get("hidden"):
+                    continue
+                if n in participants:  # a mob used in this scene is always shown here
+                    tl.vis.append(dict(char=n, t=s0 - 1e-3, on=True))
+                else:
                     tl.vis.append(dict(char=n, t=s0 - 1e-3, on=norm(cur_world) == norm(tl.world)))
             crowd_here = bool(self.crowd) and norm(cur_world) == norm(self.crowd["world"])
             if self.crowd:

@@ -36,7 +36,7 @@ EYE = {"cow": 1.25, "pig": 0.8, "chicken": 0.6, "sheep": 1.2, "wolf": 0.75, "sli
        "ocelot": 0.6, "silverfish": 0.15, "ghast": 2.0, "squid": 0.5, "snow_golem": 1.6, "villager": 1.55, "witch": 1.55}
 
 
-def load_mob(kind, texture=None):
+def load_mob(kind, texture=None, tint=None):
     gk = GEO_FROM.get(kind, kind)
     d = os.path.join(ASSETS, "mobs", gk)
     gj = json.load(open(os.path.join(d, f"{gk}.geo.json")))
@@ -52,6 +52,14 @@ def load_mob(kind, texture=None):
     img = Image.open(os.path.join(td, texf)).convert("RGBA")
     if img.size != (tw, th):
         img = img.resize((tw, th), Image.NEAREST)
+    if tint:  # recolour: keep shading (luminance), replace hue with the tint colour
+        h = tint.lstrip("#")
+        col = np.array([int(h[i:i + 2], 16) for i in (0, 2, 4)], float) / 255
+        a = np.array(img).astype(float)
+        lum = (a[..., 0] * 0.3 + a[..., 1] * 0.59 + a[..., 2] * 0.11) / 255
+        lum = lum / max(1e-3, np.percentile(lum[a[..., 3] > 0], 90) if (a[..., 3] > 0).any() else 1)
+        a[..., :3] = np.clip(lum[..., None] * col * 255, 0, 255)
+        img = Image.fromarray(a.astype(np.uint8))
     TS = max(64, tw, th)  # square padded texture; uv divided by TS
     tex = np.zeros((TS, TS, 4), np.uint8)
     tex[:th, :tw] = np.array(img)

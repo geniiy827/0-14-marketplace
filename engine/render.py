@@ -379,15 +379,16 @@ class Renderer:
         self.item_tex[name] = t
         return t
 
-    def add_mob(self, name, kind, texture=None):
+    def add_mob(self, name, kind, texture=None, tint=None):
         from .mobs import load_mob
-        parts, tex = load_mob(kind, texture)
+        parts, tex = load_mob(kind, texture, tint)
+        glow = kind in ("magma_cube", "blaze")
         t = self.ctx.texture((tex.shape[1], tex.shape[0]), 4, np.ascontiguousarray(tex).tobytes())
         t.filter = (moderngl.NEAREST, moderngl.NEAREST)
         P = {}
         for bn, b in parts.items():
             v = b["verts"]
-            v = np.concatenate([v, np.ones((len(v), 1), np.float32)], axis=1)
+            v = np.concatenate([v, np.full((len(v), 1), 2.0 if glow else 1.0, np.float32)], axis=1)
             P[bn] = (b["pivot"], self._vao(v, ao=True), self._sh_vao(v), len(v))
         self.chars[name] = dict(texs={(0, 0): t}, parts=P, mob=kind, bones=parts)
         return self.chars[name]

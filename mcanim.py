@@ -132,7 +132,7 @@ class Film:
                 if c.get("prop"):
                     r.add_prop(n, c["prop"])
                 elif c.get("mob"):
-                    r.add_mob(n, c["mob"], c.get("texture"))
+                    r.add_mob(n, c["mob"], c.get("texture"), c.get("tint"))
                 else:
                     arr, slim = load_skin(c["skin"])
                     r.add_character(n, face_variants(arr, analyze_face(arr)), slim)
@@ -242,7 +242,7 @@ class Film:
         tl = self.tl
         inr = lambda a, b: a < sc["t1"] + 1 and b > sc["t0"] - 3
         data = dict(v=VERSION, W=self.W, H=self.H, fps=self.fps, sc=sc, world=[tl.world, tl.time, tl.seed],
-                    cast={n: [c["skin"], os.path.getmtime(c["skin"]) if c.get("skin") else 0, c["pos"], c.get("yaw"), c["color"], c.get("mob"), c.get("hidden")] for n, c in tl.cast.items()},
+                    cast={n: [c["skin"], os.path.getmtime(c["skin"]) if c.get("skin") else 0, c["pos"], c.get("yaw"), c["color"], c.get("mob"), c.get("hidden"), c.get("tint")] for n, c in tl.cast.items()},
                     shots=[s for s in tl.shots if inr(s["t0"], s["t1"])],
                     moves=[m for m in tl.moves if m["t0"] < sc["t1"]],
                     clips=[c for c in tl.clips if inr(c["t0"], c["t1"])],
