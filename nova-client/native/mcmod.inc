@@ -617,6 +617,7 @@ static void mcmod_register_blocks(void) {
 
 static void mcmod_register_items(void);
 static void v15_register(void);
+static void v15_creative(void);
 static void v15_model(ModBlock *m, int data);
 static char **mf_creative_list;               /* std::vector<ItemInstance>: begin, end, cap */
 static void (*o_init_creative)(void);
@@ -627,8 +628,8 @@ static void h_init_creative(void) {
     v15_register();                                          /* what 0.15 added, when the client plays as 0.15 */
     mcmod_register_blocks();
     for (int i = 0; i < mblock_count; i++)
-        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && mblocks[i].special != 4 && mblocks[i].special != 12 &&
-            mblocks[i].special != 13 && !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps, arms */
+        if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && mblocks[i].special != 4 && mblocks[i].special < 10 &&
+            !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps; 0.15 blocks: v15_creative */
     mcmod_register_items();
     /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
     if (list) {
@@ -640,6 +641,7 @@ static void h_init_creative(void) {
             memcpy(b, tmp, k * 20);
         }
     }
+    v15_creative();
 }
 
 /* ---- model drawing: shared by the world (chunks), the inventory icon and the item in hand ---- */

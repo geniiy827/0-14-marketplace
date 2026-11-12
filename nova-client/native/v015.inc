@@ -408,9 +408,10 @@ static void v15_box_world(MAABB *a, MPos *pos, float x0, float y0, float z0, flo
 }
 static void v15_shapes(void *b, void *bs, MPos *pos, void *clip, void *vec, void *ent) {
     int id = *((unsigned char *)b + 4);
-    if (id == V15_MOVING || !mf_add_aabb) return;
+    if (!mf_add_aabb) return;
     int d = v15_data(bs, pos->x, pos->y, pos->z), f = d & 7;
     MAABB a;
+    if (id == V15_MOVING) { v15_box_world(&a, pos, 0, 0, 0, 1, 1, 1, 1); mf_add_aabb(b, &a, clip, vec); return; }
     if (id == V15_ARM) {
         v15_box_world(&a, pos, 0, 0.75f, 0, 1, 1, 1, f); mf_add_aabb(b, &a, clip, vec);
         v15_box_world(&a, pos, 0.375f, 0, 0.375f, 0.625f, 0.75f, 0.625f, f); mf_add_aabb(b, &a, clip, vec);
@@ -458,18 +459,23 @@ static void *v15_make(int idx, int id, const char *name, int special, int matfro
     m->block = b;
     mf_blocks[id] = b;
     ((void (*)(void *))(*(u32 **)b)[94])(b);                       /* Block::init */
-    if (mf_block_setcat) mf_block_setcat(b, 1);
+    if (mf_block_setcat) mf_block_setcat(b, 3);
     if (item) {
         char *it = f_new(64);
         memset(it, 0, 64);
         mf_blockitem_ctor(it, nm, id - 256);
         mf_items[id] = it;
-        if (mf_item_setcat) mf_item_setcat(it, 1);
+        if (mf_item_setcat) mf_item_setcat(it, 3);
     }
     f_strdtor(nm);
     v15_mb[idx] = m;
     v15_model(m, 1);
     return b;
+}
+static void v15_creative(void) {                     /* the end of the creative list: Tools, after the redstone things */
+    if (!v15_on || !mf_add_creative) return;
+    mf_add_creative(V15_PISTON, 0);
+    mf_add_creative(V15_STICKY, 0);
 }
 static void v15_register(void) {
     if (v15_on || nova_version < 15) return;
@@ -478,7 +484,8 @@ static void v15_register(void) {
     }
     /* 0.14 already has the slime block (165): pistons use it as it is; the four new blocks must be free */
     int ids[4] = {V15_PISTON, V15_STICKY, V15_ARM, V15_MOVING};
-    for (int i = 0; i < 4; i++) if (mf_blocks[ids[i]]) { LOGE("v015: block %d is taken, pistons off", ids[i]); return; }
+    for (int i = 0; i < 4; i++)                      /* 0.14 puts unnamed placeholders in free numbers: an item = a real block */
+        if (mf_items[ids[i]]) { LOGE("v015: block %d is taken, pistons off", ids[i]); return; }
     for (int t = 0; t < 7; t++) {
         u32 s[1];
         gstr(s, v15_tx_names[t]);

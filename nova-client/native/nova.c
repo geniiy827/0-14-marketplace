@@ -385,7 +385,7 @@ int Java_com_nova_client_NovaActivity_nativeInfo(void *env, void *cls, int what)
 
 /* ---------------- model -> resolved animation set ---------------------- */
 typedef struct { int nparts; void **parts; } BoneParts;   /* parts matching one Bone */
-typedef struct { void *model; Set *set; BoneParts *bp; u32 vt; void *pb; int pn; } ModelAnim;   /* vt, pb, pn: which object it was made for */
+typedef struct { void *model; Set *set; BoneParts *bp; u32 vt; void *first; } ModelAnim;   /* vt, first part: the object it was made for */
 #define MCAP 1024
 static ModelAnim models[MCAP];
 
@@ -407,17 +407,30 @@ static void collect(void *part, const char *bone, void **out, int *n, int max) {
     for (; c && c < e; c++) collect(*c, bone, out, n, max);
 }
 
+/* an entry is made for one model object: the game frees models (leaving a world) and makes new ones at the same
+ * addresses; parts are reloaded (hook_load rewrites their key), so an entry whose parts are no longer the bones it
+ * took them for belongs to a dead model - it would move another model's parts (one leg, a sunken head) */
+static int anim_valid(ModelAnim *m) {
+    if (!m->set || !m->bp) return 1;
+    for (int i = 0; i < m->set->nbone; i++)
+        for (int j = 0; j < m->bp[i].nparts; j++) {
+            PartInfo *pi = pinfo(m->bp[i].parts[j], 0);
+            if (!pi || !pi->key || !streq(last_seg(pi->key), m->set->bone[i].name)) return 0;
+        }
+    return 1;
+}
 static ModelAnim *model_anim(void *model) {
     u32 h = ((u32)model >> 3) * 2654435761u;
     ModelAnim *slot = 0;
-    void **b = *(void ***)((char *)model + 0xa8), **e = *(void ***)((char *)model + 0xac);
     u32 vt = *(u32 *)model;
+    void **b0 = *(void ***)((char *)model + 0xa8), **e0 = *(void ***)((char *)model + 0xac);
+    void *first = b0 && b0 < e0 ? b0[0] : 0;
     for (int i = 0; i < MCAP; i++) {
         ModelAnim *m = &models[(h + i) & (MCAP - 1)];
         if (m->model == model) {
-            /* the game frees models (leaving a world) and makes new ones at the same addresses: an entry made for
-             * another object would move parts that are not its own (one leg, a sunken head after re-entering) */
-            if (m->vt == vt && m->pb == (void *)b && m->pn == (int)(e - b)) return m;
+            if (m->vt == vt && m->first == first && anim_valid(m)) return m;
+            LOG("anim: model %p is a new object (class %d, parts %d, bones %d): animation rebound", model, m->vt == vt,
+                m->first == first, anim_valid(m));
             if (m->bp && m->set) for (int k = 0; k < m->set->nbone; k++) free(m->bp[k].parts);
             free(m->bp);
             slot = m;
@@ -426,8 +439,8 @@ static ModelAnim *model_anim(void *model) {
         if (!m->model) { slot = m; break; }
     }
     if (!slot) return 0;
-    slot->model = model; slot->set = 0; slot->bp = 0;
-    slot->vt = vt; slot->pb = (void *)b; slot->pn = (int)(e - b);
+    slot->model = model; slot->set = 0; slot->bp = 0; slot->vt = vt; slot->first = first;
+    void **b = *(void ***)((char *)model + 0xa8), **e = *(void ***)((char *)model + 0xac);
     const char *geo = 0;
     for (void **q = b; q && q < e && !geo; q++) { PartInfo *pi = pinfo(*q, 0); if (pi) geo = pi->geo; }
     if (!geo) return slot;
@@ -623,21 +636,18 @@ static void *make_string(const char *s) {
 
 #define DONE_CAP 512
 static void *done_models[DONE_CAP];
-static void *done_pb[DONE_CAP];                 /* the model's parts vector when it was rebuilt: a new object at the same address is rebuilt too */
 
 static void ensure_rebuilt(void *model) {
     if (!nrbs) return;
     u32 h = ((u32)model >> 3) * 2654435761u;
     int slot = -1;
-    void *pb = *(void **)((char *)model + 0xa8);
     for (int i = 0; i < DONE_CAP; i++) {
         int j = (h + i) & (DONE_CAP - 1);
-        if (done_models[j] == model) { if (done_pb[j] == pb) return; slot = j; break; }
+        if (done_models[j] == model) return;
         if (!done_models[j]) { slot = j; break; }
     }
     if (slot < 0) return;
     done_models[slot] = model;
-    done_pb[slot] = pb;
     u32 vt = *(u32 *)model;
     for (int i = 0; i < nrbs; i++) {
         Rebuild *R = &rbs[i];
@@ -649,7 +659,6 @@ static void ensure_rebuilt(void *model) {
         for (int k = 0; k < R->n; k++)
             hook_load((char *)model + R->offs[k], gptr, make_string(R->names[k]));
         rebuilt++;
-        done_pb[slot] = *(void **)((char *)model + 0xa8);
         return;
     }
 }
@@ -1166,14 +1175,6 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "modnet.inc"
 #include "v015.inc"
 
-/* a ModelPart goes: what we knew about it goes too (its address is reused by the next models: the player's parts,
- * built in C++ and never loaded from a geometry, would otherwise inherit a dead mob bone's geometry and animation) */
-static u64 hc_part_dtor(u32 orig, u32 *w) {
-    PartInfo *pi = pinfo((void *)w[0], 0);
-    if (pi) { pi->geo = 0; pi->key = 0; pi->pos_ok = 0; }
-    return nh_callw(orig, w);
-}
-
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
     if (!mc) mc = dlopen("libminecraftpe.so", 0x2);
@@ -1204,7 +1205,6 @@ __attribute__((constructor)) static void nova_init(void) {
     recipes_init(mc);
     modnet_init(mc);
     v015_init(mc);
-    { void *d = dlsym(mc, "_ZN9ModelPartD2Ev"); LOG("model parts: %d", d ? nh_hook_c((u32)d, hc_part_dtor) : -1); }
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }
