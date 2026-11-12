@@ -3,7 +3,7 @@ import math
 import numpy as np
 
 TILE = 16
-ATLAS_N = 8  # 8x8 tiles -> 128px atlas
+ATLAS_N = 16  # 16x16 tiles -> 256px atlas
 import os
 
 TILES = ["grass_top", "grass_side", "dirt", "stone", "log_side", "log_top", "leaves", "planks",
@@ -36,6 +36,7 @@ BLOCK_RU = {"сено": "hay", "верстак": "crafting", "динамит": "
             "листва": "leaves", "шерсть": "wool", "золото": "gold", "алмаз": "diamond", "песок": "sand",
             "земля": "dirt", "розовый": "wool_pink", "красный": "wool_red", "ель": "spruce", "кирпичи": "stonebrick"}
 TRANSPARENT = {"leaves", "glass", "water", "cactus"}
+CUTOUT_BLOCKS = {"leaves", "glass", "door_top", "door_bot", "cactus"}
 SPRITES = {"flower_red", "flower_yellow", "tallgrass", "torch", "wheat", "flower_blue", "flower_white", "flower_pink",
            "rose_bush", "flower_tulip"}
 
@@ -222,6 +223,7 @@ class World:
         snowy = preset in ("winter", "зима")
         desert = preset in ("desert", "пустыня")
         forest = preset in ("forest", "лес")
+        empty = preset in ("flat", "пусто", "empty")
         self.house_origin = (999, 999)
         if preset in ("city", "город"):
             self._city(rng, radius)
@@ -237,15 +239,15 @@ class World:
                 top = "sand" if desert else ("snow" if snowy else "grass")
                 for y in range(h - 3, h):
                     self.blocks[(x, y, z)] = top if y == h - 1 else ("sand" if desert else "dirt")
-        if not forest:
+        if not forest and not empty:
             self._house(-3, -12)
-        if not desert and not forest:
+        if not desert and not forest and not empty:
             self._pond(11, -5, rng)
         # trees & flora
         tries = 0
         trees = 0
-        ntrees = 6 if desert else (120 if forest else 30)
-        clear = 8 if forest else 13
+        ntrees = 6 if desert else (120 if forest else (14 if empty else 30))
+        clear = 8 if forest else (24 if empty else 13)
         while trees < ntrees and tries < 2000:
             tries += 1
             x, z = int(rng.integers(-radius + 3, radius - 3)), int(rng.integers(-radius + 3, radius - 3))
@@ -376,6 +378,24 @@ class World:
         self.blocks[(int(x), int(y), int(z))] = block
 
     def ground(self, x, z):
+        """terrain height, raised if something was built on top (stand on platforms)"""
+        k = (int(math.floor(x)), int(math.floor(z)))
+        gc = getattr(self, "_gcache", None)
+        if gc is None:
+            gc = self._gcache = {}
+        if k in gc:
+            return gc[k]
+        g = self._terrain(x, z)
+        gi = int(g)
+        n = 0
+        while (k[0], gi, k[1]) in self.blocks and self.blocks[(k[0], gi, k[1])] not in ("water",) and n < 12:
+            gi += 1; n += 1
+        if n > 4:  # tall column = wall/tree, not a platform: keep terrain level
+            gi = int(g)
+        gc[k] = float(gi)
+        return gc[k]
+
+    def _terrain(self, x, z):
         if self.preset in ("city", "город"):
             return float(self.height.get((int(math.floor(x)), int(math.floor(z))), 0)) if math.hypot(x, z) > 29 else 0.0
         return float(self.height.get((int(math.floor(x)), int(math.floor(z))), 0)) \
@@ -481,18 +501,18 @@ class World:
     def build_mesh(self):
         """Returns (opaque verts, water verts) float32 (N,9): pos3 normal3 uv2 ao1."""
         B = self.blocks
-        solid = lambda p: p in B and B[p] not in ("water", "glass", "leaves")
+        solid = lambda p: p in B and B[p] not in TRANSPARENT
         dirs = [((0, 1, 0), 0), ((0, -1, 0), 2), ((1, 0, 0), 1), ((-1, 0, 0), 1), ((0, 0, 1), 1), ((0, 0, -1), 1)]
         opaque, water, cut = [], [], []
-        CUT = {"leaves", "glass", "door_top", "door_bot", "cactus"}
+        CUT = CUTOUT_BLOCKS
         for (x, y, z), b in B.items():
-            tiles = BLOCKS[b]
+            tiles = BLOCKS.get(b) or (b,) * 3
             for (dx, dy, dz), ti in dirs:
                 nb = (x + dx, y + dy, z + dz)
                 if b == "water":
                     if nb in B and (B[nb] == "water" or solid(nb)):
                         continue
-                elif b in ("leaves", "glass"):
+                elif b in TRANSPARENT:
                     if nb in B and (solid(nb) or B[nb] == b):
                         continue
                 elif solid(nb):

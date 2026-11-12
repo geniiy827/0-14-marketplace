@@ -379,10 +379,10 @@ class Renderer:
         self.item_tex[name] = t
         return t
 
-    def add_mob(self, name, kind):
+    def add_mob(self, name, kind, texture=None):
         from .mobs import load_mob
-        parts, tex = load_mob(kind)
-        t = self.ctx.texture((64, 64), 4, np.ascontiguousarray(tex).tobytes())
+        parts, tex = load_mob(kind, texture)
+        t = self.ctx.texture((tex.shape[1], tex.shape[0]), 4, np.ascontiguousarray(tex).tobytes())
         t.filter = (moderngl.NEAREST, moderngl.NEAREST)
         P = {}
         for bn, b in parts.items():
@@ -390,31 +390,83 @@ class Renderer:
             v = np.concatenate([v, np.ones((len(v), 1), np.float32)], axis=1)
             P[bn] = (b["pivot"], self._vao(v, ao=True), self._sh_vao(v), len(v))
         self.chars[name] = dict(texs={(0, 0): t}, parts=P, mob=kind, bones=parts)
+        return self.chars[name]
 
     @staticmethod
     def mob_matrices(pose, ch):
         g = pose.get
-        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ S(1 / 16) @ T(0, g("oy", 0), 0)
+        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ Rx(g("r_p", 0)) @ S(g("scale", 1.0) / 16) @ T(0, g("oy", 0), 0)
         M = {}
+        bones = ch["bones"]
+        legs4 = all(k in bones for k in ("leg0", "leg1", "leg2", "leg3")) and "leg4" not in bones
+        many = "leg4" in bones
         legs_a = {"leg0": "rl_p", "leg3": "rl_p", "leg1": "ll_p", "leg2": "ll_p"}
-        for bn, b in ch["bones"].items():
+        HEAD = ("head", "beak", "comb", "nose", "hat", "hat2", "hat3", "hat4", "earright", "earleft", "rightear", "leftear")
+        t = g("t", 0)
+        for bn, b in bones.items():
             piv = b["pivot"]; rx, ry, rz = b["rest"]
+            low = bn.lower()
+            side = 1 if piv[0] > 0 else -1
             A = np.eye(4, dtype=np.float32)
-            if bn in ("head", "beak", "comb"):
-                A = Ry(g("h_y", 0)) @ Rx(-g("h_p", 0))
-            elif bn in legs_a:
+            if low in HEAD and not (b.get("parent") or "").lower().startswith("head"):
+                A = Ry(g("h_y", 0)) @ Rx(-g("h_p", 0)) @ Rz(g("h_r", 0))
+            elif "arm" in low and low != "arms":
+                c = "ra" if side < 0 else "la"
+                A = Ry(g(c + "_y", 0) * side) @ Rx(-g(c + "_p", 0)) @ Rz(g(c + "_r", 0) * side)
+            elif legs4 and bn in legs_a:
                 A = Rx(-g(legs_a[bn], 0))
-            elif bn == "wing0":
-                A = Rz(g("ra_r", 0))
-            elif bn == "wing1":
-                A = Rz(-g("la_r", 0))
-            elif bn == "tail":
-                A = Ry(0.3 * math.sin(g("t", 0) * 6))
+            elif many and low.startswith("leg"):
+                k = int(low[3:]) if low[3:].isdigit() else 0
+                A = Ry(g("rl_p", 0) * 0.7 * (1 if k % 2 else -1)) @ Rz(0.15 * math.sin(t * 9 + k) * abs(g("rl_p", 0)))
+            elif "leg" in low or "foot" in low or "haunch" in low:
+                c = "rl" if side < 0 else "ll"
+                A = Rx(-g(c + "_p", 0)) @ Rz(g(c + "_r", 0) * side)
+            elif "wing" in low:
+                A = Rz(side * (0.25 + 0.9 * abs(math.sin(t * (14 if ch.get("mob") == "bat" else 3)))) * (1 if ch.get("mob") == "bat" else g("ra_r", 0) / 0.6 if g("ra_r", 0) else 0))
+            elif "tentacle" in low:
+                A = Rx(0.35 * math.sin(t * 3 + int(low[-1] if low[-1].isdigit() else 0)))
+            elif "tail" in low:
+                A = Ry(0.35 * math.sin(t * 6))
             parent = M.get(b.get("parent")) if b.get("parent") else root
             if parent is None:
                 parent = root
             M[bn] = parent @ T(*piv) @ A @ Rz(rz) @ Ry(ry) @ Rx(rx) @ T(*[-c for c in piv])
         return M
+
+    def add_prop(self, name, spec):
+        from .props import block_prop, item_prop, load_model
+        P, ptex = {}, {}
+        if spec["kind"] == "block":
+            v = block_prop(spec["block"]); tex = self.atlas
+            P["main"] = ((0, 0, 0), self._vao(v, ao=True), self._sh_vao(v), len(v)); ptex["main"] = self.atlas
+        elif spec["kind"] == "item":
+            v = item_prop(); tex = self.get_item_tex(spec["item"]) or self.atlas
+            P["main"] = ((0, 0, 0), self._vao(v, ao=True), self._sh_vao(v), len(v)); ptex["main"] = tex
+        else:
+            tex = None
+            for i, (v, img) in enumerate(load_model(spec["model"], 1.0)):
+                t_ = self.ctx.texture((img.shape[1], img.shape[0]), 4, np.ascontiguousarray(img).tobytes())
+                t_.filter = (moderngl.NEAREST, moderngl.NEAREST) if max(img.shape[:2]) <= 64 else (moderngl.LINEAR, moderngl.LINEAR)
+                t_.repeat_x = t_.repeat_y = True
+                P[f"m{i}"] = ((0, 0, 0), self._vao(v, ao=True), self._sh_vao(v), len(v)); ptex[f"m{i}"] = t_
+                tex = tex or t_
+        self.chars[name] = dict(texs={(0, 0): tex}, parts=P, prop=True, part_tex=ptex, size=spec.get("size", 1.0))
+
+    SLOTS = {"рука": ("rarm", (-6, 8, 0)), "голова": ("head", (0, 32, 0)), "спина": ("body", (0, 14, -4)),
+             "левая_рука": ("larm", (6, 8, 0))}
+
+    def prop_matrix(self, pose, ch, charM):
+        g = pose.get
+        sz = ch.get("size", 1.0) * g("scale", 1.0)
+        local = Ry(g("yaw_off", 0)) @ Rx(g("r_p", 0)) @ Rz(g("b_r", 0)) @ S(sz)
+        att = g("attach")
+        if att and att[0] in charM:
+            part, off = self.SLOTS.get(att[1], self.SLOTS["рука"])
+            base = charM[att[0]].get(part)
+            if base is not None:
+                return base @ T(*off) @ S(16 / 0.9375) @ T(0, -0.0, 0) @ local
+        y = g("y") + g("oy", 0) / (16 / 0.9375)
+        return T(g("x"), y, g("z")) @ Ry(g("yaw")) @ local
 
     def _vao(self, v, ao=False):
         buf = self.ctx.buffer(np.ascontiguousarray(v, np.float32).tobytes())
@@ -446,7 +498,7 @@ class Renderer:
     def part_matrices(pose, pivots):
         """pose: dict with x,y,z,yaw and joint angles (radians)."""
         g = pose.get
-        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ Rx(g("r_p", 0)) @ S(1 / 16 * 0.9375)
+        root = T(g("x"), g("y"), g("z")) @ Ry(g("yaw")) @ Rx(g("r_p", 0)) @ S(1 / 16 * 0.9375 * g("scale", 1.0))
         root = root @ T(g("ox", 0) * 16, g("oy", 0), 0)
         bp = pivots["body"]
         body_m = root @ T(*bp) @ Ry(g("b_y", 0)) @ Rx(g("b_p", 0)) @ Rz(g("b_r", 0)) @ T(*[-c for c in bp])
@@ -471,10 +523,16 @@ class Renderer:
         # matrices for characters
         drawlist = []
         items = []
-        for pose in poses:
+        charM = {}
+        order = [p for p in poses if not self.chars[p["name"]].get("prop")] + [p for p in poses if self.chars[p["name"]].get("prop")]
+        for pose in order:
             if pose.get("hidden"):
                 continue
             ch = self.chars[pose["name"]]
+            if ch.get("prop"):
+                Mp = self.prop_matrix(pose, ch, charM)
+                drawlist.append((ch, {k: Mp for k in ch["parts"]}, ch["texs"][(0, 0)]))
+                continue
             if ch.get("mob"):
                 M = self.mob_matrices(pose, ch)
                 tex = ch["texs"][(0, 0)]
@@ -485,7 +543,11 @@ class Renderer:
                 if pose.get("item"):
                     it = self.get_item_tex(pose["item"])
                     if it is not None:
-                        items.append((M["rarm"], it))
+                        Mi = M["rarm"]
+                        if "/" in pose["item"] or pose["item"].startswith("f:"):  # blocks held in hand are smaller
+                            Mi = Mi @ T(-6, 10, 3) @ S(0.6) @ T(6, -10, -3)
+                        items.append((Mi, it))
+            charM[pose["name"]] = M
             drawlist.append((ch, M, tex))
         # dynamic shadows
         self.fbo_sm_dyn.use(); self.fbo_sm_dyn.clear(depth=1.0)
@@ -494,6 +556,8 @@ class Renderer:
         for ch, M, tex in drawlist:
             tex.use(0)
             for pname, (pivot, vao, shvao, n) in ch["parts"].items():
+                if "part_tex" in ch:
+                    ch["part_tex"][pname].use(0)
                 self.sh_prog["model"].write(gl_mat(M[pname])); shvao.render()
         for M, it in items:
             it.use(0); self.sh_prog["model"].write(gl_mat(M)); self.item_sh.render()
@@ -542,6 +606,8 @@ class Renderer:
         for ch, M, tex in drawlist:
             tex.use(0)
             for pname, (pivot, vao, shvao, n) in ch["parts"].items():
+                if "part_tex" in ch:
+                    ch["part_tex"][pname].use(0)
                 p["model"].write(gl_mat(M[pname])); vao.render()
         for M, it in items:
             it.use(0); p["model"].write(gl_mat(M)); self.item_vao.render()

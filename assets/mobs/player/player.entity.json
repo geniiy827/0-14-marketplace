@@ -1,0 +1,23 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:player",
+      "textures": {
+        "default": "steve.png",
+        "alex": "alex.png"
+      },
+      "geometry": {},
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/steve.png": "steve.png",
+          "images/mob/alex.png": "alex.png"
+        },
+        "model": "native",
+        "rebuild": []
+      }
+    }
+  }
+}

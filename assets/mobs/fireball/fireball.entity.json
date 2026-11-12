@@ -1,0 +1,21 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:fireball",
+      "textures": {
+        "default": "fireball.png"
+      },
+      "geometry": {},
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/entity/fireball.png": "fireball.png"
+        },
+        "model": "native",
+        "rebuild": []
+      }
+    }
+  }
+}

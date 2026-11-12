@@ -153,6 +153,14 @@ def a_lazy(u, d):
     return dict(ra_r=0.25, la_r=0.25, h_r=0.25, b_r=0.05, h_p=-0.1)
 
 
+def a_spin(u, d):
+    return dict(yaw_off=u * 2 * PI * 1.2)
+
+
+def a_wobble(u, d):
+    return dict(b_r=0.3 * sin(u * 7), r_p=0.12 * sin(u * 5))
+
+
 def a_flex(u, d):
     s = smooth(u / 0.3)
     return dict(ra_r=1.6 * s, la_r=1.6 * s, ra_p=0.3 * s, la_p=0.3 * s, b_p=-0.08 * s, h_p=0.15 * s,
@@ -166,12 +174,15 @@ ACTIONS = {
     "shrug": (a_shrug, 1.1), "think": (a_think, 2.2), "scared": (a_scared, 1.8), "angry": (a_angry, 1.6),
     "crouch": (a_crouch, 1.2), "lookaround": (a_lookaround, 2.0), "cry": (a_cry, 2.0), "bow": (a_bow, 1.2),
     "clap": (a_clap, 1.5), "spit": (a_spit, 0.7), "struggle": (a_struggle, 2.0), "grab": (a_grab, 1.6),
+    "spin": (a_spin, 2.0), "wobble": (a_wobble, 2.0),
     "love": (a_love, 2.0), "eat": (a_eat, 1.4), "hide": (a_hide, 2.0), "lazy": (a_lazy, 2.0), "flex": (a_flex, 1.6),
 }
 BIG_ACTIONS = {"spit", "struggle", "grab", "love", "eat", "hide", "flex", "fall", "jump", "dance", "celebrate", "surprise", "facepalm", "scared", "angry", "crouch", "cry", "bow",
                "point", "punch", "clap", "think"}
 
-CHANNELS = ["r_p", "ra_p", "ra_r", "ra_y", "la_p", "la_r", "la_y", "rl_p", "ll_p", "rl_r", "ll_r",
+LIB = None  # engine.library.Library, set by the compiler
+
+CHANNELS = ["lift", "r_p", "ra_p", "ra_r", "ra_y", "la_p", "la_r", "la_y", "rl_p", "ll_p", "rl_r", "ll_r",
             "h_p", "h_y", "h_r", "b_p", "b_r", "b_y", "oy", "ox", "yaw_off"]
 
 
@@ -194,7 +205,13 @@ class CharSim:
         self.vis = sorted([v for v in tl.vis if v["char"] == name], key=lambda v: v["t"])
         self.items = sorted([v for v in tl.items if v["char"] == name], key=lambda v: v["t"])
         self.lies = sorted([v for v in tl.lies if v["char"] == name], key=lambda v: v["t"])
+        self.poses = sorted([v for v in tl.poses if v["char"] == name], key=lambda v: v["t"])
+        self.pose_w = 0.0
         self.mob = tl.cast[name].get("mob")
+        self.attach = sorted([v for v in tl.attach if v["char"] == name], key=lambda v: v["t"])
+        self.scales = sorted([v for v in tl.scales if v["char"] == name], key=lambda v: v["t"])
+        self.base_lift = tl.cast[name].get("lift", 0.0)
+        self.base_scale = tl.cast[name].get("scale", 1.0)
         self.hidden0 = tl.cast[name].get("hidden", False)
         self.start = tl.cast[name]["pos"]
         self.start_yaw = tl.cast[name].get("yaw")
@@ -227,6 +244,31 @@ class CharSim:
             else:
                 break
         return x, z, dist, moving, mv
+
+    def lift_at(self, t):
+        h = self.base_lift
+        for m in self.moves:
+            if "h1" not in m:
+                continue
+            if t >= m["t1"]:
+                h = m["h1"]
+            elif t >= m["t0"]:
+                u = (t - m["t0"]) / max(1e-6, m["t1"] - m["t0"])
+                h = m["h0"] + (m["h1"] - m["h0"]) * smooth(u)
+                break
+            else:
+                break
+        return h
+
+    def scale_at(self, t):
+        s = self.base_scale
+        for e in self.scales:
+            if t >= e["t"] + 0.6:
+                s = e["v"]
+            elif t >= e["t"]:
+                s = s + (e["v"] - s) * smooth((t - e["t"]) / 0.6)
+                break
+        return s
 
     def target_point(self, tgt, t, poses_xz):
         if tgt is None:
@@ -314,7 +356,7 @@ class CharSim:
         self.lie_w = lie_t if snap else self.lie_w + (lie_t - self.lie_w) * (1 - math.exp(-dt * 9))
         # walk amplitude
         run = bool(mv and mv.get("run"))
-        amp_t = (0.95 if run else 0.62) if moving else 0.0
+        amp_t = (0.95 if run else 0.62) if moving and not mv.get("fly") else 0.0
         self.walk_amp = amp_t if snap else self.walk_amp + (amp_t - self.walk_amp) * (1 - math.exp(-dt * 10))
 
         P = {c: 0.0 for c in CHANNELS}
@@ -373,18 +415,35 @@ class CharSim:
                 w = smooth((t - c["t0"]) / fi) * smooth((c["t1"] + 0.25 - t) / 0.25)
                 vals = fn(u, d)
                 for ch, v in vals.items():
-                    if ch in ("oy", "ox"):
+                    if ch in ("oy", "ox", "lift"):
                         P[ch] += v * w
                     else:
+                        if ch in ("r_p", "yaw_off"):
+                            v = wrap(v)
                         P[ch] = P[ch] * (1 - w) + v * w
+        # persistent pose (from the text library)
+        pe = self.latest(self.poses, t)
+        want = pe["name"] if pe and pe["name"] in ACTIONS else None
+        if want:
+            self.pose_name = want
+        self.pose_w = (1.0 if want else 0.0) if snap else self.pose_w + ((1.0 if want else 0.0) - self.pose_w) * (1 - math.exp(-dt * 8))
+        if self.pose_w > 0.001 and getattr(self, "pose_name", None):
+            fn, d = ACTIONS[self.pose_name]
+            for ch, v in fn((t - (pe["t"] if pe else 0)), d).items():
+                if ch in ("oy", "ox", "lift"):
+                    P[ch] += v * self.pose_w
+                else:
+                    P[ch] = P[ch] * (1 - self.pose_w) + v * self.pose_w
         if self.lie_w > 0.001:
             w = self.lie_w
             P["r_p"] = -PI / 2 * w
             P["oy"] = P["oy"] * (1 - w) + 2.2 * w
             for c, v in dict(ra_r=0.5, la_r=0.5, rl_r=0.15, ll_r=0.15, h_y=P["h_y"] * 0.3, h_p=0.0).items():
                 P[c] = P[c] * (1 - w) + v * w
-        if self.mob:  # chicken wings flap while walking
+        if self.mob == "chicken":  # wings flap while walking
             P["ra_r"] = P["la_r"] = 0.6 * abs(sin(t * 18)) * self.walk_amp
+        if self.mob in ("zombie", "zombie_pigman", "zombie_villager"):
+            P["ra_p"] += 1.45; P["la_p"] += 1.45
         it_ = self.latest(self.items, t)
         if it_ and it_.get("carry") and it_.get("item"):
             P["ra_p"], P["la_p"], P["ra_r"], P["la_r"] = 1.05, 1.05, -0.12, -0.12
@@ -393,7 +452,11 @@ class CharSim:
         v = self.latest(self.vis, t)
         hidden = (not v["on"]) if v else self.hidden0
         it = self.latest(self.items, t)
-        P.update(name=self.name, x=x + P["ox"] * cos(self.yaw), y=gy, z=z - P["ox"] * sin(self.yaw),
+        att = self.latest(self.attach, t)
+        P["lift"] += self.lift_at(t)
+        P["scale"] = self.scale_at(t)
+        P["attach"] = (att["to"], att["slot"]) if att and att["to"] else None
+        P.update(name=self.name, x=x + P["ox"] * cos(self.yaw), y=gy + P["lift"], z=z - P["ox"] * sin(self.yaw),
                  yaw=self.yaw + P["yaw_off"], mouth=0 if self.mob else mouth, blink=blink, hidden=hidden,
                  item=(it["item"] if it else None), t=t)
         P["ox"] = 0
@@ -414,6 +477,15 @@ def particles_at(t, events, P):
         if not (e["t0"] <= t < e["t1"] + 1.5):
             continue
         A = P.get(e["char"])
+        if e["kind"] == "gen":
+            if LIB is None or e["name"] not in LIB.effects:
+                continue
+            from .library import effect_particles
+            B = P.get(e["target"][1]) if e.get("target") and e["target"][0] == "char" else None
+            if A is not None and A.get("hidden"):
+                continue
+            out += effect_particles(LIB.effects[e["name"]], e, t, A, B)
+            continue
         if A is None or A.get("hidden") and e["kind"] != "poof":
             continue
         u = t - e["t0"]

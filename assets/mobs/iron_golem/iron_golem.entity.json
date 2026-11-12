@@ -1,0 +1,29 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:iron_golem",
+      "textures": {
+        "default": "iron_golem.png"
+      },
+      "geometry": {
+        "default": "geometry.irongolem"
+      },
+      "animations": {
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/iron_golem.png": "iron_golem.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

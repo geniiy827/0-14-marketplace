@@ -4,6 +4,8 @@ import os
 import re
 
 from .anim import ACTIONS, BIG_ACTIONS
+from . import anim as _anim
+from .library import Library
 from .audio import tts, envelope, SR
 
 ALIASES = {
@@ -52,6 +54,14 @@ ALIASES = {
     "remove": "скрыт скрыта скрыть убран убрана remove",
     "hold": "держит берет берёт достает достаёт hold",
     "drop": "убирает выбрасывает прячет_предмет drop",
+    "pose": "поза принимает_позу pose",
+    "fly": "летит полетел полетела взлетает fly",
+    "spin": "вращается крутится кружится spin",
+    "wobble": "качается шатается wobble",
+    "resize": "размер растет растёт уменьшается увеличивается resize",
+    "attach": "крепится цепляется прилипает attach",
+    "detach": "отцепляется отпадает detach",
+    "effect": "эффект effect",
 }
 ITEMS = {"записк": "paper", "бумаг": "paper", "сено": "hayblock/1", "ящик": "crafting_table/1", "коробк": "crafting_table/1", "тыкв": "pumpkin/1",
          "дротик": "arrow", "сумк": "leather", "пакет": "paper", "сундук": "crafting_table/1",
@@ -78,7 +88,8 @@ for k, v in ALIASES.items():
 SHOTS = {"общий": "wide", "wide": "wide", "крупно": "close", "close": "close", "сплеча": "ots",
          "из-за": "ots", "ots": "ots", "средний": "medium", "medium": "medium", "облет": "orbit", "облёт": "orbit",
          "orbit": "orbit", "сверху": "top", "top": "top", "следом": "follow", "follow": "follow", "авто": "auto",
-         "auto": "auto", "двое": "two", "two": "two"}
+         "auto": "auto", "двое": "two", "two": "two", "точка": "fixed", "fixed": "fixed", "путь": "path", "path": "path",
+         "проезд": "path"}
 
 STOP = {"к", "на", "в", "до", "у", "плечами", "головой", "и", "руками", "в ладоши", "от", "с", "со"}
 
@@ -95,6 +106,8 @@ class Timeline:
         self.moves, self.clips, self.looks, self.faces, self.sits = [], [], [], [], []
         self.speech, self.sfx, self.shots, self.scenes = [], [], [], []
         self.vis, self.items, self.lies, self.particles, self.music_plan = [], [], [], [], []
+        self.poses = []
+        self.attach, self.scales = [], []
         self.duration = 0.0
 
 
@@ -108,16 +121,42 @@ def parse(path):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        m = re.match(r"^(актер|актёр|персонаж|cast|моб|mob)\s+([^:]+):\s*(.*)$", line, re.I)
+        if Library.is_lib_line(line):
+            head.setdefault("_lib", []).append(line)
+            continue
+        m = re.match(r"^(строить|стройка|build)\s+([^:]+):\s*(.*)$", line, re.I)
+        if m:
+            head.setdefault("_builds", []).append((norm(m.group(2)), m.group(3).strip()))
+            continue
+        m = re.match(r"^(актер|актёр|персонаж|cast|моб|mob|объект|object)\s+([^:]+):\s*(.*)$", line, re.I)
         if m:
             name = m.group(2).strip()
+            if m.group(1).lower() in ("объект", "object"):
+                opts = dict(re.findall(r"(\S+?)=(\S+)", m.group(3)))
+                p = opts.get("место", "0,0").split(",")
+                if "модель" in opts:
+                    f = opts["модель"]
+                    spec = dict(kind="model", model=f if os.path.isabs(f) else os.path.join(base, f))
+                elif "предмет" in opts:
+                    it = opts["предмет"]
+                    spec = dict(kind="item", item=next((v for k, v in ITEMS.items() if norm(it).startswith(k)), it))
+                else:
+                    spec = dict(kind="block", block=opts.get("блок", "тнт"))
+                spec["size"] = float(opts.get("размер", 1.0))
+                cast[name] = dict(name=name, prop=spec, pos=(float(p[0]), float(p[1])), color="#dddddd", voice="pavel",
+                                  pitch=None, rate=None, skin=None, lift=float(opts.get("высота", 0)),
+                                  hidden=norm(opts.get("скрыт", "нет")) in ("да", "yes"))
+                if "поворот" in opts:
+                    cast[name]["yaw"] = math.radians(float(opts["поворот"]))
+                continue
             if m.group(1).lower() in ("моб", "mob"):
                 from .mobs import MOB_RU
                 opts = dict(re.findall(r"(\S+?)=(\S+)", m.group(3)))
                 kind = MOB_RU.get(norm(opts.get("тип", opts.get("type", "корова"))), "cow")
                 p = opts.get("место", opts.get("pos", "0,0")).split(",")
                 cast[name] = dict(name=name, mob=kind, pos=(float(p[0]), float(p[1])), color=opts.get("цвет", "#dddddd"),
-                                  voice=None, pitch=None, rate=None, skin=None,
+                                  voice=None, pitch=None, rate=None, skin=None, texture=opts.get("текстура"),
+                                  lift=float(opts.get("высота", 0)), scale=float(opts.get("размер", 1)),
                                   hidden=norm(opts.get("скрыт", "нет")) in ("да", "yes"))
                 if "поворот" in opts:
                     cast[name]["yaw"] = math.radians(float(opts["поворот"]))
@@ -132,6 +171,7 @@ def parse(path):
             if "поворот" in opts:
                 cfg["yaw"] = math.radians(float(opts["поворот"]))
             cfg["hidden"] = norm(opts.get("скрыт", "нет")) in ("да", "yes")
+            cfg["scale"] = float(opts.get("размер", 1)); cfg["lift"] = float(opts.get("высота", 0))
             cfg["lying"] = norm(opts.get("лежит", opts.get("спит", "нет"))) in ("да", "yes")
             cast[name] = cfg
             continue
@@ -170,6 +210,22 @@ class Compiler:
     def __init__(self, path, world, cache="cache", world_factory=None):
         self.path = path
         self.head, castcfg, self.scenes_src = parse(path)
+        lib = Library()
+        libdir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "library")
+        if os.path.isdir(libdir):
+            for f in sorted(os.listdir(libdir)):
+                if f.endswith(".txt"):
+                    lib.load_file(os.path.join(libdir, f))
+        lib.load_lines(self.head.get("_lib", []))
+        self.lib = lib
+        _anim.LIB = lib
+        for nm, act in lib.actions.items():
+            ACTIONS[nm] = (act, act.dur)
+            ACT[nm.replace("ё", "е")] = nm
+            for al in act.aliases:
+                ACT[al.lower().replace("ё", "е")] = nm
+            if act.big:
+                BIG_ACTIONS.add(nm)
         self.world = world
         self.world0 = world
         self.world_factory = world_factory
@@ -183,6 +239,11 @@ class Compiler:
         tl.mood = norm(h.get("настроение", "весело")); tl.end_text = h.get("конец", "Конец")
         tl.cast = castcfg
         self.pos = {n: c["pos"] for n, c in castcfg.items()}
+        self.hgt = {}
+        from .build import material as _mat
+        for c in castcfg.values():
+            if c.get("prop") and c["prop"]["kind"] == "block":
+                c["prop"]["block"] = _mat(c["prop"]["block"])
 
     # ---------------------------------------------------------- helpers
     def find_char(self, tok):
@@ -226,6 +287,12 @@ class Compiler:
             subject = self.find_char(toks[0]); toks = toks[1:]
         kind = None
         for i, tok in enumerate(toks):
+            for j in (4, 3, 2):
+                cand = "_".join(norm(x).strip(",.!?") for x in toks[i:i + j])
+                if len(toks[i:i + j]) == j and cand in ACT:
+                    kind = ACT[cand]; toks = toks[i + j:]; break
+            if kind:
+                break
             t = norm(tok).strip(",.!?")
             if t in ACT:
                 kind = ACT[t]; toks = toks[i + 1:]; break
@@ -236,6 +303,7 @@ class Compiler:
                 toks = toks[i + 1:]; break
         if kind is None:
             raise ValueError(f"Неизвестное действие: «{text}». Доступны: " + ", ".join(sorted(ALIASES)))
+        self.last_tokens = [norm(x).strip(",.!?") for x in toks]
         target, num = self.resolve(toks, subject)
         return subject, kind, target, num
 
@@ -268,6 +336,32 @@ class Compiler:
                 tl.sfx.append((t0, "pop", 1.0))
                 return t0 + 0.6
             return t0
+        if kind == "pose":
+            nm = None
+            toks = getattr(self, "last_tokens", [])
+            for j in (3, 2, 1):
+                for i in range(len(toks)):
+                    cand = "_".join(toks[i:i + j])
+                    if cand in self.lib.actions or ACT.get(cand) in self.lib.actions:
+                        nm = self.lib.actions.get(cand) and cand or ACT.get(cand); break
+                if nm:
+                    break
+            tl.poses.append(dict(char=subj, t=t0, name=nm))
+            return t0 + (num or 0.6)
+        if kind == "effect":
+            toks = getattr(self, "last_tokens", [])
+            nm = next((x for x in toks if x in self.lib.effects), None)
+            if nm:
+                ev = dict(kind="gen", name=nm, t0=t0, t1=t0 + (num or 2.0), char=subj)
+                if target and target[0] == "char":
+                    ev["char"] = target[1]
+                elif target and target[0] == "point":
+                    ev["char"] = None
+                    ev["point"] = (target[1][0], self.world.ground(*target[1]) + 0.8, target[1][1])
+                P.append(ev)
+                if nm == "взрыв":
+                    tl.sfx.append((t0, "random_explode", 1.0))
+            return t0 + 0.2
         if kind == "remove":
             tl.vis.append(dict(char=subj, t=t0, on=False))
             return t0
@@ -309,6 +403,37 @@ class Compiler:
                 P.append(dict(kind="zzz", t0=t0 + 0.5, t1=t0 + (num or 3.0), char=subj))
                 return t0 + (num or 1.0)
             return t0 + (num or 0.9)
+        if kind == "resize":
+            tl.scales.append(dict(char=subj, t=t0, v=num or 1.0))
+            tl.sfx.append((t0, "random_pop", 0.6))
+            return t0 + 0.6
+        if kind == "attach":
+            if target and target[0] == "char":
+                toks = getattr(self, "last_tokens", [])
+                slot = "голова" if any(x.startswith("голов") for x in toks) else "спина" if any(x.startswith("спин") for x in toks) \
+                    else "левая_рука" if "левую" in toks or "левой" in toks else "рука"
+                tl.attach.append(dict(char=subj, t=t0, to=target[1], slot=slot))
+                tl.vis.append(dict(char=subj, t=t0, on=True))
+            return t0 + 0.3
+        if kind == "detach":
+            owner = next((a["to"] for a in reversed(tl.attach) if a["char"] == subj and a["t"] <= t0 and a["to"]), None)
+            tl.attach.append(dict(char=subj, t=t0, to=None, slot=None))
+            if owner:
+                ox, oz = self.pos[owner]
+                tl.moves.append(dict(char=subj, t0=t0, t1=t0, **{"from": (ox, oz)}, to=(ox + 0.6, oz), dist=0.0, run=False))
+                self.pos[subj] = (ox + 0.6, oz)
+            return t0 + 0.3
+        if kind == "fly":
+            dst = self.target_xz(target) or self.pos[subj]
+            ax, az = self.pos[subj]
+            h0 = self.hgt.get(subj, tl.cast[subj].get("lift", 0.0))
+            h1 = num if num is not None else h0
+            dist = math.hypot(dst[0] - ax, dst[1] - az)
+            dur = max(0.8, math.hypot(dist, h1 - h0) / 6.0 + 0.3)
+            tl.moves.append(dict(char=subj, t0=t0, t1=t0 + dur, **{"from": (ax, az)}, to=dst, dist=dist, run=False,
+                                 fly=True, h0=h0, h1=h1))
+            self.pos[subj] = dst; self.hgt[subj] = h1
+            return t0 + dur
         if kind in ("walk", "run", "sneak"):
             dst = self.target_xz(target)
             if dst is None:
@@ -356,12 +481,30 @@ class Compiler:
             tl.sits.append(dict(char=subj, t=t0, on=kind == "sit"))
             if kind == "stand":
                 tl.lies.append(dict(char=subj, t=t0, on=False))
+                tl.poses.append(dict(char=subj, t=t0, name=None))
                 for p in tl.particles:
                     if p["char"] == subj and p["kind"] == "zzz" and p["t1"] > t0:
                         p["t1"] = t0
             return t0 + (num or 0.7)
         fn, dflt = ACTIONS[kind]
         d = num or dflt
+        if kind in self.lib.actions:
+            la = self.lib.actions[kind]
+            for sd in la.sounds:
+                nm, _, at = sd.partition("@")
+                tl.sfx.append((t0 + float(at or 0), nm, 1.0))
+            for ef in la.effects:
+                nm, _, at = ef.partition("@")
+                P.append(dict(kind="gen", name=nm, t0=t0 + float(at or 0), t1=t0 + d, char=subj))
+            if target and target[0] == "char":
+                tl.faces.append(dict(char=subj, t=t0, target=target)); tl.looks.append(dict(char=subj, t=t0, target=target))
+                fly = next((x for x in getattr(self, "last_tokens", []) if x in self.lib.effects and self.lib.effects[x].fly), None)
+                if fly or kind == "бросает":
+                    fly = fly or "бросок"
+                    P.append(dict(kind="gen", name=fly, t0=t0 + 0.25, t1=t0 + 0.7, char=subj, target=target))
+                    tl.sfx.append((t0 + 0.25, "random_bow", 0.6))
+                    tl.sfx.append((t0 + 0.7, "random_pop", 0.9))
+                    tl.clips.append(dict(char=target[1], kind="surprise", t0=t0 + 0.7, t1=t0 + 1.2))
         if target and kind in ("point", "punch", "wave", "laugh", "spit", "grab", "love", "flex", "angry"):
             tl.faces.append(dict(char=subj, t=t0, target=target))
             tl.looks.append(dict(char=subj, t=t0, target=target))
@@ -417,9 +560,17 @@ class Compiler:
             cc = [float(v) for v in opts.get("центр", "0,0").split(",")]
             self.crowd = dict(world=opts.get("мир", "город"), R=float(opts.get("радиус", 8)), c=cc, names=[])
             rr = _r.Random(7)
+            placed = []
             for i in range(cnt):
                 nm = f"Прохожая{i + 1}"
-                a = rr.uniform(0, 6.28); rad = rr.uniform(3.5, self.crowd["R"])
+                for _try in range(60):
+                    a = rr.uniform(0, 6.28); rad = rr.uniform(3.5, self.crowd["R"])
+                    q = (cc[0] + rad * math.cos(a), cc[1] + rad * math.sin(a))
+                    if all(math.hypot(q[0] - o[0], q[1] - o[1]) > 1.5 for o in placed) and \
+                            all((math.floor(q[0] + dx_), 0, math.floor(q[1] + dz_)) not in self.world_factory(opts.get("мир", "город")).blocks
+                                for dx_ in (-0.3, 0.3) for dz_ in (-0.3, 0.3)):
+                        break
+                placed.append(q)
                 tl.cast[nm] = dict(name=nm, skin=skins[i % len(skins)], voice="anna", pitch=None, rate=None,
                                    color="#ffb0d0", pos=(cc[0] + rad * math.cos(a), cc[1] + rad * math.sin(a)),
                                    hidden=True, extra=True, yaw=rr.uniform(-3, 3))
@@ -510,7 +661,7 @@ class Compiler:
                     if cam_mode:
                         spec = cam_mode
                     elif first:
-                        spec = ("wide", None, None)
+                        spec = ("wide", who, None)
                     elif big and big[1] in ("walk", "run"):
                         spec = ("wide", None, None)
                     elif big:
@@ -519,9 +670,11 @@ class Compiler:
                         spec = prev_spec
                     else:
                         k = nline % 5
-                        spec = ("two", None, None) if k == 4 else (("ots", who, addr) if k % 2 == 0 else ("close", who, addr))
+                        spec = ("two", who, addr) if k == 4 else (("ots", who, addr) if k % 2 == 0 else ("close", who, addr))
                         if addr is None:
                             spec = ("medium", who, None)
+                        elif tl.cast.get(addr, {}).get("extra") and spec[0] in ("ots", "two"):
+                            spec = ("close", who, addr)  # never frame over a wandering extra's shoulder
                     nline += 1
                     last_speaker = who
                     t = end
@@ -543,6 +696,25 @@ class Compiler:
                         kind = SHOTS.get(norm(toks[0]) if toks else "авто", "auto")
                         if kind == "auto":
                             cam_mode = None
+                        elif kind in ("fixed", "path"):
+                            pts = [tuple(float(v) for v in tk.split(",")) for tk in toks[1:]
+                                   if re.match(r"^-?[\d.]+,-?[\d.]+,-?[\d.]+$", tk)]
+                            look = None
+                            lt = [norm(x) for x in toks]
+                            if "смотрит" in lt:
+                                k_ = lt.index("смотрит")
+                                if k_ + 1 < len(toks):
+                                    nx_ = toks[k_ + 1]
+                                    c_ = self.find_char(nx_)
+                                    look = c_ if c_ else (tuple(float(v) for v in nx_.split(",")) if "," in nx_ else None)
+                                    if look and not isinstance(look, str) and len(look) == 2:
+                                        look = (look[0], 1.0, look[1])
+                                    if not isinstance(look, str) and look in [pts[-1] if pts else None]:
+                                        pts = pts[:-1]
+                            fv = re.search(r"поле=(\d+)", body)
+                            p1 = pts[0] if pts else (0.0, 3.0, 8.0)
+                            p2 = pts[1] if len(pts) > 1 else p1
+                            cam_mode = (kind, None, None, (p1, p2, look, float(fv.group(1)) if fv else 45.0))
                         else:
                             subj = self.find_char(toks[1]) if len(toks) > 1 else None
                             other = None
@@ -559,6 +731,8 @@ class Compiler:
                             if not part.strip():
                                 continue
                             subj, kind, target, num = self.parse_action(part.strip(), None)
+                            if subj is None and kind == "effect":
+                                subj = names[0]
                             if subj is None:
                                 raise ValueError(f"Кто делает действие? «{part}»")
                             slot = movers if kind in ("walk", "run", "sneak") and target and target[0] == "point" else 0
@@ -598,18 +772,95 @@ class Compiler:
                 rr = _r.Random(int(s0 * 10) + 3)
                 c0 = self.crowd["c"]; R = self.crowd["R"]
                 busy = {m["char"] for m in tl.moves if s0 <= m["t0"] < t}
+                heroes = [n for n in tl.cast if n not in self.crowd["names"] and not tl.cast[n].get("prop")]
+                hero_paths = [m for m in tl.moves if m["char"] in heroes and m["t1"] >= s0 and m["t0"] <= t]
+                taken = {}
+
+                def free(p, n_, tt_):
+                    for o, q in taken.items():
+                        if o != n_ and math.hypot(p[0] - q[0], p[1] - q[1]) < 1.6:
+                            return False
+                    for h in heroes:  # keep away from where heroes stand / walk in this scene
+                        if math.hypot(p[0] - self.pos[h][0], p[1] - self.pos[h][1]) < 2.2:
+                            return False
+                    for m in hero_paths:
+                        for k in range(6):
+                            q = (m["from"][0] + (m["to"][0] - m["from"][0]) * k / 5, m["from"][1] + (m["to"][1] - m["from"][1]) * k / 5)
+                            if math.hypot(p[0] - q[0], p[1] - q[1]) < 1.6:
+                                return False
+                    return True
+                for n in self.crowd["names"]:
+                    taken[n] = self.pos[n]
+                cm = {n: [] for n in self.crowd["names"]}
+                start = dict(self.pos)
+                for h in heroes:  # heroes' own paths in this scene take part in collision checks
+                    hm = sorted([m for m in tl.moves if m["char"] == h and m["t1"] >= s0 and m["t0"] <= t], key=lambda m: m["t0"])
+                    if hm:
+                        cm[h] = [(m["t0"], m["t1"], m["from"], m["to"]) for m in hm]
+                        start[h] = hm[0]["from"]
+
+                def cpos(n_, tq):
+                    p = start[n_]
+                    for (a0, a1, f_, to_) in cm[n_]:
+                        if tq >= a1:
+                            p = to_
+                        elif tq >= a0:
+                            k_ = (tq - a0) / max(1e-6, a1 - a0)
+                            k_ = k_ - 0.85 * math.sin(2 * math.pi * k_) / (2 * math.pi)
+                            return (f_[0] + (to_[0] - f_[0]) * k_, f_[1] + (to_[1] - f_[1]) * k_)
+                    return p
+
+                def collides(n_, a0, a1, f_, to_):
+                    for k_ in range(17):
+                        uu = k_ / 16
+                        tq = a0 + (a1 - a0) * uu
+                        ss = uu - 0.85 * math.sin(2 * math.pi * uu) / (2 * math.pi)
+                        p = (f_[0] + (to_[0] - f_[0]) * ss, f_[1] + (to_[1] - f_[1]) * ss)
+                        for o in cm:
+                            if o != n_ and cm[o] is not None:
+                                q = cpos(o, tq)
+                                if math.hypot(p[0] - q[0], p[1] - q[1]) < 0.9:
+                                    return True
+                    # standing at the destination afterwards
+                    for o in cm:
+                        if o != n_:
+                            for k_ in range(13):
+                                q = cpos(o, a1 + k_ * 0.5)
+                                if math.hypot(to_[0] - q[0], to_[1] - q[1]) < 1.0:
+                                    return True
+                    # path must be walkable (no fountain / benches / trees)
+                    for k_ in range(13):
+                        p = (f_[0] + (to_[0] - f_[0]) * k_ / 12, f_[1] + (to_[1] - f_[1]) * k_ / 12)
+                        for dx_, dz_ in ((0.3, 0.3), (-0.3, 0.3), (0.3, -0.3), (-0.3, -0.3)):
+                            b_ = self.world.blocks.get((math.floor(p[0] + dx_), 0, math.floor(p[1] + dz_)))
+                            if b_ is not None:
+                                return True
+                    return False
                 for n in self.crowd["names"]:
                     if n in busy:
                         continue
+                    if n not in cm:
+                        cm[n] = []
                     tt = s0 + rr.uniform(0, 2.5)
+                    tries = 0
                     while tt < t:
+                        tries += 1
                         a = rr.uniform(0, 6.28); rad = rr.uniform(3.6, R)
                         dst = (c0[0] + rad * math.cos(a), c0[1] + rad * math.sin(a))
                         ax, az = self.pos[n]
                         dist = math.hypot(dst[0] - ax, dst[1] - az)
-                        if dist < 1.5:
+                        if dist < 1.5 or (not free(dst, n, tt) and tries < 40):
                             continue
-                        dur = dist / rr.uniform(1.3, 2.2)
+                        dur_ = dist / 1.7
+                        if collides(n, tt, tt + dur_, (ax, az), dst):
+                            if tries < 40:
+                                continue
+                            tt += 1.0; tries = 0
+                            continue
+                        tries = 0
+                        taken[n] = dst
+                        cm[n].append((tt, tt + dur_, (ax, az), dst))
+                        dur = dur_
                         tl.moves.append(dict(char=n, t0=tt, t1=tt + dur, **{"from": (ax, az)}, to=dst, dist=dist, run=False))
                         self.pos[n] = dst
                         tt += dur + rr.uniform(1.0, 5.0)
@@ -627,177 +878,4 @@ class Compiler:
 
 
 # ---------------------------------------------------------------- camera
-class Director:
-    def __init__(self, tl, world):
-        self.tl = tl
-        self.world = world
-        self.cur = None
-        self.eye = self.tgt = None
-        self.side = (0.0, 1.0)  # camera stays on +z side (house is behind)
-
-    def shot_at(self, t):
-        for s in self.tl.shots:
-            if s["t0"] <= t < s["t1"]:
-                return s
-        return self.tl.shots[-1]
-
-    def frame(self, t, dt, poses, snap=False):
-        sh = self.shot_at(t)
-        cut = sh is not self.cur or snap
-        self.cur = sh
-        kind, a, b = sh["spec"]
-        u = (t - sh["t0"]) / max(0.1, sh["t1"] - sh["t0"])
-        P = {p["name"]: p for p in poses if not p.get("hidden")}
-        group = [P[n] for n in sh["participants"] if n in P] or list(P.values())
-        if len(group) > 2:  # keep the biggest cluster (around the shot subject if any)
-            def cluster(c):
-                return [p for p in group if math.hypot(p["x"] - c["x"], p["z"] - c["z"]) < 16]
-            if a in P:
-                group = cluster(P[a]) or group
-            else:
-                best = max(group, key=lambda c: (len(cluster(c)), -len([1 for p in cluster(c) if p.get("mob")])))
-                group = cluster(best)
-        if kind in ("close", "ots", "medium", "follow") and a not in P:
-            kind, a, b = "two", None, None
-        if a in P and group and all(math.hypot(P[a]["x"] - p["x"], P[a]["z"] - p["z"]) > 16 for p in group if p is not P[a]):
-            kind, a, b = "two", None, None  # speaker is off-screen: show the listeners
-        head = lambda p: (p["x"], p["y"] + 1.5, p["z"])
-        cx = sum(p["x"] for p in group) / len(group)
-        cz = sum(p["z"] for p in group) / len(group)
-        cy = sum(p["y"] for p in group) / len(group)
-        spread = max([math.dist((p["x"], p["z"]), (q["x"], q["z"])) for p in group for q in group] + [0])
-        # axis normal on camera side
-        if len(group) >= 2:
-            ax, az = group[-1]["x"] - group[0]["x"], group[-1]["z"] - group[0]["z"]
-            L = math.hypot(ax, az) or 1
-            nx, nz = -az / L, ax / L
-            if nx * self.side[0] + nz * self.side[1] < 0:
-                nx, nz = -nx, -nz
-        else:
-            nx, nz = self.side
-        fov = 45
-        if kind in ("wide", "two"):
-            dist = max(5.0, spread * 0.95 + 4.0) if kind == "wide" else max(3.2, spread * 0.75 + 2.4)
-            extra_fov = 0.0
-            if dist > 10.0:
-                extra_fov = min(20.0, (dist - 10.0) * 2.2)
-                dist = 10.0
-            ang = (0.22 if kind == "wide" else 0.0) - 0.06 + 0.12 * u
-            rx = nx * math.cos(ang) - nz * math.sin(ang)
-            rz = nx * math.sin(ang) + nz * math.cos(ang)
-            dist *= (1 - 0.06 * u)
-            hgt = 1.9 if kind == "wide" else 1.55
-            eye = (cx + rx * dist, cy + hgt + 0.06 * dist, cz + rz * dist)
-            tgt = (cx, cy + (0.95 if kind == "wide" else 1.15), cz)
-            fov = (45 if kind == "wide" else 40) + extra_fov
-        elif kind in ("close", "ots", "medium") and a in P:
-            A = P[a]
-            Bp = P.get(b) if b else None
-            if Bp is not None:
-                dx, dz = Bp["x"] - A["x"], Bp["z"] - A["z"]
-                L = math.hypot(dx, dz) or 1
-                dx, dz = dx / L, dz / L
-            else:
-                dx, dz = math.sin(A["yaw"]), math.cos(A["yaw"])
-            sgn = 1 if (dx * -nz + dz * nx) * 0 + (nx * dx + nz * dz) >= 0 else -1
-            # rotate the A->B direction toward the camera side
-            def rot(x, z, ang):
-                return x * math.cos(ang) - z * math.sin(ang), x * math.sin(ang) + z * math.cos(ang)
-            spread_ang = 1.05 if kind == "medium" else 0.6
-            r1 = rot(dx, dz, spread_ang); r2 = rot(dx, dz, -spread_ang)
-            side_dir = r1 if (r1[0] * nx + r1[1] * nz) > (r2[0] * nx + r2[1] * nz) else r2
-            hx, hy, hz = head(A)
-            if kind == "close":
-                d = 2.05 * (1 - 0.05 * u)
-                eye = (hx + side_dir[0] * d, hy + 0.08, hz + side_dir[1] * d)
-                tgt = (hx, hy - 0.12, hz)
-                fov = 36
-            elif kind == "medium":
-                d = 3.9 * (1 - 0.05 * u)
-                eye = (A["x"] + side_dir[0] * d, A["y"] + 1.45, A["z"] + side_dir[1] * d)
-                tgt = (A["x"], A["y"] + 1.05, A["z"])
-                fov = 42
-            else:  # ots: behind B's shoulder looking at A
-                if Bp is None:
-                    eye = (hx + side_dir[0] * 2.4, hy + 0.1, hz + side_dir[1] * 2.4); tgt = (hx, hy - 0.1, hz)
-                else:
-                    bx, by, bz = head(Bp)
-                    px, pz = -dz, dx  # perpendicular
-                    if px * nx + pz * nz < 0:
-                        px, pz = -px, -pz
-                    back = 1.3 * (1 - 0.05 * u)
-                    eye = (bx + dx * back + px * 1.05, by + 0.25, bz + dz * back + pz * 1.05)
-                    tgt = (hx - px * 0.15, hy - 0.3, hz - pz * 0.15)
-                fov = 38
-        elif kind == "orbit":
-            ang = math.atan2(nx, nz) + (t - sh["t0"]) * 0.12 - 0.35
-            dist = min(9.0, max(6.0, spread * 0.4 + 4.5))
-            eye = (cx + math.sin(ang) * dist, cy + 3.0, cz + math.cos(ang) * dist)
-            tgt = (cx, cy + 1.2, cz - 1.5)
-            fov = 50
-        elif kind == "top":
-            eye = (cx + nx * 4, cy + 9, cz + nz * 4); tgt = (cx, cy, cz); fov = 50
-        elif kind == "follow" and a in P:
-            A = P[a]
-            fx, fz = math.sin(A["yaw"]), math.cos(A["yaw"])
-            eye = (A["x"] - fx * 4.2 + nx * 1.6, A["y"] + 2.3, A["z"] - fz * 4.2 + nz * 1.6)
-            tgt = (A["x"] + fx * 2, A["y"] + 1.0, A["z"] + fz * 2)
-            fov = 48
-        else:
-            eye = (cx + nx * 6, cy + 2, cz + nz * 6); tgt = (cx, cy + 1, cz)
-        # pull the desired camera in front of blocking blocks BEFORE smoothing, so it never pops
-        g0 = self.world.ground(eye[0], eye[2])
-        eye = (eye[0], max(eye[1], g0 + 0.5), eye[2])
-        for p in group:
-            eye = self.unblock((p["x"], p["y"] + 1.4, p["z"]), eye)
-        eye = self.unblock(tgt, eye)
-        if cut or self.eye is None:
-            self.eye, self.tgt, self.fov = list(eye), list(tgt), fov
-            self.ve, self.vt = [0.0] * 3, [0.0] * 3
-        else:
-            self.eye, self.ve = self.damp(self.eye, eye, self.ve, 0.45, 7.0, dt)
-            self.tgt, self.vt = self.damp(self.tgt, tgt, self.vt, 0.35, 8.0, dt)
-            self.fov += (fov - self.fov) * (1 - math.exp(-dt * 3))
-        # keep camera above ground and out of blocks (pull in toward target)
-        g = self.world.ground(self.eye[0], self.eye[2])
-        self.eye[1] = max(self.eye[1], g + 0.5)
-        return tuple(self.eye), tuple(self.tgt), self.fov
-
-    @staticmethod
-    def damp(cur, target, vel, smooth_time, max_speed, dt):
-        """critically damped spring with a speed limit (no camera pops)"""
-        omega = 2.0 / smooth_time
-        x = omega * dt
-        e = 1.0 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
-        ch = [c - t for c, t in zip(cur, target)]
-        mag = math.sqrt(sum(c * c for c in ch))
-        lim = max_speed * smooth_time
-        if mag > lim:
-            ch = [c * lim / mag for c in ch]
-        tgt2 = [c - d for c, d in zip(cur, ch)]
-        temp = [(v + omega * d) * dt for v, d in zip(vel, ch)]
-        vel = [(v - omega * tp) * e for v, tp in zip(vel, temp)]
-        out = [t2 + (d + tp) * e for t2, d, tp in zip(tgt2, ch, temp)]
-        return out, vel
-
-    def unblock(self, tgt, eye):
-        B = self.world.blocks
-        tx, ty, tz = tgt
-        ex, ey, ez = eye
-        L = math.dist(tgt, eye)
-        n = max(2, int(L * 6))
-        last_free = 0.0
-        for i in range(2, n + 1):
-            k = i / n
-            p = (tx + (ex - tx) * k, ty + (ey - ty) * k, tz + (ez - tz) * k)
-            hit = False
-            for ox in (-0.25, 0.25):
-                for oz in (-0.25, 0.25):
-                    b = B.get((math.floor(p[0] + ox), math.floor(p[1]), math.floor(p[2] + oz)))
-                    if b is not None and b != "water":
-                        hit = True
-            if hit:
-                k2 = max(0.15, last_free - 0.04)
-                return (tx + (ex - tx) * k2, ty + (ey - ty) * k2, tz + (ez - tz) * k2)
-            last_free = k
-        return eye
+from .director import Director  # noqa: E402,F401

@@ -1,0 +1,23 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:bat",
+      "textures": {
+        "default": "bat.png"
+      },
+      "geometry": {
+        "default": "geometry.bat"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/bat.png": "bat.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

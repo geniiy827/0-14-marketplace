@@ -1,0 +1,21 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:arrow",
+      "textures": {
+        "default": "arrows.png"
+      },
+      "geometry": {},
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/item/arrows.png": "arrows.png"
+        },
+        "model": "native",
+        "rebuild": []
+      }
+    }
+  }
+}

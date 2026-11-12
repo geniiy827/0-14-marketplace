@@ -1,0 +1,37 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "animation.villager.legs": {
+      "loop": true,
+      "anim_time_update": "query.modified_distance_moved",
+      "bones": {
+        "leg0": {
+          "rotation": [
+            "math.cos(query.anim_time * 38.17) * 40.0 * query.modified_move_speed",
+            0.0,
+            0.0
+          ]
+        },
+        "leg1": {
+          "rotation": [
+            "math.cos(query.anim_time * 38.17 + 180.0) * 40.0 * query.modified_move_speed",
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "animation.common.look_at_target": {
+      "loop": true,
+      "bones": {
+        "head": {
+          "rotation": [
+            "query.target_x_rotation",
+            "query.target_y_rotation",
+            0.0
+          ]
+        }
+      }
+    }
+  }
+}

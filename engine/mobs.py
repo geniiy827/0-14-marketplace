@@ -9,27 +9,50 @@ from PIL import Image
 from .skin import box
 from .world import ASSETS
 
-MOB_RU = {"корова": "cow", "свинья": "pig", "курица": "chicken", "овца": "sheep", "волк": "wolf",
-          "cow": "cow", "pig": "pig", "chicken": "chicken", "sheep": "sheep", "wolf": "wolf"}
-QUAD_BODY = {"cow", "pig", "sheep"}  # body cube is modelled upright, rotated 90 at runtime
+MOB_RU = {"корова": "cow", "свинья": "pig", "курица": "chicken", "овца": "sheep", "волк": "wolf", "зомби": "zombie",
+          "скелет": "skeleton", "крипер": "creeper", "эндермен": "enderman", "паук": "spider",
+          "пещерный_паук": "cave_spider", "житель": "villager", "ведьма": "witch", "слизень": "slime",
+          "голем": "iron_golem", "железный_голем": "iron_golem", "снеговик": "snow_golem", "кролик": "rabbit",
+          "оцелот": "ocelot", "кот": "ocelot", "летучая_мышь": "bat", "мышь": "bat", "кальмар": "squid", "гаст": "ghast",
+          "ифрит": "blaze", "блейз": "blaze", "свинозомби": "zombie_pigman", "зомби_свиночеловек": "zombie_pigman",
+          "зомби_житель": "zombie_villager", "визер_скелет": "wither_skeleton", "грибная_корова": "mooshroom",
+          "чешуйница": "silverfish", "магмовый_куб": "magma_cube", "вагонетка": "minecart", "лодка": "boat"}
+for _v in list(MOB_RU.values()):
+    MOB_RU[_v] = _v
+QUAD_BODY = {"cow", "pig", "sheep", "mooshroom"}
+GEO_FROM = {"cave_spider": "spider", "wither_skeleton": "skeleton", "mooshroom": "cow"}
+TEX_NAME = {"zombie_pigman": "pigzombie", "iron_golem": "iron_golem", "snow_golem": "snow_golem"}
+ZOMBIE_ARMS = {"zombie", "zombie_pigman", "zombie_villager"}  # body cube is modelled upright, rotated 90 at runtime
 SOUNDS = {"cow": "mob_cow_say", "pig": "mob_pig_say", "chicken": "mob_chicken_say", "sheep": "mob_sheep_say",
-          "wolf": "mob_wolf_bark"}
+          "wolf": "mob_wolf_bark", "zombie": "mob_zombie_say", "skeleton": "mob_skeleton_say", "creeper": "random_fuse",
+          "enderman": "mob_endermen_idle", "spider": "mob_spider_say", "cave_spider": "mob_spider_say",
+          "villager": "mob_villager_idle", "witch": "mob_witch_ambient", "slime": "mob_slime_small",
+          "iron_golem": "mob_irongolem_hit", "rabbit": "mob_rabbit_idle", "ocelot": "mob_cat_meow", "bat": "mob_bat_idle",
+          "ghast": "mob_ghast_moan", "blaze": "mob_blaze_breathe", "zombie_pigman": "mob_zombiepig_zpig",
+          "zombie_villager": "mob_zombie_say", "wither_skeleton": "mob_skeleton_say", "mooshroom": "mob_cow_say",
+          "silverfish": "mob_silverfish_say", "magma_cube": "mob_magmacube_small", "snow_golem": "random_pop"}
 EYE = {"cow": 1.25, "pig": 0.8, "chicken": 0.6, "sheep": 1.2, "wolf": 0.75}
 
 
-def load_mob(kind):
-    d = os.path.join(ASSETS, "mobs", kind)
-    gj = json.load(open(os.path.join(d, f"{kind}.geo.json")))
+def load_mob(kind, texture=None):
+    gk = GEO_FROM.get(kind, kind)
+    d = os.path.join(ASSETS, "mobs", gk)
+    gj = json.load(open(os.path.join(d, f"{gk}.geo.json")))
     geo = gj["minecraft:geometry"][0]
     tw = geo["description"].get("texture_width", 64)
     th = geo["description"].get("texture_height", 32)
-    texf = [f for f in os.listdir(d) if f.startswith(kind) and f.endswith((".png", ".tga"))][0]
-    img = Image.open(os.path.join(d, texf)).convert("RGBA")
+    td = os.path.join(ASSETS, "mobs", kind)
+    cands = [f for f in os.listdir(td) if f.endswith((".png", ".tga"))]
+    pref = texture or TEX_NAME.get(kind, kind)
+    texf = next((f for f in cands if f.split(".")[0] == pref), None) or \
+        next((f for f in cands if f.startswith(pref)), None) or \
+        next((f for f in cands if "armor" not in f and "saddle" not in f), cands[0])
+    img = Image.open(os.path.join(td, texf)).convert("RGBA")
     if img.size != (tw, th):
         img = img.resize((tw, th), Image.NEAREST)
-    # pad texture into 64x64 so the renderer's texture size is uniform; uv scaled accordingly
-    tex = np.zeros((64, 64, 4), np.uint8)
-    tex[:th, :tw] = np.array(img)[:64, :64]
+    TS = max(64, tw, th)  # square padded texture; uv divided by TS
+    tex = np.zeros((TS, TS, 4), np.uint8)
+    tex[:th, :tw] = np.array(img)
     parts = {}
     for b in geo["bones"]:
         if b.get("neverRender"):
@@ -43,7 +66,7 @@ def load_mob(kind):
             w, h, dd = c["size"]
             u, v = c["uv"]
             inf = c.get("inflate", 0.0)
-            vv = box(-(ox + w), oy, -(oz + dd), -ox, oy + h, -oz, u, v, w, h, dd, inf, tex=64.0)
+            vv = box(-(ox + w), oy, -(oz + dd), -ox, oy + h, -oz, u, v, w, h, dd, inf, tex=float(TS))
             verts.append(vv)
         if not verts:
             continue

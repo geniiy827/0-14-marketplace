@@ -1,0 +1,44 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:blaze",
+      "textures": {
+        "default": "blaze.tga"
+      },
+      "geometry": {
+        "default": "geometry.blaze"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/blaze.tga": "blaze.tga"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "BlazeModel",
+            "geometry": "geometry.blaze",
+            "when": null,
+            "parts": {
+              "upperBodyParts0": 180,
+              "upperBodyParts1": 340,
+              "upperBodyParts2": 500,
+              "upperBodyParts3": 660,
+              "upperBodyParts4": 820,
+              "upperBodyParts5": 980,
+              "upperBodyParts6": 1140,
+              "upperBodyParts7": 1300,
+              "upperBodyParts8": 1460,
+              "upperBodyParts9": 1620,
+              "upperBodyParts10": 1780,
+              "upperBodyParts11": 1940,
+              "head": 2100
+            }
+          }
+        ]
+      }
+    }
+  }
+}

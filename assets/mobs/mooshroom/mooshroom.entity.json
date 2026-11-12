@@ -1,0 +1,31 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:mooshroom",
+      "textures": {
+        "default": "mooshroom.png"
+      },
+      "geometry": {
+        "default": "geometry.cow"
+      },
+      "animations": {
+        "walk": "animation.quadruped.walk",
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "walk",
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/mooshroom.png": "mooshroom.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

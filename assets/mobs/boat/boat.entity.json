@@ -1,0 +1,46 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:boat",
+      "textures": {
+        "default": "boat_oak.png",
+        "boat_spruce": "boat_spruce.png",
+        "boat_birch": "boat_birch.png",
+        "boat_jungle": "boat_jungle.png",
+        "boat_acacia": "boat_acacia.png",
+        "boat_darkoak": "boat_darkoak.png"
+      },
+      "geometry": {
+        "default": "geometry.boat"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/entity/boat/boat_oak.png": "boat_oak.png",
+          "images/entity/boat/boat_spruce.png": "boat_spruce.png",
+          "images/entity/boat/boat_birch.png": "boat_birch.png",
+          "images/entity/boat/boat_jungle.png": "boat_jungle.png",
+          "images/entity/boat/boat_acacia.png": "boat_acacia.png",
+          "images/entity/boat/boat_darkoak.png": "boat_darkoak.png"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "BoatModel",
+            "geometry": "geometry.boat",
+            "when": null,
+            "parts": {
+              "bottom": 180,
+              "back": 340,
+              "front": 500,
+              "right": 660,
+              "left": 820
+            }
+          }
+        ]
+      }
+    }
+  }
+}

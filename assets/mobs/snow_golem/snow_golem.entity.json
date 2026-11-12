@@ -1,0 +1,29 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:snow_golem",
+      "textures": {
+        "default": "snow_golem.png"
+      },
+      "geometry": {
+        "default": "geometry.snowgolem"
+      },
+      "animations": {
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/snow_golem.png": "snow_golem.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

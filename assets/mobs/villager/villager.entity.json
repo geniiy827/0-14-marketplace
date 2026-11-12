@@ -1,0 +1,41 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:villager",
+      "textures": {
+        "default": "villager.png",
+        "farmer": "farmer.png",
+        "librarian": "librarian.png",
+        "priest": "priest.png",
+        "smith": "smith.png",
+        "butcher": "butcher.png"
+      },
+      "geometry": {
+        "default": "geometry.villager"
+      },
+      "animations": {
+        "legs": "animation.villager.legs",
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "legs",
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/villager/villager.png": "villager.png",
+          "images/mob/villager/farmer.png": "farmer.png",
+          "images/mob/villager/librarian.png": "librarian.png",
+          "images/mob/villager/priest.png": "priest.png",
+          "images/mob/villager/smith.png": "smith.png",
+          "images/mob/villager/butcher.png": "butcher.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

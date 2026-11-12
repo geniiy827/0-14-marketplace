@@ -1,0 +1,41 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:zombie_villager",
+      "textures": {
+        "default": "zombie_villager.png",
+        "zombie_farmer": "zombie_farmer.png",
+        "zombie_librarian": "zombie_librarian.png",
+        "zombie_priest": "zombie_priest.png",
+        "zombie_smith": "zombie_smith.png",
+        "zombie_butcher": "zombie_butcher.png"
+      },
+      "geometry": {
+        "default": "geometry.zombie.villager"
+      },
+      "animations": {
+        "legs": "animation.humanoid.legs",
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "legs",
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/zombie_villager/zombie_villager.png": "zombie_villager.png",
+          "images/mob/zombie_villager/zombie_farmer.png": "zombie_farmer.png",
+          "images/mob/zombie_villager/zombie_librarian.png": "zombie_librarian.png",
+          "images/mob/zombie_villager/zombie_priest.png": "zombie_priest.png",
+          "images/mob/zombie_villager/zombie_smith.png": "zombie_smith.png",
+          "images/mob/zombie_villager/zombie_butcher.png": "zombie_butcher.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

@@ -28,7 +28,7 @@ from engine.anim import CharSim, particles_at  # noqa: E402
 from engine.script import Compiler, Director  # noqa: E402
 from engine.audio import mix  # noqa: E402
 
-VERSION = "2.0"
+VERSION = "3.0"
 FONT_B = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 WORLD_PRESETS = {"равнина": "plains", "лес": "forest", "пустыня": "desert", "зима": "winter", "город": "city"}
 
@@ -93,6 +93,8 @@ class Film:
         # header first (world needed for marks)
         from engine.script import parse
         head, _, _ = parse(self.script)
+        self._builds = head.get("_builds", [])
+        self._base_dir = os.path.dirname(self.script)
         wname = head.get("мир", "равнина").strip().lower()
         self.seed = int(head.get("сид", 3))
         self.worlds = {}
@@ -105,13 +107,20 @@ class Film:
         self.renderers = {}
 
     def get_world(self, name):
-        name = (name or "равнина").strip().lower()
-        key = WORLD_PRESETS.get(name, name)
-        if key not in self.worlds:
-            self.worlds[key] = World(key, self.seed)
-            for line in getattr(self, "_props", []):
-                pass
-        return self.worlds[key]
+        from engine import build
+        name = (name or "равнина").strip().lower().replace("ё", "е")
+        if name not in self.worlds:
+            mine = [c for (wn, c) in self._builds if wn.replace("ё", "е") == name]
+            base = WORLD_PRESETS.get(name) or (name if name in WORLD_PRESETS.values() else None)
+            for c in mine:
+                if c.split()[0].lower() == "основа":
+                    base = WORLD_PRESETS.get(c.split()[1].lower(), c.split()[1].lower())
+            w = World(base or "flat", self.seed)
+            for c in mine:
+                if c.split()[0].lower() != "основа":
+                    build.apply(w, c, self._base_dir)
+            self.worlds[name] = w
+        return self.worlds[name]
 
     def renderer(self, world_name):
         w = self.get_world(world_name)
@@ -120,8 +129,10 @@ class Film:
             tl = self.tl
             r = Renderer(self.W, self.H, w, make_atlas(tl.seed), tl.time, msaa=0)
             for n, c in tl.cast.items():
-                if c.get("mob"):
-                    r.add_mob(n, c["mob"])
+                if c.get("prop"):
+                    r.add_prop(n, c["prop"])
+                elif c.get("mob"):
+                    r.add_mob(n, c["mob"], c.get("texture"))
                 else:
                     arr, slim = load_skin(c["skin"])
                     r.add_character(n, face_variants(arr, analyze_face(arr)), slim)
@@ -216,7 +227,8 @@ class Film:
         paths = []
         for tt in times:
             sc = next((s for s in self.tl.scenes if s["t0"] <= tt < s["t1"]), self.tl.scenes[-1])
-            st = max(sc["t0"], tt - 1.5)
+            shot = next((s for s in self.tl.shots if s["t0"] <= tt < s["t1"]), None)
+            st = max(sc["t0"], (shot["t0"] if shot else tt) - 0.5)
             snapped = round(tt * self.fps) / self.fps
 
             def sink(t, buf, tt=tt):
@@ -237,7 +249,8 @@ class Film:
                     looks=[l for l in tl.looks if l["t"] < sc["t1"]], faces=[f for f in tl.faces if f["t"] < sc["t1"]],
                     sits=[s for s in tl.sits if s["t"] < sc["t1"]],
                     extra=[[v for v in tl.vis if v["t"] < sc["t1"]], [v for v in tl.items if v["t"] < sc["t1"]],
-                           [v for v in tl.lies if v["t"] < sc["t1"]], [p for p in tl.particles if inr(p["t0"], p["t1"])]],
+                           [v for v in tl.lies if v["t"] < sc["t1"]], [p for p in tl.particles if inr(p["t0"], p["t1"])],
+                           [v for v in tl.poses if v["t"] < sc["t1"]]],
                     speech=[(s["char"], s["t0"], s["t1"], s["text"]) for s in tl.speech if inr(s["t0"], s["t1"])],
                     title=[tl.title, tl.subtitle, tl.subs, tl.end_text, tl.duration])
         blob = json.dumps(data, sort_keys=True, default=str).encode()
@@ -327,6 +340,69 @@ class Film:
                         "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", out], check=True)
         print(f"Готово: {out} из {len(files)} кусков")
 
+    def check(self):
+        """Simulate the whole film without rendering and report visual problems as text."""
+        tl = self.tl
+        fps = self.fps
+        issues = []
+        mmss = lambda t: f"{int(t // 60)}:{t % 60:04.1f}"
+        for sc in tl.scenes:
+            world = self.get_world(sc.get("world"))
+            sims = [CharSim(n, tl, world) for n in tl.cast]
+            d = Director(tl, world)
+            cam = None
+            overl = {}
+            stuck = {}
+            for i in range(int(sc["t0"] * fps), int(sc["t1"] * fps)):
+                t = i / fps
+                pxz = {s.name: (*s.pos_at(t)[:2], 0.0) for s in sims}
+                poses = [s.step(t, 1 / fps, pxz, cam, i == int(sc["t0"] * fps)) for s in sims]
+                eye, tgt, fov = d.frame(t, 1 / fps, poses, i == int(sc["t0"] * fps))
+                cam = eye
+                P = {p["name"]: p for p in poses if not p.get("hidden")}
+                if d.solid(eye):
+                    issues.append((t, "камера внутри блока"))
+                sp = next((s for s in tl.speech if s["t0"] + 0.3 <= t <= s["t1"] - 0.2), None)
+                if sp and sp["char"] in P and d.kind_now in ("close", "ots", "medium", "two", "wide"):
+                    far = all(math.hypot(P[sp["char"]]["x"] - p["x"], P[sp["char"]]["z"] - p["z"]) > 16
+                              for p in P.values() if p["name"] != sp["char"])
+                    if not far:
+                        fr, bl, ch = d.visibility(eye, tgt, fov, sp["char"], P)
+                        if not fr or bl or ch:
+                            why = "вне кадра" if not fr else ("за блоками" if bl else f"закрыт: {ch}")
+                            issues.append((t, f"говорит {sp['char']} — {why} («{sp['text'][:30]}»)"))
+                people = [p for p in P.values() if not p.get("prop") and not p.get("attach") and p.get("r_p", 0) > -0.5]
+                for a_ in range(len(people)):
+                    pa = people[a_]
+                    if d.solid((pa["x"], pa["y"] + 0.9, pa["z"])):
+                        stuck[pa["name"]] = stuck.get(pa["name"], 0) + 1
+                        if stuck[pa["name"]] == int(0.3 * fps):
+                            issues.append((t, f"{pa['name']} застрял в блоке"))
+                    for b_ in range(a_ + 1, len(people)):
+                        pb = people[b_]
+                        key = (pa["name"], pb["name"])
+                        if math.hypot(pa["x"] - pb["x"], pa["z"] - pb["z"]) < 0.5 and not (pa.get("mob") or pb.get("mob")):
+                            overl[key] = overl.get(key, 0) + 1
+                            if overl[key] == int(0.8 * fps):
+                                issues.append((t, f"{pa['name']} и {pb['name']} стоят друг в друге"))
+                        else:
+                            overl[key] = 0
+        # merge repeats
+        out, last = [], {}
+        for t, msg in sorted(issues):
+            k = msg.split("(")[0]
+            if k in last and t - last[k] < 1.0:
+                last[k] = t; continue
+            last[k] = t
+            out.append((t, msg))
+        if not out:
+            print("Проверка: проблем не найдено ✔")
+        else:
+            print(f"Проверка: {len(out)} замечаний")
+            for t, msg in out:
+                print(f"  {mmss(t)}  {msg}")
+        return out
+
     def plan(self):
         tl = self.tl
         for sc in tl.scenes:
@@ -347,6 +423,7 @@ def main():
     ap.add_argument("--preview", action="store_true", help="быстрый черновик 360p")
     ap.add_argument("--stills", help="времена кадров через запятую, напр. 2,10.5")
     ap.add_argument("--plan", action="store_true", help="только показать раскадровку")
+    ap.add_argument("--check", action="store_true", help="автопроверка: говорящий в кадре, камера/персонажи в блоках")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--chunk", help="i/n — отрендерить только i-й из n кусков (облачный рендер)")
     ap.add_argument("--assemble", help="папка с chunk_*.mp4 — склеить и добавить звук")
@@ -359,6 +436,8 @@ def main():
         film.assemble(a.assemble, a.out or film.base + ".mp4"); return
     if a.plan:
         film.plan(); return
+    if a.check:
+        film.check(); return
     if a.stills:
         ps = film.stills([float(x) for x in a.stills.split(",")], os.path.join(os.path.dirname(film.base), "stills"))
         print("\n".join(ps)); return
