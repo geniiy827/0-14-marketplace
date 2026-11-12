@@ -99,15 +99,6 @@ jobs:
           ~/godot/godot --headless --path . --quit-after 5 2>&1 | tee /tmp/run.log
           if grep -q "SCRIPT ERROR" /tmp/run.log; then echo "Ошибки в скриптах"; exit 1; fi
 
-      - name: Install Android build template + allow cleartext HTTP
-        working-directory: storycraft
-        run: |
-          ~/godot/godot --headless --path . --install-android-build-template
-          M=android/build/AndroidManifest.xml
-          # сервер игры — обычный HTTP без TLS: разрешаем cleartext-трафик
-          sed -i 's/<application/<application android:usesCleartextTraffic="true"/' $M
-          grep -n "usesCleartextTraffic" $M
-
       - name: Export APK
         working-directory: storycraft
         env:
@@ -116,11 +107,20 @@ jobs:
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
           mkdir -p build
-          ~/godot/godot --headless --path . --export-debug "Android" build/StoryCraft.apk 2>&1 | tee /tmp/export.log
+          # 1) ставим gradle-шаблон Android (флаг работает только вместе с экспортом)
+          timeout 1500 ~/godot/godot --headless --path . --install-android-build-template --export-debug "Android" build/StoryCraft.apk 2>&1 | tail -20
+          M=android/build/AndroidManifest.xml
+          test -f $M
+          # 2) сервер игры — обычный HTTP без TLS: разрешаем cleartext-трафик
+          sed -i 's/<application/<application android:usesCleartextTraffic="true"/' $M
+          grep -n "usesCleartextTraffic" $M
+          # 3) финальный экспорт с исправленным манифестом
+          rm -f build/StoryCraft.apk
+          timeout 1500 ~/godot/godot --headless --path . --export-debug "Android" build/StoryCraft.apk 2>&1 | tail -40
           test -f build/StoryCraft.apk
           ls -la build
           # проверка: в манифесте APK разрешён cleartext
-          $SDK/build-tools/36.1.0/aapt dump xmltree build/StoryCraft.apk AndroidManifest.xml | grep -i -E "package|usesCleartextTraffic|screenOrientation" | head
+          $SDK/build-tools/36.1.0/aapt dump xmltree build/StoryCraft.apk AndroidManifest.xml | grep -i -E "package=|usesCleartextTraffic|screenOrientation" | head
 
       - uses: actions/upload-artifact@v4
         with:
