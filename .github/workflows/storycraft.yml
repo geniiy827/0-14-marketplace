@@ -105,6 +105,10 @@ jobs:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+          # release-сборка (оптимизированная и в разы меньше) подписывается тем же ключом из CI
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: /home/runner/debug.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: android
         run: |
           mkdir -p build
           # 1) ставим gradle-шаблон Android (флаг работает только вместе с экспортом)
@@ -117,7 +121,7 @@ jobs:
           grep -n "usesCleartextTraffic" $M
           # 3) финальный экспорт с исправленным манифестом
           rm -f build/StoryCraft.apk
-          timeout 1500 ~/godot/godot --headless --verbose --path . --export-debug "Android" build/StoryCraft.apk > /tmp/export2.log 2>&1 || true
+          timeout 1500 ~/godot/godot --headless --verbose --path . --export-release "Android" build/StoryCraft.apk > /tmp/export2.log 2>&1 || true
           grep -i -E "error|gradle|FAIL|wrong|apk" /tmp/export2.log | tail -80
           test -f build/StoryCraft.apk
           ls -la build
