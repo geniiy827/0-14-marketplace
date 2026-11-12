@@ -22,6 +22,7 @@ void *dlopen(const char *, int);
 void *dlsym(void *, const char *);
 int mprotect(void *, size_t, int);
 void *malloc(size_t);
+void free(void *);
 void *memset(void *, int, size_t);
 int memcmp(const void *, const void *, size_t);
 void *memcpy(void *, const void *, size_t); void *memmove(void *, const void *, size_t);
@@ -384,7 +385,7 @@ int Java_com_nova_client_NovaActivity_nativeInfo(void *env, void *cls, int what)
 
 /* ---------------- model -> resolved animation set ---------------------- */
 typedef struct { int nparts; void **parts; } BoneParts;   /* parts matching one Bone */
-typedef struct { void *model; Set *set; BoneParts *bp; } ModelAnim;
+typedef struct { void *model; Set *set; BoneParts *bp; u32 vt; void *pb; int pn; } ModelAnim;   /* vt, pb, pn: which object it was made for */
 #define MCAP 1024
 static ModelAnim models[MCAP];
 
@@ -409,14 +410,24 @@ static void collect(void *part, const char *bone, void **out, int *n, int max) {
 static ModelAnim *model_anim(void *model) {
     u32 h = ((u32)model >> 3) * 2654435761u;
     ModelAnim *slot = 0;
+    void **b = *(void ***)((char *)model + 0xa8), **e = *(void ***)((char *)model + 0xac);
+    u32 vt = *(u32 *)model;
     for (int i = 0; i < MCAP; i++) {
-        ModelAnim *e = &models[(h + i) & (MCAP - 1)];
-        if (e->model == model) return e;
-        if (!e->model) { slot = e; break; }
+        ModelAnim *m = &models[(h + i) & (MCAP - 1)];
+        if (m->model == model) {
+            /* the game frees models (leaving a world) and makes new ones at the same addresses: an entry made for
+             * another object would move parts that are not its own (one leg, a sunken head after re-entering) */
+            if (m->vt == vt && m->pb == (void *)b && m->pn == (int)(e - b)) return m;
+            if (m->bp && m->set) for (int k = 0; k < m->set->nbone; k++) free(m->bp[k].parts);
+            free(m->bp);
+            slot = m;
+            break;
+        }
+        if (!m->model) { slot = m; break; }
     }
     if (!slot) return 0;
-    slot->model = model;
-    void **b = *(void ***)((char *)model + 0xa8), **e = *(void ***)((char *)model + 0xac);
+    slot->model = model; slot->set = 0; slot->bp = 0;
+    slot->vt = vt; slot->pb = (void *)b; slot->pn = (int)(e - b);
     const char *geo = 0;
     for (void **q = b; q && q < e && !geo; q++) { PartInfo *pi = pinfo(*q, 0); if (pi) geo = pi->geo; }
     if (!geo) return slot;
@@ -612,18 +623,21 @@ static void *make_string(const char *s) {
 
 #define DONE_CAP 512
 static void *done_models[DONE_CAP];
+static void *done_pb[DONE_CAP];                 /* the model's parts vector when it was rebuilt: a new object at the same address is rebuilt too */
 
 static void ensure_rebuilt(void *model) {
     if (!nrbs) return;
     u32 h = ((u32)model >> 3) * 2654435761u;
     int slot = -1;
+    void *pb = *(void **)((char *)model + 0xa8);
     for (int i = 0; i < DONE_CAP; i++) {
         int j = (h + i) & (DONE_CAP - 1);
-        if (done_models[j] == model) return;
+        if (done_models[j] == model) { if (done_pb[j] == pb) return; slot = j; break; }
         if (!done_models[j]) { slot = j; break; }
     }
     if (slot < 0) return;
     done_models[slot] = model;
+    done_pb[slot] = pb;
     u32 vt = *(u32 *)model;
     for (int i = 0; i < nrbs; i++) {
         Rebuild *R = &rbs[i];
@@ -635,6 +649,7 @@ static void ensure_rebuilt(void *model) {
         for (int k = 0; k < R->n; k++)
             hook_load((char *)model + R->offs[k], gptr, make_string(R->names[k]));
         rebuilt++;
+        done_pb[slot] = *(void **)((char *)model + 0xa8);
         return;
     }
 }
@@ -1151,6 +1166,14 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "modnet.inc"
 #include "v015.inc"
 
+/* a ModelPart goes: what we knew about it goes too (its address is reused by the next models: the player's parts,
+ * built in C++ and never loaded from a geometry, would otherwise inherit a dead mob bone's geometry and animation) */
+static u64 hc_part_dtor(u32 orig, u32 *w) {
+    PartInfo *pi = pinfo((void *)w[0], 0);
+    if (pi) { pi->geo = 0; pi->key = 0; pi->pos_ok = 0; }
+    return nh_callw(orig, w);
+}
+
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
     if (!mc) mc = dlopen("libminecraftpe.so", 0x2);
@@ -1181,6 +1204,7 @@ __attribute__((constructor)) static void nova_init(void) {
     recipes_init(mc);
     modnet_init(mc);
     v015_init(mc);
+    { void *d = dlsym(mc, "_ZN9ModelPartD2Ev"); LOG("model parts: %d", d ? nh_hook_c((u32)d, hc_part_dtor) : -1); }
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }

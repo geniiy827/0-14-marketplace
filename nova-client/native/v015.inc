@@ -10,7 +10,7 @@
  *             the blocks move into hold a moving block (250, invisible) for 2 game ticks (BlockTickingQueue), then
  *             the blocks land; meanwhile they are drawn sliding (v15_render, from LevelRenderer::renderNameTags)
  *   sticky    retracting pulls the block in front of the arm back (with the slime blocks it drags)
- * Slime block (165): bounces what falls on it (no fall damage), slows what walks on it, sticks to pistons' loads.
+ * The slime block (165) is 0.14's own; a piston's load drags what sticks to it.
  * Blocks with block entities (chests, furnaces...) do not move yet. */
 
 #define V15_PISTON 33
@@ -26,11 +26,10 @@ static int v15_on;                                        /* blocks registered *
 static volatile int v15_busy;                             /* our own block changes: onRemove of pistons ignores them */
 
 /* ---------------------------------------------------------------------------------------------------- models ---- */
-static TexSet v15_tx[7];                                  /* side, top_normal, top_sticky, bottom, inner, slime, rod */
+static TexSet v15_tx[7];                                  /* side, top_normal, top_sticky, bottom, inner, (unused), rod */
 static const char *v15_tx_names[7] = {"piston_side", "piston_top_normal", "piston_top_sticky", "piston_bottom", "piston_inner",
                                       "slime", "piston_rod"};
 static float v15_cubes[3][2][6][3 * MB_CUBE];             /* [base normal/sticky/arm][ext or arm sticky][facing] */
-static float v15_slime_cube[2 * MB_CUBE];
 static ModBlock *v15_mb[5];
 
 static void v15_uv(float *dst, int t, float fu0, float fv0, float fu1, float fv1) {
@@ -72,10 +71,6 @@ static void v15_build_models(void) {
                     for (int s = 2; s < 6; s++) v15_uv(r + 6 + s * 4, 6, 0.75f, 0, 1, 1);
                 }
             }
-    v15_box(v15_slime_cube, 0, 0, 0, 1, 1, 1, 1);         /* slime: the outer cube and a smaller one inside */
-    for (int s = 0; s < 6; s++) v15_uv(v15_slime_cube + 6 + s * 4, 5, 0, 0, 1, 1);
-    v15_box(v15_slime_cube + MB_CUBE, 0.1875f, 0.1875f, 0.1875f, 0.8125f, 0.8125f, 0.8125f, 1);
-    for (int s = 0; s < 6; s++) v15_uv(v15_slime_cube + MB_CUBE + 6 + s * 4, 5, 0.1875f, 0.1875f, 0.8125f, 0.8125f);
 }
 /* mcmod.inc asks which cubes to draw for a block and its data */
 static void v15_model(ModBlock *m, int data) {
@@ -84,7 +79,6 @@ static void v15_model(ModBlock *m, int data) {
     if (f > 5) f = 1;
     if (m->special == 10 || m->special == 11) { m->cubes = v15_cubes[m->special - 10][(data >> 3) & 1][f]; m->ncubes = 1; }
     else if (m->special == 12) { m->cubes = v15_cubes[2][(data >> 3) & 1][f]; m->ncubes = 2; }
-    else if (m->special == 14) { m->cubes = v15_slime_cube; m->ncubes = 2; }
 }
 
 /* ------------------------------------------------------------------------------------------------- world ---- */
@@ -436,27 +430,6 @@ static MAABB *v15_aabb(void *b, void *bs, MPos *pos, MAABB *out, int x, int y, i
     return out;
 }
 
-/* slime: bounce, no fall damage, slow steps */
-static void v15_slime_fall(void *b, void *bs, MPos *pos, char *e, float dist) {
-    if (e && !((int (*)(void *))(*(u32 **)e)[61])(e)) *(float *)(e + 0x124) = 0;   /* not sneaking: no fall damage */
-}
-static void v15_slime_after_fall(void *b, char *e) {
-    if (((int (*)(void *))(*(u32 **)e)[61])(e)) { *(float *)(e + 0x30) = 0; return; }
-    float *my = (float *)(e + 0x30);
-    if (*my < 0) *my = -*my;
-}
-static void (*v15_base_step)(void *b, void *e, MPos *pos);
-static void v15_slime_step(void *b, char *e, MPos *pos) {
-    float my = *(float *)(e + 0x30);
-    if (my < 0) my = -my;
-    if (my < 0.1f && !((int (*)(void *))(*(u32 **)e)[61])(e)) {
-        float k = 0.4f + my * 0.2f;
-        *(float *)(e + 0x2c) *= k;
-        *(float *)(e + 0x34) *= k;
-    }
-    if (v15_base_step) v15_base_step(b, e, pos);
-}
-
 /* ------------------------------------------------------------------------------------------- registration ---- */
 static u32 *v15_vt[5];
 static void *v15_make(int idx, int id, const char *name, int special, int matfrom, float hard, int item) {
@@ -465,7 +438,7 @@ static void *v15_make(int idx, int id, const char *name, int special, int matfro
     memset(m, 0, sizeof *m);
     m->id = id; m->kind = 1; m->special = special; m->hardness = hard; m->resistance = hard * 5;
     for (int i = 0; i < 64 && name[i]; i++) m->name[i] = name[i];
-    for (int f = 0; f < 6; f++) m->tex[f] = v15_tx[special == 14 ? 5 : 0];   /* particles */
+    for (int f = 0; f < 6; f++) m->tex[f] = v15_tx[0];             /* particles */
     m->sel[3] = m->sel[4] = m->sel[5] = 1;
     char *b = f_new(0x98);
     memset(b, 0, 0x98);
@@ -503,8 +476,9 @@ static void v15_register(void) {
     if (!mf_blocks || !mf_items || !mf_block_ctor || !mf_blockitem_ctor || !mf_texset || !mf_setblock_pos || !rs_lamp_vt[0]) {
         LOGE("v015: symbols missing"); return;
     }
-    int ids[5] = {V15_PISTON, V15_STICKY, V15_ARM, V15_SLIME, V15_MOVING};
-    for (int i = 0; i < 5; i++) if (mf_blocks[ids[i]]) { LOGE("v015: block %d is taken", ids[i]); return; }
+    /* 0.14 already has the slime block (165): pistons use it as it is; the four new blocks must be free */
+    int ids[4] = {V15_PISTON, V15_STICKY, V15_ARM, V15_MOVING};
+    for (int i = 0; i < 4; i++) if (mf_blocks[ids[i]]) { LOGE("v015: block %d is taken, pistons off", ids[i]); return; }
     for (int t = 0; t < 7; t++) {
         u32 s[1];
         gstr(s, v15_tx_names[t]);
@@ -522,7 +496,6 @@ static void v15_register(void) {
         v15_vt[i] = v;
     }
     v15_base_remove = (void *)base[2 + 28];
-    v15_base_step = (void *)base[2 + 30];
     for (int i = 0; i < 2; i++) {                                   /* pistons */
         u32 *v = v15_vt[i];
         v[2 + 27] = (u32)rs_lamp_vt[0]; v[2 + 33] = (u32)rs_lamp_vt[1];   /* a ConsumerComponent, as a lamp */
@@ -534,26 +507,19 @@ static void v15_register(void) {
     v15_vt[2][2 + 48] = (u32)v15_no_drop;                           /* the arm */
     v15_vt[2][2 + 28] = (u32)v15_arm_removed;
     v15_vt[2][2 + 8] = (u32)v15_shapes; v15_vt[2][2 + 10] = (u32)v15_shapes; v15_vt[2][2 + 9] = (u32)v15_aabb;
-    v15_vt[3][2 + 31] = (u32)v15_slime_fall;                        /* slime */
-    v15_vt[3][2 + 35] = (u32)v15_slime_after_fall;
-    v15_vt[3][2 + 30] = (u32)v15_slime_step;
     v15_vt[4][2 + 48] = (u32)v15_no_drop;                           /* moving block */
     v15_vt[4][2 + 2] = (u32)v15_moving_tick;
     v15_vt[4][2 + 8] = (u32)v15_shapes; v15_vt[4][2 + 10] = (u32)v15_shapes; v15_vt[4][2 + 9] = (u32)v15_aabb;
     v15_make(0, V15_PISTON, "piston", 10, 1, 0.5f, 1);
     v15_make(1, V15_STICKY, "sticky_piston", 11, 1, 0.5f, 1);
     v15_make(2, V15_ARM, "pistonArmCollision", 12, 1, 0.5f, 0);
-    v15_make(3, V15_SLIME, "slime", 14, 82, 0.f, 1);
     v15_make(4, V15_MOVING, "movingBlock", 13, 1, -1.f, 0);
-    *(int *)((char *)mf_blocks[V15_SLIME] + 48) = 4;
     v15_on = 1;
     /* recipes (0.15): piston, sticky piston, slime block and back to slime balls */
-    static const struct { int out, n; const char *s; } rec[4] = {
+    static const struct { int out, n; const char *s; } rec[2] = {
         {V15_PISTON, 1, "TTT|CIC|CRC|T:5:32767|C:4:0|I:265:0|R:331:0"},
-        {V15_STICKY, 1, "S|P||S:341:0|P:33:0"},
-        {V15_SLIME, 1, "SSS|SSS|SSS|S:341:0"},
-        {341, 9, "B|||B:165:0"}};
-    for (int i = 0; i < 4; i++) {
+        {V15_STICKY, 1, "S|P||S:341:0|P:33:0"}};
+    for (int i = 0; i < 2; i++) {
         double a[3] = {rec[i].out, rec[i].n, 0};
         char s[96];
         int k = 0;
@@ -561,7 +527,7 @@ static void v15_register(void) {
         s[k] = 0;
         rc_op(OP_RECIPE, a, 3, s);
     }
-    LOG("v015: pistons, sticky pistons, slime blocks");
+    LOG("v015: pistons and sticky pistons");
 }
 
 /* ----------------------------------------------------------------------------------------------- drawing ---- */

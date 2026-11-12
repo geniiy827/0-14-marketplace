@@ -631,7 +631,7 @@ final class ModBlocks {
     }
 
     /** pictures of the blocks 0.15 added (native/v015.inc looks them up by these terrain.meta names) */
-    static final String[] V015_TEX = {"piston_side", "piston_top_normal", "piston_top_sticky", "piston_bottom", "piston_inner", "slime"};
+    static final String[] V015_TEX = {"piston_side", "piston_top_normal", "piston_top_sticky", "piston_bottom", "piston_inner"};
     private void builtin015() {
         for (String n : V015_TEX) {
             try { named.put(n, pack(null, "nova/v015/blocks/" + n + ".png", null)); }
@@ -649,9 +649,9 @@ final class ModBlocks {
             named.put("piston_rod", pack(null, "builtin:piston_rod", o.toByteArray()));
         } catch (Exception e) { Log.e(TAG, "0.15 rod texture", e); }
     }
-    /** block numbers 0.15 uses itself (pistons, the arm, slime, the moving block): not for mods then */
+    /** block numbers 0.15 uses itself (pistons, the arm, the moving block): not for mods then */
     static boolean reserved(int id) {
-        return NovaActivity.playVersion >= 15 && (id == 29 || id == 33 || id == 34 || id == 165 || id == 250);
+        return NovaActivity.playVersion >= 15 && (id == 29 || id == 33 || id == 34 || id == 250);
     }
 
     private void saveIds(Map<String, Integer> m) {
