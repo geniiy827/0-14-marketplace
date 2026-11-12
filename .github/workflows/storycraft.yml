@@ -1,0 +1,128 @@
+name: Build Story Craft
+
+on:
+  push:
+    branches: [main]
+    paths: ['storycraft/**', 'storycraft-plugin/**', '.github/workflows/storycraft.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: 4.7.2
+  GODOT_STATUS: stable
+
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build StoryCraft.phar
+        run: |
+          php -v
+          for f in storycraft-plugin/StoryCraft/src/rcode/storycraft/*.php; do php -l "$f"; done
+          php -d phar.readonly=0 storycraft-plugin/tools/build_phar.php StoryCraft.phar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StoryCraft-plugin
+          path: |
+            StoryCraft.phar
+            storycraft-plugin/README.md
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_STATUS }}-android
+
+      - name: Download Godot + Android export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          V=${GODOT_VERSION}-${GODOT_STATUS}
+          mkdir -p ~/godot
+          cd ~/godot
+          wget -q https://github.com/godotengine/godot/releases/download/$V/Godot_v${V}_linux.x86_64.zip
+          unzip -q Godot_v${V}_linux.x86_64.zip && rm Godot_v${V}_linux.x86_64.zip
+          mv Godot_v${V}_linux.x86_64 godot
+          wget -q https://github.com/godotengine/godot/releases/download/$V/Godot_v${V}_export_templates.tpz
+          T=~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_STATUS}
+          mkdir -p $T
+          # из всех шаблонов нужны только Android
+          unzip -q -j Godot_v${V}_export_templates.tpz 'templates/android_*' 'templates/version.txt' -d $T
+          rm Godot_v${V}_export_templates.tpz
+          ls -la $T
+
+      - name: Android SDK packages
+        run: |
+          SDK=${ANDROID_HOME:-$ANDROID_SDK_ROOT}
+          echo "SDK=$SDK" >> $GITHUB_ENV
+          yes | $SDK/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
+          $SDK/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0" > /dev/null
+
+      - name: Debug keystore + editor settings
+        run: |
+          keytool -genkeypair -v -keystore ~/debug.keystore -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-4.7.tres <<EOT
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$SDK"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOT
+          sed -i 's/^          //' ~/.config/godot/editor_settings-4.7.tres
+          cat ~/.config/godot/editor_settings-4.7.tres
+
+      - name: Import project
+        working-directory: storycraft
+        run: |
+          ~/godot/godot --headless --path . --import || true
+          ~/godot/godot --headless --path . --quit-after 5 2>&1 | tee /tmp/run.log
+          if grep -q "SCRIPT ERROR" /tmp/run.log; then echo "Ошибки в скриптах"; exit 1; fi
+
+      - name: Install Android build template + allow cleartext HTTP
+        working-directory: storycraft
+        run: |
+          ~/godot/godot --headless --path . --install-android-build-template
+          M=android/build/AndroidManifest.xml
+          # сервер игры — обычный HTTP без TLS: разрешаем cleartext-трафик
+          sed -i 's/<application/<application android:usesCleartextTraffic="true"/' $M
+          grep -n "usesCleartextTraffic" $M
+
+      - name: Export APK
+        working-directory: storycraft
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p build
+          ~/godot/godot --headless --path . --export-debug "Android" build/StoryCraft.apk 2>&1 | tee /tmp/export.log
+          test -f build/StoryCraft.apk
+          ls -la build
+          # проверка: в манифесте APK разрешён cleartext
+          $SDK/build-tools/36.1.0/aapt dump xmltree build/StoryCraft.apk AndroidManifest.xml | grep -i -E "package|usesCleartextTraffic|screenOrientation" | head
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StoryCraft
+          path: storycraft/build/StoryCraft.apk

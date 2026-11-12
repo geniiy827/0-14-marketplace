@@ -1,0 +1,178 @@
+extends Node
+## Автотест для разработки (не входит в APK): проходит экраны и сохраняет скриншоты.
+## godot --path . res://tests/AutoTest.tscn -- <сценарий> <папка>
+
+var out := "/tmp/shots"
+
+func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	var mode := args[0] if args.size() > 0 else "menu"
+	if args.size() > 1:
+		out = args[1]
+	DirAccess.make_dir_recursive_absolute(out)
+	await _run(mode)
+	get_tree().quit()
+
+func shot(name: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(out + "/" + name + ".png")
+	print("SHOT ", name)
+
+func wait(t: float) -> void:
+	await get_tree().create_timer(t, true, false, true).timeout
+
+func _run(mode: String) -> void:
+	match mode:
+		"boot":
+			var b = load("res://screens/Boot.tscn").instantiate()
+			get_tree().root.add_child.call_deferred(b)
+			await wait(0.35); await shot("boot_0_35")
+			await wait(0.5); await shot("boot_0_85")
+			await wait(0.4); await shot("boot_1_25")
+			await wait(2.0); await shot("boot_after")
+			await wait(1.5); await shot("menu")
+		"menu":
+			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
+			Router.go("main_menu", {}, false)
+			await wait(2.0); await shot("menu")
+			await wait(6.0); await shot("menu_later")
+			await Content.refresh()
+			Router.go("adventures")
+			await wait(2.5); await shot("adventures")
+			Router.go("episodes", {"adventure": "last_men"})
+			await wait(2.5); await shot("episodes")
+			Router.go("settings")
+			await wait(1.5); await shot("settings")
+		"orbit":
+			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
+			Router.go("main_menu", {}, false)
+			await wait(1.0)
+			for i in 6:
+				Router.menu_bg._angle = i * TAU / 6.0
+				await wait(0.2)
+				await shot("orbit_%d" % i)
+		"download":
+			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
+			await Content.refresh()
+			await Progress.register()
+			var e := Content.episode("last_men", "01_escape")
+			var dl = Net.Download.new()
+			var err = await Content.download_episode("last_men", e, dl, func(d, t): pass)
+			print("DOWNLOAD err='", err, "' cached=", Content.is_cached("last_men", e))
+		"intro":
+			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, false)
+			for t in [1.0, 4.0, 6.0, 9.0]:
+				await wait(t - (0 if t == 1.0 else 0))
+				await shot("intro_%d" % int(t))
+		"frame":
+			# сцена на заданном кадре для сверки с reference_player
+			var sid := OS.get_cmdline_user_args()[2]
+			var fr := int(OS.get_cmdline_user_args()[3])
+			var p = load("res://screens/Player.tscn").instantiate()
+			p.setup({"adventure": "last_men", "episode": "01_escape"})
+			p.set_meta("test_no_start", true)
+			Router._screen_layer.add_child(p)
+			await wait(0.5)
+			var ls = await p.get_scene(sid)
+			await p._show_world(ls.world)
+			p.sp.start(ls, false, float(fr) / ls.fps + 0.0001)
+			p.sp.set_paused(true)
+			p.sp.paused = true
+			await wait(0.3)
+			p.subs.visible = false
+			await shot("frame_%s_%d" % [sid, fr])
+		"widgets":
+			var p = load("res://screens/Player.tscn").instantiate()
+			p.setup({"adventure": "last_men", "episode": "01_escape"})
+			p.set_meta("test_no_start", true)
+			Router._screen_layer.add_child(p)
+			await wait(0.5)
+			p.runner = LogicRunner.new(p, p.ep, {})
+			p.show_background("think_loop")
+			var games := [
+				{"kind": "timing", "params": {"zone": [0.4, 0.6], "speed": 1.2, "rounds": 2, "title": "Тайминг"}},
+				{"kind": "sequence", "params": {"items": ["А", "Б", "В", "А"], "show": true, "title": "Повтори"}},
+				{"kind": "hold", "params": {"time": 1.5, "title": "Держи"}},
+				{"kind": "swipe", "params": {"directions": ["left", "up"], "time_each": 2.0}},
+				{"kind": "code", "params": {"length": 4, "answer": "1234", "title": "Код", "hint": "один два три четыре"}},
+				{"kind": "drag", "params": {"items": [{"id": "a"}, {"id": "b"}], "targets": [{"id": "x", "rect": [0.2, 0.2, 0.2, 0.2]}, {"id": "y", "rect": [0.6, 0.2, 0.2, 0.2]}], "pairs": {"a": "x", "b": "y"}}},
+			]
+			for gm in games:
+				var n := {"type": "minigame", "kind": gm["kind"], "params": gm["params"]}
+				p.ui_minigame(n, p.runner.gen())
+				await wait(1.6)
+				await shot("mg_" + gm["kind"])
+				p._clear_interactive()
+			p.runner.vars["found"] = 1
+			p.ui_overlay({"type": "overlay", "dim": 0.4, "widgets": [
+				{"id": "pnl", "kind": "panel", "rect": [0.25, 0.1, 0.5, 0.7], "anim": "pop"},
+				{"id": "txt", "kind": "text", "text": "Найдено: {found}", "rect": [0.3, 0.15, 0.4, 0.1], "size": 36, "color": "#3b2a12"},
+				{"id": "pr", "kind": "progress", "bind": "found / 3.0", "rect": [0.3, 0.3, 0.4, 0.05]},
+				{"id": "tm", "kind": "timer", "sec": 5, "rect": [0.45, 0.38, 0.1, 0.08], "on_end": [{"sfx": "fail"}]},
+				{"id": "dr", "kind": "draggable", "src": "cover.png", "rect": [0.3, 0.5, 0.1, 0.1]},
+				{"id": "dz", "kind": "dropzone", "accepts": ["dr"], "rect": [0.55, 0.5, 0.12, 0.12], "on_drop": [{"add": {"found": 1}}]},
+				{"id": "kp", "kind": "keypad", "rect": [0.76, 0.1, 0.2, 0.5], "on_submit": [{"say": {"who": "kvas", "text": "Код {input}"}}]},
+				{"id": "ok", "kind": "button", "text": "Понятно", "rect": [0.42, 0.7, 0.16, 0.08], "anim": "slide_up", "on_tap": [{"flash": "#ffffff"}]}]}, p.runner.gen())
+			await wait(1.0)
+			await shot("overlay")
+			p.runner.run_actions([{"say": {"who": "zina", "text": "Привет!"}}, {"shake": 0.5}, {"hide": "pnl"}, {"unknown": 1}], p.runner.gen())
+			await wait(0.5)
+			await shot("overlay2")
+		"path":
+			# проходим серию по заданному пути: аргументы — действия
+			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, false)
+			var steps := OS.get_cmdline_user_args().slice(2)
+			for st in steps:
+				await _step(st)
+			await wait(1.0)
+			await shot("path_end")
+
+func _player():
+	return Router.current
+
+## Шаг пути: wait:<сек>, choose:<i>, tap:<hotspot>, taps:<n>, shot:<имя>, skip (перемотка сцены)
+func _step(st: String) -> void:
+	var p = _player()
+	var a := st.split(":")
+	match a[0]:
+		"wait":
+			await wait(float(a[1]))
+		"skip":
+			# ждём, пока идёт сцена, ускоряя время
+			Engine.time_scale = 8.0
+			var w0 := Time.get_ticks_msec()
+			while not (p.sp.playing and not p.sp.looped) and Time.get_ticks_msec() - w0 < 4000:
+				await get_tree().process_frame
+			while p.sp.playing and not p.sp.looped:
+				await get_tree().process_frame
+			Engine.time_scale = 1.0
+			await wait(0.6)
+		"shot":
+			await shot(a[1])
+		"choose":
+			for c in p.interactive.get_children():
+				if c is ChoicePanel:
+					c._finish(int(a[1]))
+			await wait(0.5)
+		"tap":
+			for c in p.interactive.get_children():
+				if c is HotspotLayer:
+					for it in c._items:
+						if it["h"].get("id") == a[1]:
+							print("hotspot ", a[1], " on=", it["on"], " screen=", it["screen"])
+							c._trigger(it)
+			await wait(0.5)
+		"taps":
+			for c in p.interactive.get_children():
+				if c is Minigame:
+					for i in int(a[1]):
+						if not is_instance_valid(c) or c.finished:
+							break
+						var ev := InputEventMouseButton.new()
+						ev.button_index = MOUSE_BUTTON_LEFT
+						ev.pressed = true
+						c._gui_input(ev)
+						await wait(0.05)
+			await wait(0.5)
+		"state":
+			print("STATE node=", p.runner.node_id, " vars=", p.runner.vars, " adv=", p.runner.adv)

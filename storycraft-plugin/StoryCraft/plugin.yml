@@ -1,0 +1,16 @@
+name: StoryCraft
+main: rcode\storycraft\Main
+version: 1.0.0
+api: [2.0.0]
+author: RCodeStudio
+description: "Раздаёт контент игре Story Craft по HTTP и хранит прогресс игроков"
+load: POSTWORLD
+commands:
+  storycraft:
+    description: "Story Craft: status | reload | list | progress <device_id>"
+    usage: "/storycraft <status|reload|list|progress <device_id>>"
+    permission: storycraft.admin
+permissions:
+  storycraft.admin:
+    description: "Управление плагином Story Craft"
+    default: op
