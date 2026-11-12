@@ -220,6 +220,74 @@ func _run(mode: String) -> void:
 					seam = " шов цикла: склейка %.2f м (без промежуточных кадров)" % a.distance_to(ls.cam.global_position)
 				print("CAM ", sid, " cuts=", cuts, " скачков всего: ", jumps, ", вне склеек: ", bad.size(), " ", bad.slice(0, 5), seam)
 				p.sp.stop()
+		"seed":
+			# невидимые хотспоты, on_miss, видимый таймер, экран проигрыша с retry (синтетический узел)
+			var p = load("res://screens/Player.tscn").instantiate()
+			p.setup({"adventure": "last_men", "episode": "01_escape"})
+			p.set_meta("test_no_start", true)
+			Router._screen_layer.add_child(p)
+			await wait(0.5)
+			p.runner = LogicRunner.new(p, p.ep, {})
+			var nodes: Dictionary = p.ep.data["nodes"]
+			nodes["diff"] = {"type": "interact", "background": "lever_loop", "hint": "Найди 1 отличие", "timeout": 8, "timer_visible": true,
+				"on_enter": [{"set": {"misses": 0, "found": 0, "retry": "diff"}}],
+				"hotspots": [{"id": "lever", "node": "rychag__main", "radius": 90, "hidden": true, "once": true,
+					"on_tap": [{"add": {"found": 1}}, {"if": "found >= 1", "then": [{"goto": "win"}]}]}],
+				"on_miss": [{"add": {"misses": 1}}, {"shake": 0.3}, {"if": "misses >= 3", "then": [{"goto": "lose"}]}],
+				"on_timeout": [{"goto": "lose"}]}
+			nodes["lose"] = {"type": "overlay", "background": "lever_loop", "dim": 0.6, "widgets": [
+				{"id": "t", "kind": "text", "text": "Ты проиграл", "rect": [0.3, 0.3, 0.4, 0.1], "size": 48},
+				{"id": "b", "kind": "button", "text": "Попробовать снова", "rect": [0.38, 0.55, 0.24, 0.1],
+					"on_tap": [{"if": "retry == 'diff'", "then": [{"goto": "diff"}], "else": [{"goto": "win"}]}]}]}
+			nodes["win"] = {"type": "end", "title": "Нашёл", "text": "ok"}
+			p.runner.start("diff")
+			await wait(1.5)
+			await shot("seed_diff")
+			var hl: HotspotLayer = null
+			for c in p.interactive.get_children():
+				if c is HotspotLayer:
+					hl = c
+			var it = hl._items[0]
+			print("SEED hidden ring visible=", it["ring"].visible, " label visible=", it["label"].visible, " on=", it["on"])
+			# 3 промаха: один двойной (засчитывается один раз), потом ещё два
+			for xy in [Vector2(100, 600), Vector2(102, 600)]:
+				var ev := InputEventMouseButton.new(); ev.button_index = MOUSE_BUTTON_LEFT; ev.pressed = true; ev.position = xy
+				hl._gui_input(ev)
+			await wait(0.1)
+			print("SEED после двойного тапа misses=", p.runner.vars.get("misses"))
+			for i in 2:
+				await wait(0.4)
+				var ev2 := InputEventMouseButton.new(); ev2.button_index = MOUSE_BUTTON_LEFT; ev2.pressed = true; ev2.position = Vector2(100, 600)
+				if is_instance_valid(hl):
+					hl._gui_input(ev2)
+			await wait(1.0)
+			print("SEED после 3 промахов node=", p.runner.node_id)
+			await shot("seed_lose")
+			# «Попробовать снова» → goto из if внутри on_tap
+			for c in p.interactive.get_children():
+				if c is Overlay2D:
+					c._tap("b")
+			await wait(1.0)
+			print("SEED retry → node=", p.runner.node_id, " misses=", p.runner.vars.get("misses"))
+			# находим невидимое отличие тапом по его экранной точке
+			for c in p.interactive.get_children():
+				if c is HotspotLayer:
+					await wait(0.3)
+					var ev3 := InputEventMouseButton.new(); ev3.button_index = MOUSE_BUTTON_LEFT; ev3.pressed = true; ev3.position = c._items[0]["screen"]
+					c._gui_input(ev3)
+			await wait(1.0)
+			print("SEED тап по отличию → node=", p.runner.node_id)
+			# таймаут: снова в diff и ждём 8 с
+			for c in p.get_children():
+				if c is EndScreen:
+					c.queue_free()
+			p.runner.ended = false
+			p._finished = false
+			p.runner.goto("diff")
+			await wait(4.5)
+			await shot("seed_timer_red")
+			await wait(4.5)
+			print("SEED по таймеру → node=", p.runner.node_id)
 		"path":
 			# проходим серию по заданному пути: аргументы — действия
 			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, false)

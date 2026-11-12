@@ -380,8 +380,21 @@ func ui_interact(n: Dictionary, g: int) -> void:
 	_hotspots = HotspotLayer.new()
 	_hotspots.player = self
 	_hotspots.gen = g
+	_hotspots.node = n
 	_hotspots.hotspots = n.get("hotspots", [])
+	_hotspots.ignore_rects = [hint]
 	interactive.add_child(_hotspots)
+	# видимая полоса времени (timeout + timer_visible)
+	var to = n.get("timeout")
+	if n.get("timer_visible", false) and (to is int or to is float) and float(to) > 0.0:
+		var tb := InteractTimer.new()
+		tb.duration = float(to)
+		interactive.add_child(tb)
+		_hotspots.ignore_rects.append(tb)
+
+## Промах в interact → on_miss узла.
+func interact_miss(n: Dictionary, g: int) -> void:
+	await runner.run_actions(n.get("on_miss", []), g)
 
 ## Тап по хотспоту — действия по очереди.
 func hotspot_tapped(h: Dictionary, g: int) -> void:

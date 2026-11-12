@@ -3,10 +3,17 @@ extends Control
 ## Хотспоты 3D-взаимодействия: позиция узла фоновой сцены (каждый кадр) или точки pos →
 ## экран через Camera3D.unproject_position. Пульсирующее кольцо + подпись. Тап в радиусе (px при 720p)
 ## или удержание (hold, с круговым прогрессом) → действия on_tap.
+## "hidden": true — невидимый хотспот (жанр «найди отличия»): без кольца и подписи, тап работает как обычно.
+## Тап мимо всех активных хотспотов → on_miss узла (не чаще раза в 0.35 с).
 
 var player              # Player
 var gen := 0
 var hotspots: Array = []
+var node := {}           # узел interact (для on_miss)
+var ignore_rects: Array[Control] = []   # тапы по этим контролам (подсказка, таймер) — не промах
+
+const MISS_COOLDOWN := 0.35
+var _last_miss := -10.0
 
 var _items: Array = []   # {h, ring, label, hidden_by_action, used, busy}
 var _ring_tex: Texture2D
@@ -33,14 +40,14 @@ func _ready() -> void:
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl)
-		_items.append({"h": h, "ring": ring, "label": lbl, "hidden": false, "used": false, "busy": false,
+		_items.append({"h": h, "ring": ring, "label": lbl, "off": false, "used": false, "busy": false,
 			"cond": true, "screen": Vector2.ZERO, "on": false})
 	_eval_conditions()
 
 func set_hotspot_visible(id: String, v: bool) -> void:
 	for it in _items:
 		if String(it["h"].get("id", "")) == id:
-			it["hidden"] = not v
+			it["off"] = not v
 
 func _eval_conditions() -> void:
 	for it in _items:
@@ -71,16 +78,19 @@ func _process(delta: float) -> void:
 		var ring: TextureRect = it["ring"]
 		var lbl: Label = it["label"]
 		var wp = _world_pos(h)
-		var on: bool = not it["hidden"] and not it["used"] and it["cond"] and wp != null and cam != null
+		var on: bool = not it["off"] and not it["used"] and it["cond"] and wp != null and cam != null
 		if on and cam.is_position_behind(wp):
 			on = false
 		it["on"] = on
-		ring.visible = on
-		lbl.visible = on and lbl.text != ""
+		var invisible: bool = h.get("hidden", false)
+		ring.visible = on and not invisible
+		lbl.visible = on and not invisible and lbl.text != ""
 		if not on:
 			continue
 		var sp: Vector2 = cam.unproject_position(wp)
 		it["screen"] = sp
+		if invisible:
+			continue
 		var base := clampf(float(h.get("radius", 80)) * 1.1, 56.0, 140.0) * k
 		var pulse := 1.0 + 0.08 * sin(_time * 4.0 + float(_items.find(it)))
 		var sz := base * pulse
@@ -102,6 +112,12 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	# отладка (5 тапов по версии): невидимые хотспоты — красными кругами. В обычной игре не рисуются.
+	if bool(Settings.get_value("debug_overlay", false)):
+		var k := _scale_k()
+		for it in _items:
+			if it["on"] and it["h"].get("hidden", false):
+				draw_arc(it["screen"], float(it["h"].get("radius", 80)) * k, 0, TAU, 40, Color(1, 0.15, 0.15, 0.9), 3.0)
 	if _hold_item == null:
 		return
 	var need := maxf(0.05, float(_hold_item["h"].get("hold", 1.0)))
@@ -119,15 +135,18 @@ func _gui_input(e: InputEvent) -> void:
 	var best = null
 	var best_d := INF
 	for it in _items:
-		if not it["on"] or it["busy"]:
+		if not it["on"]:
 			continue
 		var d: float = (it["screen"] as Vector2).distance_to(e.position)
 		if d <= float(it["h"].get("radius", 80)) * k and d < best_d:
 			best = it
 			best_d = d
 	if best == null:
+		_miss(e.position)
 		return
 	accept_event()
+	if best["busy"]:
+		return   # действия этого хотспота ещё выполняются — не промах и не повтор
 	if best["h"].has("hold"):
 		_hold_item = best
 		_hold_t = 0.0
@@ -135,15 +154,33 @@ func _gui_input(e: InputEvent) -> void:
 	else:
 		_trigger(best)
 
+## Промах: тап не попал ни в один активный хотспот.
+func _miss(pos: Vector2) -> void:
+	if not node.has("on_miss"):
+		return
+	for c in ignore_rects:
+		if is_instance_valid(c) and c.visible and c.get_global_rect().has_point(pos):
+			return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_miss < MISS_COOLDOWN:
+		return   # двойной тап — одна ошибка
+	_last_miss = now
+	accept_event()
+	player.interact_miss(node, gen)
+
 func _trigger(it: Dictionary) -> void:
 	var h: Dictionary = it["h"]
+	if h.get("hidden", false):
+		# невидимый хотспот: ничего не подсвечиваем, только короткий звук
+		Audio.play_sfx("pop", -6.0)
 	if h.get("once", false):
 		it["used"] = true
 	it["busy"] = true
-	var ring: TextureRect = it["ring"]
-	var tw := ring.create_tween()
-	tw.tween_property(ring, "modulate", Color(2, 2, 2, 1), 0.06)
-	tw.tween_property(ring, "modulate", Color.WHITE, 0.15)
+	if not h.get("hidden", false):
+		var ring: TextureRect = it["ring"]
+		var tw := ring.create_tween()
+		tw.tween_property(ring, "modulate", Color(2, 2, 2, 1), 0.06)
+		tw.tween_property(ring, "modulate", Color.WHITE, 0.15)
 	await player.hotspot_tapped(h, gen)
 	if is_instance_valid(self):
 		it["busy"] = false
