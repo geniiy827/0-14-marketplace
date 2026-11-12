@@ -108,7 +108,9 @@ jobs:
         run: |
           mkdir -p build
           # 1) ставим gradle-шаблон Android (флаг работает только вместе с экспортом)
-          timeout 1500 ~/godot/godot --headless --path . --install-android-build-template --export-debug "Android" build/StoryCraft.apk 2>&1 | tail -20
+          timeout 1500 ~/godot/godot --headless --verbose --path . --install-android-build-template --export-debug "Android" build/StoryCraft.apk > /tmp/export1.log 2>&1 || true
+          grep -i -E "error|android|gradle|build" /tmp/export1.log | grep -v "^\s*$" | tail -60
+          ls -la android android/build 2>&1 | head -30
           M=android/build/AndroidManifest.xml
           test -f $M
           # 2) сервер игры — обычный HTTP без TLS: разрешаем cleartext-трафик
@@ -116,7 +118,8 @@ jobs:
           grep -n "usesCleartextTraffic" $M
           # 3) финальный экспорт с исправленным манифестом
           rm -f build/StoryCraft.apk
-          timeout 1500 ~/godot/godot --headless --path . --export-debug "Android" build/StoryCraft.apk 2>&1 | tail -40
+          timeout 1500 ~/godot/godot --headless --verbose --path . --export-debug "Android" build/StoryCraft.apk > /tmp/export2.log 2>&1 || true
+          grep -i -E "error|gradle|FAIL|wrong|apk" /tmp/export2.log | tail -80
           test -f build/StoryCraft.apk
           ls -la build
           # проверка: в манифесте APK разрешён cleartext
