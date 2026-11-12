@@ -99,6 +99,10 @@ func _rebuild(animated: bool) -> void:
 	_empty.visible = empty
 
 func _load_cover(card: Card, url: String, sha: String) -> void:
+	var now := Content.cover_now(url, sha)
+	if now:
+		card.set_cover(now, false)   # уже в памяти — без мигания
+		return
 	var tex: Texture2D = await Content.get_cover(url, sha)
 	if is_instance_valid(card):
 		card.set_cover(tex)

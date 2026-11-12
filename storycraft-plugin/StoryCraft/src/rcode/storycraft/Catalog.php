@@ -280,6 +280,7 @@ class Catalog {
 					"duration" => isset($e["duration"]) ? (float) $e["duration"] : 0.0,
 					"version" => isset($e["version"]) ? (int) $e["version"] : 1,
 					"cover" => is_file($epDir . "/" . $epCover) ? $this->url($advId, "episodes/" . $epId . "/" . $epCover) : "",
+					"cover_sha1" => is_file($epDir . "/" . $epCover) ? $this->sha1Of($epDir . "/" . $epCover) : "",
 					"size" => $size,
 					"sha1" => $this->sha1Of($epDir . "/episode.json"),
 					"pack_size" => $pack !== null ? $pack["size"] : 0,

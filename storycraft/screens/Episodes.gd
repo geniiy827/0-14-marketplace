@@ -80,10 +80,14 @@ func _build() -> void:
 		row.long_pressed.connect(_on_long.bind(i))
 		_list.content.add_child(row)
 		_rows.append(row)
-		_cover(row, String(e.get("cover", "")), String(e.get("sha1", "")) + "_c")
+		_cover(row, String(e.get("cover", "")), String(e.get("cover_sha1", "")))
 
-func _cover(row: EpisodeRow, url: String, key: String) -> void:
-	var t: Texture2D = await Content.get_cover(url, "")
+func _cover(row: EpisodeRow, url: String, sha: String) -> void:
+	var now := Content.cover_now(url, sha)
+	if now:
+		row.set_cover(now, false)
+		return
+	var t: Texture2D = await Content.get_cover(url, sha)
 	if is_instance_valid(row):
 		row.set_cover(t)
 

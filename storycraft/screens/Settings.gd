@@ -39,6 +39,7 @@ func _ready() -> void:
 
 	_section("Графика")
 	_check("Тени", "shadows")
+	_check("V-Sync", "vsync")
 	_cycle("Качество", "quality", Settings.QUALITY_NAMES, [0, 1, 2])
 	_cycle("Частота кадров", "fps", ["Как у экрана", "60 FPS", "30 FPS"], [0, 60, 30])
 

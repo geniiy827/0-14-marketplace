@@ -21,7 +21,8 @@ var values := {
 	"sub_size": 0,
 	"shadows": true,
 	"quality": 2,
-	"fps": 0,              # 0 — частота экрана (vsync), 30 — экономия батареи
+	"fps": 0,              # 0 — частота экрана, 60, 30 — экономия батареи. Без ограничения — никогда
+	"vsync": true,
 	"debug_overlay": false,
 	"vibration": true,
 	"server_url": "",
@@ -70,7 +71,16 @@ func _apply(key: String) -> void:
 		"master", "music", "sfx", "voice":
 			Audio.set_bus_volume(key, float(values[key]))
 		"fps":
-			Engine.max_fps = int(values["fps"])
+			# всегда есть потолок: без него телефон рисует кадры без остановки, видеочип занят на 100%
+			# и начинает тормозить уже сама система (шторка, громкость)
+			var cap := int(values["fps"])
+			if cap <= 0:
+				cap = roundi(DisplayServer.screen_get_refresh_rate())
+				if cap < 30:
+					cap = 60
+			Engine.max_fps = cap
+		"vsync":
+			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if values["vsync"] else DisplayServer.VSYNC_DISABLED)
 		"quality":
 			var q: float = QUALITY[clampi(int(values["quality"]), 0, 2)]
 			get_viewport().scaling_3d_scale = q

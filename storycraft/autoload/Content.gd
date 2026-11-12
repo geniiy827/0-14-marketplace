@@ -5,6 +5,7 @@ extends Node
 const CACHE := "user://session"
 const LEGACY_CACHE := "user://cache"     # кэш версии 1.0 — удаляем
 const STREAMS := 5
+const CHUNK := 524288           # кусок пакета для одного запроса (512 КБ)
 const SUPPORTED_EPISODE_VERSION := 1
 
 signal catalog_changed
@@ -47,6 +48,7 @@ func refresh() -> Dictionary:
 	if not catalog.get("adventures") is Array:
 		catalog["adventures"] = []
 	catalog_changed.emit()
+	preload_covers()
 	return {"ok": true, "changed": true}
 
 func adventures() -> Array:
@@ -120,31 +122,27 @@ func _download_pack(adv_id: String, ep: Dictionary, idx: Dictionary, dl, on_prog
 	var url := "/api/pack/%s/%s" % [adv_id.uri_encode(), ep_id.uri_encode()]
 	var tmp_dir := "%s/_dl/%s_%s" % [CACHE, adv_id, ep_id]
 	DirAccess.make_dir_recursive_absolute(tmp_dir)
-	# 5 частей диапазона [0, size) — качаем одновременно
-	var n := mini(STREAMS, maxi(1, size / 65536))
-	var step := int(ceil(float(size) / n))
-	var results := {}
-	for i in n:
-		var a := i * step
-		var b := mini(size, a + step) - 1
-		if a > b:
-			results[i] = ""
-			continue
-		dl.slot_bytes[i] = 0
-		_range_job(url, "%s/part%d" % [tmp_dir, i], a, b, dl, i, results)
-	while results.size() < n:
-		on_progress.call(dl.total_slots(), size)
+	# пакет режем на куски по CHUNK и качаем 5 потоками из общей очереди: медленный/оборванный кусок
+	# маленький и перезапрашивается сам, остальные потоки тем временем берут следующие куски
+	var chunks := int(ceil(float(size) / CHUNK))
+	var st := {"next": 0, "err": "", "running": 0, "done_bytes": 0}
+	for slot in mini(STREAMS, chunks):
+		dl.slot_bytes[slot] = 0
+		_chunk_worker(url, tmp_dir, size, chunks, st, dl, slot)
+	while st["running"] > 0:
+		on_progress.call(st["done_bytes"] + dl.total_slots(), size)
 		await get_tree().process_frame
-	for i in n:
-		if results[i] != "":
-			return results[i]
+	if dl.cancel:
+		return "cancel"
+	if st["err"] != "":
+		return st["err"]
 	on_progress.call(size, size)
 	# склейка частей
 	var pack_path := tmp_dir + "/pack.bin"
 	var out := FileAccess.open(pack_path, FileAccess.WRITE)
 	if out == null:
 		return "не удалось записать пакет"
-	for i in n:
+	for i in chunks:
 		var pf := FileAccess.open("%s/part%d" % [tmp_dir, i], FileAccess.READ)
 		if pf:
 			while pf.get_position() < pf.get_length():
@@ -169,9 +167,21 @@ func _download_pack(adv_id: String, ep: Dictionary, idx: Dictionary, dl, on_prog
 		return await _download_files(adv_id, ep, dl, on_progress)
 	return ""
 
-func _range_job(url: String, dest: String, a: int, b: int, dl, slot: int, results: Dictionary) -> void:
-	var err: String = await Net.download_range(url, dest, a, b, dl, slot)
-	results[slot] = err
+func _chunk_worker(url: String, tmp_dir: String, size: int, chunks: int, st: Dictionary, dl, slot: int) -> void:
+	st["running"] += 1
+	while st["next"] < chunks and st["err"] == "" and not dl.cancel:
+		var i: int = st["next"]
+		st["next"] += 1
+		var a := i * CHUNK
+		var b := mini(size, a + CHUNK) - 1
+		var err: String = await Net.download_range(url, "%s/part%d" % [tmp_dir, i], a, b, dl, slot)
+		dl.slot_bytes[slot] = 0
+		if err != "":
+			if st["err"] == "":
+				st["err"] = err
+			break
+		st["done_bytes"] += b - a + 1
+	st["running"] -= 1
 
 ## Распаковать пакет (вызывается из потока). Возвращает "" или текст ошибки.
 static func _unpack(pack_path: String, idx: Dictionary, dir: String) -> String:
@@ -273,23 +283,65 @@ static func sha1_file(path: String) -> String:
 
 # ---------------------------------------------------------------- обложки
 
-## Обложка по URL каталога; кэшируется на диске по sha1. Может вернуть null.
+var _cover_jobs := {}         # key → true, пока обложка грузится
+
+static func _cover_key(url: String, sha1: String) -> String:
+	return sha1 if sha1 != "" else url.md5_text()
+
+## Обложка уже в памяти? (без ожидания — чтобы карточка сразу показывала картинку)
+func cover_now(url: String, sha1: String = "") -> Texture2D:
+	return _cover_cache.get(_cover_key(url, sha1))
+
+## Обложка по URL каталога: скачивание + декодирование PNG в фоновом потоке. Может вернуть null.
 func get_cover(url: String, sha1: String = "") -> Texture2D:
 	if url == "":
 		return null
-	var key := sha1 if sha1 != "" else url.md5_text()
+	var key := _cover_key(url, sha1)
 	if _cover_cache.has(key):
 		return _cover_cache[key]
+	# уже грузится (например, предзагрузкой) — ждём её
+	if _cover_jobs.has(key):
+		while _cover_jobs.has(key):
+			await get_tree().process_frame
+		return _cover_cache.get(key)
+	_cover_jobs[key] = true
 	var lp := "%s/covers/%s.%s" % [CACHE, key, url.get_extension().to_lower()]
 	if not FileAccess.file_exists(lp):
 		var dl = Net.Download.new()
-		var err: String = await Net.download(url, lp, dl, 2)
+		var err: String = await Net.download(url, lp, dl, 3)
 		if err != "":
+			_cover_jobs.erase(key)
 			return null
-	var tex := load_texture(lp)
-	if tex:
+	# PNG 1280×720 декодируется в потоке — без подвисаний интерфейса
+	var holder := [null]
+	var task := WorkerThreadPool.add_task(func(): holder[0] = Image.load_from_file(lp), false, "cover")
+	while not WorkerThreadPool.is_task_completed(task):
+		await get_tree().process_frame
+	WorkerThreadPool.wait_for_task_completion(task)
+	var img: Image = holder[0]
+	var tex: Texture2D = null
+	if img != null and not img.is_empty():
+		tex = ImageTexture.create_from_image(img)
 		_cover_cache[key] = tex
+	_cover_jobs.erase(key)
 	return tex
+
+## Сразу после загрузки каталога — все обложки приключений и серий, по 4 одновременно.
+func preload_covers() -> void:
+	var list := []
+	for a in adventures():
+		list.append([String(a.get("cover", "")), String(a.get("cover_sha1", ""))])
+		for e in a.get("episodes", []):
+			list.append([String(e.get("cover", "")), String(e.get("cover_sha1", ""))])
+	var st := {"i": 0}
+	var worker := func():
+		while st["i"] < list.size():
+			var it: Array = list[st["i"]]
+			st["i"] += 1
+			if it[0] != "":
+				await get_cover(it[0], it[1])
+	for k in 4:
+		worker.call()
 
 ## Загрузить картинку с диска как текстуру (без импорта).
 static func load_texture(path: String) -> ImageTexture:

@@ -117,10 +117,25 @@ func _run(mode: String) -> void:
 			var dl = Net.Download.new()
 			var mode2 := OS.get_cmdline_user_args()[2] if OS.get_cmdline_user_args().size() > 2 else "pack"
 			var err
+			var hitch := {"max": 0.0, "n": 0}
+			var mon := func():
+				var last := Time.get_ticks_usec()
+				while hitch["n"] >= 0:
+					await get_tree().process_frame
+					var now := Time.get_ticks_usec()
+					var dtt := (now - last) / 1000.0
+					last = now
+					if dtt > hitch["max"]:
+						hitch["max"] = dtt
+					if dtt > 100.0:
+						print("HITCH ", int(dtt), " ms at ", Content.human_size(dl.total_slots()))
+			mon.call()
 			if mode2 == "files":
 				err = await Content._download_files("last_men", e, dl, func(d, t): pass)
 			else:
 				err = await Content.download_episode("last_men", e, dl, func(d, t): pass)
+			print("MAXFRAME ", hitch["max"], " ms")
+			hitch["n"] = -1
 			print("DOWNLOAD ", mode2, " err='", err, "' cached=", Content.is_cached("last_men", e), " time=", Time.get_ticks_msec() - t0, "ms size=", Content.human_size(Content.cache_size()))
 		"intro":
 			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, false)

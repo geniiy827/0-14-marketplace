@@ -72,12 +72,13 @@ func _ready() -> void:
 	d.add_theme_constant_override("outline_size", 4)
 	vb.add_child(d)
 
-func set_cover(tex: Texture2D) -> void:
+func set_cover(tex: Texture2D, fade := true) -> void:
 	if tex == null or _cover == null:
 		return
 	_cover.texture = tex
-	_cover.modulate.a = 0.0
-	create_tween().tween_property(_cover, "modulate:a", 1.0, 0.25)
+	if fade:
+		_cover.modulate.a = 0.0
+		create_tween().tween_property(_cover, "modulate:a", 1.0, 0.25)
 
 func _carousel() -> Carousel:
 	var p := get_parent()

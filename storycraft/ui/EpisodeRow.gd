@@ -104,9 +104,10 @@ func _ready() -> void:
 			l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			rv.add_child(l2)
 
-func set_cover(tex: Texture2D) -> void:
+func set_cover(tex: Texture2D, fade := true) -> void:
 	if tex == null or _cover_rect == null:
 		return
 	_cover_rect.texture = tex
-	_cover_rect.modulate.a = 0.0
-	create_tween().tween_property(_cover_rect, "modulate:a", 1.0, 0.25)
+	if fade:
+		_cover_rect.modulate.a = 0.0
+		create_tween().tween_property(_cover_rect, "modulate:a", 1.0, 0.25)

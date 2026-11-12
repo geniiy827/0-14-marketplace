@@ -17,9 +17,18 @@ $cfg = ["http_port" => isset($argv[2]) ? (int) $argv[2] : 12055, "bind" => "0.0.
 $srv = new rcode\storycraft\HttpServer($cfg, function ($m) {
 	fwrite(STDERR, date("H:i:s ") . $m . "\n");
 });
+// SC_THROTTLE=<байт/с на соединение> — имитация медленной мобильной сети для тестов
+if (getenv("SC_THROTTLE")) {
+	$srv->writePerTick = max(1024, (int) (getenv("SC_THROTTLE") / 20));
+	fwrite(STDERR, "throttle " . getenv("SC_THROTTLE") . " B/s per connection\n");
+}
+// SC_STALL=<байт> — одно соединение «зависнет» после стольких байт (проверка сторожа в игре)
+if (getenv("SC_STALL")) {
+	$srv->stallOnceAfter = (int) getenv("SC_STALL");
+}
 if (!$srv->open()) {
 	exit(1);
 }
 while (true) {
-	$srv->tick(50000);
+	$srv->tick(getenv("SC_THROTTLE") ? 0 : 50000); if (getenv("SC_THROTTLE")) { usleep(50000); }
 }

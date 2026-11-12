@@ -27,6 +27,13 @@ class HttpServer {
 	private $log;
 	private $lastScan = 0;
 
+	/** @var int байт на соединение за тик (для тестов медленной сети в standalone можно уменьшить) */
+	public $writePerTick = self::WRITE_PER_TICK;
+
+	/** @var int только для тестов (standalone): «заморозить» одно соединение после стольких байт */
+	public $stallOnceAfter = 0;
+	private $stallId = -1;
+
 	/** @var int счётчик обслуженных запросов */
 	public $served = 0;
 
@@ -442,8 +449,11 @@ class HttpServer {
 			return;
 		}
 		$c = &$this->conns[$id];
+		if ($id === $this->stallId) {
+			return;   // тест: соединение «повисло»
+		}
 		// пишем, пока сокет принимает данные (до WRITE_PER_TICK за тик), а не один кусок
-		$budget = self::WRITE_PER_TICK;
+		$budget = $this->writePerTick;
 		while ($budget > 0) {
 			if ($c["out"] === "" && $c["file"] !== null) {
 				$chunk = fread($c["file"], min(self::CHUNK, $c["fileLeft"]));
@@ -463,7 +473,7 @@ class HttpServer {
 			if ($c["out"] === "") {
 				break;
 			}
-			$w = @fwrite($c["sock"], $c["out"]);
+			$w = @fwrite($c["sock"], strlen($c["out"]) > $budget ? substr($c["out"], 0, $budget) : $c["out"]);
 			if ($w === false) {
 				$this->drop($id);
 				return;
@@ -474,6 +484,14 @@ class HttpServer {
 			$c["out"] = (string) substr($c["out"], $w);
 			$c["last"] = time();
 			$budget -= $w;
+			if ($this->stallOnceAfter > 0 && $c["file"] !== null) {
+				$c["sent"] = (isset($c["sent"]) ? $c["sent"] : 0) + $w;
+				if ($c["sent"] >= $this->stallOnceAfter) {
+					$this->stallOnceAfter = 0;
+					$this->stallId = $id;
+					return;
+				}
+			}
 		}
 		if ($c["out"] === "" && $c["file"] === null) {
 			if (!$c["keep"]) {
