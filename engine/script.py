@@ -66,7 +66,7 @@ ALIASES = {
     "effect": "эффект effect",
     "sound": "звук sound",
 }
-ITEMS = {"пицц": "pizza", "записк": "paper", "бумаг": "paper", "сено": "hayblock/1", "ящик": "crafting_table/1", "коробк": "crafting_table/1", "тыкв": "pumpkin/1",
+ITEMS = {"рычаг": "lever", "пицц": "pizza", "записк": "paper", "бумаг": "paper", "сено": "hayblock/1", "ящик": "crafting_table/1", "коробк": "crafting_table/1", "тыкв": "pumpkin/1",
          "дротик": "arrow", "сумк": "leather", "пакет": "paper", "сундук": "crafting_table/1",
          "банк": "potion_bottle_empty", "бутыл": "potion_bottle_empty", "ведр": "bucket", "яблок": "apple",
          "хлеб": "bread", "торт": "cake", "рыб": "fish_raw_cod", "книг": "book_normal", "кост": "bone",
@@ -327,8 +327,10 @@ class Compiler:
         if kind in ("place", "appear"):
             dst = self.target_xz(target) if target and target[0] == "point" else None
             if dst:
-                tl.moves.append(dict(char=subj, t0=t0, t1=t0, **{"from": dst}, to=dst, dist=0.0, run=False))
-                self.pos[subj] = dst
+                base_h = tl.cast[subj].get("lift", 0.0)
+                tl.moves.append(dict(char=subj, t0=t0, t1=t0, **{"from": dst}, to=dst, dist=0.0, run=False,
+                                     h0=base_h, h1=base_h))
+                self.pos[subj] = dst; self.hgt[subj] = base_h
             tl.vis.append(dict(char=subj, t=t0, on=True))
             if num is not None:
                 tl.faces.append(dict(char=subj, t=t0, target=("yaw", math.radians(num))))
@@ -905,7 +907,7 @@ class Compiler:
                         tl.moves.append(dict(char=n, t0=tt, t1=tt + dur, **{"from": (ax, az)}, to=dst, dist=dist, run=False))
                         self.pos[n] = dst
                         tt += dur + rr.uniform(1.0, 5.0)
-            tl.scenes.append(dict(name=sname, t0=s0, t1=t, participants=sorted(participants), world=cur_world,
+            tl.scenes.append(dict(name=sname, sid=params.get("id"), t0=s0, t1=t, participants=sorted(participants), world=cur_world,
                                   time=cur_time, mood=cur_mood))
             tl.music_plan.append((s0, t, cur_mood))
         tl.duration = t + (1.5 if tl.end_text else 0.5)

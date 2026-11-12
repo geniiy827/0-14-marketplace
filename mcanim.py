@@ -410,7 +410,7 @@ class Film:
             print(f"== {sc['name']}  {sc['t0']:.1f}–{sc['t1']:.1f} с")
             for s in tl.shots:
                 if sc["t0"] <= s["t0"] < sc["t1"]:
-                    k, a, b = s["spec"]
+                    k, a, b = s["spec"][:3]
                     print(f"   {s['t0']:6.1f}–{s['t1']:5.1f}  камера: {k} {a or ''} {b or ''}")
             for s in tl.speech:
                 if sc["t0"] <= s["t0"] < sc["t1"]:
@@ -428,11 +428,16 @@ def main():
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--chunk", help="i/n — отрендерить только i-й из n кусков (облачный рендер)")
     ap.add_argument("--assemble", help="папка с chunk_*.mp4 — склеить и добавить звук")
+    ap.add_argument("--export-game", help="папка: экспорт серии для игры Story Craft")
+    ap.add_argument("--logic", help="логика серии (json) для --export-game")
     a = ap.parse_args()
     film = Film(a.script, preview=a.preview, fps=a.fps)
     if a.chunk:
         i, n = map(int, a.chunk.split("/"))
         film.render_chunk(i, n, a.out or f"chunk_{i}.mp4"); return
+    if a.export_game:
+        from engine.export_game import Exporter
+        Exporter(film, a.export_game, logic_path=a.logic).export(); return
     if a.assemble:
         film.assemble(a.assemble, a.out or film.base + ".mp4"); return
     if a.plan:

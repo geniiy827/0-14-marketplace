@@ -1,0 +1,160 @@
+{
+ "id": "01_escape",
+ "number": 1,
+ "title": "Побег из клетки",
+ "description": "Пробная интерактивная серия: выбор, рычаг и мини-игра на силу.",
+ "start": "intro",
+ "variables": {
+  "tries": 0,
+  "ending": ""
+ },
+ "nodes": {
+  "intro": {
+   "type": "scene",
+   "scene": "intro",
+   "next": "choose"
+  },
+  "choose": {
+   "type": "choice",
+   "background": "think_loop",
+   "prompt": "Как выбираемся?",
+   "speaker": "kvas",
+   "timer": 15,
+   "timeout": 2,
+   "options": [
+    {
+     "text": "Дёрнуть рычаг",
+     "goto": "lever"
+    },
+    {
+     "text": "Разогнуть прутья",
+     "goto": "bars",
+     "if": "tries < 2"
+    },
+    {
+     "text": "Смыться в унитаз",
+     "goto": "flush"
+    }
+   ]
+  },
+  "lever": {
+   "type": "interact",
+   "background": "lever_loop",
+   "hint": "Найди рычаг и дёрни его",
+   "hotspots": [
+    {
+     "id": "lever",
+     "node": "rychag__main",
+     "radius": 90,
+     "label": "Рычаг",
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "goto": "lever_pull"
+      }
+     ]
+    },
+    {
+     "id": "toilet",
+     "pos": [
+      3.0,
+      1.0,
+      4.0
+     ],
+     "radius": 70,
+     "label": "Унитаз",
+     "on_tap": [
+      {
+       "say": {
+        "who": "kvas",
+        "text": "Нет, туда я больше не полезу."
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "lever_pull": {
+   "type": "scene",
+   "scene": "lever_pull",
+   "next": "escape",
+   "on_enter": [
+    {
+     "set": {
+      "ending": "door"
+     }
+    }
+   ]
+  },
+  "bars": {
+   "type": "minigame",
+   "background": "bars_loop",
+   "kind": "tap_fast",
+   "params": {
+    "taps": 18,
+    "time": 5.0,
+    "title": "Жми быстрее! Разгибай прутья!",
+    "bar_color": "#ff8a3a"
+   },
+   "success": [
+    {
+     "set": {
+      "ending": "bars"
+     }
+    },
+    {
+     "goto": "bars_win"
+    }
+   ],
+   "fail": [
+    {
+     "add": {
+      "tries": 1
+     }
+    },
+    {
+     "goto": "bars_fail"
+    }
+   ]
+  },
+  "bars_win": {
+   "type": "scene",
+   "scene": "bars_win",
+   "next": "escape"
+  },
+  "bars_fail": {
+   "type": "scene",
+   "scene": "bars_fail",
+   "next": "choose"
+  },
+  "escape": {
+   "type": "scene",
+   "scene": "escape",
+   "next": "end_free"
+  },
+  "flush": {
+   "type": "scene",
+   "scene": "flush",
+   "next": "end_flush",
+   "on_enter": [
+    {
+     "set": {
+      "ending": "flush"
+     }
+    }
+   ]
+  },
+  "end_free": {
+   "type": "end",
+   "title": "Свобода!",
+   "text": "Вы сбежали через {'дверь' if ending == 'door' else 'прутья'}."
+  },
+  "end_flush": {
+   "type": "end",
+   "title": "Смыло",
+   "text": "Классика. Канализация ждёт."
+  }
+ }
+}

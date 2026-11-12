@@ -475,6 +475,7 @@ class CharSim:
         P["attach"] = (att["to"], att["slot"]) if att and att["to"] else None
         P.update(name=self.name, x=x + P["ox"] * cos(self.yaw), y=gy + P["lift"], z=z - P["ox"] * sin(self.yaw),
                  yaw=self.yaw + P["yaw_off"], mouth=0 if self.mob else mouth, blink=blink, hidden=hidden, mob=self.mob,
+                 prop=bool(self.tl.cast[self.name].get("prop")),
                  item=(it["item"] if it else None), t=t)
         P["ox"] = 0
         self.last = P
