@@ -1,0 +1,5 @@
+cache/
+**/cache/
+*.mp4
+stills/
+__pycache__/

@@ -1,0 +1,27 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:wolf",
+      "textures": {
+        "default": "wolf.png",
+        "wolf_angry": "wolf_angry.png",
+        "wolf_tame": "wolf_tame.tga"
+      },
+      "geometry": {
+        "default": "geometry.wolf"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/wolf.png": "wolf.png",
+          "images/mob/wolf_angry.png": "wolf_angry.png",
+          "images/mob/wolf_tame.tga": "wolf_tame.tga"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}

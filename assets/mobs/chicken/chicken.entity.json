@@ -1,0 +1,39 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:chicken",
+      "textures": {
+        "default": "chicken.png"
+      },
+      "geometry": {
+        "default": "geometry.chicken"
+      },
+      "animations": {},
+      "scripts": {},
+      "nova:legacy": {
+        "textures": {
+          "images/mob/chicken.png": "chicken.png"
+        },
+        "model": "rebuild",
+        "rebuild": [
+          {
+            "class": "ChickenModel",
+            "geometry": "geometry.chicken",
+            "when": null,
+            "parts": {
+              "head": 180,
+              "beak": 1300,
+              "comb": 1460,
+              "body": 500,
+              "leg0": 660,
+              "leg1": 820,
+              "wing0": 980,
+              "wing1": 1140
+            }
+          }
+        ]
+      }
+    }
+  }
+}

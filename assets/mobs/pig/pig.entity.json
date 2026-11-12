@@ -1,0 +1,33 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "minecraft:pig",
+      "textures": {
+        "default": "pig.png",
+        "saddle": "saddle.png"
+      },
+      "geometry": {
+        "default": "geometry.pig"
+      },
+      "animations": {
+        "walk": "animation.quadruped.walk",
+        "look_at_target": "animation.common.look_at_target"
+      },
+      "scripts": {
+        "animate": [
+          "walk",
+          "look_at_target"
+        ]
+      },
+      "nova:legacy": {
+        "textures": {
+          "images/mob/pig.png": "pig.png",
+          "images/mob/saddle.png": "saddle.png"
+        },
+        "model": "json",
+        "rebuild": []
+      }
+    }
+  }
+}
