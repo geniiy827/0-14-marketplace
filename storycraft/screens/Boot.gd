@@ -2,7 +2,7 @@ extends CanvasLayer
 ## Запуск: логотип студии RC на чёрном экране. Параллельно — проверка сети, каталог, регистрация,
 ## подготовка живого фона меню. Затем чёрный фон плавно становится прозрачным — под ним главное меню.
 
-const LOGO_W := 440.0
+const LOGO_W := 260.0
 
 var _black: ColorRect
 var _logo: TextureRect
@@ -16,6 +16,8 @@ var _first_launch := true
 func _ready() -> void:
 	layer = 50
 	_first_launch = not Settings.get_value("launched_before", false)
+	# серии и обложки храним только одну сессию — стираем всё скачанное в прошлый раз
+	Content.reset_session()
 	Router.boot_mode = true
 
 	_black = ColorRect.new()

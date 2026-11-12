@@ -21,7 +21,8 @@ var values := {
 	"sub_size": 0,
 	"shadows": true,
 	"quality": 2,
-	"fps": 60,
+	"fps": 0,              # 0 — частота экрана (vsync), 30 — экономия батареи
+	"debug_overlay": false,
 	"vibration": true,
 	"server_url": "",
 	"launched_before": false,

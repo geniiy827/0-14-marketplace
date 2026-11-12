@@ -136,11 +136,14 @@ func _build_theme() -> Theme:
 	t.set_color("font_color", "ProgressBar", Color(0, 0, 0, 0))
 
 	# Чекбокс
+	# чекбоксы 24×24 (вдвое детальнее прежних 12×12). Раньше было 12×PX = 36 px; ровно 36 из 24 не получить
+	# целым масштабом (×1.5 ломает пиксели галочки), поэтому ближайший целый: round(PX / 2) = 2 → 48 px.
+	var cb_scale := maxi(1, roundi(PX / 2.0))
 	for cls in ["CheckBox", "CheckButton"]:
-		t.set_icon("checked", cls, px_tex("res://assets/ui/checkbox_on.png"))
-		t.set_icon("unchecked", cls, px_tex("res://assets/ui/checkbox_off.png"))
-		t.set_icon("checked_disabled", cls, px_tex("res://assets/ui/checkbox_on.png"))
-		t.set_icon("unchecked_disabled", cls, px_tex("res://assets/ui/checkbox_off.png"))
+		t.set_icon("checked", cls, px_tex("res://assets/ui/checkbox_on.png", cb_scale))
+		t.set_icon("unchecked", cls, px_tex("res://assets/ui/checkbox_off.png", cb_scale))
+		t.set_icon("checked_disabled", cls, px_tex("res://assets/ui/checkbox_on.png", cb_scale))
+		t.set_icon("unchecked_disabled", cls, px_tex("res://assets/ui/checkbox_off.png", cb_scale))
 		for s in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 			t.set_stylebox(s, cls, StyleBoxEmpty.new())
 		t.set_color("font_color", cls, C_TEXT)

@@ -154,7 +154,7 @@ func _start(e: Dictionary, resume: bool) -> void:
 			_build()
 			return
 	_busy = false
-	Router.go("player", {"adventure": adv_id, "episode": String(e.get("id", "")), "resume": resume})
+	Router.go("player", {"adventure": adv_id, "episode": String(e.get("id", "")), "resume": resume}, true)
 
 ## Окно загрузки с прогресс-баром; можно отменить. true — всё скачано.
 func _download(e: Dictionary) -> bool:

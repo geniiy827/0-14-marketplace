@@ -10,6 +10,7 @@ var _w := 900.0
 var _cache_btn: Button
 var _ver_taps := 0
 var _ver_last := 0
+var _ver_down := 0
 var _toast: Label
 
 func setup(params: Dictionary) -> void:
@@ -39,11 +40,11 @@ func _ready() -> void:
 	_section("Графика")
 	_check("Тени", "shadows")
 	_cycle("Качество", "quality", Settings.QUALITY_NAMES, [0, 1, 2])
-	_cycle("Частота кадров", "fps", ["30 FPS", "60 FPS"], [30, 60])
+	_cycle("Частота кадров", "fps", ["Как у экрана", "60 FPS", "30 FPS"], [0, 60, 30])
 
 	_section("Прочее")
 	_check("Вибрация", "vibration")
-	var row := _row("Кэш серий")
+	var row := _row("Скачано за сессию")
 	_cache_btn = UI.button("Очистить (%s)" % Content.human_size(Content.cache_size()), _clear_cache)
 	_cache_btn.custom_minimum_size = Vector2(320, 0)
 	row.add_child(_cache_btn)
@@ -53,7 +54,19 @@ func _ready() -> void:
 	about.custom_minimum_size = Vector2(_w, 0)
 	about.mouse_filter = Control.MOUSE_FILTER_PASS
 	_list.content.add_child(about)
-	about.add_child(UI.label("Story Craft — RCodeStudio", UI.FS_SMALL, true))
+	var logo_row := HBoxContainer.new()
+	logo_row.add_theme_constant_override("separation", 16)
+	logo_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	var logo := TextureRect.new()
+	logo.texture = load("res://assets/branding/sc_logo_source.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.custom_minimum_size = Vector2(72, 72)
+	logo_row.add_child(logo)
+	var nm := UI.label("Story Craft — RCodeStudio", UI.FS_SMALL, true)
+	nm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	logo_row.add_child(nm)
+	about.add_child(logo_row)
 	var ver := UI.label("Версия " + str(ProjectSettings.get_setting("application/config/version")), UI.FS_SMALL, false, UI.C_DIM)
 	ver.mouse_filter = Control.MOUSE_FILTER_PASS
 	ver.gui_input.connect(_on_version_input)
@@ -164,16 +177,26 @@ func _clear_cache() -> void:
 		_cache_btn.text = "Очистить (%s)" % Content.human_size(Content.cache_size())
 		_show_toast("Кэш очищен")
 
-## 5 тапов по версии → скрытая настройка адреса сервера.
+## Скрытое по номеру версии: 5 тапов — оверлей отладки (FPS, draw calls, полигоны);
+## удержание 1.5 с — адрес сервера для тестов.
 func _on_version_input(e: InputEvent) -> void:
-	if not (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT):
+	if not (e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT):
 		return
 	var now := Time.get_ticks_msec()
+	if not e.pressed:
+		if _ver_down > 0 and now - _ver_down >= 1500:
+			_ver_taps = 0
+			_server_dialog()
+		_ver_down = 0
+		return
+	_ver_down = now
 	_ver_taps = _ver_taps + 1 if now - _ver_last < 700 else 1
 	_ver_last = now
 	if _ver_taps >= 5:
 		_ver_taps = 0
-		_server_dialog()
+		var on := not bool(Settings.get_value("debug_overlay", false))
+		Settings.set_value("debug_overlay", on)
+		_show_toast("Отладка: " + ("вкл" if on else "выкл"))
 
 func _server_dialog() -> void:
 	var m: Modal = load("res://ui/Modal.tscn").instantiate()

@@ -61,4 +61,5 @@ func _ready() -> void:
 
 func on_back() -> void:
 	if await Router.confirm("Выйти из игры?", "", "Выйти", "Остаться"):
+		Content.clear_cache()   # скачанное живёт только одну сессию
 		get_tree().quit()

@@ -9,7 +9,9 @@ namespace rcode\storycraft;
 class HttpServer {
 	const MAX_HEADER = 16384;
 	const MAX_BODY = 65536;
-	const CHUNK = 65536;
+	const CHUNK = 262144;
+	/** сколько максимум пишем в один сокет за один тик цикла */
+	const WRITE_PER_TICK = 524288;
 	const IDLE_TIMEOUT = 20;
 	const KEEPALIVE_MAX = 200;
 
@@ -125,6 +127,13 @@ class HttpServer {
 				return;
 			}
 			stream_set_blocking($s, false);
+			// большой буфер отправки — быстрее отдаём файлы по медленным мобильным каналам
+			if (function_exists("socket_import_stream") && defined("SO_SNDBUF")) {
+				$sock = @socket_import_stream($s);
+				if ($sock) {
+					@socket_set_option($sock, SOL_SOCKET, SO_SNDBUF, 1048576);
+				}
+			}
 			$id = (int) $s;
 			$this->conns[$id] = ["sock" => $s, "in" => "", "out" => "", "file" => null, "fileLeft" => 0,
 				"keep" => false, "count" => 0, "last" => time(), "peer" => $peer];
@@ -271,6 +280,32 @@ class HttpServer {
 				"Cache-Control" => "no-cache"], $this->catalog->json, $isHead);
 			return;
 		}
+		if (strpos($path, "/api/pack/") === 0) {
+			if ($method !== "GET" && !$isHead) {
+				$this->respondJson($id, 405, ["ok" => false, "error" => "method"]);
+				return;
+			}
+			$parts = explode("/", substr($path, 10));
+			$pack = count($parts) >= 2 ? $this->catalog->pack($parts[0], $parts[1]) : null;
+			if ($pack === null || !is_file($pack["path"])) {
+				$this->respondJson($id, 404, ["ok" => false, "error" => "no pack"]);
+				return;
+			}
+			if (count($parts) === 3 && $parts[2] === "index") {
+				$idx = $pack["index"];
+				$idx["data_offset"] = $pack["data_offset"];
+				$idx["pack_size"] = $pack["size"];
+				$idx["ok"] = true;
+				$this->respondJson($id, 200, $idx);
+				return;
+			}
+			if (count($parts) === 2) {
+				$this->serveAbs($id, $pack["path"], $h, $isHead);
+				return;
+			}
+			$this->respondJson($id, 404, ["ok" => false, "error" => "not found"]);
+			return;
+		}
 		if (strpos($path, "/files/") === 0) {
 			if ($method !== "GET" && !$isHead) {
 				$this->respondJson($id, 405, ["ok" => false, "error" => "method"]);
@@ -340,6 +375,11 @@ class HttpServer {
 			$this->respondJson($id, 404, ["ok" => false, "error" => "not found"]);
 			return;
 		}
+		$this->serveAbs($id, $abs, $h, $isHead);
+	}
+
+	/** Отдать файл с диска: ETag, If-None-Match, Range (докачка и параллельные части). */
+	private function serveAbs($id, $abs, array $h, $isHead) {
 		$size = (int) filesize($abs);
 		$sha = $this->catalog->sha1Of($abs);
 		$etag = '"' . $sha . '"';
@@ -402,32 +442,38 @@ class HttpServer {
 			return;
 		}
 		$c = &$this->conns[$id];
-		// подкачиваем кусок файла в буфер вывода
-		if ($c["out"] === "" && $c["file"] !== null) {
-			$chunk = fread($c["file"], min(self::CHUNK, $c["fileLeft"]));
-			if ($chunk === false || $chunk === "") {
-				fclose($c["file"]);
-				$c["file"] = null;
-				$c["keep"] = false;
-			} else {
-				$c["out"] = $chunk;
-				$c["fileLeft"] -= strlen($chunk);
-				if ($c["fileLeft"] <= 0) {
+		// пишем, пока сокет принимает данные (до WRITE_PER_TICK за тик), а не один кусок
+		$budget = self::WRITE_PER_TICK;
+		while ($budget > 0) {
+			if ($c["out"] === "" && $c["file"] !== null) {
+				$chunk = fread($c["file"], min(self::CHUNK, $c["fileLeft"]));
+				if ($chunk === false || $chunk === "") {
 					fclose($c["file"]);
 					$c["file"] = null;
+					$c["keep"] = false;
+				} else {
+					$c["out"] = $chunk;
+					$c["fileLeft"] -= strlen($chunk);
+					if ($c["fileLeft"] <= 0) {
+						fclose($c["file"]);
+						$c["file"] = null;
+					}
 				}
 			}
-		}
-		if ($c["out"] !== "") {
+			if ($c["out"] === "") {
+				break;
+			}
 			$w = @fwrite($c["sock"], $c["out"]);
 			if ($w === false) {
 				$this->drop($id);
 				return;
 			}
-			if ($w > 0) {
-				$c["out"] = (string) substr($c["out"], $w);
-				$c["last"] = time();
+			if ($w === 0) {
+				break;   // буфер сокета полон — продолжим на следующем тике
 			}
+			$c["out"] = (string) substr($c["out"], $w);
+			$c["last"] = time();
+			$budget -= $w;
 		}
 		if ($c["out"] === "" && $c["file"] === null) {
 			if (!$c["keep"]) {

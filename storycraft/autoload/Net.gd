@@ -94,13 +94,24 @@ func ensure_online() -> void:
 class Download:
 	extends RefCounted
 	var cancel := false
-	var downloaded := 0      # байт текущего файла
+	var downloaded := 0      # байт текущего файла (одиночная загрузка)
 	var req: HTTPRequest = null
+	var reqs := {}           # слот → HTTPRequest (параллельные потоки)
+	var slot_bytes := {}     # слот → скачано байт этим потоком
+
+	func total_slots() -> int:
+		var n := 0
+		for k in slot_bytes:
+			n += int(slot_bytes[k])
+		return n
 
 	func abort() -> void:
 		cancel = true
 		if req != null and is_instance_valid(req):
 			req.cancel_request()
+		for k in reqs:
+			if is_instance_valid(reqs[k]):
+				reqs[k].cancel_request()
 
 ## Скачать файл в dest (через .part, с докачкой). Возвращает "" при успехе или текст ошибки.
 func download(path: String, dest: String, dl: Download, attempts := 3) -> String:
@@ -167,6 +178,73 @@ func download(path: String, dest: String, dl: Download, attempts := 3) -> String
 		DirAccess.rename_absolute(part, dest)
 		return ""
 	return last_err if last_err != "" else "error"
+
+## Скачать диапазон [start, end] файла path в dest (докачка: продолжает с уже скачанного в dest).
+## Прогресс — в dl.slot_bytes[slot]. Возвращает "" или текст ошибки.
+func download_range(path: String, dest: String, start: int, end: int, dl: Download, slot: int, attempts := 4) -> String:
+	DirAccess.make_dir_recursive_absolute(dest.get_base_dir())
+	var need := end - start + 1
+	var last_err := ""
+	for attempt in attempts:
+		if dl.cancel:
+			return "cancel"
+		var have := _file_size(dest)
+		if have >= need:
+			dl.slot_bytes[slot] = need
+			return ""
+		var tmp := dest + ".chunk"
+		var req := HTTPRequest.new()
+		req.use_threads = true
+		req.timeout = 30.0
+		req.download_chunk_size = 65536
+		req.download_file = tmp
+		add_child(req)
+		dl.reqs[slot] = req
+		var hs := PackedStringArray(["Range: bytes=%d-%d" % [start + have, end]])
+		if req.request(url(path), hs) != OK:
+			req.queue_free()
+			last_err = "request"
+			continue
+		var done := [false]
+		var poll := func():
+			while not done[0] and is_instance_valid(req):
+				dl.slot_bytes[slot] = have + req.get_downloaded_bytes()
+				await get_tree().process_frame
+		poll.call()
+		var res: Array = await req.request_completed
+		done[0] = true
+		req.queue_free()
+		dl.reqs.erase(slot)
+		if dl.cancel:
+			DirAccess.remove_absolute(tmp)
+			return "cancel"
+		var code: int = res[1]
+		if res[0] != HTTPRequest.RESULT_SUCCESS or code != 206:
+			# 200 — сервер не понял Range: такую часть принять нельзя
+			DirAccess.remove_absolute(tmp)
+			last_err = "HTTP %d / %d" % [code, res[0]]
+			await get_tree().create_timer(0.5 * (attempt + 1)).timeout
+			continue
+		if have > 0:
+			_append_file(dest, tmp)
+			DirAccess.remove_absolute(tmp)
+		else:
+			DirAccess.rename_absolute(tmp, dest)
+		have = _file_size(dest)
+		dl.slot_bytes[slot] = have
+		if have >= need:
+			return ""
+	return last_err if last_err != "" else "error"
+
+static func _file_size(p: String) -> int:
+	if not FileAccess.file_exists(p):
+		return 0
+	var f := FileAccess.open(p, FileAccess.READ)
+	if f == null:
+		return 0
+	var n := int(f.get_length())
+	f.close()
+	return n
 
 func _append_file(dst: String, src: String) -> void:
 	var a := FileAccess.open(dst, FileAccess.READ_WRITE)

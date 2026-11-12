@@ -16,6 +16,7 @@ boot_splash/bg_color=Color(0, 0, 0, 1)
 boot_splash/show_image=false
 boot_splash/fullsize=false
 run/low_processor_mode=false
+run/max_fps=0
 
 [autoload]
 
@@ -37,6 +38,7 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=4
 window/energy_saving/keep_screen_on=true
+window/vsync/vsync_mode=1
 
 [gui]
 

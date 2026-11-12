@@ -58,7 +58,7 @@ func _ready() -> void:
 			await Router.alert("Обновите игру", "Эта серия сделана для более новой версии Story Craft.")
 		else:
 			await Router.alert("Серия не открывается", ep.error + "\nПопробуй очистить кэш в настройках и скачать серию снова.")
-		Router.go("episodes", {"adventure": adv_id})
+		Router.go("episodes", {"adventure": adv_id}, true)
 		return
 	# переменные приключения (выборы переносятся между сериями)
 	var adv_vars := Progress.adv_vars(adv_id)
@@ -74,7 +74,7 @@ func _ready() -> void:
 					adv_vars[k] = r["adv_vars"][k]
 	if start_node == "" or not ep.nodes().has(start_node):
 		await Router.alert("Серия повреждена", "Не найден начальный узел серии.")
-		Router.go("episodes", {"adventure": adv_id})
+		Router.go("episodes", {"adventure": adv_id}, true)
 		return
 	runner = LogicRunner.new(self, ep, adv_vars)
 	_started_at = Time.get_ticks_msec()
@@ -481,15 +481,15 @@ func ui_end(title: String, text: String, ending: String, unlock_next: bool) -> v
 	add_child(es)
 	var idx: int = await es.chosen
 	if idx == 0:
-		Router.go("episodes", {"adventure": adv_id})
+		Router.go("episodes", {"adventure": adv_id}, true)
 	else:
-		Router.go("player", {"adventure": adv_id, "episode": ep_id, "resume": false})
+		Router.go("player", {"adventure": adv_id, "episode": ep_id, "resume": false}, true)
 
 # ---------------------------------------------------------------- пауза
 
 func on_back() -> void:
 	if _finished:
-		Router.go("episodes", {"adventure": adv_id})
+		Router.go("episodes", {"adventure": adv_id}, true)
 		return
 	toggle_pause()
 
@@ -522,7 +522,7 @@ func pause_action(what: String) -> void:
 		"restart":
 			if await Router.confirm("Начать серию заново?", "Прогресс в этой серии сбросится.", "Заново", "Отмена"):
 				get_tree().paused = false
-				Router.go("player", {"adventure": adv_id, "episode": ep_id, "resume": false})
+				Router.go("player", {"adventure": adv_id, "episode": ep_id, "resume": false}, true)
 		"settings":
 			var s: Control = load("res://screens/Settings.tscn").instantiate()
 			s.setup({"overlay": true})
@@ -531,4 +531,4 @@ func pause_action(what: String) -> void:
 			if runner and not _finished:
 				_send_checkpoint(runner.node_id)
 			get_tree().paused = false
-			Router.go("episodes", {"adventure": adv_id})
+			Router.go("episodes", {"adventure": adv_id}, true)

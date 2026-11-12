@@ -20,6 +20,13 @@ HTTP работает в отдельном потоке и не тормози�
 > посмотри строку `API_VERSION` в консоли при старте сервера и впиши её в `plugin.yml`.
 
 ## Как добавлять серии
+
+**Проще всего — архивом.** Положи `last_men.zip` (внутри сразу папка приключения `last_men/…`) прямо в
+`plugins/StoryCraft/content/adventures/`. Через несколько секунд плагин распакует его (папка с тем же именем
+заменяется) и переименует архив в `last_men.zip.done`. То же делает `/storycraft reload`.
+Нужно расширение PHP `zip` (класс `ZipArchive`); если его нет — в консоли будет сообщение «распакуй вручную».
+
+Вручную — папками:
 ```
 plugins/StoryCraft/content/adventures/<id>/
   adventure.json   {"id","title","description","order":1,"accent":"#ff8a3a","cover":"cover.png","hidden":false}
@@ -29,6 +36,12 @@ plugins/StoryCraft/content/adventures/<id>/
 Положил / удалил / заменил папку → через `scan_interval` секунд каталог обновится, игра это увидит
 (список приключений обновляется каждые 30 с). Изменённые файлы игра перекачает сама (сверка по sha1).
 `"hidden": true` скрывает приключение или серию.
+
+## Пакеты серий (быстрая загрузка)
+При сканировании плагин собирает для каждой серии пакет `plugins/StoryCraft/packs/<adv>/<ep>.pack`:
+все файлы серии, каждый сжат gzip (нужен только zlib). Пробная серия: 17.7 МБ → 3.8 МБ.
+Игра качает пакет в 5 параллельных потоков (Range) и распаковывает у себя. Пакет пересобирается сам,
+если у любого файла серии изменились размер или время изменения.
 
 ## Команды (op)
 - `/storycraft status` — порт, подключения, версия каталога
@@ -42,6 +55,8 @@ plugins/StoryCraft/content/adventures/<id>/
 | GET | `/api/ping` | проверка связи |
 | GET | `/api/catalog` | каталог (`If-None-Match` → 304) |
 | GET/HEAD | `/files/<adventure>/<path>` | файлы (Range, ETag) |
+| GET | `/api/pack/<adventure>/<episode>/index` | индекс пакета + `data_offset`, `pack_size` |
+| GET/HEAD | `/api/pack/<adventure>/<episode>` | пакет серии (Range) |
 | POST | `/api/register` | `{"device_id","model","app_version"}` → `{"ok":true,"token"}` |
 | GET/POST | `/api/progress` | заголовки `X-Device`, `X-Token`; POST — события `checkpoint` / `complete` / `reset` |
 

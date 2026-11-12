@@ -35,7 +35,7 @@ class Main extends PluginBase {
 			"http_port" => (int) $conf->get("http_port", 12055),
 			"bind" => (string) $conf->get("bind", "0.0.0.0"),
 			"scan_interval" => max(1, (int) $conf->get("scan_interval", 5)),
-			"max_connections" => max(4, (int) $conf->get("max_connections", 64)),
+			"max_connections" => max(32, (int) $conf->get("max_connections", 64)),
 			"public_url" => (string) $conf->get("public_url", ""),
 			"data_dir" => $data,
 		];
@@ -80,6 +80,7 @@ class Main extends PluginBase {
 			"    episodes/<NN_id>/                    например 01_escape\r\n" .
 			"        episode.json, cover.png, scenes/, worlds/, textures/, audio/   (экспорт mcanim --export-game)\r\n\r\n" .
 			"Положили/удалили/изменили папку — через несколько секунд это видно в игре.\r\n" .
+			"Можно класть архив <id>.zip (внутри папка приключения) — он распакуется сам и станет <id>.zip.done.\r\n" .
 			"\"hidden\": true в adventure.json или episode.json скрывает приключение/серию.\r\n" .
 			"Команды: /storycraft status | reload | list | progress <device_id>\r\n");
 	}

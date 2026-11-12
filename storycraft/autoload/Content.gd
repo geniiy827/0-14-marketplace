@@ -1,8 +1,10 @@
 extends Node
-## Контент: каталог приключений с сервера, кэш файлов в user://cache/…, скачивание серий
-## (только изменившиеся файлы — по sha1) с прогрессом, обложки.
+## Контент: каталог приключений с сервера, скачивание серий «пакетом» в 5 параллельных потоков,
+## обложки. Всё скачанное живёт только одну сессию: user://session/ удаляется при запуске и выходе.
 
-const CACHE := "user://cache"
+const CACHE := "user://session"
+const LEGACY_CACHE := "user://cache"     # кэш версии 1.0 — удаляем
+const STREAMS := 5
 const SUPPORTED_EPISODE_VERSION := 1
 
 signal catalog_changed
@@ -13,10 +15,11 @@ var _cover_cache := {}         # sha1 → Texture2D
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	DirAccess.make_dir_recursive_absolute(CACHE)
-	var j = _read_json(CACHE + "/manifest.json")
-	if j is Dictionary:
-		_manifest = j
+
+## Новая сессия: стираем всё скачанное в прошлый раз (вызывается из Boot).
+func reset_session() -> void:
+	_remove_tree(LEGACY_CACHE)
+	clear_cache()
 
 func _read_json(path: String):
 	if not FileAccess.file_exists(path):
@@ -82,6 +85,10 @@ func missing_files(adv_id: String, ep: Dictionary) -> Array:
 	return out
 
 func download_size(adv_id: String, ep: Dictionary) -> int:
+	if is_cached(adv_id, ep):
+		return 0
+	if int(ep.get("pack_size", 0)) > 0:
+		return int(ep["pack_size"])
 	var n := 0
 	for f in missing_files(adv_id, ep):
 		n += int(f.get("size", 0))
@@ -90,44 +97,168 @@ func download_size(adv_id: String, ep: Dictionary) -> int:
 func is_cached(adv_id: String, ep: Dictionary) -> bool:
 	return missing_files(adv_id, ep).is_empty()
 
-## Скачать изменившиеся файлы серии. on_progress(done_bytes, total_bytes). Возвращает "" или ошибку.
+## Скачать серию. on_progress(done_bytes, total_bytes). Возвращает "" или текст ошибки.
+## Сначала — пакет серии в 5 параллельных потоков (Range); если сервер старый (нет /api/pack) —
+## отдельные файлы, тоже по 5 одновременно.
 func download_episode(adv_id: String, ep: Dictionary, dl, on_progress: Callable) -> String:
+	if is_cached(adv_id, ep):
+		on_progress.call(1, 1)
+		return ""
+	var ep_id := String(ep.get("id", ""))
+	var r := await Net.get_json("/api/pack/%s/%s/index" % [adv_id.uri_encode(), ep_id.uri_encode()], PackedStringArray(), 10.0)
+	if r["ok"] and r["json"] is Dictionary and int(r["json"].get("pack_size", 0)) > 0:
+		return await _download_pack(adv_id, ep, r["json"], dl, on_progress)
+	if r["code"] != 404 and r["code"] != 0 and not r["ok"]:
+		return "HTTP %d" % r["code"]
+	if r["code"] == 0:
+		return "нет связи"
+	return await _download_files(adv_id, ep, dl, on_progress)
+
+func _download_pack(adv_id: String, ep: Dictionary, idx: Dictionary, dl, on_progress: Callable) -> String:
+	var ep_id := String(ep.get("id", ""))
+	var size := int(idx["pack_size"])
+	var url := "/api/pack/%s/%s" % [adv_id.uri_encode(), ep_id.uri_encode()]
+	var tmp_dir := "%s/_dl/%s_%s" % [CACHE, adv_id, ep_id]
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+	# 5 частей диапазона [0, size) — качаем одновременно
+	var n := mini(STREAMS, maxi(1, size / 65536))
+	var step := int(ceil(float(size) / n))
+	var results := {}
+	for i in n:
+		var a := i * step
+		var b := mini(size, a + step) - 1
+		if a > b:
+			results[i] = ""
+			continue
+		dl.slot_bytes[i] = 0
+		_range_job(url, "%s/part%d" % [tmp_dir, i], a, b, dl, i, results)
+	while results.size() < n:
+		on_progress.call(dl.total_slots(), size)
+		await get_tree().process_frame
+	for i in n:
+		if results[i] != "":
+			return results[i]
+	on_progress.call(size, size)
+	# склейка частей
+	var pack_path := tmp_dir + "/pack.bin"
+	var out := FileAccess.open(pack_path, FileAccess.WRITE)
+	if out == null:
+		return "не удалось записать пакет"
+	for i in n:
+		var pf := FileAccess.open("%s/part%d" % [tmp_dir, i], FileAccess.READ)
+		if pf:
+			while pf.get_position() < pf.get_length():
+				out.store_buffer(pf.get_buffer(1 << 20))
+			pf.close()
+	out.close()
+	# распаковка в потоке: gzip каждого файла + сверка sha1
+	var dir := episode_dir(adv_id, ep_id)
+	var holder := [""]
+	var task := WorkerThreadPool.add_task(func(): holder[0] = _unpack(pack_path, idx, dir), false, "unpack " + ep_id)
+	while not WorkerThreadPool.is_task_completed(task):
+		await get_tree().process_frame
+	WorkerThreadPool.wait_for_task_completion(task)
+	_remove_tree(tmp_dir)
+	if holder[0] != "":
+		return holder[0]
+	for f in idx.get("files", []):
+		_manifest[local_path(adv_id, "episodes/%s/%s" % [ep_id, f["path"]])] = String(f.get("sha1", ""))
+	# файлы из каталога, которых нет в пакете (на всякий случай) — докачиваем по одному
+	_save_manifest()
+	if not is_cached(adv_id, ep):
+		return await _download_files(adv_id, ep, dl, on_progress)
+	return ""
+
+func _range_job(url: String, dest: String, a: int, b: int, dl, slot: int, results: Dictionary) -> void:
+	var err: String = await Net.download_range(url, dest, a, b, dl, slot)
+	results[slot] = err
+
+## Распаковать пакет (вызывается из потока). Возвращает "" или текст ошибки.
+static func _unpack(pack_path: String, idx: Dictionary, dir: String) -> String:
+	var f := FileAccess.open(pack_path, FileAccess.READ)
+	if f == null:
+		return "пакет не открывается"
+	var base := int(idx.get("data_offset", 0))
+	for e in idx.get("files", []):
+		var rel := String(e.get("path", ""))
+		if rel == "" or rel.begins_with("/") or rel.contains(".."):
+			continue
+		f.seek(base + int(e["offset"]))
+		var z := f.get_buffer(int(e["zsize"]))
+		var raw := z.decompress_dynamic(-1, FileAccess.COMPRESSION_GZIP)
+		if raw.size() != int(e.get("size", raw.size())):
+			f.close()
+			return "файл повреждён: " + rel
+		var ctx := HashingContext.new()
+		ctx.start(HashingContext.HASH_SHA1)
+		ctx.update(raw)
+		if e.has("sha1") and ctx.finish().hex_encode() != String(e["sha1"]):
+			f.close()
+			return "контрольная сумма не совпала: " + rel
+		var out_path := dir + "/" + rel
+		DirAccess.make_dir_recursive_absolute(out_path.get_base_dir())
+		var o := FileAccess.open(out_path, FileAccess.WRITE)
+		if o == null:
+			f.close()
+			return "не удалось записать: " + rel
+		o.store_buffer(raw)
+		o.close()
+	f.close()
+	return ""
+
+## Старый сервер без пакетов: отдельные файлы, по 5 одновременно.
+func _download_files(adv_id: String, ep: Dictionary, dl, on_progress: Callable) -> String:
 	var need := missing_files(adv_id, ep)
 	var total := 0
 	for f in need:
 		total += int(f.get("size", 0))
-	var st := {"done": 0}
-	var fin := [false]
-	# фоновое обновление прогресса
-	var ticker := func():
-		while not fin[0]:
-			on_progress.call(st["done"] + dl.downloaded, total)
-			await get_tree().process_frame
-	ticker.call()
-	for f in need:
-		if dl.cancel:
-			fin[0] = true
-			return "cancel"
+	var st := {"done": 0, "next": 0, "err": "", "running": 0}
+	for slot in mini(STREAMS, need.size()):
+		dl.slot_bytes[slot] = 0
+		_file_worker(adv_id, need, st, dl, slot)
+	while st["running"] > 0 or (st["next"] < need.size() and st["err"] == "" and not dl.cancel):
+		on_progress.call(st["done"] + dl.total_slots(), total)
+		await get_tree().process_frame
+	_save_manifest()
+	if dl.cancel:
+		return "cancel"
+	if st["err"] != "":
+		return st["err"]
+	on_progress.call(total, total)
+	return ""
+
+func _file_worker(adv_id: String, need: Array, st: Dictionary, dl, slot: int) -> void:
+	st["running"] += 1
+	var one = Net.Download.new()
+	while st["next"] < need.size() and st["err"] == "" and not dl.cancel:
+		var f: Dictionary = need[st["next"]]
+		st["next"] += 1
 		var lp := local_path(adv_id, f["path"])
 		var parts := PackedStringArray()
 		for seg in String(f["path"]).split("/"):
 			parts.append(seg.uri_encode())
-		var err: String = await Net.download("/files/%s/%s" % [adv_id.uri_encode(), "/".join(parts)], lp, dl)
-		if err == "" and f.get("sha1", "") != "":
-			var got := sha1_file(lp)
-			if got != f["sha1"]:
-				err = "контрольная сумма не совпала: " + String(f["path"])
-				DirAccess.remove_absolute(lp)
+		one.downloaded = 0
+		var watch := [true]
+		var mirror := func():
+			while watch[0]:
+				dl.slot_bytes[slot] = one.downloaded
+				if dl.cancel:
+					one.abort()
+				await get_tree().process_frame
+		mirror.call()
+		var err: String = await Net.download("/files/%s/%s" % [adv_id.uri_encode(), "/".join(parts)], lp, one)
+		watch[0] = false
+		dl.slot_bytes[slot] = 0
+		if err == "" and f.get("sha1", "") != "" and sha1_file(lp) != f["sha1"]:
+			err = "контрольная сумма не совпала: " + String(f["path"])
+			DirAccess.remove_absolute(lp)
 		if err != "":
-			fin[0] = true
-			_save_manifest()
-			return err
+			if st["err"] == "":
+				st["err"] = err
+			break
 		_manifest[lp] = f.get("sha1", "")
 		st["done"] += int(f.get("size", 0))
-	fin[0] = true
-	_save_manifest()
-	on_progress.call(total, total)
-	return ""
+	st["running"] -= 1
 
 static func sha1_file(path: String) -> String:
 	var f := FileAccess.open(path, FileAccess.READ)

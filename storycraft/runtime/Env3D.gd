@@ -17,7 +17,9 @@ func _init() -> void:
 	sky_mat.shader = load("res://shaders/sky.gdshader")
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
-	sky.process_mode = Sky.PROCESS_MODE_REALTIME
+	# QUALITY: radiance-карта пересчитывается только при смене параметров неба.
+	# Она всё равно не используется (ambient — цвет, отражения выключены), а фон рисуется шейдером напрямую.
+	sky.process_mode = Sky.PROCESS_MODE_QUALITY
 	sky.radiance_size = Sky.RADIANCE_SIZE_32
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR

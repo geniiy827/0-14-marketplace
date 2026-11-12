@@ -117,7 +117,8 @@ func load_scene(sid: String) -> LoadedScene:
 			if ls.world == "":
 				ls.world = String(j.get("world", ""))
 	# glb
-	var root := GlbLoader.load_glb(file(String(info.get("glb", "scenes/%s.glb" % sid))))
+	# keep_keys: исходные ключи анимации (с дублями на склейках), без пересэмплирования
+	var root := GlbLoader.load_glb(file(String(info.get("glb", "scenes/%s.glb" % sid))), true)
 	if root == null:
 		ls.error = "Не удалось загрузить сцену «%s»" % sid
 		return ls
@@ -134,6 +135,8 @@ func load_scene(sid: String) -> LoadedScene:
 		if anim:
 			for ti in anim.get_track_count():
 				anim.track_set_interpolation_type(ti, Animation.INTERPOLATION_LINEAR)
+			# сегменты между ключами не «срезаем» на шве цикла
+			anim.loop_mode = Animation.LOOP_NONE
 	for c in root.find_children("*", "Camera3D", true, false):
 		ls.cam = c
 		break

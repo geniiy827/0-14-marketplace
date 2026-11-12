@@ -45,10 +45,16 @@ func _ready() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UI.full(_fade)
 	_fade_layer.add_child(_fade)
+	_build_debug_overlay()
 	add_child(_world_root)
 	add_child(_screen_layer)
 	add_child(_modal_layer)
 	add_child(_fade_layer)
+
+func _exit_tree() -> void:
+	# фон меню может быть вне дерева (во время серии) — освобождаем вручную
+	if menu_bg != null and is_instance_valid(menu_bg) and menu_bg.get_parent() == null:
+		menu_bg.free()
 
 func world_root() -> Node:
 	return _world_root
@@ -58,8 +64,9 @@ func modal_layer() -> CanvasLayer:
 
 # ---------------------------------------------------------------- переходы
 
-## Перейти на экран name с параметрами. fade — с затемнением.
-func go(name: String, params := {}, fade := true) -> void:
+## Перейти на экран name с параметрами. fade — затемнение в чёрный: только для входа в серию и выхода из неё.
+## Между экранами меню переход мгновенный — живой фон не перекрывается.
+func go(name: String, params := {}, fade := false) -> void:
 	if _busy:
 		return
 	_busy = true
@@ -125,6 +132,9 @@ func set_black(a: float) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_back()
+	elif what == NOTIFICATION_WM_CLOSE_REQUEST:
+		# выход: удаляем скачанное за сессию (если ОС даёт время)
+		Content.clear_cache()
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_ESCAPE:
@@ -183,3 +193,38 @@ func hide_no_internet() -> void:
 	if _no_net != null:
 		_no_net.close()
 		_no_net = null
+
+# ---------------------------------------------------------------- оверлей отладки
+
+var _dbg_layer: CanvasLayer
+var _dbg_label: Label
+var _dbg_t := 0.0
+
+## Скрытый оверлей (5 тапов по версии в настройках): FPS, draw calls, полигоны в кадре.
+func _build_debug_overlay() -> void:
+	_dbg_layer = CanvasLayer.new()
+	_dbg_layer.layer = 99
+	_dbg_label = Label.new()
+	_dbg_label.position = Vector2(8, 4)
+	_dbg_label.add_theme_font_size_override("font_size", 24)
+	_dbg_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.5))
+	_dbg_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_dbg_label.add_theme_constant_override("outline_size", 6)
+	_dbg_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dbg_layer.add_child(_dbg_label)
+	add_child(_dbg_layer)
+	_dbg_layer.visible = false
+
+func _process(delta: float) -> void:
+	var on := bool(Settings.get_value("debug_overlay", false))
+	_dbg_layer.visible = on
+	if not on:
+		return
+	_dbg_t += delta
+	if _dbg_t < 0.5:
+		return
+	_dbg_t = 0.0
+	_dbg_label.text = "FPS %d  ·  draw calls %d  ·  полигоны %d" % [
+		Performance.get_monitor(Performance.TIME_FPS),
+		Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+		Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)]

@@ -9,6 +9,7 @@ uniform vec3 sun_dir = vec3(0.45, 0.8, 0.35);
 uniform float sun_size = 0.07;
 uniform float stars = 0.0;
 uniform float cloud_amount = 0.45;
+uniform vec2 cloud_offset = vec2(0.0, 0.0);
 
 float hash2(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -43,7 +44,8 @@ void sky() {
 	}
 	// блочные облака на «потолке»
 	if (y > 0.03 && cloud_amount > 0.0) {
-		vec2 uv = dir.xz / y * 0.5 + vec2(TIME * 0.004, 0.0);
+		// без TIME: иначе radiance неба пересчитывалась бы каждый кадр (облака и так почти неподвижны)
+		vec2 uv = dir.xz / y * 0.5 + cloud_offset;
 		vec2 c = floor(uv * 5.0);
 		float n = hash2(c);
 		float n2 = hash2(floor(uv * 2.5) + 17.0);

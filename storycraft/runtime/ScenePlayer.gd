@@ -21,6 +21,8 @@ var _frame := -1
 var _sync_t := 0.0
 var _face_state := {}         # cid → текущий индекс
 var _done := false
+var _cuts := {}               # кадры k, где между k-1 и k склейка (из дорожки cuts)
+var _need_seek := false       # после паузы/перемотки — выровнять анимацию по часам
 
 func _init() -> void:
 	name = "ScenePlayer"
@@ -39,6 +41,11 @@ func start(ls: EpisodeLoader.LoadedScene, loop: bool, start_t := 0.0) -> void:
 	_done = false
 	_frame = -1
 	_face_state.clear()
+	_cuts.clear()
+	var cuts = ls.tracks.get("cuts", [])
+	if cuts is Array:
+		for c in cuts:
+			_cuts[int(c)] = true
 	t = clampf(start_t, 0.0, maxf(0.0, ls.duration))
 	if ls.root.get_parent() != self:
 		if ls.root.get_parent():
@@ -49,7 +56,9 @@ func start(ls: EpisodeLoader.LoadedScene, loop: bool, start_t := 0.0) -> void:
 		var anim_name := "main" if ls.ap.has_animation("main") else (ls.ap.get_animation_list()[0] if ls.ap.get_animation_list().size() > 0 else "")
 		if anim_name != "":
 			var anim := ls.ap.get_animation(anim_name)
-			anim.loop_mode = Animation.LOOP_LINEAR if loop else Animation.LOOP_NONE
+			# цикл крутим сами (seek в 0 на шве): LOOP_LINEAR интерполировал бы от последнего ключа
+			# к первому — камера «проезжала» бы между концом и началом цикла
+			anim.loop_mode = Animation.LOOP_NONE
 			ls.ap.play(anim_name)
 			ls.ap.seek(t, true)
 			_fix_hidden()
@@ -84,6 +93,8 @@ func stop() -> void:
 	scene = null
 
 func set_paused(v: bool) -> void:
+	if paused and not v:
+		_need_seek = true
 	paused = v
 	for k in _players:
 		_players[k].stream_paused = v
@@ -95,9 +106,11 @@ func _process(delta: float) -> void:
 		var prev := t
 		t += delta
 		var dur := maxf(scene.duration, 0.001)
+		var wrapped := false
 		if looped:
 			if t >= dur:
 				t = fmod(t, dur)
+				wrapped = true
 				# новый круг — звук тоже с начала
 				for k in _players:
 					var p: AudioStreamPlayer = _players[k]
@@ -106,8 +119,14 @@ func _process(delta: float) -> void:
 		elif t >= dur:
 			t = dur
 		if scene.ap:
-			scene.ap.advance(t - prev if t >= prev else t + (dur - prev))
-			if absf(scene.ap.current_animation_position - t) > 0.05:
+			# каждый кадр — advance; seek только при заметном расхождении (> 0.25 с) или после паузы.
+			# Частые seek на медленных кадрах давали дёрганье.
+			if wrapped:
+				scene.ap.seek(t, true)
+			else:
+				scene.ap.advance(t - prev)
+			if _need_seek or absf(scene.ap.current_animation_position - t) > 0.25:
+				_need_seek = false
 				scene.ap.seek(t, true)
 			_fix_hidden()
 		_sync_t += delta
@@ -161,7 +180,9 @@ func _apply_frame(force: bool) -> void:
 		var ft := t * scene.fps
 		var i0 := clampi(int(floor(ft)), 0, fa.size() - 1)
 		var i1 := mini(i0 + 1, fa.size() - 1)
-		scene.cam.fov = clampf(lerpf(float(fa[i0]), float(fa[i1]), clampf(ft - i0, 0.0, 1.0)), 1.0, 170.0)
+		# на склейке (i1 в cuts) FOV не лерпим — иначе он на мгновение «едет» между планами
+		var fov := float(fa[i0]) if _cuts.has(i1) else lerpf(float(fa[i0]), float(fa[i1]), clampf(ft - i0, 0.0, 1.0))
+		scene.cam.fov = clampf(fov, 1.0, 170.0)
 	if f == _frame and not force:
 		return
 	_frame = f

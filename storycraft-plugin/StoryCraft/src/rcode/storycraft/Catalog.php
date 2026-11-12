@@ -29,6 +29,12 @@ class Catalog {
 	public $json = "{}";
 	/** @var array каталог как массив */
 	public $data = [];
+	/** @var Packer */
+	private $packer;
+	/** @var array пакеты серий: "adv/ep" → ["path","size","index","data_offset"] */
+	public $packs = [];
+	/** @var array предупреждения про zip, чтобы не повторять каждые несколько секунд */
+	private $zipWarned = [];
 
 	public function __construct($root, $dataDir, $publicUrl, $log) {
 		$this->root = rtrim($root, "/\\");
@@ -36,6 +42,7 @@ class Catalog {
 		$this->shaFile = $dataDir . "/sha1_cache.json";
 		$this->publicUrl = rtrim((string) $publicUrl, "/");
 		$this->log = $log;
+		$this->packer = new Packer($dataDir . "/packs", $log);
 		if (!is_dir($this->root)) {
 			@mkdir($this->root, 0777, true);
 		}
@@ -67,6 +74,7 @@ class Catalog {
 	 */
 	public function scan($force = false) {
 		clearstatcache();
+		$this->importZips();
 		$sig = $this->computeSignature();
 		if (!$force && $sig === $this->signature && $this->data !== []) {
 			return false;
@@ -110,7 +118,7 @@ class Catalog {
 			return;
 		}
 		while (($e = readdir($h)) !== false) {
-			if ($e === "." || $e === "..") {
+			if ($e === "." || $e === ".." || strpos($e, ".import_") === 0) {
 				continue;
 			}
 			$p = $abs . "/" . $e;
@@ -200,6 +208,8 @@ class Catalog {
 
 	private function build() {
 		$advs = [];
+		$keepPacks = [];
+		$this->packs = [];
 		$known = [];
 		$dirs = @scandir($this->root);
 		if ($dirs === false) {
@@ -245,12 +255,21 @@ class Catalog {
 				}
 				$num = isset($e["number"]) ? (int) $e["number"] : (int) $epId;
 				$files = [];
+				$packFiles = [];
 				$size = 0;
 				foreach ($this->files($epDir) as $rel) {
 					$abs = $epDir . "/" . $rel;
 					$fs = (int) @filesize($abs);
 					$size += $fs;
-					$files[] = ["path" => "episodes/" . $epId . "/" . $rel, "size" => $fs, "sha1" => $this->sha1Of($abs)];
+					$sha = $this->sha1Of($abs);
+					$files[] = ["path" => "episodes/" . $epId . "/" . $rel, "size" => $fs, "sha1" => $sha];
+					$packFiles[] = ["rel" => $rel, "abs" => $abs, "size" => $fs, "sha1" => $sha];
+				}
+				// пакет серии (пересобирается только при изменении файлов)
+				$pack = $this->packer->ensure($advId, $epId, $packFiles);
+				if ($pack !== null) {
+					$this->packs[$advId . "/" . $epId] = $pack;
+					$keepPacks[$pack["path"]] = true;
 				}
 				$epCover = isset($e["cover"]) ? (string) $e["cover"] : "cover.png";
 				$adv["episodes"][] = [
@@ -263,6 +282,7 @@ class Catalog {
 					"cover" => is_file($epDir . "/" . $epCover) ? $this->url($advId, "episodes/" . $epId . "/" . $epCover) : "",
 					"size" => $size,
 					"sha1" => $this->sha1Of($epDir . "/episode.json"),
+					"pack_size" => $pack !== null ? $pack["size"] : 0,
 					"files" => $files,
 				];
 				$known[$epDir] = true;
@@ -281,6 +301,7 @@ class Catalog {
 			}
 			return $x["order"] < $y["order"] ? -1 : 1;
 		});
+		$this->packer->cleanup($keepPacks);
 		// чистим кэш sha1 от удалённых файлов
 		foreach (array_keys($this->sha) as $p) {
 			if (!is_file($p)) {
@@ -304,6 +325,104 @@ class Catalog {
 			}
 		}
 		return $lines;
+	}
+
+	/** Пакет серии или null. */
+	public function pack($advId, $epId) {
+		$k = $advId . "/" . $epId;
+		return isset($this->packs[$k]) ? $this->packs[$k] : null;
+	}
+
+	/**
+	 * Заливка серий архивом: adventures/*.zip (внутри — папка приключения) распаковываются
+	 * в adventures/ (папка с тем же именем заменяется), архив переименовывается в *.zip.done.
+	 */
+	public function importZips() {
+		$zips = glob($this->root . "/*.zip");
+		if (empty($zips)) {
+			return;
+		}
+		foreach ($zips as $zip) {
+			if (!class_exists("\\ZipArchive")) {
+				if (!isset($this->zipWarned[$zip])) {
+					$this->zipWarned[$zip] = true;
+					$this->log("[StoryCraft] Найден " . basename($zip) . ", но в PHP нет расширения zip (ZipArchive). Распакуй архив вручную в " . $this->root);
+				}
+				continue;
+			}
+			// архив ещё загружается? ждём, пока размер перестанет меняться
+			$age = time() - (int) @filemtime($zip);
+			if ($age < 3) {
+				continue;
+			}
+			$za = new \ZipArchive();
+			if ($za->open($zip) !== true) {
+				$key = $zip . "@" . @filemtime($zip);
+				if (!isset($this->zipWarned[$key])) {
+					$this->zipWarned[$key] = true;
+					$this->log("[StoryCraft] Не удалось открыть " . basename($zip) . " (архив повреждён или ещё загружается)");
+				}
+				continue;
+			}
+			// защита от путей с .. и абсолютных путей внутри архива
+			$ok = true;
+			for ($i = 0; $i < $za->numFiles; $i++) {
+				$n = str_replace("\\", "/", (string) $za->getNameIndex($i));
+				if ($n === "" || $n[0] === "/" || preg_match('#(^|/)\.\.(/|$)#', $n) || strpos($n, ":") !== false) {
+					$ok = false;
+					break;
+				}
+			}
+			if (!$ok) {
+				$za->close();
+				$this->log("[StoryCraft] В архиве " . basename($zip) . " недопустимые пути — пропускаю");
+				@rename($zip, $zip . ".bad");
+				continue;
+			}
+			$tmp = $this->root . "/.import_" . getmypid() . "_" . mt_rand(1000, 9999);
+			@mkdir($tmp, 0777, true);
+			$ex = $za->extractTo($tmp);
+			$za->close();
+			if (!$ex) {
+				self::rrmdir($tmp);
+				$this->log("[StoryCraft] Ошибка распаковки " . basename($zip));
+				continue;
+			}
+			$names = [];
+			foreach ((array) @scandir($tmp) as $e) {
+				if ($e === "." || $e === ".." || $e === "__MACOSX" || !is_dir($tmp . "/" . $e)) {
+					continue;
+				}
+				if (!preg_match('/^[A-Za-z0-9_\-]+$/', $e)) {
+					$this->log("[StoryCraft] Папка «" . $e . "» в архиве: недопустимое имя, пропуск");
+					continue;
+				}
+				self::rrmdir($this->root . "/" . $e);
+				@rename($tmp . "/" . $e, $this->root . "/" . $e);
+				$names[] = $e;
+			}
+			self::rrmdir($tmp);
+			@rename($zip, $zip . ".done");
+			$this->log("[StoryCraft] Распакован " . basename($zip) . ": " . (empty($names) ? "нет папок приключений" : implode(", ", $names)));
+		}
+	}
+
+	public static function rrmdir($d) {
+		if (!is_dir($d)) {
+			return;
+		}
+		foreach ((array) @scandir($d) as $e) {
+			if ($e === "." || $e === "..") {
+				continue;
+			}
+			$p = $d . "/" . $e;
+			if (is_dir($p) && !is_link($p)) {
+				self::rrmdir($p);
+			} else {
+				@unlink($p);
+			}
+		}
+		@rmdir($d);
 	}
 
 	/**

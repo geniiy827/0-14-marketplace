@@ -43,6 +43,25 @@ func _run(mode: String) -> void:
 			await wait(2.5); await shot("episodes")
 			Router.go("settings")
 			await wait(1.5); await shot("settings")
+		"fps":
+			# замер FPS: меню, приключения, серия (без ограничения частоты)
+			await wait(0.2)
+			Engine.max_fps = 0
+			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
+			Router.go("main_menu", {}, false)
+			await wait(2.0)
+			print("FPS menu ", await _measure(5.0))
+			Settings.set_value("shadows", false)
+			await wait(0.5)
+			print("FPS menu (без теней) ", await _measure(4.0))
+			Settings.set_value("shadows", true)
+			await Content.refresh()
+			Router.go("adventures")
+			await wait(2.0)
+			print("FPS adventures ", await _measure(5.0))
+			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, true)
+			await wait(4.0)
+			print("FPS episode ", await _measure(5.0))
 		"orbit":
 			Router.menu_bg = preload("res://screens/MenuBackground.gd").new()
 			Router.go("main_menu", {}, false)
@@ -56,9 +75,16 @@ func _run(mode: String) -> void:
 			await Content.refresh()
 			await Progress.register()
 			var e := Content.episode("last_men", "01_escape")
+			Content.reset_session()
+			var t0 := Time.get_ticks_msec()
 			var dl = Net.Download.new()
-			var err = await Content.download_episode("last_men", e, dl, func(d, t): pass)
-			print("DOWNLOAD err='", err, "' cached=", Content.is_cached("last_men", e))
+			var mode2 := OS.get_cmdline_user_args()[2] if OS.get_cmdline_user_args().size() > 2 else "pack"
+			var err
+			if mode2 == "files":
+				err = await Content._download_files("last_men", e, dl, func(d, t): pass)
+			else:
+				err = await Content.download_episode("last_men", e, dl, func(d, t): pass)
+			print("DOWNLOAD ", mode2, " err='", err, "' cached=", Content.is_cached("last_men", e), " time=", Time.get_ticks_msec() - t0, "ms size=", Content.human_size(Content.cache_size()))
 		"intro":
 			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, false)
 			for t in [1.0, 4.0, 6.0, 9.0]:
@@ -118,6 +144,45 @@ func _run(mode: String) -> void:
 			p.runner.run_actions([{"say": {"who": "zina", "text": "Привет!"}}, {"shake": 0.5}, {"hide": "pnl"}, {"unknown": 1}], p.runner.gen())
 			await wait(0.5)
 			await shot("overlay2")
+		"camcheck":
+			# камера по времени с шагом 1/120 с: скачки вне склеек = «чужой» план
+			var p = load("res://screens/Player.tscn").instantiate()
+			p.setup({"adventure": "last_men", "episode": "01_escape"})
+			p.set_meta("test_no_start", true)
+			Router._screen_layer.add_child(p)
+			await wait(0.3)
+			for sid in p.ep.data["scenes"]:
+				var tl := Time.get_ticks_msec()
+				var ls = await p.get_scene(sid)
+				print("LOAD ", sid, " ", Time.get_ticks_msec() - tl, " ms")
+				var loop := String(sid).ends_with("_loop")
+				p.sp.start(ls, loop, 0.0)
+				p.sp.set_paused(true)
+				var cuts: Array = ls.tracks.get("cuts", [])
+				var prev = null
+				var bad := []
+				var jumps := 0
+				var steps := int(ls.duration * 120.0)
+				for i in steps + 1:
+					var tt := minf(i / 120.0, ls.duration)
+					ls.ap.seek(tt, true)
+					var pos: Vector3 = ls.cam.global_position
+					if prev != null and pos.distance_to(prev) > 0.6:
+						jumps += 1
+						var fr := int(round(tt * ls.fps))
+						var cuts_i := cuts.map(func(x): return int(x))
+						if not (fr in cuts_i or (fr + 1) in cuts_i or (fr - 1) in cuts_i):
+							bad.append("%.3f" % tt)
+					prev = pos
+				var seam := ""
+				if loop:
+					# как проигрыватель: на шве — склейка (seek в 0), без интерполяции конец→начало
+					ls.ap.seek(ls.duration - 0.001, true)
+					var a: Vector3 = ls.cam.global_position
+					ls.ap.seek(0.0, true)
+					seam = " шов цикла: склейка %.2f м (без промежуточных кадров)" % a.distance_to(ls.cam.global_position)
+				print("CAM ", sid, " cuts=", cuts, " скачков всего: ", jumps, ", вне склеек: ", bad.size(), " ", bad.slice(0, 5), seam)
+				p.sp.stop()
 		"path":
 			# проходим серию по заданному пути: аргументы — действия
 			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, false)
@@ -126,6 +191,14 @@ func _run(mode: String) -> void:
 				await _step(st)
 			await wait(1.0)
 			await shot("path_end")
+
+func _measure(sec: float) -> String:
+	var frames := Engine.get_process_frames()
+	var t0 := Time.get_ticks_usec()
+	await wait(sec)
+	var dt := (Time.get_ticks_usec() - t0) / 1000000.0
+	var fps := (Engine.get_process_frames() - frames) / dt
+	return "%.1f fps, draw calls %d, primitives %d" % [fps, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)]
 
 func _player():
 	return Router.current

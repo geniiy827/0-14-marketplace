@@ -21,8 +21,6 @@ func build_frame(title: String) -> void:
 	UI.full(backdrop)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
-	mat.set_shader_parameter("amount", 0.0)
-	create_tween().tween_method(func(v): mat.set_shader_parameter("amount", v), 0.0, 1.0, 0.35)
 
 	frame = PanelContainer.new()
 	UI.full(frame)
@@ -49,12 +47,16 @@ func build_frame(title: String) -> void:
 	back_btn.position = Vector2(20 + sm.x, 16 + sm.y)
 	add_child(back_btn)
 
-	# появление панели
+	# появление панели: 0.12 с, масштаб 0.97→1 и прозрачность 0→1 (размытие фона включено сразу)
 	frame.modulate.a = 0.0
-	frame.position.y += 24
+	frame.scale = Vector2(0.97, 0.97)
+	_anim_frame.call_deferred()
+
+func _anim_frame() -> void:
+	frame.pivot_offset = frame.size * 0.5
 	var tw := create_tween().set_parallel(true)
-	tw.tween_property(frame, "modulate:a", 1.0, 0.25)
-	tw.tween_property(frame, "position:y", frame.position.y - 24, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(frame, "modulate:a", 1.0, 0.12)
+	tw.tween_property(frame, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 ## Переопределяется: куда ведёт «Назад».
 func on_back() -> void:

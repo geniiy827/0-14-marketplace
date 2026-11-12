@@ -35,6 +35,7 @@ class HttpThread extends \pocketmine\Thread {
 			$this->registerClassLoader();
 		}
 		// подстраховка: явно подключаем классы без зависимостей от ядра
+		require_once $this->srcDir . "/Packer.php";
 		require_once $this->srcDir . "/Catalog.php";
 		require_once $this->srcDir . "/Progress.php";
 		require_once $this->srcDir . "/HttpServer.php";

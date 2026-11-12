@@ -5,6 +5,7 @@
  * data_dir — папка как plugins/StoryCraft (внутри content/adventures, progress).
  */
 $src = __DIR__ . "/../StoryCraft/src/rcode/storycraft";
+require $src . "/Packer.php";
 require $src . "/Catalog.php";
 require $src . "/Progress.php";
 require $src . "/HttpServer.php";
