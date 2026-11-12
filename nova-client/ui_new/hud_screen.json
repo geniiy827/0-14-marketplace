@@ -215,14 +215,14 @@
 
   "hotbar_slot_image": {
     "type": "image",
-    "texture": "gui/newgui/dialog-background-atlas.png",
+    "texture": "gui/newgui/NormalButtonNoStroke.png",
     "size": [ 20, 22 ],
     "layer": 1,
-    "alpha": 1.0,
-    "uv": [ 0, 80 ],
-    "uv_size": [ 16, 16 ],
+    "alpha": 0.62,
+    "uv": [ 0, 0 ],
+    "uv_size": [ 10, 10 ],
     "nineslice_size": 4.0,
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "color": [ 0.16, 0.18, 0.28, 1.0 ]
   },
 
   "hotbar_slot_selected_image": {
@@ -233,7 +233,7 @@
     "uv": [ 0, 22 ],
     "offset": [ 0, -1 ],
     "uv_size": [ 24, 22 ],
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "bindings": [
       {
         "binding_name": "#slot_selected",
@@ -319,7 +319,7 @@
     "text": "#text",
     "shadow": true,
     "offset": [ 4, 0 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "color": [ 0.94, 0.96, 1.0, 1.0 ],
     "anims": [
       "@hud.anim_chat_txt_wait"
     ],
@@ -348,7 +348,7 @@
           "texture": "gui/newgui/newTouchScrollBox.png",
           "uv": [ 0, 0 ],
           "uv_size": [ 1, 1 ],
-          "color": [ 0.06, 0.06, 0.06, 1.0 ],
+          "color": [ 0.04, 0.05, 0.12, 1.0 ],
           "alpha": 0.6,
           "size": [ 240, 10 ],
           "anims": [
@@ -366,7 +366,7 @@
           "anchor_from": "left_middle",
           "anchor_to": "left_middle",
           "size": [ 2, 10 ],
-          "color": [ 1.0, 1.0, 0.63, 1.0 ],
+          "color": [ 0.4, 0.95, 0.88, 1.0 ],
           "anims": [
             "@hud.anim_chat_bar_wait"
           ]
@@ -594,7 +594,7 @@
           "type": "label",
           "layer": 101,
           "alignment": "bottom_middle",
-          "color": [ 0.93, 0.93, 0.93, 1.0 ],
+          "color": [ 0.55, 1.0, 0.93, 1.0 ],
           "text": "#text",
 					"shadow": true,
           "offset": "@hud.anim_item_name_text_rise",
@@ -634,7 +634,7 @@
           "alignment": "top_left",
           "offset": [ 3, 3 ],
           "shadow": true,
-          "color": [ 1.0, 1.0, 0.2 ],
+          "color": [ 0.4, 0.95, 0.88 ],
           "bindings": [
             {
               "binding_name": "#player_position_visible",

@@ -262,7 +262,7 @@ static int ct_ui_render(void *client, char *cc) {
         CTab *t = ct_page > 0 ? ct_tab(ct_page, k) : 0;
         if (ct_page > 0) snprintf(txt, sizeof txt, "%s", t ? t->name : "");
         else loc_into(ct_keys[k], txt, sizeof txt);
-        float col[4] = {1.f, 1.f, 0.63f, 1.f}, grey[4] = {0.8f, 0.8f, 0.8f, 1.f};
+        float col[4] = {0.4f, 0.95f, 0.88f, 1.f}, grey[4] = {0.75f, 0.78f, 0.85f, 1.f};
         if (font && txt[0]) draw_text_col(font, x, y, txt, col);
         if (font && ct_count) {                            /* page number at the right end of the row */
             char pg[16];

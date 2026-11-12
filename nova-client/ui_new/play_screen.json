@@ -12,49 +12,49 @@
 
   "dark_thin_button": {
     "type": "image",
-    "nineslice_size": 2.0,
-    "texture": "gui/nova/btn.png",
+    "nineslice_size": 4.0,
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
-    "alpha": 1.0
+    "uv_size": [ 12, 12 ],
+    "color": [ 0.47, 0.53, 0.68, 1.0 ],
+    "alpha": 0.95
   },
 
   "normal_stroke_button": {
     "type": "image",
-    "nineslice_size": 2.0,
-    "texture": "gui/nova/btn.png",
+    "nineslice_size": 4.0,
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
-    "alpha": 1.0
+    "uv_size": [ 12, 12 ],
+    "color": [ 0.36, 0.41, 0.54, 1.0 ],
+    "alpha": 0.94
   },
 
   "hover_thin_stroke_button": {
     "type": "image",
-    "nineslice_size": 2.0,
-    "texture": "gui/nova/btn_hover.png",
+    "nineslice_size": 4.0,
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "uv_size": [ 12, 12 ],
+    "color": [ 0.34, 0.8, 0.82, 1.0 ]
   },
 
   "hover_thin_button": {
     "type": "image",
-    "nineslice_size": 2.0,
-    "texture": "gui/nova/btn_hover.png",
+    "nineslice_size": 4.0,
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "uv_size": [ 12, 12 ],
+    "color": [ 0.34, 0.8, 0.82, 1.0 ]
   },
 
   "pressed_thin_stroke_button": {
     "type": "image",
-    "nineslice_size": 2.0,
-    "texture": "gui/nova/btn_pressed.png",
+    "nineslice_size": 4.0,
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "uv_size": [ 12, 12 ],
+    "color": [ 0.24, 0.62, 0.66, 1.0 ]
   },
 
   "indent": {
@@ -64,7 +64,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
     "layer": 3,
-    "color": [ 0.78, 0.78, 0.78, 1.0 ]
+    "color": [ 0.62, 0.72, 1.0, 1.0 ]
   },
 
   "tab_front": {
@@ -74,7 +74,7 @@
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 10 ],
-    "color": [ 0.44, 0.44, 0.44, 1.0 ]
+    "color": [ 0.36, 0.41, 0.54, 1.0 ]
   },
 
   "tab_front_left@tab_front": {
@@ -96,7 +96,7 @@
     "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 12, 10 ],
-    "color": [ 0.31, 0.31, 0.31, 1.0 ],
+    "color": [ 0.25, 0.29, 0.39, 1.0 ],
     "alpha": 0.9
   },
 
@@ -110,7 +110,7 @@
     "alignment": "top_right",
     "offset": [ -4, 5 ],
     "layer": 6,
-    "color": [ 1.0, 1.0, 1.0 ]
+    "color": [ 0.4, 0.95, 0.88 ]
   },
 
   //---------------------------------------------------------------------------
@@ -235,7 +235,7 @@
             {
               "@common.button_text": {
                 "text": "gui.back",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -247,7 +247,7 @@
             {
               "@common.button_text": {
                 "text": "gui.back",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -286,7 +286,7 @@
           "type": "image",
           "texture": "gui/newgui/WorldDemoScreen.png",
           "layer": 1,
-          "color": [ 0.96, 0.96, 0.96, 1.0 ],
+          "color": [ 0.82, 0.9, 1.0, 1.0 ],
           "uv": [ 0, 0 ],
           "uv_size": [ 160, 92 ],
           "size": [ "100%-2px", "100%-2px" ]
@@ -398,18 +398,18 @@
 
   "local_world_item_button_default_state@local_world_item_button_state": {
     "$bright_text_color": [ 1.0, 1.0, 1.0 ],
-    "$dark_text_color": [ 0.72, 0.72, 0.72 ],
+    "$dark_text_color": [ 0.62, 0.67, 0.78 ],
     "$button_sprite_control": "play.dark_thin_button",
     "$local_world_screenshot_border_image": "gui/newgui/focusBorder.png",
-    "$shot_border_color": [ 0.45, 0.45, 0.45, 1.0 ]
+    "$shot_border_color": [ 0.36, 0.42, 0.58, 1.0 ]
   },
 
   "local_world_item_button_hover_state@local_world_item_button_state": {
-    "$bright_text_color": [ 1.0, 1.0, 0.2 ],
-    "$dark_text_color": [ 0.8, 0.8, 0.16 ],
+    "$bright_text_color": [ 0.4, 0.95, 0.88 ],
+    "$dark_text_color": [ 0.32, 0.76, 0.7 ],
     "$button_sprite_control": "play.hover_thin_stroke_button",
     "$local_world_screenshot_border_image": "gui/newgui/focusBorder.png",
-    "$shot_border_color": [ 0.93, 0.93, 0.93, 1.0 ]
+    "$shot_border_color": [ 0.55, 1.0, 0.94, 1.0 ]
   },
 
   "local_world_item_button_pressed_state@local_world_item_button_hover_state": {
@@ -440,7 +440,7 @@
 
   "local_world_edit_button_hover_state@local_world_edit_button_state": {
     "$button_sprite_control": "play.hover_thin_stroke_button",
-    "$icon_color": [ 1.0, 1.0, 0.2 ]
+    "$icon_color": [ 0.4, 0.95, 0.88 ]
   },
 
   "local_world_edit_button_pressed_state@local_world_edit_button_hover_state": {
@@ -705,13 +705,13 @@
   "network_world_item_button_default_state@network_world_item_button_state": {
     "$button_sprite_control": "play.dark_thin_button",
     "$bright_text_color": [ 1.0, 1.0, 1.0 ],
-    "$dark_text_color": [ 0.72, 0.72, 0.72 ]
+    "$dark_text_color": [ 0.62, 0.67, 0.78 ]
   },
 
   "network_world_item_button_hover_state@network_world_item_button_state": {
     "$button_sprite_control": "play.hover_thin_stroke_button",
-    "$bright_text_color": [ 1.0, 1.0, 0.2 ],
-    "$dark_text_color": [ 0.8, 0.8, 0.16 ]
+    "$bright_text_color": [ 0.4, 0.95, 0.88 ],
+    "$dark_text_color": [ 0.32, 0.76, 0.7 ]
   },
 
   "network_world_item_button_pressed_state@network_world_item_button_hover_state": {
@@ -762,7 +762,7 @@
 
   "network_world_remove_button_hover_state@network_world_remove_button_state": {
     "$button_sprite_control": "play.hover_thin_stroke_button",
-    "$icon_color": [ 1.0, 1.0, 0.2 ]
+    "$icon_color": [ 0.4, 0.95, 0.88 ]
   },
 
   "network_world_remove_button_pressed_state@network_world_remove_button_hover_state": {
@@ -914,7 +914,7 @@
             {
               "@common.button_text": {
                 "text": "selectWorld.newWorld",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -926,7 +926,7 @@
             {
               "@common.button_text": {
                 "text": "selectWorld.newWorld",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -971,7 +971,7 @@
             {
               "@common.button_text": {
                 "text": "gui.importWorld",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -983,7 +983,7 @@
             {
               "@common.button_text": {
                 "text": "gui.importWorld",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -1079,7 +1079,7 @@
           "offset": [ 0, "-10%" ],
           "text": "selectWorld.realmsComingSoon",
           "alignment": "center",
-          "color": [ 1.0, 1.0, 0.0 ],
+          "color": [ 0.68, 0.52, 1.0 ],
           "shadow": true
         }
       }
@@ -1145,7 +1145,7 @@
             {
               "@common.button_text": {
                 "text": "externalServerScreen.addServer",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -1157,7 +1157,7 @@
             {
               "@common.button_text": {
                 "text": "externalServerScreen.addServer",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -1443,7 +1443,7 @@
       {
         "default@play.tab_text": {
           "text": "selectWorld.tab.realms",
-          "color": [ 0.99, 0.99, 0.99 ]
+          "color": [ 0.88, 0.92, 1.0 ]
         }
       }
     ]
@@ -1481,7 +1481,7 @@
             {
               "default@play.tab_text": {
                 "text": "selectWorld.tab.worlds",
-                "color": [ 0.99, 0.99, 0.99 ]
+                "color": [ 0.88, 0.92, 1.0 ]
               }
             }
           ]
@@ -1501,7 +1501,7 @@
             {
               "default@play.tab_text": {
                 "text": "selectWorld.tab.friends",
-                "color": [ 0.99, 0.99, 0.99 ]
+                "color": [ 0.88, 0.92, 1.0 ]
               }
             }
           ]
@@ -1551,7 +1551,7 @@
             {
               "default@play.tab_text": {
                 "text": "selectWorld.tab.worlds",
-                "color": [ 0.99, 0.99, 0.99 ]
+                "color": [ 0.88, 0.92, 1.0 ]
               }
             }
           ]

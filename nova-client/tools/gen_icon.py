@@ -28,7 +28,7 @@ def make():
     for i, c in enumerate(txt):
         g = font.crop(((ord(c) % 16) * cw, (ord(c) // 16) * cw, (ord(c) % 16 + 1) * cw, (ord(c) // 16 + 1) * cw))
         lab.alpha_composite(g.resize((gw, gw), Image.NEAREST), (i * gw - i * sc, 0))
-    col = Image.new('RGBA', lab.size, (255, 255, 160, 255)); col.putalpha(lab.split()[3])
+    col = Image.new('RGBA', lab.size, (130, 245, 230, 255)); col.putalpha(lab.split()[3])
     shd = Image.new('RGBA', lab.size, (20, 30, 40, 255)); shd.putalpha(lab.split()[3])
     x = (S - lab.width) // 2 + 8; yy = y0 + th + 6
     bg.alpha_composite(shd, (x + sc, yy + sc)); bg.alpha_composite(col, (x, yy))

@@ -171,13 +171,10 @@
     ]
   },
 
-  // text on the classic 1.1.5 buttons (tools/classic_gui.py): dark grey on the light grey button, white (states set
-  // it) on the lavender hover / pressed ones, no shadow, as 1.1.5 draws it
   "button_text": {
     "type": "label",
     "layer": 1,
-    "color": [ 0.3, 0.3, 0.3 ],
-    "shadow": false
+    "shadow": true
   },
 
   //---------------------------------------------------------------------------
@@ -191,26 +188,24 @@
   // Desktop-style button (was the 200x20 stone strip from gui.png)
   "button_state": {
     "type": "image",
-    "texture": "gui/nova/btn.png",
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "layer": 2,
-    "nineslice_size": 2.0,
+    "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
-    "alpha": 1.0
+    "uv_size": [ 12, 12 ],
+    "color": [ 0.47, 0.53, 0.68, 1.0 ],
+    "alpha": 0.92
   },
 
   "button_state_default@button_state": { },
 
   "button_state_hover@button_state": {
-    "texture": "gui/nova/btn_hover.png",
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "color": [ 0.34, 0.8, 0.82, 1.0 ],
     "alpha": 1.0
   },
 
   "button_state_pressed@button_state": {
-    "texture": "gui/nova/btn_pressed.png",
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "color": [ 0.24, 0.62, 0.66, 1.0 ],
     "alpha": 1.0
   },
 
@@ -219,12 +214,12 @@
     "layer": 2,
     "uv_size": [ 16, 13 ],
     "size": [ 16, 13 ],
-    "color": [ 0.81, 0.81, 0.81, 1.0 ]
+    "color": [ 0.7, 0.75, 0.9, 1.0 ]
   },
 
   "checkbox_checked_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_checked.png",
-    "color": [ 1.0, 1.0, 0.63, 1.0 ]
+    "color": [ 0.4, 0.95, 0.88, 1.0 ]
   },
 
   "checkbox_unchecked_state@toggle_state_template": {
@@ -233,41 +228,41 @@
 
   "checkbox_checked_hover_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_checked_hover.png",
-    "color": [ 0.93, 0.93, 0.93, 1.0 ]
+    "color": [ 0.55, 1.0, 0.94, 1.0 ]
   },
 
   "checkbox_unchecked_hover_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_unchecked_hover.png",
-    "color": [ 0.93, 0.93, 0.93, 1.0 ]
+    "color": [ 0.55, 1.0, 0.94, 1.0 ]
   },
 
   "checkbox_checked_locked_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_checked_disabled.png",
-    "color": [ 0.59, 0.59, 0.59, 1.0 ]
+    "color": [ 0.5, 0.55, 0.65, 1.0 ]
   },
 
   "checkbox_unchecked_locked_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_unchecked_disabled.png",
-    "color": [ 0.59, 0.59, 0.59, 1.0 ]
+    "color": [ 0.5, 0.55, 0.65, 1.0 ]
   },
 
   "radio_toggle_checked_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_filled.png",
-    "color": [ 1.0, 1.0, 0.0, 1.0 ]
+    "color": [ 0.68, 0.52, 1.0, 1.0 ]
   },
 
   "radio_toggle_unchecked_state@checkbox_unchecked_state": { },
 
   "radio_toggle_checked_hover_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_filled_hover.png",
-    "color": [ 0.79, 0.79, 0.79, 1.0 ]
+    "color": [ 0.78, 0.66, 1.0, 1.0 ]
   },
 
   "radio_toggle_unchecked_hover_state@checkbox_unchecked_hover_state": { },
 
   "radio_toggle_checked_locked_state@toggle_state_template": {
     "texture": "gui/newgui/buttons/checkbox/checkbox_filled_disabled.png",
-    "color": [ 0.59, 0.59, 0.59, 1.0 ]
+    "color": [ 0.5, 0.55, 0.65, 1.0 ]
   },
 
   "radio_toggle_unchecked_locked_state@checkbox_unchecked_locked_state": { },
@@ -279,10 +274,10 @@
     "texture": "gui/newgui/focusBorder.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
-    "color": [ 1.0, 1.0, 0.63, 1.0 ]
+    "color": [ 0.4, 0.95, 0.88, 1.0 ]
   },
   "focus_border_yellow@common.focus_border_white": {
-    "color": [ 1.0, 1.0, 0.0, 1.0 ]
+    "color": [ 0.68, 0.52, 1.0, 1.0 ]
   },
 
   // Dark inset fields (text boxes, lists)
@@ -292,7 +287,7 @@
     "texture": "gui/newgui/play_screen/Indent2.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
-    "color": [ 0.78, 0.78, 0.78, 1.0 ]
+    "color": [ 0.62, 0.72, 1.0, 1.0 ]
   },
 
   // Solid colour helper: 1x1 opaque white pixel, tinted with "color"
@@ -301,16 +296,16 @@
     "texture": "gui/newgui/newTouchScrollBox.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 1, 1 ],
-    "color": [ 0.06, 0.06, 0.06, 1.0 ]
+    "color": [ 0.04, 0.05, 0.09, 1.0 ]
   },
 
-  // Thin accent line that slowly breathes classic yellow <-> white
+  // Thin accent line that slowly breathes mint <-> violet
   "anim_accent_breath_a": {
     "anim_type": "color",
     "easing": "in_out_sine",
     "duration": 2.5,
-    "from": [ 1.0, 1.0, 0.63, 1.0 ],
-    "to": [ 1.0, 1.0, 1.0, 1.0 ],
+    "from": [ 0.4, 0.95, 0.88, 1.0 ],
+    "to": [ 0.68, 0.52, 1.0, 1.0 ],
     "next": "@common.anim_accent_breath_b"
   },
 
@@ -318,8 +313,8 @@
     "anim_type": "color",
     "easing": "in_out_sine",
     "duration": 2.5,
-    "from": [ 1.0, 1.0, 1.0, 1.0 ],
-    "to": [ 1.0, 1.0, 0.63, 1.0 ],
+    "from": [ 0.68, 0.52, 1.0, 1.0 ],
+    "to": [ 0.4, 0.95, 0.88, 1.0 ],
     "next": "@common.anim_accent_breath_a"
   },
 
@@ -353,7 +348,7 @@
     "text": "NOVA",
     "shadow": true,
     "layer": 50,
-    "color": [ 1.0, 1.0, 0.2 ],
+    "color": [ 0.4, 0.95, 0.88 ],
     "alpha": 0.55
   },
 
@@ -496,7 +491,7 @@
     "layer": 1,
     "uv": [ 0, 0 ],
     "uv_size": [ 1, 1 ],
-    "color": [ 0.14, 0.14, 0.14, 1.0 ],
+    "color": [ 0.1, 0.13, 0.22, 1.0 ],
     "controls": [
       {
         "top_band@common.solid_fill": {
@@ -504,7 +499,7 @@
           "anchor_from": "top_middle",
           "anchor_to": "top_middle",
           "layer": 1,
-          "color": [ 0.22, 0.22, 0.22, 1.0 ],
+          "color": [ 0.17, 0.2, 0.33, 1.0 ],
           "alpha": 0.6
         }
       },
@@ -669,7 +664,7 @@
 
   "gamepad_helper_x@gamepad_helper": {
     "$icon_text": "X",
-    "$icon_text_color": [ 0.12, 0.12, 0.12 ],
+    "$icon_text_color": [ 0.0, 0.0, 1.0 ],
     "$icon_description_bind": "#button_x_description",
     "$icon_image_ref": "icon@gamepad_icon_button"
   },
@@ -788,7 +783,7 @@
     "type": "image",
     "texture": "gui/newgui/dialog-background-atlas.png",
     "layer": 1,
-    "color": [ 0.53, 0.53, 0.53, 1.0 ]
+    "color": [ 0.44, 0.49, 0.62, 1.0 ]
   },
 
   "dialog_background_hollow_common@dialog_background_common": {
@@ -803,7 +798,7 @@
           "size": [ "100% - 8px", "100% - 8px" ],
           "uv": [ 14, 75 ],
           "uv_size": [ 2, 2 ],
-          "color": [ 0.56, 0.56, 0.56, 1.0 ],
+          "color": [ 0.47, 0.52, 0.66, 1.0 ],
           "alpha": "$fill_alpha"
         }
       }
@@ -842,22 +837,22 @@
 
   "normal_button": {
     "type": "image",
-    "texture": "gui/nova/btn.png",
+    "texture": "gui/newgui/NormalButtonNoStroke.png",
     "layer": 1,
-    "nineslice_size": 2.0,
+    "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "uv_size": [ 10, 10 ],
+    "color": [ 0.47, 0.53, 0.68, 1.0 ]
   },
 
   "normal_stroke_button": {
     "type": "image",
-    "texture": "gui/nova/btn.png",
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "layer": 1,
-    "nineslice_size": 2.0,
+    "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "uv_size": [ 12, 12 ],
+    "color": [ 0.44, 0.49, 0.62, 1.0 ]
   },
 
   "section_heading_label": {
@@ -868,7 +863,7 @@
     "anchor_to": "top_left",
     "alignment": "top_left",
     "shadow": true,
-    "color": [ 1.0, 1.0, 0.63, 1.0 ]
+    "color": [ 0.4, 0.95, 0.88, 1.0 ]
   },
 
   "close_button_image": {
@@ -918,7 +913,7 @@
       {
         "default@close_button_panel": {
           "$close_button_texture": "gui/newgui/X.png",
-          "$close_button_color": [ 0.95, 0.95, 0.95, 1.0 ]
+          "$close_button_color": [ 0.85, 0.88, 0.98, 1.0 ]
         }
       },
       {
@@ -944,7 +939,7 @@
     "nineslice_size": 1.0,
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
-    "color": [ 0.74, 0.74, 0.74, 1.0 ]
+    "color": [ 0.62, 0.69, 0.86, 1.0 ]
   },
 
   "cell_overlay": {
@@ -960,7 +955,7 @@
     "alpha": 0.45,
     "uv": [ 13, 196 ],
     "uv_size": [ 1, 1 ],
-    "color": [ 1.0, 1.0, 0.63, 1.0 ]
+    "color": [ 0.4, 0.95, 0.88, 1.0 ]
   },
 
   "highlight_slot_panel": {
@@ -999,7 +994,7 @@
     "uv_size": [ 24, 24 ],
     "anchor_from": "center",
     "anchor_to": "center",
-    "color": [ 1.0, 1.0, 0.63, 1.0 ]
+    "color": [ 0.4, 0.95, 0.88, 1.0 ]
   },
 
   "hover_text": {
@@ -1020,7 +1015,7 @@
     "alpha": 0.6,
     "uv": [ 0, 0 ],
     "uv_size": [ 1, 1 ],
-    "color": [ 0.08, 0.08, 0.08, 1.0 ],
+    "color": [ 0.05, 0.07, 0.14, 1.0 ],
     "controls": [
       { "close@common.screen_close_button": { } }
     ]
@@ -1028,11 +1023,11 @@
 
   "screen_close_state": {
     "type": "image",
-    "texture": "gui/nova/btn.png",
-    "nineslice_size": 2.0,
+    "texture": "gui/newgui/NormalButtonStroke.png",
+    "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "uv_size": [ 12, 12 ],
+    "color": "$close_bg",
     "controls": [
       {
         "x": {
@@ -1232,18 +1227,18 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 3, 3 ],
     "layer": 1,
-    "color": [ 0.49, 0.49, 0.49, 1.0 ]
+    "color": [ 0.4, 0.45, 0.6, 1.0 ]
   },
 
   // Scroll thumb: stone button -> mint pill
   "scrollbar_box_image": {
     "type": "image",
     "nineslice_size": 4.0,
-    "texture": "gui/newgui/dialog-background-atlas.png",
-    "uv": [ 0, 80 ],
-    "uv_size": [ 16, 16 ],
+    "texture": "gui/newgui/NormalButtonStroke.png",
+    "uv": [ 0, 0 ],
+    "uv_size": [ 12, 12 ],
     "layer": 4,
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "color": [ 0.36, 0.86, 0.8, 1.0 ]
   },
 
   "anim_scrollbar_box_fadeout": {
@@ -1266,7 +1261,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 1, 1 ],
     "layer": 3,
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "alpha": "@common.anim_scrollbar_box_fadeout"
   },
 
@@ -1278,7 +1273,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 1, 1 ],
     "layer": 3,
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "alpha": "@common.anim_scrollbar_box_fadeout"
   },
 
@@ -1289,7 +1284,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
     "layer": 3,
-    "color": [ 0.78, 0.78, 0.78, 1.0 ],
+    "color": [ 0.62, 0.72, 1.0, 1.0 ],
     "alpha": 0.9
   },
 
@@ -1669,7 +1664,7 @@
     "layer": 103,
     "shadow": true,
     "alignment": "bottom_right",
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "text": "#inventory_selected_item_stack_count",
     // was yellow; now theme mint
     "bindings": [

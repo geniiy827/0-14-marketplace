@@ -12,7 +12,7 @@
 
   "progress_title_text@progress.progress_screen_text": {
     "offset": [ 0, -15 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "color": [ 0.9, 0.95, 1.0, 1.0 ],
     "alpha": "@common.anim_fade_in",
     "text": "#title_text",
     "bindings": [
@@ -25,7 +25,7 @@
 
   "progress_bar_text@progress.progress_screen_text": {
     "offset": [ 0, 9 ],
-    "color": [ 0.72, 0.72, 0.72, 1.0 ],
+    "color": [ 0.62, 0.67, 0.78, 1.0 ],
     "text": "#progress_text",
     "bindings": [
       { "binding_name": "#progress_text" }
@@ -68,8 +68,8 @@
     "layer": 2,
     "offset": [ 0, 16 ],
     "size": [ 140, 3 ],
-    "primary_color": [ 1.0, 1.0, 0.63, 1.0 ],
-    "secondary_color": [ 0.2, 0.2, 0.2, 1.0 ],
+    "primary_color": [ 0.4, 0.95, 0.88, 1.0 ],
+    "secondary_color": [ 0.16, 0.18, 0.28, 1.0 ],
     "bindings": [
       {
         "binding_name_override": "#progress_bar_visible",
@@ -123,7 +123,7 @@
           "controls": [
             {
               "@progress.cancel_button_text": {
-                "color": [ 1.0, 1.0, 0.63, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88, 1.0 ]
               }
             }
           ]
@@ -134,7 +134,7 @@
           "controls": [
             {
               "@progress.cancel_button_text": {
-                "color": [ 1.0, 1.0, 0.63, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88, 1.0 ],
                 "alpha": 0.65
               }
             }
@@ -161,7 +161,7 @@
     "alignment": "center",
     "layer": 3,
     "shadow": true,
-    "color": [ 1.0, 1.0, 0.2 ],
+    "color": [ 0.4, 0.95, 0.88 ],
     "offset": "@progress.anim_brand_drop"
   },
 

@@ -11,7 +11,6 @@ static MRecipe rc_list[RC_MAX];
 static int rc_count;
 static void *(*rc_book)(void);
 static void *(*rc_furnace)(void);
-static void *(*rc_find)(void *book, void *ii);
 static void (*rc_add)(void *book, void *out, void *r0, void *r1, void *r2, void *vec);
 static void (*rc_add1)(void *book, void *out, void *r0, void *vec);
 static void (*rc_add2)(void *book, void *out, void *r0, void *r1, void *vec);
@@ -59,17 +58,39 @@ static void rc_apply(MRecipe *r) {
     u32 s0[1], s1[1], s2[1];
     gstr(s0, rows[0]); gstr(s1, rows[1]); gstr(s2, rows[2]);
     int before = rc_count_book(book);
+    if (crash_path[0] && sigsetjmp(nova_guard_jb, 1)) {   /* the game crashed inside: skip this recipe, keep playing */
+        LOGE("recipe: %d x%d:%d crashed the game's Recipes (pc rel 0x%x), skipped", r->out, r->n, r->aux, nova_guard_pc);
+        return;
+    }
+    nova_guard = crash_path[0] != 0;                       /* only once the crash handler is installed */
     if (nr == 1 && rc_add1) rc_add1(book, out, s0, vec);
     else if (nr == 2 && rc_add2) rc_add2(book, out, s0, s1, vec);
     else rc_add(book, out, s0, s1, s2, vec);
+    nova_guard = 0;
     f_strdtor(s0); f_strdtor(s1); f_strdtor(s2);
-    LOG("recipe: %d x%d:%d rows %d [%s|%s|%s] keys %d (%c %d:%d) book %d -> %d, found %d", r->out, r->n, r->aux, nr,
-        rows[0], rows[1], rows[2], r->nk, r->key[0], r->kid[0], r->kaux[0], before, rc_count_book(book),
-        rc_find ? rc_find(book, out) != 0 : -1);
+    LOG("recipe: %d x%d:%d rows %d [%s|%s|%s] keys %d (%c %d:%d) book %d -> %d", r->out, r->n, r->aux, nr,
+        rows[0], rows[1], rows[2], r->nk, r->key[0], r->kid[0], r->kaux[0], before, rc_count_book(book));
 }
 
 static void rc_apply_all(void) {
     for (int i = 0; i < rc_count; i++) rc_apply(&rc_list[i]);
+}
+
+/* Recipes are never added from inside a script call or a packet handler: rc_op and the CraftingDataPacket hook only
+ * mark them, and the client loop adds them on a later frame (mcmod_frame -> rc_frame), when the game is not walking
+ * its recipe book (world start, CraftingDataPacket refill, the crafting screen's list). alpha33 crashed while adding
+ * them from world.join; this keeps the game's own work and ours apart. */
+static volatile int rc_dirty;
+static long rc_dirty_at;
+static void rc_mark(void) { if (!rc_dirty) rc_dirty_at = now_ms(); rc_dirty = 1; }
+static void rc_frame(int in_world) {
+    if (!rc_dirty || !in_world) return;
+    if (now_ms() - rc_dirty_at < 400) return;             /* let the world start / the packet settle first */
+    rc_dirty = 0;
+    int before = rc_count_book(rc_book ? rc_book() : 0);
+    rc_apply_all();
+    LOG("recipes: mods' recipes added on the client loop (%d known), book %d -> %d", rc_count, before,
+        rc_count_book(rc_book ? rc_book() : 0));
 }
 
 /* OP_RECIPE: a = [out, count, aux], s = "row0|row1|row2|K:id:aux|..."; OP_SMELT: a = [from, fromAux, to, count, toAux] */
@@ -112,28 +133,28 @@ static int rc_op(int op, double *a, int n, char *s) {
     for (int i = 0; i < rc_count; i++) {
         MRecipe *o = &rc_list[i];
         if (o->kind == r->kind && o->out == r->out && o->aux == r->aux && o->n == r->n &&
-            !memcmp(o->rows, r->rows, sizeof r->rows) && o->nk == r->nk && !memcmp(o->kid, r->kid, sizeof r->kid)) {
-            rc_apply(o);
+            !memcmp(o->rows, r->rows, sizeof r->rows) && o->nk == r->nk && !memcmp(o->kid, r->kid, sizeof r->kid) &&
+            !memcmp(o->kaux, r->kaux, sizeof r->kaux) && !memcmp(o->key, r->key, sizeof r->key)) {
+            rc_mark();
             return 0;
         }
     }
     rc_count++;
-    rc_apply(r);
+    rc_mark();
     return 0;
 }
 
 static u64 hc_crafting_data(u32 orig, u32 *w) {   /* ClientNetworkHandler::handle(this, guid, CraftingDataPacket*) */
     u64 ret = nh_callw(orig, w);
     rc_gen++;                                            /* the book was cleared and refilled */
-    LOG("recipes: book refilled by the server (%d), mods' recipes back: %d", rc_count_book(rc_book ? rc_book() : 0), rc_count);
-    rc_apply_all();
+    LOG("recipes: book refilled by the server (%d), mods' recipes come back next: %d", rc_count_book(rc_book ? rc_book() : 0), rc_count);
+    rc_mark();
     return ret;
 }
 
 static void recipes_init(void *mc) {
     rc_book = dlsym(mc, "_ZN7Recipes11getInstanceEv");
     rc_furnace = dlsym(mc, "_ZN14FurnaceRecipes11getInstanceEv");
-    rc_find = dlsym(mc, "_ZN7Recipes12getRecipeForERK12ItemInstance");
     rc_add = dlsym(mc, "_ZN7Recipes15addShapedRecipeERK12ItemInstanceRKSsS4_S4_RKSt6vectorINS_4TypeESaIS6_EE");
     rc_list_of = dlsym(mc, "_ZN7Recipes10getRecipesEv");
     rc_add1 = dlsym(mc, "_ZN7Recipes15addShapedRecipeERK12ItemInstanceRKSsRKSt6vectorINS_4TypeESaIS6_EE");

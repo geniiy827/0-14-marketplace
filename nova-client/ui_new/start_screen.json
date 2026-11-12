@@ -24,7 +24,7 @@
     "alignment": "top_left",
     "layer": 2,
     "offset": [ 3, 0 ],
-    "color": [ 0.72, 0.72, 0.72 ],
+    "color": [ 0.62, 0.67, 0.78 ],
     "text": "menu.copyright"
   },
 
@@ -32,7 +32,7 @@
     "type": "label",
     "alignment": "top_middle",
     "layer": 2,
-    "color": [ 1.0, 1.0, 0.0 ],
+    "color": [ 0.68, 0.52, 1.0 ],
     "text": "#development_version",
     "bindings": [
       {
@@ -47,7 +47,7 @@
     "alignment": "top_right",
     "layer": 2,
     "offset": [ -3, 0 ],
-    "color": [ 1.0, 1.0, 0.2 ],
+    "color": [ 0.4, 0.95, 0.88 ],
     "text": "nova.version"
   },
 
@@ -62,7 +62,7 @@
         "bar_bg@common.solid_fill": {
           "size": [ "100%", "100%" ],
           "layer": 1,
-          "color": [ 0.08, 0.08, 0.08, 1.0 ],
+          "color": [ 0.05, 0.07, 0.14, 1.0 ],
           "alpha": 0.7
         }
       },
@@ -113,30 +113,30 @@
       {
         "badge_bg": {
           "type": "image",
-          "texture": "gui/newgui/newTouchScrollBox.png",
+          "texture": "gui/newgui/NormalButtonStroke.png",
+          "nineslice_size": 4.0,
           "uv": [ 0, 0 ],
-          "uv_size": [ 1, 1 ],
+          "uv_size": [ 12, 12 ],
           "size": [ 73, 15 ],
           "layer": 3,
           "anchor_from": "top_left",
           "anchor_to": "top_left",
-          "color": [ 0.0, 0.0, 0.0, 1.0 ],
-          "alpha": 0.5,
+          "color": [ 0.22, 0.26, 0.38, 1.0 ],
+          "alpha": 0.85,
           "offset": "@start.anim_badge_slide",
           "controls": [
             {
               "badge_dot": {
-                "nineslice_size": 4.0,
                 "type": "image",
-                "texture": "gui/newgui/dialog-background-atlas.png",
-                "uv": [ 0, 80 ],
-                "uv_size": [ 16, 16 ],
+                "texture": "gui/newgui/NormalButtonNoStroke.png",
+                "uv": [ 0, 0 ],
+                "uv_size": [ 10, 10 ],
                 "size": [ 6, 6 ],
                 "layer": 4,
                 "anchor_from": "left_middle",
                 "anchor_to": "left_middle",
                 "offset": [ 4, 0 ],
-                "color": [ 1.0, 1.0, 1.0, 1.0 ]
+                "color": "@common.anim_accent_breath_a"
               }
             },
             {
@@ -150,7 +150,7 @@
                 "anchor_to": "left_middle",
                 "alignment": "left_middle",
                 "offset": [ 13, 1 ],
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.9, 0.95, 1.0 ]
               }
             }
           ]
@@ -397,7 +397,7 @@
             {
               "@common.button_text": {
                 "text": "menu.skins",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -409,7 +409,7 @@
             {
               "@common.button_text": {
                 "text": "menu.skins",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -440,7 +440,7 @@
             {
               "@common.button_text": {
                 "text": "menu.options",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -452,7 +452,7 @@
             {
               "@common.button_text": {
                 "text": "menu.options",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -464,20 +464,17 @@
 
   // "Play" is the hero button: mint-filled instead of slate
   "play_state_default@common-classic.button_state_default": {
-    "texture": "gui/nova/btn.png",
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "color": [ 0.31, 0.72, 0.74, 1.0 ],
     "alpha": 1.0
   },
 
   "play_state_hover@common-classic.button_state_default": {
-    "texture": "gui/nova/btn_hover.png",
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "color": [ 0.36, 0.86, 0.8, 1.0 ],
     "alpha": 1.0
   },
 
   "play_state_pressed@common-classic.button_state_default": {
-    "texture": "gui/nova/btn_pressed.png",
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "color": [ 0.22, 0.55, 0.58, 1.0 ],
     "alpha": 1.0
   },
 
@@ -516,7 +513,7 @@
             {
               "@common.button_text": {
                 "text": "menu.play",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.8, 1.0, 0.96 ],
                 "alpha": 0.8
               }
             }
@@ -790,7 +787,7 @@
             {
               "@common.button_text": {
                 "text": "menu.achievements",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -802,7 +799,7 @@
             {
               "@common.button_text": {
                 "text": "menu.achievements",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -835,7 +832,7 @@
             {
               "@common.button_text": {
                 "text": "trial.pauseScreen.buyGame",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -847,7 +844,7 @@
             {
               "@common.button_text": {
                 "text": "trial.pauseScreen.buyGame",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -875,15 +872,16 @@
         // translucent glass card behind the menu buttons
         "menu_card": {
           "type": "image",
-          "texture": "gui/newgui/newTouchScrollBox.png",
+          "texture": "gui/newgui/NormalButtonNoStroke.png",
+          "nineslice_size": 4.0,
           "uv": [ 0, 0 ],
-          "uv_size": [ 1, 1 ],
+          "uv_size": [ 10, 10 ],
           "size": [ "100%+14px", "100%+14px" ],
           "anchor_from": "center",
           "anchor_to": "center",
           "layer": 0,
-          "color": [ 0.0, 0.0, 0.0, 1.0 ],
-          "alpha": 0.35
+          "color": [ 0.12, 0.14, 0.24, 1.0 ],
+          "alpha": 0.42
         }
       },
       {

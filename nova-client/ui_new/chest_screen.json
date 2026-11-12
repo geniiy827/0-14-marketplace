@@ -19,7 +19,7 @@
     "alignment": "top_left",
     "text": "container.chest",
     "shadow": true,
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "layer": 2
   },
 
@@ -163,7 +163,7 @@
                       "anchor_to": "top_left",
                       "offset": [ 156, 17 ],
                       "layer": 2,
-                      "color": [ 1.0, 1.0, 0.63, 1.0 ],
+                      "color": [ 0.4, 0.95, 0.88, 1.0 ],
                       "alpha": 0.35
                     }
                   },

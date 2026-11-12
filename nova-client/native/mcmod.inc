@@ -814,6 +814,7 @@ static void h_gui(void *bt, unsigned char *fb, void *tex, float bright, float al
 static char *mm_last_pl;
 static long mm_t0, mm_ticks;
 static void sc_frame(void);
+static void rc_frame(int in_world);
 static void mcmod_frame(void *client) {
     sc_frame();
     if (mm_ok) ev_frame();
@@ -832,6 +833,7 @@ static void mcmod_frame(void *client) {
     }
     if (!pl) return;
     mm_last_pl = pl;
+    rc_frame(1);                                       /* recipes of mods, outside of script calls (recipes.inc) */
     long due = (now_ms() - mm_t0) / 50;
     if (due - mm_ticks > 10) mm_ticks = due - 10;
     for (int k = 0; k < 3 && mm_ticks < due; k++, mm_ticks++) mm_fire(EV_TICK, 0, 0, 0);

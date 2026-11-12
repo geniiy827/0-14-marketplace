@@ -911,7 +911,7 @@ static void draw_toast(void *client) {
     float w = 170.f, h = 30.f;
     float x0 = (W - w) / 2.f, y0 = -h - 2.f + (h + 6.f) * k;
     void *sr = f_sr();
-    float border[4] = {0.62f, 0.62f, 0.62f, 0.95f}, bg[4] = {0.07f, 0.07f, 0.07f, 0.92f};
+    float border[4] = {0.55f, 0.6f, 0.75f, 0.95f}, bg[4] = {0.09f, 0.1f, 0.15f, 0.92f};
     f_fill(sr, x0 - 1, y0 - 1, x0 + w + 1, y0 + h + 1, border);
     f_fill(sr, x0, y0, x0 + w, y0 + h, bg);
     float yellow[4] = {1.f, 1.f, 0.4f, 1.f}, white[4] = {1, 1, 1, 1};
@@ -986,7 +986,7 @@ static void h_grp_render(void *g, void *client, int mx, int my) {
     float x0 = *(int *)(G + 8) + 3, y0 = *(int *)(G + 0xc);
     float x1 = *(int *)(G + 8) + *(int *)(G + 0x10) - 2, y1 = y0 + *(int *)(G + 0x14) - CARD_GAP;
     void *sr = f_sr();
-    float black[4] = {0, 0, 0, 1}, bg[4] = {0.22f, 0.22f, 0.22f, 0.88f}, hi[4] = {1, 1, 1, 0.16f},
+    float black[4] = {0, 0, 0, 1}, bg[4] = {0.22f, 0.22f, 0.25f, 0.88f}, hi[4] = {1, 1, 1, 0.16f},
           head[4] = {0.f, 0.f, 0.f, 0.22f}, line[4] = {0, 0, 0, 0.55f};
     f_fill(sr, x0 - 1, y0 - 1, x1 + 1, y1 + 1, black);          /* 1px black border */
     f_fill(sr, x0, y0, x1, y1, bg);
@@ -1012,7 +1012,7 @@ static void h_grp_render(void *g, void *client, int mx, int my) {
         tx = x0 + 42;
     }
     void *font = *(void **)((char *)client + 0x7c);
-    float white[4] = {1, 1, 1, 1}, grey[4] = {0.68f, 0.68f, 0.68f, 1};
+    float white[4] = {1, 1, 1, 1}, grey[4] = {0.68f, 0.68f, 0.72f, 1};
     if (c->sub[0]) {
         draw_text_col(font, tx, y0 + 9, c->title, white);
         draw_text_col(font, tx, y0 + 22, c->sub, grey);
@@ -1065,8 +1065,20 @@ static int hexw(char *p, u32 v) {
 }
 static int strw(char *p, const char *s) { int n = 0; while (s[n]) { p[n] = s[n]; n++; } return n; }
 
+/* a guarded call into the game (recipes.inc rc_apply): a crash inside it jumps back instead of killing the game */
+__attribute__((returns_twice)) int sigsetjmp(long *env, int savemask);
+void siglongjmp(long *env, int val);
+static long nova_guard_jb[128];
+static volatile int nova_guard;
+static volatile u32 nova_guard_pc;
 static void crash_handler(int sig, void *info, void *uc) {
-    if (crash_path[0]) {
+    if (nova_guard) {
+        u32 *mc = (u32 *)((char *)uc + 20);
+        nova_guard = 0;
+        nova_guard_pc = mc[18] - mcbase;
+        siglongjmp(nova_guard_jb, 1);
+    }
+    {
         char buf[1024];
         int n = 0;
         u32 *mc = (u32 *)((char *)uc + 20);           /* struct sigcontext */
@@ -1091,6 +1103,8 @@ static void crash_handler(int sig, void *info, void *uc) {
         buf[n++] = '\n';
         int fd = open(crash_path, 01 | 0100 | 01000, 0644);
         if (fd >= 0) { write(fd, buf, n); close(fd); }
+        buf[n] = 0;
+        LOGE("%s", buf);                    /* into the log too: the file was not always written */
     }
     struct ksigaction dfl = {0, 0, 0, 0};
     sigaction(sig, &dfl, 0);               /* default action on return -> real crash */

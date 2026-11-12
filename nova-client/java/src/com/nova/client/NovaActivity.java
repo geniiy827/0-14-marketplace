@@ -653,13 +653,8 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
 
     @Override
     public byte[] getFileDataBytes(String path) {
-        String np = norm(path);
-        // state of this client for libnova's 1.1.5 screens (native/nui_game.inc): read once a second
-        if (np != null && np.equals("nova/state.txt")) {
-            try { return ("signed=" + (signedIn() ? 1 : 0) + "\ntag=" + accountTag() + "\n").getBytes("UTF-8"); }
-            catch (Exception e) { return null; }
-        }
         byte[] b = fileData(path);
+        String np = norm(path);
         if (np != null && np.startsWith("ui/")) b = Social.serveUi(np, b);
         return b;
     }

@@ -15,12 +15,12 @@
 
   "normal_stroke_button": {
     "type": "image",
-    "nineslice_size": 2.0,
-    "texture": "gui/nova/btn.png",
+    "nineslice_size": 4.0,
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
+    "uv_size": [ 12, 12 ],
     "layer": 3,
-    "color": [ 1.0, 1.0, 1.0, 1.0 ]
+    "color": [ 0.36, 0.41, 0.54, 1.0 ]
   },
 
   "normal_thin_button": {
@@ -30,7 +30,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 8, 8 ],
     "layer": 3,
-    "color": [ 0.55, 0.55, 0.55, 1.0 ]
+    "color": [ 0.45, 0.5, 0.68, 1.0 ]
   },
 
   "hover_thin_stroke_button": {
@@ -40,7 +40,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 7, 7 ],
     "layer": 3,
-    "color": [ 0.93, 0.93, 0.93, 1.0 ]
+    "color": [ 0.55, 1.0, 1.0, 1.0 ]
   },
 
   "hover_thin_button": {
@@ -50,7 +50,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 8, 8 ],
     "layer": 3,
-    "color": [ 0.93, 0.93, 0.93, 1.0 ]
+    "color": [ 0.55, 1.0, 1.0, 1.0 ]
   },
 
   "indent": {
@@ -60,7 +60,7 @@
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
     "layer": 3,
-    "color": [ 0.78, 0.78, 0.78, 1.0 ]
+    "color": [ 0.62, 0.72, 1.0, 1.0 ]
   },
 
   //---------------------------------------------------------------------------
@@ -158,7 +158,7 @@
             {
               "back_button_text@common.button_text": {
                 "text": "controllerLayoutScreen.cancel",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -170,7 +170,7 @@
             {
               "back_button_text@common.button_text": {
                 "text": "controllerLayoutScreen.cancel",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -205,7 +205,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "controllerLayoutScreen.save",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -217,7 +217,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "controllerLayoutScreen.save",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -252,7 +252,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "controls.reset",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -264,7 +264,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "controls.reset",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -299,7 +299,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "gui.yes",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -311,7 +311,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "gui.yes",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -346,7 +346,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "gui.no",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -358,7 +358,7 @@
             {
               "accept_button_text@common.button_text": {
                 "text": "gui.no",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -415,7 +415,7 @@
       { "action_bg@hover_thin_stroke_button": { } },
       {
         "action_text@gamepad_action": {
-          "color": [ 1.0, 1.0, 0.2 ]
+          "color": [ 0.4, 0.95, 0.88 ]
         }
       }
     ]
@@ -430,7 +430,7 @@
       { "binding_bg@hover_thin_stroke_button": { } },
       {
         "binding_text@gamepad_binding": {
-          "color": [ 1.0, 1.0, 0.2 ]
+          "color": [ 0.4, 0.95, 0.88 ]
         }
       }
     ]

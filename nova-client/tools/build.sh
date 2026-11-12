@@ -9,11 +9,6 @@ python3 -I tools/make_manifest.py /home/claude/apk/x/AndroidManifest.xml Android
 python3 -I tools/gen_entities.py /home/claude/apk/x/assets assets_new
 python3 -I tools/nova_lang.py assets_new/loc
 python3 -I tools/gen_intro_mesh.py intro/title.bbmodel assets_new/nova/intro
-# the start screen title and the launcher icon follow the intro letters
-if [ intro/title.bbmodel -nt assets_new/images/gui/title.png ]; then
-  python3 tools/gen_title.py assets_new/nova/intro/title_mesh.bin assets_new/nova/intro/title_tex.png assets_new/images/gui/title.png
-  rm -f res_new/drawable/iconx.png
-fi
 [ -f assets_new/nova/intro/sfx/hit.ogg ] || python3 -I tools/gen_intro_sfx.py assets_new/nova/intro/sfx
 python3 -W ignore -I tools/gen_textures.py /home/claude/apk/x/assets /home/claude/jt/j/textures assets_new
 python3 -I tools/gen_mcmod.py

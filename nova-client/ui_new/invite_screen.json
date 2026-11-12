@@ -11,7 +11,7 @@
     "type": "label",
     "text": "$button_text",
     "layer": 1,
-    "color": [ 1.0, 1.0, 1.0 ]
+    "color": [ 0.9, 0.94, 1.0 ]
   },
 
   "bound_button_label@button_label": {
@@ -36,7 +36,7 @@
     "texture": "gui/newgui/buttons/borderless/base.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
-    "color": [ 0.44, 0.44, 0.44, 1.0 ],
+    "color": [ 0.36, 0.4, 0.54, 1.0 ],
     "controls": [
       { "@invite.$label_to_use": { } }
     ]
@@ -44,12 +44,12 @@
 
   "hover_borderless_button_layout@default_borderless_button_layout": {
     "texture": "gui/newgui/buttons/borderless/hover.png",
-    "color": [ 0.69, 0.69, 0.69, 1.0 ]
+    "color": [ 0.3, 0.78, 0.8, 1.0 ]
   },
 
   "pressed_borderless_button_layout@default_borderless_button_layout": {
     "texture": "gui/newgui/buttons/borderless/hoverpress.png",
-    "color": [ 0.49, 0.49, 0.49, 1.0 ],
+    "color": [ 0.2, 0.55, 0.6, 1.0 ],
     "controls": [
       { "@invite.$label_to_use": { "offset": [ 1, 1 ] } }
     ]
@@ -401,7 +401,7 @@
           "anchor_from": "top_middle",
           "anchor_to": "top_middle",
           "layer": 2,
-          "color": [ 1.0, 1.0, 1.0 ]
+          "color": [ 0.9, 0.94, 1.0 ]
         }
       },
       {

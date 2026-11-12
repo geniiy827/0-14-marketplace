@@ -27,13 +27,12 @@
   },
 
   "button_image": {
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "type": "image",
-    "texture": "gui/nova/btn.png",
+    "texture": "gui/newgui/NormalButtonStroke.png",
     "layer": 2,
-    "nineslice_size": 2.0,
+    "nineslice_size": 4.0,
     "uv": [ 0, 0 ],
-    "uv_size": [ 6, 6 ],
+    "uv_size": [ 12, 12 ],
     "controls": [
       {
         "@button_text": {
@@ -288,12 +287,12 @@
     "anchor_from": "top_left",
     "anchor_to": "center",
     "size": [ 10, 10 ],
-    "texture": "gui/newgui/dialog-background-atlas.png",
+    "texture": "gui/newgui/NormalButtonNoStroke.png",
     "layer": 2,
     "nineslice_size": 4.0,
-    "uv": [ 0, 80 ],
-    "uv_size": [ 16, 16 ],
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
+    "uv": [ 0, 0 ],
+    "uv_size": [ 10, 10 ],
+    "color": "@anim_color_cycle",
     "offset": "@anim_move_along_top",
     "controls": [
       {
@@ -312,15 +311,14 @@
   },
 
   "anchored_panel": {
-    "color": [ 1.0, 1.0, 1.0, 1.0 ],
     "type": "image",
     "anchor_from": "top_left",
     "anchor_to": "top_left",
-    "texture": "gui/newgui/dialog-background-atlas.png",
+    "texture": "gui/newgui/NormalButtonNoStroke.png",
     "layer": 2,
     "nineslice_size": 4.0,
-    "uv": [ 0, 80 ],
-    "uv_size": [ 16, 16 ]
+    "uv": [ 0, 0 ],
+    "uv_size": [ 10, 10 ]
   },
 
   "panel_1@anchored_panel": {

@@ -19,7 +19,7 @@
           "texture": "gui/newgui/TopBar.png",
           "uv": [ 0, 0 ],
           "uv_size": [ 5, 8 ],
-          "color": [ 0.69, 0.69, 0.69, 1.0 ]
+          "color": [ 0.55, 0.62, 0.95, 1.0 ]
         }
       },
       {
@@ -38,7 +38,7 @@
           "text": "options.language",
           "anchor_from": "center",
           "anchor_to": "center",
-          "color": [ 1.0, 1.0, 0.2 ],
+          "color": [ 0.4, 0.95, 0.88 ],
           "alpha": "@common.anim_fade_in",
           "shadow": true
         }
@@ -53,7 +53,7 @@
     "texture": "gui/newgui/play_screen/NormalButtonThinNewBevel.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 8, 8 ],
-    "color": [ 0.55, 0.55, 0.55, 1.0 ]
+    "color": [ 0.45, 0.5, 0.68, 1.0 ]
   },
 
   "back_button@common-classic.button": {
@@ -91,7 +91,7 @@
             {
               "@common.button_text": {
                 "text": "gui.back",
-                "color": [ 1.0, 1.0, 1.0 ]
+                "color": [ 0.4, 0.95, 0.88 ]
               }
             }
           ]
@@ -103,7 +103,7 @@
             {
               "@common.button_text": {
                 "text": "gui.back",
-                "color": [ 1.0, 1.0, 1.0 ],
+                "color": [ 0.4, 0.95, 0.88 ],
                 "alpha": 0.65
               }
             }
@@ -146,7 +146,7 @@
     "texture": "gui/newgui/focusBorder.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
-    "color": [ 1.0, 1.0, 0.0, 1.0 ],
+    "color": [ 0.68, 0.52, 1.0, 1.0 ],
     "bindings": [
       {
         "binding_name": "#choice_indicator_rectangle_visibility",
@@ -163,7 +163,7 @@
     "texture": "gui/newgui/play_screen/Indent2.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
-    "color": [ 0.78, 0.78, 0.78, 1.0 ]
+    "color": [ 0.62, 0.72, 1.0, 1.0 ]
   },
 
   "background_overay": {
@@ -171,7 +171,7 @@
     "texture": "gui/newgui/newTouchScrollBox.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 1, 1 ],
-    "color": [ 0.09, 0.09, 0.09, 1.0 ],
+    "color": [ 0.06, 0.08, 0.16, 1.0 ],
     "alpha": 0.72
   },
 
@@ -196,7 +196,7 @@
   },
 
   "language_label_yellow@language_label": {
-    "color": [ 1.0, 1.0, 0.2 ]
+    "color": [ 0.4, 0.95, 0.88 ]
   },
 
   "language_grid_item": {

@@ -99,12 +99,12 @@
   // Creative tabs: active tab matches the slate window, inactive is darker
   "tab_front@crafting.tab_image": {
     "texture": "gui/newgui/TabFrontInGame.png",
-    "color": [ 0.53, 0.53, 0.53, 1.0 ]
+    "color": [ 0.44, 0.49, 0.62, 1.0 ]
   },
 
   "tab_back@crafting.tab_image": {
     "texture": "gui/newgui/TabBackInGame.png",
-    "color": [ 0.37, 0.37, 0.37, 1.0 ]
+    "color": [ 0.3, 0.34, 0.45, 1.0 ]
   },
 
   "item_renderer": {
@@ -588,7 +588,7 @@
     "size": [ 14, 14 ],
     "uv": [ 0, 0 ],
     "uv_size": [ 16, 16 ],
-    "color": [ 0.76, 0.76, 0.76, 1.0 ],
+    "color": [ 0.62, 0.7, 0.95, 1.0 ],
     "alpha": 0.7,
     "bindings": [
       {
@@ -629,7 +629,7 @@
           "size": [ 48, 64 ],
           "uv": [ 0, 0 ],
           "uv_size": [ 1, 1 ],
-          "color": [ 0.18, 0.18, 0.18, 1.0 ],
+          "color": [ 0.14, 0.16, 0.26, 1.0 ],
           "layer": 2,
           "anchor_from": "top_left",
           "anchor_to": "top_left",
@@ -704,7 +704,7 @@
     "alignment": "top_left",
     "text": "container.crafting",
     "shadow": true,
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "layer": 2
   },
 
@@ -712,7 +712,7 @@
     "type": "image",
     "layer": 3,
     "texture": "gui/newgui/arrow.png",
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "anchor_from": "top_left",
     "anchor_to": "top_left",
     "size": [ 14, 12 ],
@@ -724,7 +724,7 @@
     "type": "image",
     "layer": 3,
     "texture": "gui/newgui/arrow_large.png",
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "anchor_from": "top_left",
     "anchor_to": "top_left",
     "size": [ 20, 13 ],
@@ -1015,7 +1015,7 @@
     "texture": "gui/newgui/ScrollBox.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 3, 3 ],
-    "color": [ 1.0, 1.0, 0.63, 1.0 ]
+    "color": [ 0.4, 0.95, 0.88, 1.0 ]
   },
 
   "scroll_bar_side_rails": {
@@ -1027,7 +1027,7 @@
     "texture": "gui/newgui/ScrollGutter.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 3, 3 ],
-    "color": [ 0.74, 0.74, 0.74, 1.0 ]
+    "color": [ 0.62, 0.69, 0.86, 1.0 ]
   },
 
   "scroll_bar_top_bottom": {
@@ -1131,7 +1131,7 @@
           "texture": "gui/newgui/Indent.png",
           "uv": [ 0, 0 ],
           "uv_size": [ 5, 5 ],
-          "color": [ 0.37, 0.37, 0.37, 1.0 ]
+          "color": [ 0.3, 0.34, 0.46, 1.0 ]
         }
       },
       {
@@ -1146,10 +1146,10 @@
                 "layer": 1,
                 "size": [ "100%-2px", "100%-2px" ],
                 "nineslice_size": 4.0,
-                "texture": "gui/newgui/dialog-background-atlas.png",
-                "uv": [ 0, 80 ],
-                "uv_size": [ 16, 16 ],
-                "color": [ 1.0, 1.0, 1.0, 1.0 ]
+                "texture": "gui/newgui/NormalButtonStroke.png",
+                "uv": [ 0, 0 ],
+                "uv_size": [ 12, 12 ],
+                "color": [ 0.4, 0.95, 0.88, 1.0 ]
               }
             }
           ]
@@ -1169,7 +1169,7 @@
     "texture": "gui/newgui/Indent.png",
     "uv": [ 0, 0 ],
     "uv_size": [ 5, 5 ],
-    "color": [ 0.63, 0.63, 0.63, 1.0 ]
+    "color": [ 0.52, 0.58, 0.74, 1.0 ]
   },
 
   "touch_creative_panel": {
@@ -1294,7 +1294,7 @@
     "alignment": "top_left",
     "text": "$label_text",
     "shadow": true,
-    "color": [ 1.0, 1.0, 0.63, 1.0 ],
+    "color": [ 0.4, 0.95, 0.88, 1.0 ],
     "layer": 101
   },
 
