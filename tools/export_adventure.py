@@ -46,6 +46,9 @@ def main(src, out_root="/tmp/storycraft_out"):
             im.resize((640, 360), Image.LANCZOS).save(os.path.join(ep_dir, "cover.png"))
             if i == 0:
                 im.resize((1280, 720), Image.LANCZOS).save(os.path.join(root, "cover.png"))
+        extra = os.path.join(sdir, "files")          # extra episode files (ui images for drag etc.)
+        if os.path.isdir(extra):
+            shutil.copytree(extra, ep_dir, dirs_exist_ok=True)
         em = json.load(open(os.path.join(ep_dir, "episode.json"), encoding="utf-8"))
         em["cover"] = "cover.png"
         json.dump(em, open(os.path.join(ep_dir, "episode.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)

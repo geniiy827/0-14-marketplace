@@ -1,0 +1,838 @@
+{
+ "id": "03_keeper",
+ "number": 3,
+ "title": "Смотритель",
+ "description": "Маяк горит, но сервер не отпускает. Внутри — комната смотрителя, которого никто больше не видел.",
+ "start": "arrive",
+ "variables": {
+  "retry": "",
+  "has_dust": false,
+  "has_lens": false,
+  "has_torch": false,
+  "l1": 0,
+  "l2": 0,
+  "l3": 0,
+  "lever_fails": 0
+ },
+ "nodes": {
+  "arrive": {
+   "type": "scene",
+   "scene": "arrive",
+   "next": "inside"
+  },
+  "inside": {
+   "type": "scene",
+   "scene": "inside",
+   "next": "search",
+   "on_enter": [
+    {
+     "checkpoint": true
+    },
+    {
+     "set": {
+      "has_dust": false,
+      "has_lens": false,
+      "has_torch": false
+     }
+    }
+   ]
+  },
+  "search": {
+   "type": "interact",
+   "background": "search_loop",
+   "hint": "Обыщи маяк: найди 3 детали для механизма",
+   "hotspots": [
+    {
+     "id": "crate",
+     "pos": [
+      -1.5,
+      0.6,
+      -2.9
+     ],
+     "radius": 70,
+     "label": "Ящик",
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "random_chestopen"
+      },
+      {
+       "set": {
+        "has_dust": true
+       }
+      },
+      {
+       "say": {
+        "who": "toha",
+        "text": "Редстоун-пыль! Целая горсть.",
+        "time": 1.8
+       }
+      }
+     ]
+    },
+    {
+     "id": "shelf",
+     "pos": [
+      -2.0,
+      1.5,
+      -8.5
+     ],
+     "radius": 80,
+     "label": "Полки",
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "set": {
+        "has_lens": true
+       }
+      },
+      {
+       "say": {
+        "who": "lina",
+        "text": "За книгами линза. И записка Митяя.",
+        "time": 1.8
+       }
+      },
+      {
+       "goto": "note"
+      }
+     ]
+    },
+    {
+     "id": "kira",
+     "pos": [
+      0.6,
+      1.5,
+      -7.8
+     ],
+     "radius": 60,
+     "label": "Кира",
+     "once": true,
+     "on_tap": [
+      {
+       "sfx": "ui_click"
+      },
+      {
+       "set": {
+        "has_torch": true
+       }
+      },
+      {
+       "say": {
+        "who": "kira",
+        "text": "Держи факел. Я три дня с ним не расстаюсь.",
+        "time": 2.0
+       }
+      }
+     ]
+    },
+    {
+     "id": "bed",
+     "pos": [
+      3.5,
+      0.6,
+      -7.0
+     ],
+     "radius": 70,
+     "label": "Кровать",
+     "on_tap": [
+      {
+       "say": {
+        "who": "grom",
+        "text": "Я только прилягу. На минутку...",
+        "time": 1.6
+       }
+      },
+      {
+       "wait": 1.2
+      },
+      {
+       "set": {
+        "retry": "bed"
+       }
+      },
+      {
+       "goto": "bed_lose"
+      }
+     ]
+    },
+    {
+     "id": "pedestal",
+     "pos": [
+      0.5,
+      1.0,
+      -5.5
+     ],
+     "radius": 70,
+     "label": "Постамент",
+     "on_tap": [
+      {
+       "if": "has_dust and has_lens and has_torch",
+       "then": [
+        {
+         "goto": "mech"
+        }
+       ],
+       "else": [
+        {
+         "say": {
+          "who": "toha",
+          "text": "Не хватает деталей. Нужны линза, пыль и огонь.",
+          "time": 1.8
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "note": {
+   "type": "overlay",
+   "background": "search_loop",
+   "dim": 0.45,
+   "widgets": [
+    {
+     "id": "p",
+     "kind": "panel",
+     "rect": [
+      0.28,
+      0.12,
+      0.44,
+      0.6
+     ],
+     "anim": "pop"
+    },
+    {
+     "id": "h",
+     "kind": "text",
+     "text": "Записка смотрителя",
+     "rect": [
+      0.3,
+      0.16,
+      0.4,
+      0.08
+     ],
+     "size": 26,
+     "color": "#3b2a12"
+    },
+    {
+     "id": "b",
+     "kind": "text",
+     "text": "Если придёт — прячься под лестницей.\nОн никогда не смотрит вниз.\nИ не ложись на кровать.\n               — Д. Митяй",
+     "rect": [
+      0.3,
+      0.27,
+      0.4,
+      0.36
+     ],
+     "size": 22,
+     "color": "#3b2a12",
+     "align": "left"
+    },
+    {
+     "id": "ok",
+     "kind": "button",
+     "text": "Дальше",
+     "rect": [
+      0.42,
+      0.76,
+      0.16,
+      0.09
+     ],
+     "on_tap": [
+      {
+       "goto": "search"
+      }
+     ]
+    }
+   ]
+  },
+  "bed_lose": {
+   "type": "scene",
+   "scene": "bed_lose",
+   "next": "lose",
+   "on_enter": [
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    }
+   ]
+  },
+  "mech": {
+   "type": "minigame",
+   "background": "mech_loop",
+   "kind": "drag",
+   "params": {
+    "title": "Собери механизм маяка",
+    "items": [
+     {
+      "id": "lens",
+      "image": "ui/lens.png"
+     },
+     {
+      "id": "dust",
+      "image": "ui/dust.png"
+     },
+     {
+      "id": "torch",
+      "image": "ui/torch.png"
+     }
+    ],
+    "targets": [
+     {
+      "id": "t_dust",
+      "rect": [
+       0.2,
+       0.3,
+       0.12,
+       0.2
+      ],
+      "image": "ui/slot_dust.png"
+     },
+     {
+      "id": "t_lens",
+      "rect": [
+       0.44,
+       0.18,
+       0.12,
+       0.2
+      ],
+      "image": "ui/slot_lens.png"
+     },
+     {
+      "id": "t_torch",
+      "rect": [
+       0.68,
+       0.3,
+       0.12,
+       0.2
+      ],
+      "image": "ui/slot_torch.png"
+     }
+    ],
+    "pairs": {
+     "lens": "t_lens",
+     "dust": "t_dust",
+     "torch": "t_torch"
+    }
+   },
+   "success": [
+    {
+     "goto": "lens_done"
+    }
+   ],
+   "fail": [
+    {
+     "goto": "mech"
+    }
+   ]
+  },
+  "lens_done": {
+   "type": "scene",
+   "scene": "lens_done",
+   "next": "levers",
+   "on_exit": [
+    {
+     "set": {
+      "l1": 0,
+      "l2": 0,
+      "l3": 0,
+      "lever_fails": 0
+     }
+    }
+   ]
+  },
+  "levers": {
+   "type": "overlay",
+   "background": "levers_loop",
+   "dim": 0.3,
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ],
+   "widgets": [
+    {
+     "id": "h",
+     "kind": "text",
+     "text": "«Края — к свету. Середина — во тьму»",
+     "rect": [
+      0.2,
+      0.1,
+      0.6,
+      0.08
+     ],
+     "size": 26,
+     "color": "#ffe08a"
+    },
+    {
+     "id": "n1",
+     "kind": "text",
+     "text": "Рычаг 1",
+     "rect": [
+      0.2,
+      0.3,
+      0.18,
+      0.06
+     ],
+     "size": 22,
+     "color": "#ffffff"
+    },
+    {
+     "id": "n2",
+     "kind": "text",
+     "text": "Рычаг 2",
+     "rect": [
+      0.41,
+      0.3,
+      0.18,
+      0.06
+     ],
+     "size": 22,
+     "color": "#ffffff"
+    },
+    {
+     "id": "n3",
+     "kind": "text",
+     "text": "Рычаг 3",
+     "rect": [
+      0.62,
+      0.3,
+      0.18,
+      0.06
+     ],
+     "size": 22,
+     "color": "#ffffff"
+    },
+    {
+     "id": "b1",
+     "kind": "button",
+     "text": "{'ВВЕРХ' if l1 == 1 else 'ВНИЗ'}",
+     "rect": [
+      0.2,
+      0.38,
+      0.18,
+      0.12
+     ],
+     "on_tap": [
+      {
+       "if": "l1 == 1",
+       "then": [
+        {
+         "set": {
+          "l1": 0
+         }
+        }
+       ],
+       "else": [
+        {
+         "set": {
+          "l1": 1
+         }
+        }
+       ]
+      },
+      {
+       "sfx": "random_click"
+      }
+     ]
+    },
+    {
+     "id": "b2",
+     "kind": "button",
+     "text": "{'ВВЕРХ' if l2 == 1 else 'ВНИЗ'}",
+     "rect": [
+      0.41,
+      0.38,
+      0.18,
+      0.12
+     ],
+     "on_tap": [
+      {
+       "if": "l2 == 1",
+       "then": [
+        {
+         "set": {
+          "l2": 0
+         }
+        }
+       ],
+       "else": [
+        {
+         "set": {
+          "l2": 1
+         }
+        }
+       ]
+      },
+      {
+       "sfx": "random_click"
+      }
+     ]
+    },
+    {
+     "id": "b3",
+     "kind": "button",
+     "text": "{'ВВЕРХ' if l3 == 1 else 'ВНИЗ'}",
+     "rect": [
+      0.62,
+      0.38,
+      0.18,
+      0.12
+     ],
+     "on_tap": [
+      {
+       "if": "l3 == 1",
+       "then": [
+        {
+         "set": {
+          "l3": 0
+         }
+        }
+       ],
+       "else": [
+        {
+         "set": {
+          "l3": 1
+         }
+        }
+       ]
+      },
+      {
+       "sfx": "random_click"
+      }
+     ]
+    },
+    {
+     "id": "go",
+     "kind": "button",
+     "text": "Подать ток",
+     "rect": [
+      0.38,
+      0.62,
+      0.24,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "if": "l1 == 1 and l2 == 0 and l3 == 1",
+       "then": [
+        {
+         "sfx": "random_levelup"
+        },
+        {
+         "flash": "#ffe08a"
+        },
+        {
+         "goto": "steps"
+        }
+       ],
+       "else": [
+        {
+         "add": {
+          "lever_fails": 1
+         }
+        },
+        {
+         "sfx": "random_fizz"
+        },
+        {
+         "shake": 0.3
+        },
+        {
+         "vibrate": 80
+        },
+        {
+         "if": "lever_fails >= 2",
+         "then": [
+          {
+           "say": {
+            "who": "kira",
+            "text": "Искры! Он увидел вспышку!",
+            "time": 1.4
+           }
+          },
+          {
+           "wait": 1.0
+          },
+          {
+           "set": {
+            "retry": "levers"
+           }
+          },
+          {
+           "goto": "caught"
+          }
+         ],
+         "else": [
+          {
+           "say": {
+            "who": "toha",
+            "text": "Замкнуло. Края — к свету, значит ВВЕРХ...",
+            "time": 2.0
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "steps": {
+   "type": "scene",
+   "scene": "steps",
+   "next": "hide",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "hide": {
+   "type": "interact",
+   "background": "hide_loop",
+   "hint": "Спрячься! Куда?",
+   "timeout": 5,
+   "timer_visible": true,
+   "hotspots": [
+    {
+     "id": "stairs",
+     "pos": [
+      -2.4,
+      0.8,
+      -4.2
+     ],
+     "radius": 80,
+     "label": "Под лестницу",
+     "on_tap": [
+      {
+       "goto": "hidden_ok"
+      }
+     ]
+    },
+    {
+     "id": "bed",
+     "pos": [
+      3.4,
+      0.5,
+      -7.6
+     ],
+     "radius": 70,
+     "label": "За кровать",
+     "on_tap": [
+      {
+       "set": {
+        "retry": "hide"
+       }
+      },
+      {
+       "goto": "found_lose"
+      }
+     ]
+    },
+    {
+     "id": "crate",
+     "pos": [
+      -1.5,
+      0.6,
+      -2.9
+     ],
+     "radius": 70,
+     "label": "За ящик",
+     "on_tap": [
+      {
+       "set": {
+        "retry": "hide"
+       }
+      },
+      {
+       "goto": "found_lose"
+      }
+     ]
+    }
+   ],
+   "on_timeout": [
+    {
+     "set": {
+      "retry": "hide"
+     }
+    },
+    {
+     "goto": "found_lose"
+    }
+   ]
+  },
+  "found_lose": {
+   "type": "scene",
+   "scene": "found_lose",
+   "next": "lose",
+   "on_enter": [
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    },
+    {
+     "shake": 0.5
+    }
+   ]
+  },
+  "hidden_ok": {
+   "type": "scene",
+   "scene": "hidden_ok",
+   "next": "brother"
+  },
+  "brother": {
+   "type": "choice",
+   "background": "choice_loop",
+   "prompt": "Пустой у рычага. Голос брата Киры",
+   "speaker": "lina",
+   "timer": 8,
+   "timeout": 0,
+   "options": [
+    {
+     "text": "Дёрнуть рычаг. Свет!",
+     "goto": "light_now",
+     "remember": "Кира запомнила, что ты не дал ей шанса",
+     "actions": [
+      {
+       "set": {
+        "adv.brother": "burned"
+       }
+      }
+     ]
+    },
+    {
+     "text": "Дать Кире поговорить",
+     "goto": "talk_brother",
+     "remember": "Кира запомнила, что ты дал ей поговорить",
+     "actions": [
+      {
+       "set": {
+        "adv.brother": "talked"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "light_now": {
+   "type": "scene",
+   "scene": "light_now",
+   "next": "lit"
+  },
+  "talk_brother": {
+   "type": "scene",
+   "scene": "talk_brother",
+   "next": "lit"
+  },
+  "lit": {
+   "type": "scene",
+   "scene": "lit",
+   "next": "end"
+  },
+  "end": {
+   "type": "end",
+   "title": "Смотритель",
+   "text": "{'Кира услышала брата: «Найди того, кто не спит».' if adv.brother == 'talked' else 'Свет сжёг то, что осталось от брата Киры.'} В чате: «Осталось трое из четверых».",
+   "ending": "lit",
+   "unlock_next": true
+  },
+  "caught": {
+   "type": "scene",
+   "scene": "caught",
+   "next": "lose",
+   "on_enter": [
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    },
+    {
+     "shake": 0.6
+    }
+   ]
+  },
+  "lose": {
+   "type": "overlay",
+   "background": "lose_loop",
+   "dim": 0.55,
+   "widgets": [
+    {
+     "id": "t",
+     "kind": "text",
+     "text": "{'ГРОМ УСНУЛ' if retry == 'bed' else 'ОН ВАС НАШЁЛ'}",
+     "rect": [
+      0.2,
+      0.3,
+      0.6,
+      0.12
+     ],
+     "size": 48,
+     "color": "#ff4040",
+     "anim": "shake"
+    },
+    {
+     "id": "s",
+     "kind": "text",
+     "text": "{'Не ложись на кровать.' if retry == 'bed' else ('Он не смотрит вниз...' if retry == 'hide' else 'Попробуй ещё раз.')}",
+     "rect": [
+      0.2,
+      0.44,
+      0.6,
+      0.08
+     ],
+     "size": 24,
+     "color": "#ffffff"
+    },
+    {
+     "id": "again",
+     "kind": "button",
+     "text": "Попробовать снова",
+     "rect": [
+      0.36,
+      0.62,
+      0.28,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "if": "retry == 'bed'",
+       "then": [
+        {
+         "goto": "inside"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'levers'",
+       "then": [
+        {
+         "goto": "levers"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'hide'",
+       "then": [
+        {
+         "goto": "steps"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

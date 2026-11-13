@@ -770,6 +770,7 @@ class Compiler:
                                 parts_ += [nm + pt[5:] for nm in self.crowd["names"]]
                             else:
                                 parts_.append(pt)
+                        line_pts = []
                         for part in parts_:
                             if not part.strip():
                                 continue
@@ -778,7 +779,12 @@ class Compiler:
                                 subj = names[0]
                             if subj is None:
                                 raise ValueError(f"Кто делает действие? «{part}»")
-                            slot = movers if kind in ("walk", "run", "sneak") and target and target[0] == "point" else 0
+                            # spread movers sideways only when several go to (nearly) the same point
+                            slot = 0
+                            if kind in ("walk", "run", "sneak") and target and target[0] == "point":
+                                same = [q for q in line_pts if math.hypot(q[0] - target[1][0], q[1] - target[1][1]) < 1.2]
+                                slot = len(same)
+                                line_pts.append(target[1][:2])
                             if kind in ("walk", "run", "sneak"):
                                 movers += 1
                             end = max(end, self.schedule(subj, kind, target, num, t, slot))

@@ -1,0 +1,606 @@
+{
+ "id": "04_stolen_face",
+ "number": 4,
+ "title": "Чужое лицо",
+ "description": "«Осталось трое из четверых». Один из друзей — не тот, за кого себя выдаёт.",
+ "start": "doubt",
+ "variables": {
+  "retry": "",
+  "q_toha": false,
+  "q_grom": false,
+  "q_kira": false,
+  "pizza_gone": false
+ },
+ "nodes": {
+  "doubt": {
+   "type": "scene",
+   "scene": "doubt",
+   "next": "ask",
+   "on_enter": [
+    {
+     "set": {
+      "q_toha": false,
+      "q_grom": false,
+      "q_kira": false
+     }
+    }
+   ]
+  },
+  "ask": {
+   "type": "overlay",
+   "background": "ask_loop",
+   "dim": 0.35,
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ],
+   "widgets": [
+    {
+     "id": "h",
+     "kind": "text",
+     "text": "Кто из них — не настоящий? Спроси, потом обвини.",
+     "rect": [
+      0.15,
+      0.06,
+      0.7,
+      0.08
+     ],
+     "size": 24,
+     "color": "#ffe08a"
+    },
+    {
+     "id": "q1",
+     "kind": "button",
+     "text": "Тоха: какой был код сундука?",
+     "rect": [
+      0.06,
+      0.2,
+      0.4,
+      0.09
+     ],
+     "on_tap": [
+      {
+       "set": {
+        "q_toha": true
+       }
+      },
+      {
+       "say": {
+        "who": "toha",
+        "text": "Четыре... ноль... четыре... три. Точно. Нас же трое было.",
+        "time": 2.8
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "kind": "button",
+     "text": "Гром: как ты попал на сервер?",
+     "rect": [
+      0.06,
+      0.31,
+      0.4,
+      0.09
+     ],
+     "on_tap": [
+      {
+       "set": {
+        "q_grom": true
+       }
+      },
+      {
+       "say": {
+        "who": "grom",
+        "text": "Упал с неба на спавне! Прямо на лицо. Кто так спавн ставит?",
+        "time": 2.8
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "kind": "button",
+     "text": "Кира: сколько ты здесь?",
+     "rect": [
+      0.06,
+      0.42,
+      0.4,
+      0.09
+     ],
+     "on_tap": [
+      {
+       "set": {
+        "q_kira": true
+       }
+      },
+      {
+       "say": {
+        "who": "kira",
+        "text": "Три дня, когда вы пришли. Теперь уже четыре. И брат... Саша.",
+        "time": 2.8
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "kind": "button",
+     "text": "Всех: что сказал брат Киры?",
+     "rect": [
+      0.06,
+      0.53,
+      0.4,
+      0.09
+     ],
+     "on_tap": [
+      {
+       "say": {
+        "who": "grom",
+        "text": "Я прятался, не слышал!",
+        "time": 1.6
+       }
+      },
+      {
+       "wait": 1.6
+      },
+      {
+       "say": {
+        "who": "toha",
+        "text": "Я... тоже не помню. Я был за ящиком.",
+        "time": 2.0
+       }
+      },
+      {
+       "wait": 2.0
+      },
+      {
+       "say": {
+        "who": "kira",
+        "text": "«Найди того, кто не спит».",
+        "time": 1.8
+       }
+      }
+     ]
+    },
+    {
+     "id": "a1",
+     "kind": "button",
+     "text": "Обвинить Тоху",
+     "rect": [
+      0.56,
+      0.22,
+      0.36,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "goto": "reveal"
+      }
+     ]
+    },
+    {
+     "id": "a2",
+     "kind": "button",
+     "text": "Обвинить Грома",
+     "rect": [
+      0.56,
+      0.35,
+      0.36,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "set": {
+        "retry": "ask"
+       }
+      },
+      {
+       "goto": "wrong"
+      }
+     ]
+    },
+    {
+     "id": "a3",
+     "kind": "button",
+     "text": "Обвинить Киру",
+     "rect": [
+      0.56,
+      0.48,
+      0.36,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "set": {
+        "retry": "ask"
+       }
+      },
+      {
+       "goto": "wrong"
+      }
+     ]
+    }
+   ]
+  },
+  "wrong": {
+   "type": "scene",
+   "scene": "wrong",
+   "next": "lose",
+   "on_enter": [
+    {
+     "vibrate": 300
+    },
+    {
+     "shake": 0.5
+    }
+   ]
+  },
+  "reveal": {
+   "type": "scene",
+   "scene": "reveal",
+   "next": "forest"
+  },
+  "forest": {
+   "type": "scene",
+   "scene": "forest",
+   "next": "j1",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "j1": {
+   "type": "choice",
+   "background": "j1_loop",
+   "prompt": "Слева зовут: «Лина!». Справа — тишина. Прямо — кто-то храпит.",
+   "speaker": "lina",
+   "timer": 8,
+   "timeout": 0,
+   "on_enter": [
+    {
+     "sfx": "portal_portal"
+    }
+   ],
+   "options": [
+    {
+     "text": "Налево, на голос",
+     "goto": "voice_lose"
+    },
+    {
+     "text": "Направо, в тишину",
+     "goto": "dead_lose"
+    },
+    {
+     "text": "Прямо, на храп",
+     "goto": "j1_ok"
+    }
+   ]
+  },
+  "j1_ok": {
+   "type": "scene",
+   "scene": "j1_ok",
+   "next": "j2",
+   "on_enter": [
+    {
+     "checkpoint": true
+    }
+   ]
+  },
+  "j2": {
+   "type": "choice",
+   "background": "j2_loop",
+   "prompt": "Прямо — голос Грома: «Сюда!». Слева — храп. Справа — шаги.",
+   "speaker": "lina",
+   "timer": 6,
+   "timeout": 0,
+   "options": [
+    {
+     "text": "Прямо, к Грому",
+     "goto": "voice_lose"
+    },
+    {
+     "text": "Налево, на храп",
+     "goto": "pit"
+    },
+    {
+     "text": "Направо, на шаги",
+     "goto": "dead_lose"
+    }
+   ]
+  },
+  "voice_lose": {
+   "type": "scene",
+   "scene": "voice_lose",
+   "next": "caught",
+   "on_enter": [
+    {
+     "set": {
+      "retry": "forest_voice"
+     }
+    }
+   ]
+  },
+  "dead_lose": {
+   "type": "scene",
+   "scene": "dead_lose",
+   "next": "caught",
+   "on_enter": [
+    {
+     "set": {
+      "retry": "forest_dead"
+     }
+    }
+   ]
+  },
+  "pit": {
+   "type": "scene",
+   "scene": "pit",
+   "next": "wake",
+   "on_enter": [
+    {
+     "checkpoint": true
+    },
+    {
+     "set": {
+      "pizza_gone": false
+     }
+    }
+   ]
+  },
+  "wake": {
+   "type": "overlay",
+   "background": "wake_loop",
+   "dim": 0.3,
+   "widgets": [
+    {
+     "id": "h",
+     "kind": "text",
+     "text": "Лицо Тохи бледнеет. Чем разбудить?",
+     "rect": [
+      0.2,
+      0.08,
+      0.6,
+      0.08
+     ],
+     "size": 26,
+     "color": "#ffe08a"
+    },
+    {
+     "id": "tm",
+     "kind": "timer",
+     "rect": [
+      0.3,
+      0.18,
+      0.4,
+      0.04
+     ],
+     "on_end": [
+      {
+       "set": {
+        "retry": "wake"
+       }
+      },
+      {
+       "goto": "caught"
+      }
+     ],
+     "sec": 12,
+     "size": 34
+    },
+    {
+     "id": "o1",
+     "kind": "button",
+     "text": "Облить водой",
+     "rect": [
+      0.1,
+      0.7,
+      0.24,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "set": {
+        "retry": "wake"
+       }
+      },
+      {
+       "goto": "water_lose"
+      }
+     ]
+    },
+    {
+     "id": "o2",
+     "kind": "button",
+     "text": "{'Пиццы больше нет' if pizza_gone else 'Помахать пиццей'}",
+     "rect": [
+      0.38,
+      0.7,
+      0.24,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "if": "pizza_gone",
+       "then": [
+        {
+         "say": {
+          "who": "grom",
+          "text": "Её нет. Я её съел. Прости.",
+          "time": 1.6
+         }
+        }
+       ],
+       "else": [
+        {
+         "set": {
+          "pizza_gone": true
+         }
+        },
+        {
+         "goto": "pizza_try"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "o3",
+     "kind": "button",
+     "text": "Нотный блок из его инвентаря",
+     "rect": [
+      0.66,
+      0.7,
+      0.24,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "goto": "awake"
+      }
+     ]
+    },
+    {
+     "id": "hint",
+     "kind": "text",
+     "text": "Тоха: «Я по технике. Редстоун, моды...»",
+     "rect": [
+      0.2,
+      0.84,
+      0.6,
+      0.06
+     ],
+     "size": 18,
+     "color": "#cfd8e3"
+    }
+   ]
+  },
+  "pizza_try": {
+   "type": "scene",
+   "scene": "pizza_try",
+   "next": "wake"
+  },
+  "water_lose": {
+   "type": "scene",
+   "scene": "water_lose",
+   "next": "lose",
+   "on_enter": [
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    }
+   ]
+  },
+  "awake": {
+   "type": "scene",
+   "scene": "awake",
+   "next": "end"
+  },
+  "end": {
+   "type": "end",
+   "title": "Чужое лицо",
+   "text": "Настоящий Тоха с вами. Он знает, где выход из Сида 404. Но Пустой всё слышал.",
+   "ending": "awake",
+   "unlock_next": true
+  },
+  "caught": {
+   "type": "scene",
+   "scene": "caught",
+   "next": "lose",
+   "on_enter": [
+    {
+     "flash": "#ffffff"
+    },
+    {
+     "vibrate": 300
+    },
+    {
+     "shake": 0.6
+    }
+   ]
+  },
+  "lose": {
+   "type": "overlay",
+   "background": "lose_loop",
+   "dim": 0.55,
+   "widgets": [
+    {
+     "id": "t",
+     "kind": "text",
+     "text": "ОН ВАС НАШЁЛ",
+     "rect": [
+      0.2,
+      0.3,
+      0.6,
+      0.12
+     ],
+     "size": 48,
+     "color": "#ff4040",
+     "anim": "shake"
+    },
+    {
+     "id": "s",
+     "kind": "text",
+     "text": "{'Настоящий знает код. Кто ошибся?' if retry == 'ask' else ('Правило 1: кто зовёт по имени — не он.' if retry == 'forest_voice' else ('Тишина ведёт в тупик. Иди на храп.' if retry == 'forest_dead' else 'Громкий крик разбудил не только Тоху.'))}",
+     "rect": [
+      0.15,
+      0.44,
+      0.7,
+      0.08
+     ],
+     "size": 22,
+     "color": "#ffffff"
+    },
+    {
+     "id": "again",
+     "kind": "button",
+     "text": "Попробовать снова",
+     "rect": [
+      0.36,
+      0.62,
+      0.28,
+      0.1
+     ],
+     "on_tap": [
+      {
+       "if": "retry == 'ask'",
+       "then": [
+        {
+         "goto": "ask"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'forest_voice'",
+       "then": [
+        {
+         "goto": "forest"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'forest_dead'",
+       "then": [
+        {
+         "goto": "forest"
+        }
+       ]
+      },
+      {
+       "if": "retry == 'wake'",
+       "then": [
+        {
+         "goto": "pit"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}
