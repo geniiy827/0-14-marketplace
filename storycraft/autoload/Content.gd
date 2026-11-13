@@ -99,6 +99,62 @@ func download_size(adv_id: String, ep: Dictionary) -> int:
 func is_cached(adv_id: String, ep: Dictionary) -> bool:
 	return missing_files(adv_id, ep).is_empty()
 
+# ---------------------------------------------------------------- общие загрузки (фон + экран серий)
+
+var _jobs := {}               # "adv/ep" → {"dl", "done", "total", "finished", "err"}
+
+func _job_key(adv_id: String, ep_id: String) -> String:
+	return adv_id + "/" + ep_id
+
+## Состояние загрузки серии (пусто — не качается).
+func job(adv_id: String, ep_id: String) -> Dictionary:
+	return _jobs.get(_job_key(adv_id, ep_id), {})
+
+## Начать загрузку серии в фоне (если ещё не скачана и не качается).
+func start_background(adv_id: String, ep: Dictionary) -> void:
+	if is_cached(adv_id, ep) or not job(adv_id, String(ep.get("id", ""))).is_empty():
+		return
+	_run_job(adv_id, ep)
+
+func _run_job(adv_id: String, ep: Dictionary) -> Dictionary:
+	var key := _job_key(adv_id, String(ep.get("id", "")))
+	var j := {"dl": Net.Download.new(), "done": 0, "total": 1, "finished": false, "err": ""}
+	_jobs[key] = j
+	_job_body(key, adv_id, ep, j)
+	return j
+
+func _job_body(key: String, adv_id: String, ep: Dictionary, j: Dictionary) -> void:
+	var err: String = await download_episode(adv_id, ep, j["dl"], func(d, t):
+		j["done"] = d
+		j["total"] = maxi(1, t))
+	j["err"] = err
+	j["finished"] = true
+	_jobs.erase(key)
+
+## Скачать серию с прогрессом; если она уже качается в фоне — присоединиться к этой загрузке.
+## cancel_dl — внешний объект отмены (кнопка «Отмена» в окне). Возвращает "" или текст ошибки.
+func download_shared(adv_id: String, ep: Dictionary, cancel_dl, on_progress: Callable) -> String:
+	if is_cached(adv_id, ep):
+		on_progress.call(1, 1)
+		return ""
+	var j := job(adv_id, String(ep.get("id", "")))
+	if j.is_empty():
+		j = _run_job(adv_id, ep)
+	while not j["finished"]:
+		if cancel_dl.cancel:
+			j["dl"].abort()
+		on_progress.call(j["done"], j["total"])
+		await get_tree().process_frame
+	return j["err"]
+
+## Следующая серия приключения после ep_id (или пусто).
+func next_episode(adv_id: String, ep_id: String) -> Dictionary:
+	var eps := episodes(adv_id)
+	for i in eps.size():
+		if eps[i].get("id", "") == ep_id and i + 1 < eps.size():
+			return eps[i + 1]
+	return {}
+
 ## Скачать серию. on_progress(done_bytes, total_bytes). Возвращает "" или текст ошибки.
 ## Сначала — пакет серии в 5 параллельных потоков (Range); если сервер старый (нет /api/pack) —
 ## отдельные файлы, тоже по 5 одновременно.

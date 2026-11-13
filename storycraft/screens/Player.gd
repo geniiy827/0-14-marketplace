@@ -83,6 +83,20 @@ func _ready() -> void:
 	if has_meta("test_no_start"):
 		return   # автотест сам управляет сценой
 	runner.start(start_node, saved_vars)
+	_prefetch_next()
+
+## Настройка «Качать следующую серию во время просмотра»: пока идёт эта серия, следующая качается в фоне —
+## к концу серии средней длины она уже готова, и «Дальше» запускает её без ожидания.
+func _prefetch_next() -> void:
+	if not bool(Settings.get_value("prefetch_next", false)):
+		return
+	var nxt := Content.next_episode(adv_id, ep_id)
+	if nxt.is_empty() or int(nxt.get("version", 1)) > Content.SUPPORTED_EPISODE_VERSION:
+		return
+	# даём текущей серии спокойно загрузить первые сцены, потом начинаем
+	await get_tree().create_timer(3.0, false).timeout
+	if is_inside_tree():
+		Content.start_background(adv_id, nxt)
 
 func _exit_tree() -> void:
 	get_tree().paused = false

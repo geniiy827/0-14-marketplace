@@ -45,6 +45,7 @@ func _ready() -> void:
 
 	_section("Прочее")
 	_check("Вибрация", "vibration")
+	_check("Качать следующую серию во время просмотра", "prefetch_next")
 	var row := _row("Скачано за сессию")
 	_cache_btn = UI.button("Очистить (%s)" % Content.human_size(Content.cache_size()), _clear_cache)
 	_cache_btn.custom_minimum_size = Vector2(320, 0)

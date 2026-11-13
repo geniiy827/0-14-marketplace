@@ -235,6 +235,58 @@ func _run(mode: String) -> void:
 					seam = " шов цикла: склейка %.2f м (без промежуточных кадров)" % a.distance_to(ls.cam.global_position)
 				print("CAM ", sid, " cuts=", cuts, " скачков всего: ", jumps, ", вне склеек: ", bad.size(), " ", bad.slice(0, 5), seam)
 				p.sp.stop()
+		"prefetch":
+			Settings.set_value("prefetch_next", true)
+			await Content.refresh()
+			var nxt := Content.next_episode("last_men", "01_escape")
+			print("PREFETCH next=", nxt.get("id"), " cached=", Content.is_cached("last_men", nxt))
+			Router.go("player", {"adventure": "last_men", "episode": "01_escape"}, false)
+			for i in 12:
+				await wait(1.0)
+				var j := Content.job("last_men", "02_test")
+				print("PREFETCH t=", i + 1, " job=", ("%d/%d" % [j["done"], j["total"]]) if not j.is_empty() else "-", " cached=", Content.is_cached("last_men", nxt), " fps=", Engine.get_frames_per_second())
+				if i == 5:
+					Router.current.toggle_pause()
+					await wait(0.3)
+					for c in Router.current.get_children():
+						if c is PauseMenu:
+							print("PREFETCH pause status: ", c._status.text)
+					Router.current.toggle_pause()
+			Settings.set_value("prefetch_next", false)
+		"attach":
+			await Content.refresh()
+			var e2 := Content.episode("last_men", "02_test")
+			Content.clear_cache()
+			Content.start_background("last_men", e2)
+			await wait(1.5)
+			var before: int = Content.job("last_men", "02_test")["done"]
+			var c := Net.Download.new()
+			var seen := {"min": 1 << 40}
+			var err = await Content.download_shared("last_men", e2, c, func(d, t): seen["min"] = mini(seen["min"], d))
+			print("ATTACH err='", err, "' cached=", Content.is_cached("last_men", e2), " прогресс при присоединении не с нуля: ", seen["min"] >= before, " (", before, ")")
+		"expr":
+			var cases := [
+				["'ВВЕРХ' if l1 == 1 else 'ВНИЗ'", {"l1": 0}, {}, "ВНИЗ"],
+				["'ВВЕРХ' if l1 == 1 else 'ВНИЗ'", {"l1": 1}, {}, "ВВЕРХ"],
+				["'a' if r == 'x' else ('b' if r == 'y' else 'c')", {"r": "y"}, {}, "b"],
+				["'a' if r == 'x' else 'b' if r == 'y' else 'c'", {"r": "z"}, {}, "c"],
+				["'есть' if adv.brother == 'talked' else 'нет'", {}, {"brother": "talked"}, "есть"],
+				["'Пиццы больше нет' if pizza_gone else 'Помахать пиццей'", {"pizza_gone": false}, {}, "Помахать пиццей"],
+				["found >= 3", {"found": 3}, {}, true],
+				["'if внутри строки else'", {}, {}, "if внутри строки else"],
+				["('x' if a else 'y')", {"a": true}, {}, "x"],
+				["(a) and (b)", {"a": true, "b": false}, {}, false],
+			]
+			var bad := 0
+			for c in cases:
+				var r = Expr.eval(c[0], c[1], c[2])
+				var ok: bool = typeof(r) == typeof(c[3]) and r == c[3]
+				if not ok:
+					bad += 1
+				print("EXPR ", "ok  " if ok else "FAIL", " ", c[0], " → ", r)
+			var txt := Expr.interpolate("Рычаг: {'ВВЕРХ' if l1 == 1 else 'ВНИЗ'}. {'Не оборачивайся, когда зовут.' if retry == 'call' else ('Не смотри на него.' if retry == 'look' else 'Попробуй ещё раз.')}", {"l1": 0, "retry": "look"}, {})
+			print("EXPR text: ", txt)
+			print("EXPR failed: ", bad)
 		"seed":
 			# невидимые хотспоты, on_miss, видимый таймер, экран проигрыша с retry (синтетический узел)
 			var p = load("res://screens/Player.tscn").instantiate()

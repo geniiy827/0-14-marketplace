@@ -88,11 +88,29 @@ jobs:
           yes | $SDK/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
           $SDK/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0" > /dev/null
 
-      - name: Debug keystore + editor settings
+      - name: Signing key + editor settings
+        env:
+          KS_B64: ${{ secrets.STORYCRAFT_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.STORYCRAFT_KEYSTORE_PASS }}
         run: |
           keytool -genkeypair -v -keystore ~/debug.keystore -storepass android -alias androiddebugkey \
             -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
+          # Постоянный ключ из секретов: с ним новая версия ставится ПОВЕРХ старой (обновление).
+          # Случайный ключ на каждую сборку давал «конфликт пакетов» — только удалить и поставить заново.
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
+            echo "$KS_B64" | base64 -d > ~/release.keystore
+            echo "RELEASE_KS=$HOME/release.keystore" >> $GITHUB_ENV
+            echo "RELEASE_USER=storycraft" >> $GITHUB_ENV
+            echo "::add-mask::$KS_PASS"
+            echo "RELEASE_PASS=$KS_PASS" >> $GITHUB_ENV
+            echo "Подпись: постоянный ключ storycraft"
+          else
+            echo "::warning::Нет секретов STORYCRAFT_KEYSTORE_B64 / STORYCRAFT_KEYSTORE_PASS — APK подписан временным ключом, обновление поверх установленной версии не сработает"
+            echo "RELEASE_KS=$HOME/debug.keystore" >> $GITHUB_ENV
+            echo "RELEASE_USER=androiddebugkey" >> $GITHUB_ENV
+            echo "RELEASE_PASS=android" >> $GITHUB_ENV
+          fi
           mkdir -p ~/.config/godot
           cat > ~/.config/godot/editor_settings-4.7.tres <<EOT
           [gd_resource type="EditorSettings" format=3]
@@ -121,11 +139,16 @@ jobs:
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
           # release-сборка (оптимизированная и в разы меньше) подписывается тем же ключом из CI
-          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: /home/runner/debug.keystore
-          GODOT_ANDROID_KEYSTORE_RELEASE_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: android
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.RELEASE_KS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ env.RELEASE_USER }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ env.RELEASE_PASS }}
         run: |
           mkdir -p build
+          # versionCode растёт с каждой сборкой — Android принимает её как обновление
+          sed -i "s/^version\/code=.*/version\/code=${{ github.run_number }}/" export_presets.cfg
+          sed -i "s/^version\/name=.*/version\/name=\"1.2.${{ github.run_number }}\"/" export_presets.cfg
+          sed -i "s/^config\/version=.*/config\/version=\"1.2.${{ github.run_number }}\"/" project.godot
+          grep -E "^version/" export_presets.cfg
           # 1) ставим gradle-шаблон Android (флаг работает только вместе с экспортом)
           timeout 1500 ~/godot/godot --headless --verbose --path . --install-android-build-template --export-debug "Android" build/StoryCraft.apk > /tmp/export1.log 2>&1 || true
           grep -E "gradle|BUILD|rror" /tmp/export1.log | tail -15
@@ -141,7 +164,9 @@ jobs:
           test -f build/StoryCraft.apk
           ls -la build
           # проверка: в манифесте APK разрешён cleartext
-          $SDK/build-tools/36.1.0/aapt dump xmltree build/StoryCraft.apk AndroidManifest.xml | grep -i -E "package=|usesCleartextTraffic|screenOrientation" | head
+          $SDK/build-tools/36.1.0/aapt dump xmltree build/StoryCraft.apk AndroidManifest.xml | grep -i -E "package=|usesCleartextTraffic|screenOrientation|versionCode" | head
+          # чем подписан APK (отпечаток должен быть одинаковым от сборки к сборке)
+          $SDK/build-tools/36.1.0/apksigner verify --print-certs build/StoryCraft.apk | grep -E "SHA-256|DN"
 
       - uses: actions/upload-artifact@v4
         with:

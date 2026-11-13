@@ -23,6 +23,7 @@ var values := {
 	"quality": 2,
 	"fps": 0,              # 0 — частота экрана, 60, 30 — экономия батареи. Без ограничения — никогда
 	"vsync": true,
+	"prefetch_next": false,  # качать следующую серию в фоне, пока идёт текущая
 	"debug_overlay": false,
 	"vibration": true,
 	"server_url": "",

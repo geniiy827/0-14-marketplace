@@ -29,8 +29,29 @@ func _ready() -> void:
 		var b := UI.button(pair[0], func(): player.pause_action(pair[1]))
 		b.custom_minimum_size = Vector2(432, 72)
 		vb.add_child(b)
+	_status = UI.label("", UI.FS_SMALL, false, UI.C_DIM)
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(_status)
 	modulate.a = 0.0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.15)
+
+var _status: Label
+
+## Строка «Следующая серия: 63%», если она качается в фоне.
+func _process(_d: float) -> void:
+	if _status == null or player == null:
+		return
+	var nxt: Dictionary = Content.next_episode(player.adv_id, player.ep_id)
+	if nxt.is_empty() or not bool(Settings.get_value("prefetch_next", false)):
+		_status.text = ""
+		return
+	var j: Dictionary = Content.job(player.adv_id, String(nxt.get("id", "")))
+	if not j.is_empty():
+		_status.text = "Следующая серия: %d%%" % int(100.0 * j["done"] / maxi(1, j["total"]))
+	elif Content.is_cached(player.adv_id, nxt):
+		_status.text = "Следующая серия скачана ✔"
+	else:
+		_status.text = ""
 
 func close() -> void:
 	queue_free()

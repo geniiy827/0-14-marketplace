@@ -183,7 +183,7 @@ func _download(e: Dictionary) -> bool:
 		box.move_child(pct, box.get_child_count() - 2)
 		var dl := Net.Download.new()
 		m.chosen.connect(func(_i): dl.abort())
-		var err: String = await Content.download_episode(adv_id, e, dl, func(done, tot):
+		var err: String = await Content.download_shared(adv_id, e, dl, func(done, tot):
 			if is_instance_valid(bar) and tot > 0:
 				bar.value = float(done) / float(tot)
 				pct.text = "%d%%  ·  %s / %s" % [int(100.0 * done / tot), Content.human_size(done), Content.human_size(tot)])
