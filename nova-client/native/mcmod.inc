@@ -184,6 +184,11 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
 
 static int hud_op(double *a, int n, char *s);
 static int rc_op(int op, double *a, int n, char *s);
+static int wt_op(int op, double *a, int n);
+static void wt_frame(void *bs);
+static void wt_tick(void *level);
+static void wt_reset(void);
+static void *(*wt_region)(void *ent);
 void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, void *darr, void *jstr) {
     void **f = *(void ***)env;
     double a[16];
@@ -198,6 +203,7 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     double out[72];
     if (op == OP_HUD) { hud_op(a, n, s); return 0; }
     if (op == OP_RECIPE || op == OP_SMELT) { rc_op(op, a, n, s); return 0; }
+    if (op == OP_WEATHER_RAIN || op == OP_WEATHER_FREEZE || op == OP_WEATHER_SNOW) { wt_op(op, a, n); return 0; }
     int r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
         : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
         ? sc_op(op, a, n, out) : mm_op(op, a, n, s, out);
@@ -841,13 +847,19 @@ static void mcmod_frame(void *client) {
     } else if (!pl && mm_last_pl) {
         mm_last_pl = 0;
         mm_fire(EV_WORLD_LEAVE, 0, 0, 0);
+        wt_reset();
     }
     if (!pl) return;
     mm_last_pl = pl;
     rc_frame(1);                                       /* recipes of mods, outside of script calls (recipes.inc) */
     long due = (now_ms() - mm_t0) / 50;
     if (due - mm_ticks > 10) mm_ticks = due - 10;
-    for (int k = 0; k < 3 && mm_ticks < due; k++, mm_ticks++) mm_fire(EV_TICK, 0, 0, 0);
+    void *wbs = wt_region ? wt_region(pl) : 0;
+    wt_frame(wbs);                                       /* weather.* (winter.inc) */
+    for (int k = 0; k < 3 && mm_ticks < due; k++, mm_ticks++) {
+        mm_fire(EV_TICK, 0, 0, 0);
+        wt_tick(wbs && mf_getlevel ? mf_getlevel(wbs) : 0);
+    }
 }
 
 static void mcmod_init(void *mc, u32 base) {

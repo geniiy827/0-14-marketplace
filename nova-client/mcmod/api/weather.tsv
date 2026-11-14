@@ -1,0 +1,4 @@
+# weather.* — погода и снег (native/winter.inc); каждый игрок с модом видит то же самое у себя
+weather.rain	level:num	-	native:WEATHER_RAIN	wip	Осадки всегда: сила 0..1 (снег там, где холодно); -1 - как в игре
+weather.freeze	on:num	-	native:WEATHER_FREEZE	wip	1 - все биомы холодные (снег вместо дождя, вода замерзает), 0 - как были
+weather.snow	speed:num, limit:num=0	-	native:WEATHER_SNOW	wip	Снег копится у игроков: слоёв в минуту на клетку (8 слоёв = блок); limit - высота сугробов в блоках (0 - без предела)

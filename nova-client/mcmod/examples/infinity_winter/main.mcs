@@ -1,0 +1,69 @@
+// Infinity Winter.
+//  Во всём мире вечно идёт снег, и он копится: слой за слоем, блок за блоком, без предела.
+//  - все биомы холодные (вода замерзает, дождь всюду идёт снегом) - у каждого игрока с модом;
+//  - снег наваливает хост мира вокруг каждого игрока (см. weather.snow), друзья видят те же сугробы.
+// Команды: /winter - сколько длится зима и как быстро идёт снег;
+//          /winter speed N - слоёв снега в минуту (8 слоёв = блок; только хост), /winter limit N - высота сугробов (0 - без предела).
+
+var speed = 1          // слоёв в минуту на каждую клетку вокруг игроков: блок снега за 8 минут
+var limit = 0          // 0 - копится без конца
+var started = 0        // тик, когда началась зима в этом мире
+var ticks = 0
+
+fn apply() {
+    weather.freeze(1)
+    weather.rain(1)
+    if host.isMe() { weather.snow(speed, limit) } else { weather.snow(0) }   // сугробы растит только хост
+}
+
+fn save() {
+    if host.isMe() { data.save("winter", [speed, limit, started + ticks]) }
+}
+
+on world.join(e) {
+    ticks = 0
+    var s = data.load("winter", null)
+    if s != null {
+        speed = s[0]
+        limit = s[1]
+        started = s[2]
+    }
+    apply()
+    ui.toast("Infinity Winter", "Зима пришла. Навсегда.")
+}
+
+on world.leave(e) { save() }
+
+on tick(e) {
+    ticks = ticks + 1
+    if ticks % 600 == 0 { save() }                 // раз в 30 секунд
+}
+
+fn minutes() { return math.floor((started + ticks) / 1200) }
+
+on chat(e) {
+    if e.text == "/winter" {
+        e.cancel()
+        var h = speed > 0 ? math.roundTo(8 / speed, 1) : 0
+        chat.send("§bInfinity Winter§f: зима идёт {minutes()} мин. Снег: {speed} слоёв в минуту" +
+                  (speed > 0 ? " (блок за {h} мин)" : " (стоит)") + (limit > 0 ? ", сугробы до {limit} блоков" : ", без предела"))
+    } else if e.text.startsWith("/winter speed ") {
+        e.cancel()
+        if !host.isMe() { ui.tip("Скорость снега меняет хост мира"); return }
+        var v = num(e.text.sub(14))
+        if v == null { ui.tip("Пример: /winter speed 2"); return }
+        speed = math.clamp(v, 0, 64)
+        apply()
+        save()
+        chat.send("§bСнег теперь: {speed} слоёв в минуту")
+    } else if e.text.startsWith("/winter limit ") {
+        e.cancel()
+        if !host.isMe() { ui.tip("Высоту сугробов меняет хост мира"); return }
+        var v = num(e.text.sub(14))
+        if v == null { ui.tip("Пример: /winter limit 10 (0 - без предела)"); return }
+        limit = math.max(0, math.floor(v))
+        apply()
+        save()
+        chat.send(limit > 0 ? "§bСугробы растут до {limit} блоков" : "§bСугробы растут без предела")
+    }
+}

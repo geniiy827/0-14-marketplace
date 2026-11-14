@@ -100,7 +100,11 @@
   скриптовое управление (идти к точке, атака, фаза), хитбокс, здоровье.
 - [ ] Иммерсивные порталы (как мод Immersive Portals): видеть и проходить через портал в другое место без загрузки.
 
-## Гибрид-клиент: версии 0.15 -> 1.1.5 (главная задача с alpha35)
+## alpha39 (в работе): Infinity Winter
+- Гибрид 0.15->1.1.5 ОТМЕНЁН пользователем; переключатель 0.15 убран, playVersion = 14.
+- weather.rain/freeze/snow (native/winter.inc) + мод mcmod/examples/infinity_winter. Осталось: собрать alpha39, выпустить, документация weather.* в MCMOD_SCRIPT.md.
+
+## Гибрид-клиент: версии 0.15 -> 1.1.5 (ОТМЕНЁН в alpha39, оставлено для истории)
 - alpha35: квадратные кнопки вместо скруглённых (gui/nova/btn_square.png, btn_square_flat.png; цвета темы те же);
   переключатель «Версия 0.15 (перезапуск)» во вкладке NOVA (группа «Версии», R_V015 в menus.inc) -> Java пишет
   files/nova_version (14/15), перезапуск; при старте nativeSetVersion -> nova_version в libnova, NovaActivity.playVersion.

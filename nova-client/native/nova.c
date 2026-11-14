@@ -890,10 +890,6 @@ static void *build_nova_pane(void *client) {
         void *g2 = f_cgroup(pane, str, 1);
         f_strdtor(str);
         f_ctoggle(g2, newtex_option(), client);
-        gstr(str, "options.group.nova.versions");      /* the hybrid client: later versions, by a restart */
-        void *g3 = f_cgroup(pane, str, 1);
-        f_strdtor(str);
-        f_ctoggle(g3, v015_option(), client);
     }
     last_pane_doll = doll | (f3 << 1);
     return pane;
@@ -1174,6 +1170,7 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "recipes.inc"
 #include "modnet.inc"
 #include "v015.inc"
+#include "winter.inc"
 
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
@@ -1205,6 +1202,7 @@ __attribute__((constructor)) static void nova_init(void) {
     recipes_init(mc);
     modnet_init(mc);
     v015_init(mc);
+    winter_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }

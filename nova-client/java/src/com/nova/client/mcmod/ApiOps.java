@@ -19,8 +19,11 @@ final class ApiOps {
     static final int POPUP = 14;
     static final int UI_ACTION = 15;
     static final int HUD = 16;
-    static final int WORLD_BLOCK = 17;
-    static final int WORLD_SET_BLOCK = 18;
-    static final int WORLD_TIME = 19;
-    static final int WORLD_SET_TIME = 20;
+    static final int WEATHER_RAIN = 17;
+    static final int WEATHER_FREEZE = 18;
+    static final int WEATHER_SNOW = 19;
+    static final int WORLD_BLOCK = 20;
+    static final int WORLD_SET_BLOCK = 21;
+    static final int WORLD_TIME = 22;
+    static final int WORLD_SET_TIME = 23;
 }

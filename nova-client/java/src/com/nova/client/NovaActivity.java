@@ -561,7 +561,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
             atlases = new AtlasBuilder(entities, newTex);
             if (nativeOk) {
                 try { nativeSetTexMode(newTex ? 1 : 0); } catch (Throwable t) { Log.w(TAG, "tex mode", t); }
-                playVersion = versionPref();
+                playVersion = 14;                   // the hybrid (0.15...) is off: the "Version 0.15" switch is gone (alpha39)
                 try { nativeSetVersion(playVersion); } catch (Throwable t) { Log.w(TAG, "version", t); }
                 Log.i(TAG, "plays as version 0." + playVersion);
                 try { nativeSetDataDir(getFilesDir().getAbsolutePath()); } catch (Throwable t) { Log.w(TAG, "data dir", t); }
