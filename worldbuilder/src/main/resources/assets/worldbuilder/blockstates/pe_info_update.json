@@ -1,0 +1,7 @@
+{
+ "variants": {
+  "": {
+   "model": "worldbuilder:block/pe_info_update"
+  }
+ }
+}

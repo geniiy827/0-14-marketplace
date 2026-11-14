@@ -1,0 +1,14 @@
+{
+ "modmenu.nameTranslation.worldbuilder": "World Builder 0.14.3",
+ "worldbuilder.title": "World Builder 0.14.3",
+ "worldbuilder.menu.button": "World Builder 0.14.3",
+ "block.worldbuilder.pe_invisible_bedrock": "\u041d\u0435\u0432\u0438\u0434\u0438\u043c\u044b\u0439 \u0431\u0435\u0434\u0440\u043e\u043a (PE)",
+ "block.worldbuilder.pe_stonecutter": "\u041a\u0430\u043c\u043d\u0435\u0440\u0435\u0437 (PE 0.14)",
+ "block.worldbuilder.pe_glowing_obsidian": "\u0421\u0432\u0435\u0442\u044f\u0449\u0438\u0439\u0441\u044f \u043e\u0431\u0441\u0438\u0434\u0438\u0430\u043d (PE)",
+ "block.worldbuilder.pe_nether_reactor": "\u042f\u0434\u0440\u043e \u0440\u0435\u0430\u043a\u0442\u043e\u0440\u0430 \u041d\u0438\u0436\u043d\u0435\u0433\u043e \u043c\u0438\u0440\u0430 (PE)",
+ "block.worldbuilder.pe_info_update": "\u0411\u043b\u043e\u043a \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f (PE)",
+ "block.worldbuilder.pe_info_update2": "\u0411\u043b\u043e\u043a \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f 2 (PE)",
+ "block.worldbuilder.pe_reserved6": "\u0417\u0430\u0440\u0435\u0437\u0435\u0440\u0432\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0439 \u0431\u043b\u043e\u043a 6 (PE)",
+ "block.worldbuilder.item_frame": "\u0420\u0430\u043c\u043a\u0430 (\u0431\u043b\u043e\u043a PE)",
+ "block.worldbuilder.unknown_block": "\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u044b\u0439 \u0431\u043b\u043e\u043a (\u0437\u0430\u0433\u043b\u0443\u0448\u043a\u0430)"
+}

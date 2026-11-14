@@ -1,0 +1,19 @@
+{
+ "variants": {
+  "facing=north": {
+   "model": "worldbuilder:block/item_frame"
+  },
+  "facing=east": {
+   "model": "worldbuilder:block/item_frame",
+   "y": 90
+  },
+  "facing=south": {
+   "model": "worldbuilder:block/item_frame",
+   "y": 180
+  },
+  "facing=west": {
+   "model": "worldbuilder:block/item_frame",
+   "y": 270
+  }
+ }
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "worldbuilder",
+  "version": "${version}",
+  "name": "World Builder 0.14.3",
+  "description": "Редактор миров серверов Minecraft PE 0.14.3 (Genisys, McRegion) внутри Minecraft Java 1.20.1.",
+  "authors": ["geniiy827"],
+  "license": "All-Rights-Reserved",
+  "icon": "assets/worldbuilder/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["com.geniiy.worldbuilder.blocks.ModBlocks"],
+    "client": ["com.geniiy.worldbuilder.WorldBuilderMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.14.22",
+    "fabric-api": "*",
+    "minecraft": "~1.20.1",
+    "java": ">=17"
+  }
+}

@@ -1,0 +1,13 @@
+{
+ "variants": {
+  "state=normal": {
+   "model": "worldbuilder:block/pe_nether_reactor_normal"
+  },
+  "state=active": {
+   "model": "worldbuilder:block/pe_nether_reactor_active"
+  },
+  "state=used": {
+   "model": "worldbuilder:block/pe_nether_reactor_used"
+  }
+ }
+}
