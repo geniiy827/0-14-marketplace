@@ -47,14 +47,13 @@ tint(Image.open(os.path.join(G, 'gui/newgui/X.png')), (1.0, 1.0, 1.0)).save(os.p
 for n in ('arrowLeft', 'arrowRight'):
     Image.open(os.path.join(G, 'gui/newgui/%s.png' % n)).convert('RGBA').save(os.path.join(OUT, n + '.png'))
 
-# the green book of Java's recipe button, without its grey frame
-rb = Image.open(os.path.join(J, 'gui/recipe_button.png')).convert('RGBA').crop((1, 1, 19, 17))
+# the green book of Java's recipe button (with its pages), without the button around it
+rb = Image.open(os.path.join(J, 'gui/recipe_button.png')).convert('RGBA').crop((2, 21, 18, 35))
 px = rb.load()
-frame = px[1, 8]
+face = px[0, 0]
 for y in range(rb.height):
     for x in range(rb.width):
-        p = px[x, y]
-        if abs(p[0] - p[1]) < 10 and abs(p[1] - p[2]) < 10 and p[0] > 140:   # light greys of the button face
+        if px[x, y][:3] == face[:3]:
             px[x, y] = (0, 0, 0, 0)
 rb.save(os.path.join(OUT, 'book.png'))
 print('ok')

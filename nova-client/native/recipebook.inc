@@ -546,15 +546,15 @@ static int rb_draw(void *client, char *cc, int creative) {
     rb_hit_n = 0;
     float rx = (float)(int)(W / 2 - 78), ry = (float)(int)(H / 2 - 74) + (creative ? 10 : 0);   /* common.root_panel */
     /* the book button: the screen's top-left corner */
-    rb_btn[0] = 4; rb_btn[1] = 4; rb_btn[2] = 20; rb_btn[3] = 20;
-    rb_nine(client, rb_open ? 3 : 2, 4, 4, 20, 20);
-    rb_blit(client, "book", 5, 6, 18, 16);
+    rb_btn[0] = 4; rb_btn[1] = 4; rb_btn[2] = 22; rb_btn[3] = 22;
+    rb_nine(client, rb_open ? 3 : 2, 4, 4, 22, 22);
+    rb_blit(client, "book", 7, 8, 16, 14);
     if (!rb_open) { rb_tooltip(client, font); return 1; }
     if (rb_gen_built != rc_gen || rb_built_mods != rc_count) { rb_build(); rb_tabs(); rb_query_dirty = 1; }
     /* the curtain: from the screen's left edge to the inventory, under the button */
     float x1 = rx - 3, x0 = x1 - 160;
     if (x0 < 4) x0 = 4;
-    float y0 = ry < 28 ? 28 : ry, y1 = ry + 148;
+    float y0 = ry < 30 ? 30 : ry, y1 = ry + 148;
     if (y1 > H - 2) y1 = H - 2;
     float pw = x1 - x0, ph = y1 - y0;
     if (pw < 60 || ph < 70) return 1;
@@ -562,31 +562,31 @@ static int rb_draw(void *client, char *cc, int creative) {
     rb_nine(client, 0, x0, y0, pw, ph);
     rb_accent(x0 + 5, y0 + 3, x1 - 5);
     /* tabs: a row of buttons with the tab's item */
-    rb_fit = (int)((pw - 10) / 19);
+    rb_fit = (int)((pw - 10 + 1) / 23);
     rb_tab_arrows = rb_tab_n > rb_fit;
-    if (rb_tab_arrows) rb_fit = (int)((pw - 10 - 22) / 19);
+    if (rb_tab_arrows) rb_fit = (int)((pw - 10 - 22 + 1) / 23);
     if (rb_fit < 1) rb_fit = 1;
     if (rb_tab_off > rb_tab_n - rb_fit) rb_tab_off = rb_tab_n - rb_fit;
     if (rb_tab_off < 0) rb_tab_off = 0;
     rb_tabs_y = y0 + 6;
     rb_tabs_x0 = x0 + 5 + (rb_tab_arrows ? 11 : 0);
     if (rb_tab_arrows) {
-        rb_button(client, x0 + 5, rb_tabs_y, 10, 18, "arrowLeft", 0);
-        rb_button(client, x1 - 15, rb_tabs_y, 10, 18, "arrowRight", 0);
+        rb_button(client, x0 + 5, rb_tabs_y, 10, 22, "arrowLeft", 0);
+        rb_button(client, x1 - 15, rb_tabs_y, 10, 22, "arrowRight", 0);
     }
     for (int i = 0; i < rb_fit && rb_tab_off + i < rb_tab_n; i++) {
         int t = rb_tab_off + i, id, aux;
-        float tx = rb_tabs_x0 + i * 19;
-        rb_nine(client, t == rb_tab ? 3 : 2, tx, rb_tabs_y, 18, 18);
+        float tx = rb_tabs_x0 + i * 23;
+        rb_nine(client, t == rb_tab ? 3 : 2, tx, rb_tabs_y, 22, 22);
         rb_tab_icon(t, &id, &aux);
-        rb_item_safe(id, aux, tx + 1, rb_tabs_y + 1);
+        rb_item_safe(id, aux, tx + 3, rb_tabs_y + 3);
     }
     if (rb_query_dirty) { rb_query_dirty = 0; rb_filter(); }
     /* title + page */
     char title[64];
     rb_tab_title(rb_tab, title, sizeof title);
-    rb_text(font, x0 + 6, y0 + 27, title, RB_CYAN);
-    float gy = y0 + 38;
+    rb_text(font, x0 + 6, y0 + 31, title, RB_CYAN);
+    float gy = y0 + 42;
     rb_search[2] = 0;
     if (rb_tab == 1) {                                         /* search field: a slot-like box */
         rb_search[0] = x0 + 5; rb_search[1] = gy; rb_search[2] = pw - 10; rb_search[3] = 13;
@@ -682,11 +682,11 @@ static void rb_handle_tap(float x, float y) {
     }
     float x0 = rb_panel[0], pw = rb_panel[2], x1 = x0 + pw, y1 = rb_panel[1] + rb_panel[3];
     if (rb_tab_arrows) {
-        if (rb_in(x, y, x0 + 3, rb_tabs_y - 2, 14, 22)) { if (rb_tab_off > 0) { rb_tab_off--; rb_click(); } return; }
-        if (rb_in(x, y, x1 - 17, rb_tabs_y - 2, 14, 22)) { if (rb_tab_off < rb_tab_n - rb_fit) { rb_tab_off++; rb_click(); } return; }
+        if (rb_in(x, y, x0 + 3, rb_tabs_y - 2, 14, 26)) { if (rb_tab_off > 0) { rb_tab_off--; rb_click(); } return; }
+        if (rb_in(x, y, x1 - 17, rb_tabs_y - 2, 14, 26)) { if (rb_tab_off < rb_tab_n - rb_fit) { rb_tab_off++; rb_click(); } return; }
     }
     for (int i = 0; i < rb_fit && rb_tab_off + i < rb_tab_n; i++)
-        if (rb_in(x, y, rb_tabs_x0 + i * 19, rb_tabs_y - 2, 19, 22)) {
+        if (rb_in(x, y, rb_tabs_x0 + i * 23, rb_tabs_y - 2, 23, 26)) {
             int t = rb_tab_off + i;
             if (t != rb_tab) { rb_tab = t; rb_page = 0; rb_query_dirty = 1; rb_click(); }
             if (t == 1 && !rb_kbd) rb_keyboard(1);

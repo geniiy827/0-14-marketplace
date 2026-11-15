@@ -9,4 +9,6 @@ public class MainActivity extends android.app.NativeActivity {
     public void hideKeyboard() { }
     public native void nativeSetTextboxText(String text);
     public native void nativeReturnKeyPressed();
+    public native void nativeBackPressed();
+    public native void nativeBackSpacePressed();
 }

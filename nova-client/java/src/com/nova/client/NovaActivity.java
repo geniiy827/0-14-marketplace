@@ -547,6 +547,18 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     // ---- recipe book search (native/recipebook.inc): the game's own keyboard, the text goes to the book while it is up
     private volatile boolean recipeSearch;
 
+    private android.text.TextWatcher recipeWatcher;
+    private android.widget.TextView recipeField;
+
+    /* the game's hidden text field (MainActivity.textInputWidget), made by showKeyboard */
+    private android.widget.TextView gameTextField() {
+        try {
+            java.lang.reflect.Field f = com.mojang.minecraftpe.MainActivity.class.getDeclaredField("textInputWidget");
+            f.setAccessible(true);
+            return (android.widget.TextView) f.get(this);
+        } catch (Throwable t) { Log.w(TAG, "recipe keyboard: no text field", t); return null; }
+    }
+
     void recipeKeyboard(final boolean show, final String text) {
         recipeSearch = show;
         runOnUiThread(new Runnable() {
@@ -557,6 +569,30 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
                 } catch (Throwable t) { Log.w(TAG, "recipe keyboard", t); }
             }
         });
+        if (!show) return;
+        // showKeyboard builds the field in a runnable of its own: listen to it after that one ran
+        runOnUiThread(new Runnable() {
+            public void run() {
+                android.widget.TextView tv = gameTextField();
+                if (tv == null) return;
+                if (recipeField != null && recipeWatcher != null) recipeField.removeTextChangedListener(recipeWatcher);
+                recipeField = tv;
+                recipeWatcher = new android.text.TextWatcher() {
+                    public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+                    public void onTextChanged(CharSequence s, int a, int b, int c) { }
+                    public void afterTextChanged(android.text.Editable e) {
+                        if (recipeSearch) ModBridge.nativeRecipeSearch(e.toString(), 0);
+                    }
+                };
+                tv.addTextChangedListener(recipeWatcher);
+            }
+        });
+    }
+
+    private void recipeKeyboardClosed() {
+        recipeSearch = false;
+        ModBridge.nativeRecipeSearch(null, 1);
+        try { hideKeyboard(); } catch (Throwable t) { }
     }
 
     @Override
@@ -567,13 +603,21 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
 
     @Override
     public void nativeReturnKeyPressed() {
-        if (recipeSearch) {
-            recipeSearch = false;
-            ModBridge.nativeRecipeSearch(null, 1);
-            try { hideKeyboard(); } catch (Throwable t) { }
-            return;
-        }
+        if (recipeSearch) { recipeKeyboardClosed(); return; }
         super.nativeReturnKeyPressed();
+    }
+
+    // back key or a touch outside the keyboard: the game would take it as "back" and close the inventory
+    @Override
+    public void nativeBackPressed() {
+        if (recipeSearch) { recipeKeyboardClosed(); return; }
+        super.nativeBackPressed();
+    }
+
+    @Override
+    public void nativeBackSpacePressed() {
+        if (recipeSearch) return;          // the text comes whole through the watcher
+        super.nativeBackSpacePressed();
     }
 
     @Override
