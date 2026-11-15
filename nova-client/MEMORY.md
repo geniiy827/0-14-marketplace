@@ -328,3 +328,6 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Краш alpha48 при любом поджоге: BlockSource::getBlockID(int,int,int) возвращает BlockID через sret (r0 = out, r1 = this). Теперь wd_get_id(out, bs, x, y, z).
 - Деревянное измерение вынесено в мод (mcmod/examples/wood_world). Объявление `dimension name { portal: {frame, color|texture}, generator: {type islands|flat, ...}, respawn }` → ModDims.java → nativeDimensions → dims.inc (до 4 измерений, номера 2.. в files/nova/dimids.json, у каждого свой блок портала с конца свободных номеров вне POOL).
 - Текстура портала: полоса portal.png игры в цвете color или своя; отдаётся игре как nova/dimportal/<n>.png (NovaActivity), первый кадр в атласе как nova_portal_tex_<n> (ModBlocks.addAnimated).
+
+## alpha50
+- ModDims: блоки игры по имени из своей таблицы VANILLA (моды читаются до того, как игра знает свои имена: ITEM_ID давал -1 → «неизвестный блок planks»).

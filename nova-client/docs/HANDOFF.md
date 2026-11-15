@@ -114,7 +114,10 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha49 выпущена)
+## 4. Где остановились (alpha50 выпущена)
+
+alpha50: исправлено «неизвестный блок planks» в dimension.
+
 
 alpha49: краш поджога исправлен, измерения — API модов (`dimension`), пример wood_world. Ждём проверки.
 
