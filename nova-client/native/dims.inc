@@ -96,18 +96,22 @@ static int wd_column(Dim *D, u8 *bl, u8 *dt, int x, int z, int wx, int wz, u32 s
     if (bottom < 4) bottom = 4;
     if (top > 118) top = 118;
     int shift = (int)(wd_vnoise(wx / 9.f, wz / 9.f, seed + 5) * 4);           /* once per column */
+    #define WD_FALLS(b) ((b) == 12 || (b) == 13 || (b) == 145 || (b) == 122)   /* sand, gravel, anvil, egg */
     for (int y = bottom; y <= top; y++) {
-        if (y == top) wd_put(bl, dt, x, y, z, D->top, D->top_d);
-        else if (y >= top - D->fill_n) wd_put(bl, dt, x, y, z, D->fill, D->fill_d);
+        int under = y == bottom;                       /* nothing below: sand / gravel would fall into the void */
+        if (y == top && !(under && WD_FALLS(D->top))) wd_put(bl, dt, x, y, z, D->top, D->top_d);
+        else if (y >= top - D->fill_n && y < top && !(under && WD_FALLS(D->fill))) wd_put(bl, dt, x, y, z, D->fill, D->fill_d);
+        else if (y == top) wd_put(bl, dt, x, y, z, D->nbody ? D->body[0][0] : 1, D->nbody ? D->body[0][1] : 0);
         else if (D->nbody) {
             int k = ((y + shift) / 3) % D->nbody;
-            wd_put(bl, dt, x, y, z, D->body[k][0], D->body[k][1]);
+            if (under && WD_FALLS(D->body[k][0])) k = 0;
+            wd_put(bl, dt, x, y, z, WD_FALLS(D->body[k][0]) && under ? 1 : D->body[k][0], D->body[k][1]);
         } else wd_put(bl, dt, x, y, z, 1, 0);
     }
     if (D->roots > 0 && s > 0.15f && wd_rnd(wx, wz, seed + 11) < 0.07f) {
         u32 h = wd_hash(wx, wz, seed + 12);
         int len = 1 + (int)(h % 6);
-        for (int k = 1; k <= len && bottom - k > 0; k++) wd_put(bl, dt, x, bottom - k, z, D->roots, D->roots_d >= 0 ? D->roots_d : (int)((h >> 8) % 4));
+        if (!WD_FALLS(D->roots)) for (int k = 1; k <= len && bottom - k > 0; k++) wd_put(bl, dt, x, bottom - k, z, D->roots, D->roots_d >= 0 ? D->roots_d : (int)((h >> 8) % 4));
     }
     return top;
 }
