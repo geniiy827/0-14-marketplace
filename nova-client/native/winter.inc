@@ -15,6 +15,7 @@ static float wt_saved_temp[256];
 static unsigned char wt_saved_rain[256];
 static int wt_saved;
 static float wt_acc;
+static int wt_batch;
 static u32 wt_seed = 0x9e3779b9u;
 static void **wt_biomes;                                 /* Biome::mBiomes */
 static void *(*wt_get_weather)(void *dim);
@@ -111,22 +112,24 @@ static void wt_place(void *bs, int x, int z, char **pls, int npl) {
 /* every game tick on the host: the snow piles up around the players */
 static void wt_tick(void *level) {
     if (wt_speed <= 0 || !level || !mf_isclient || mf_isclient(level) || !nf_players || !wt_top_rain || !wt_region) return;
+    if (++wt_batch < 20) return;                              /* once a second: each chunk rebuilds at most once */
+    wt_batch = 0;
     u32 *v = nf_players(level);
     if (!v) return;
     char *pls[16];
     int npl = 0;
     for (char **it = (char **)v[0]; it < (char **)v[1] && npl < 16; it++) if (*it) pls[npl++] = *it;
     const int R = 32;
-    float per_tick = wt_speed * (2 * R + 1) * (2 * R + 1) / 1200.f;   /* columns around one player, 20 ticks a second */
+    float per_sec = wt_speed * (2 * R + 1) * (2 * R + 1) / 60.f;      /* columns around one player, layers a second */
     for (int i = 0; i < npl; i++) {
         void *bs = wt_region(pls[i]);
         if (!bs) continue;
         float *pp = (float *)(pls[i] + 8);
         int cx = (int)floorf(pp[0]), cz = (int)floorf(pp[2]);
-        wt_acc += per_tick;
+        wt_acc += per_sec;
         int n = (int)wt_acc;
         wt_acc -= n;
-        if (n > 400) n = 400;
+        if (n > 600) n = 600;
         for (int k = 0; k < n; k++) {
             u32 span = 2 * R + 1;                             /* no division in libnova: scale the random number */
             int x = cx + (int)(((unsigned long long)wt_rand() * span) >> 32) - R;
@@ -145,4 +148,4 @@ static void winter_init(void *mc) {
 }
 
 /* a world was left: the next one starts as the game makes it (mods set it again on world.join) */
-static void wt_reset(void) { wt_rain = -1.f; wt_speed = 0; wt_limit = 0; wt_freeze = 0; wt_apply_freeze(0); }
+static void wt_reset(void) { wt_batch = 0; wt_acc = 0; wt_rain = -1.f; wt_speed = 0; wt_limit = 0; wt_freeze = 0; wt_apply_freeze(0); }

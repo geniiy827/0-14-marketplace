@@ -201,10 +201,11 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     static char s[2048];
     jstr_copy(env, jstr, s, sizeof s);
     double out[72];
-    if (op == OP_HUD) { hud_op(a, n, s); return 0; }
-    if (op == OP_RECIPE || op == OP_SMELT) { rc_op(op, a, n, s); return 0; }
-    if (op == OP_WEATHER_RAIN || op == OP_WEATHER_FREEZE || op == OP_WEATHER_SNOW) { wt_op(op, a, n); return 0; }
-    int r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
+    int r;                                             /* void ops still answer [] : null means "not in a world" */
+    if (op == OP_HUD) { hud_op(a, n, s); r = 0; }
+    else if (op == OP_RECIPE || op == OP_SMELT) { rc_op(op, a, n, s); r = 0; }
+    else if (op == OP_WEATHER_RAIN || op == OP_WEATHER_FREEZE || op == OP_WEATHER_SNOW) { wt_op(op, a, n); r = 0; }
+    else r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
         : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
         ? sc_op(op, a, n, out) : mm_op(op, a, n, s, out);
     if (r < 0) return 0;
