@@ -114,7 +114,10 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha50 выпущена)
+## 4. Где остановились (alpha51 выпущена)
+
+alpha51: булыжный и алмазный миры в wood_world; ищем причину «не отвечает» при переходе.
+
 
 alpha50: исправлено «неизвестный блок planks» в dimension.
 

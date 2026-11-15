@@ -95,11 +95,12 @@ static int wd_column(Dim *D, u8 *bl, u8 *dt, int x, int z, int wx, int wz, u32 s
     int bottom = top - depth;
     if (bottom < 4) bottom = 4;
     if (top > 118) top = 118;
+    int shift = (int)(wd_vnoise(wx / 9.f, wz / 9.f, seed + 5) * 4);           /* once per column */
     for (int y = bottom; y <= top; y++) {
         if (y == top) wd_put(bl, dt, x, y, z, D->top, D->top_d);
         else if (y >= top - D->fill_n) wd_put(bl, dt, x, y, z, D->fill, D->fill_d);
         else if (D->nbody) {
-            int k = ((y + (int)(wd_vnoise(wx / 9.f, wz / 9.f, seed + 5) * 4)) / 3) % D->nbody;
+            int k = ((y + shift) / 3) % D->nbody;
             wd_put(bl, dt, x, y, z, D->body[k][0], D->body[k][1]);
         } else wd_put(bl, dt, x, y, z, 1, 0);
     }
@@ -324,11 +325,14 @@ static void wd_arrive(void *forcer, void *ent, Dim *D) {
     if (!bs) return;
     float *pp = (float *)((char *)ent + 8);
     int bx = (int)floorf(pp[0]), bz = (int)floorf(pp[2]), dim = wd_bs_dim(bs);
-    int best = 1 << 30;
+    long t0 = now_ms();
+    int best = 1 << 30, y0 = (int)pp[1] - 40, y1 = (int)pp[1] + 40;
+    if (y0 < 1) y0 = 1;
+    if (y1 > 126) y1 = 126;
     MPos at = {0, 0, 0};
-    for (int dx = -16; dx <= 16; dx++)
-        for (int dz = -16; dz <= 16; dz++)
-            for (int y = 1; y < 127; y++) {
+    for (int dx = -12; dx <= 12; dx++)
+        for (int dz = -12; dz <= 12; dz++)
+            for (int y = y0; y <= y1; y++) {
                 if ((int)wd_id(bs, bx + dx, y, bz + dz) != P) continue;
                 int yy = y;
                 while (yy > 1 && (int)wd_id(bs, bx + dx, yy - 1, bz + dz) == P) yy--;
@@ -346,16 +350,17 @@ static void wd_arrive(void *forcer, void *ent, Dim *D) {
         if (sy > 118) sy = 118;
         for (int x = bx - 2; x <= bx + 3; x++)                       /* a floor, and room around the frame */
             for (int z = bz - 2; z <= bz + 2; z++) {
-                if (wd_air(wd_id(bs, x, sy - 1, z)) || wd_id(bs, x, sy - 1, z) == 31) wd_set(bs, x, sy - 1, z, F, 0, 3);
-                for (int y = sy; y <= sy + 3; y++) if (z != bz || x < bx - 1 || x > bx + 2) wd_set(bs, x, y, z, 0, 0, 3);
+                if (wd_air(wd_id(bs, x, sy - 1, z)) || wd_id(bs, x, sy - 1, z) == 31) wd_set(bs, x, sy - 1, z, F, 0, 2);
+                for (int y = sy; y <= sy + 3; y++) if ((z != bz || x < bx - 1 || x > bx + 2) && !wd_air(wd_id(bs, x, y, z))) wd_set(bs, x, y, z, 0, 0, 2);
             }
-        for (int x = bx - 1; x <= bx + 2; x++) { wd_set(bs, x, sy - 1, bz, F, 0, 3); wd_set(bs, x, sy + 3, bz, F, 0, 3); }
-        for (int y = sy; y <= sy + 2; y++) { wd_set(bs, bx - 1, y, bz, F, 0, 3); wd_set(bs, bx + 2, y, bz, F, 0, 3); }
+        for (int x = bx - 1; x <= bx + 2; x++) { wd_set(bs, x, sy - 1, bz, F, 0, 2); wd_set(bs, x, sy + 3, bz, F, 0, 2); }
+        for (int y = sy; y <= sy + 2; y++) { wd_set(bs, bx - 1, y, bz, F, 0, 2); wd_set(bs, bx + 2, y, bz, F, 0, 2); }
         for (int y = sy; y <= sy + 2; y++) for (int x = bx; x <= bx + 1; x++) wd_set(bs, x, y, bz, P, 1, 2);
         at.x = bx; at.y = sy; at.z = bz;
         LOG("dims: portal built at %d %d %d (dimension %d)", bx, sy, bz, dim);
     }
     wd_travel(forcer, ent, &at, dim);
+    LOG("dims: arrival in %d took %ld ms", dim, now_ms() - t0);
 }
 static u64 hc_wd_force(u32 orig, u32 *w) {                   /* PortalForcer::force(this, Entity&) */
     if (wd_traveller && (void *)w[1] == wd_traveller && wd_trav_dim) {

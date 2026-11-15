@@ -1,4 +1,4 @@
-// Деревянный мир - пример измерения.
+// Деревянный мир (и ещё два) - примеры измерений.
 // Портал: рамка из досок любой породы, как у адского портала (внутри от 2x3 до 21x21), зажечь огнивом.
 // Заливка - портал игры в янтарном цвете. Обратно - тем же порталом. Умер там - возродишься дома.
 
@@ -21,9 +21,47 @@ dimension wood {
     respawn: false
 }
 
+// Булыжный мир: острова из камня, булыжника и замшелого булыжника, снизу свисают стены. Портал - рамка из булыжника.
+dimension cobble {
+    name: {ru: "Булыжный мир", en: "Cobblestone world"}
+    portal: {frame: "cobblestone", color: "#a8a8a8"}
+    generator: {
+        type: "islands"
+        height: 58
+        size: 48
+        top: "mossy_cobblestone"
+        filler: "gravel"
+        filler_depth: 2
+        body: ["stone", "cobblestone", "stone", "mossy_cobblestone", "stonebrick:0", "stonebrick:1"]
+        roots: "cobblestone_wall"
+        biome: "extremeHills"
+    }
+    respawn: false
+}
+
+// Алмазный мир: ледяные острова, внутри алмазная и лазуритовая руда, снизу светятся сосульки из светокамня.
+// Портал - рамка из алмазных блоков.
+dimension diamond {
+    name: {ru: "Алмазный мир", en: "Diamond world"}
+    portal: {frame: "diamond_block", color: "#40e8e0"}
+    generator: {
+        type: "islands"
+        height: 70
+        size: 40
+        density: 0.6
+        top: "snow"
+        filler: "packed_ice"
+        filler_depth: 2
+        body: ["stone", "diamond_ore", "stone", "lapis_ore", "packed_ice"]
+        roots: "glowstone"
+        biome: "iceFlats"
+    }
+    respawn: false
+}
+
 on chat(e) {
-    if e.text == "/wood" {
+    if e.text == "/wood" || e.text == "/dims" {
         e.cancel()
-        chat.send("§6Деревянный мир:§f построй рамку из досок как у адского портала и зажги её огнивом.")
+        chat.send("§6Измерения:§f рамка как у адского портала, зажечь огнивом. Доски - деревянный мир, булыжник - булыжный, алмазные блоки - алмазный.")
     }
 }
