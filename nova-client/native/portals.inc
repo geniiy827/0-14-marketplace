@@ -486,6 +486,32 @@ static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, 
     o_pt_rfi(scr, cam[0], cam[1], cam[2], lr, ent, a);
 }
 
+/* The game sets the stencil state itself with every material (glStencilFuncSeparate / OpSeparate / Mask, and
+ * glDisable(GL_STENCIL_TEST)): during our pass that switched our stencil off, the world beyond was drawn over the
+ * whole screen (bits of world in the sky, faces missing - alpha55/56). Its imports of these are pointed at ours:
+ * during our pass the stencil stays ours. */
+static void (*o_gl_disable)(GLenum), (*o_gl_sfs)(GLenum, GLenum, GLint, GLuint), (*o_gl_sos)(GLenum, GLenum, GLenum, GLenum);
+static void (*o_gl_smask)(GLuint), (*o_gl_clear)(GLuint);
+static void w_gl_disable(GLenum cap) { if (pt_inpass && cap == GL_STENCIL_TEST) return; o_gl_disable(cap); }
+static void w_gl_sfs(GLenum f, GLenum fn, GLint r, GLuint m) { if (!pt_inpass) o_gl_sfs(f, fn, r, m); }
+static void w_gl_sos(GLenum f, GLenum a, GLenum b, GLenum c) { if (!pt_inpass) o_gl_sos(f, a, b, c); }
+static void w_gl_smask(GLuint m) { if (!pt_inpass) o_gl_smask(m); }
+static void w_gl_clear(GLuint bits) { if (pt_inpass) bits &= ~(GLuint)GL_STENCIL_BUFFER_BIT; if (bits) o_gl_clear(bits); }
+static int pt_got(u32 base, u32 off, void *fn, void **orig) {
+    u32 *slot = (u32 *)(base + off);
+    u32 page = (u32)slot & ~4095u;
+    if (mprotect((void *)page, 4096, 3) != 0) return -1;
+    *orig = (void *)*slot;
+    *slot = (u32)fn;
+    mprotect((void *)page, 4096, 1);
+    return *orig ? 0 : -1;
+}
+#define GOT_GLDISABLE 0x75a9e4                 /* libminecraftpe R_ARM_JUMP_SLOT of glDisable, ... */
+#define GOT_GLSTENCILFUNCSEP 0x75aa08
+#define GOT_GLSTENCILOPSEP 0x75aa0c
+#define GOT_GLSTENCILMASK 0x75aa18
+#define GOT_GLCLEAR 0x75aa58
+
 /* RenderChunk::_chooseMaterial(layer, double time, bool): layers 8..10 fade a chunk in after it was (re)built or
  * came into sight; in our pass every chunk would be "new" each frame (transparent ground) - drawn settled there */
 static u64 hc_pt_material(u32 orig, u32 *w) {
@@ -544,6 +570,13 @@ static void portals_init(void *mc) {
     int r = nh_hook_c((u32)va, hc_pt_view_area);
     pt_view_hooked = r >= 0;
     if (!pt_view_hooked) LOGE("portals: updateViewArea hook failed (%d): crossing only, no see-through", r);
+    u32 base = ((u32)pt_render_level & ~1u) - 0x49bdb8;                /* LevelRenderer::renderLevel */
+    int g = pt_got(base, GOT_GLDISABLE, w_gl_disable, (void **)&o_gl_disable) |
+            pt_got(base, GOT_GLSTENCILFUNCSEP, w_gl_sfs, (void **)&o_gl_sfs) |
+            pt_got(base, GOT_GLSTENCILOPSEP, w_gl_sos, (void **)&o_gl_sos) |
+            pt_got(base, GOT_GLSTENCILMASK, w_gl_smask, (void **)&o_gl_smask) |
+            pt_got(base, GOT_GLCLEAR, w_gl_clear, (void **)&o_gl_clear);
+    if (g) { pt_view_hooked = 0; LOGE("portals: GL imports not hooked: crossing only, no see-through"); }
     pt_ok = 1;
     LOG("portals: ready");
 }
