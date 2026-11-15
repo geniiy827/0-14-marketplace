@@ -288,3 +288,12 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Block vt: 51 getDestroyProgress(Player&) (без позиции: данные берём из Level::getHitResult), 61 playerDestroy(.., data),
   63 getExperienceDrop, 107 getSpawnResourcesAuxValue. Item vt: 13 getLevelDataForAuxValue, 40 buildDescriptionName.
 - Упакованные блоки: прочность подменяется на время getDestroyProgress (b+112), кирка / опыт — через mb_ctx_data.
+
+## alpha44 (ноябрь 2026)
+- Recipe: ShapedRecipe +0x30 w, +0x34 h, +0x38 vector<ItemInstance> ингредиенты, +0x44 vector результатов;
+  ShapelessRecipe +0x30 ингредиенты, +0x3c результаты; vt 7 isShapeless. FurnaceRecipes: std::map по id (+0, корень +8)
+  и по id<<16|aux (+0x18, корень +0x20), узел +8 left, +0xc right, +0x10 ключ, +0x14 ItemInstance.
+- ItemRenderer::renderGuiItemNew(ii, frame, x, y, 1, 1, 1, false) рисует иконку 16 px (так делает Screen::_renderSlot).
+- Multitouch::feed(button, state, x, y, pointer): 1/1 нажатие, 1/0 отпускание, 0 - движение (net.inc hc_touch).
+- MainActivity.showKeyboard(String, int, boolean, boolean) / hideKeyboard / nativeSetTextboxText(String) — текст
+  клавиатуры игры; NovaActivity переопределяет nativeSetTextboxText и nativeReturnKeyPressed (поиск книги рецептов).

@@ -114,7 +114,12 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha42 выпущена)
+## 4. Где остановились (alpha44 выпущена)
+
+alpha44: книга рецептов — `native/recipebook.inc`, контрол `nova_rb` в `ui_new/inventory_screen.json`, картинки
+`tools/gen_recipebook.py` -> `assets_new/images/gui/nova/rb/`. alpha43: crop картинок, упаковка предметов с action.
+
+### alpha42
 
 alpha42: упаковка простых блоков по данным (ModBlocks.packKey/packSlot, mcmod.inc mblock_sub/mb_of, ключи
 "pack:/pdn:/data:" в файле номеров), анимации блоков (FlipbookTexture), предметы с кадрами (item.frame),

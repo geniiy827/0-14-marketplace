@@ -6,7 +6,7 @@
  * vector<Recipes::Type> + Recipes::addShapedRecipe) whenever that packet has been handled, and when a mod adds them.
  * Recipes::Type: +0 Item*, +4 Block*, +8 ItemInstance, +0x1c letter (32 bytes). */
 #define RC_MAX 512
-typedef struct { int kind, out, n, aux, gen; char rows[3][4]; int nk; char key[9]; short kid[9], kaux[9]; } MRecipe;
+typedef struct { int kind, out, n, aux, gen; char rows[3][4]; int nk; char key[9]; short kid[9], kaux[9]; int mod; } MRecipe;   /* mod: rb_mods index (recipebook.inc) */
 static MRecipe rc_list[RC_MAX];
 static int rc_count;
 static void *(*rc_book)(void);
@@ -101,10 +101,17 @@ static int rc_num(char **pp) {
     *pp = p;
     return neg ? -v : v;
 }
+static int rb_mod_index(const char *id);
 static int rc_op(int op, double *a, int n, char *s) {
     if (rc_count >= RC_MAX) return 0;
     MRecipe *r = &rc_list[rc_count];
     memset(r, 0, sizeof *r);
+    r->mod = -1;
+    {                                                     /* "<mod id>\x1d" in front: whose recipe (the recipe book) */
+        char *g = s;
+        while (*g && *g != '\x1d') g++;
+        if (*g == '\x1d') { *g = 0; r->mod = rb_mod_index(s); s = g + 1; }
+    }
     if (op == OP_SMELT) {
         if (n < 5) return 0;
         r->kind = 1; r->nk = 1; r->kid[0] = (short)a[0]; r->kaux[0] = (short)a[1];
@@ -135,6 +142,7 @@ static int rc_op(int op, double *a, int n, char *s) {
         if (o->kind == r->kind && o->out == r->out && o->aux == r->aux && o->n == r->n &&
             !memcmp(o->rows, r->rows, sizeof r->rows) && o->nk == r->nk && !memcmp(o->kid, r->kid, sizeof r->kid) &&
             !memcmp(o->kaux, r->kaux, sizeof r->kaux) && !memcmp(o->key, r->key, sizeof r->key)) {
+            if (r->mod >= 0) o->mod = r->mod;
             rc_mark();
             return 0;
         }

@@ -62,6 +62,8 @@ T = {
 }
 # mods (alpha5)
 EXTRA = {
+ 'nova.rb.search': {'en_US': 'Search...', 'ru_RU': 'Поиск...', 'de_DE': 'Suchen...', 'es_ES': 'Buscar...', 'fr_FR': 'Rechercher...',
+                    'it_IT': 'Cerca...', 'pt_BR': 'Pesquisar...', 'ja_JP': '検索...', 'ko_KR': '검색...', 'zh_CN': '搜索...', 'zh_TW': '搜尋...'},
  'nova.mods.none': {'en_US': 'No mods yet. Import a .mcmod file on the Import tab', 'ru_RU': 'Модов нет. Импортируйте файл мода на вкладке «Импорт»',
                     'de_DE': 'Noch keine Mods. Importiere eine .mcmod-Datei im Tab Import', 'es_ES': 'No hay mods. Importa un archivo .mcmod en Importar',
                     'fr_FR': 'Aucun mod. Importez un fichier .mcmod dans Importer', 'it_IT': 'Nessuna mod. Importa un file .mcmod in Importa',

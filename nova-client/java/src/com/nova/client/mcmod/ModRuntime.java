@@ -490,13 +490,13 @@ public final class ModRuntime {
                     sb.append(k).append(':').append(ia[0]).append(':').append(ia[1]).append('|');
                 }
                 double cnt = a.get(3) instanceof Double ? (Double) a.get(3) : 1;
-                host.nativeApi(ApiOps.RECIPE, new double[]{res[0], cnt, res[1]}, sb.toString());
+                host.nativeApi(ApiOps.RECIPE, new double[]{res[0], cnt, res[1]}, modOf(in).id + "\u001d" + sb.toString());
                 return null;
             }
             case "recipe.smelt": {
                 int[] in2 = idAux(a.get(0), line), out = idAux(a.get(1), line);
                 double cnt = a.get(2) instanceof Double ? (Double) a.get(2) : 1;
-                host.nativeApi(ApiOps.SMELT, new double[]{in2[0], in2[1], out[0], cnt, out[1]}, "");
+                host.nativeApi(ApiOps.SMELT, new double[]{in2[0], in2[1], out[0], cnt, out[1]}, modOf(in).id + "\u001d");
                 return null;
             }
             case "ui.hud": {                     // icons of the mod -> nova/mod/<id>/<file>, drawn by libnova (hud.inc)

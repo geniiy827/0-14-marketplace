@@ -22,6 +22,14 @@ public final class ModBridge {
     static native int nativeStructures(byte[] data);
     static native int nativeBlockExtra(double[] data);
     static native int nativeBlockAnims(double[] data, String paths);
+    static native int nativeRecipeMods(String spec);
+    static native void nativeRecipeSearch(String text, int done);
+
+    /** libnova's recipe book asks for the search keyboard (the game's own text input) */
+    static void recipeKeyboard(int show, String text) {
+        NovaActivity a = NovaActivity.instance;
+        if (a != null) a.recipeKeyboard(show != 0, text);
+    }
     static native int nativeCreativeTabs(String spec);
     static native int nativeArmorTextures(String spec);
     static native int nativeItemVariants(double[] data, String names);
@@ -266,11 +274,20 @@ public final class ModBridge {
                 icon.put(tkey, (code & 0xffff) + "\u001f" + (code >> 16));
         }
         StringBuilder out = new StringBuilder();
+        StringBuilder rm = new StringBuilder();              // recipe book: mod id, title, icon of its first tab
+        java.util.Set<String> seenMods = new java.util.HashSet<String>();
         for (java.util.Map.Entry<String, StringBuilder> en : items.entrySet()) {
+            String mid = en.getKey().substring(0, en.getKey().indexOf('\u0000'));
+            if (seenMods.add(mid)) {
+                if (rm.length() > 0) rm.append('\u001e');
+                rm.append(mid).append('\u001f').append(title.get(en.getKey()).replace('\u001f', ' ').replace('\u001e', ' '))
+                  .append('\u001f').append(icon.get(en.getKey()));
+            }
             if (out.length() > 0) out.append('\u001e');
             out.append(title.get(en.getKey()).replace('\u001f', ' ').replace('\u001e', ' '))
                .append('\u001f').append(icon.get(en.getKey())).append('\u001f').append(en.getValue());
         }
+        try { nativeRecipeMods(rm.toString()); } catch (Throwable t) { Log.e(TAG, "recipe book mods", t); }
         return out.toString();
     }
 }

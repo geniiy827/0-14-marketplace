@@ -983,11 +983,13 @@ static void title_gate(char *cc) {
     }
 }
 static int ct_ui_render(void *client, char *cc);
+static int rb_ui_render(void *client, char *cc);
 static void h_dbg_render(void *self, void *client, void **ctrl, int pass) {
     o_dbg_render(self, client, ctrl, pass);
     if (pass != 0) return;
     char *cc = ctrl ? *(char **)ctrl : 0;
     if (cc && ct_ui_render(client, cc)) return;                         /* creative tab pages (creative.inc) */
+    if (cc && rb_ui_render(client, cc)) return;                         /* recipe book (recipebook.inc) */
     if (cc && streq(sdata(cc + 0xc), "nova_title_gate")) { menu_seen = 1; title_gate(cc); return; }
     if (menus_ok) draw_toast(client);
     if (cc && streq(sdata(cc + 0xc), "nova_toast")) { menu_seen = 1; return; }   /* menu screens: toast only */
@@ -1172,6 +1174,7 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "v015.inc"
 #include "winter.inc"
 #include "env.inc"
+#include "recipebook.inc"
 
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
@@ -1206,6 +1209,7 @@ __attribute__((constructor)) static void nova_init(void) {
     winter_init(mc);
     env_init(mc);
     flip_init(mc);
+    recipebook_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }

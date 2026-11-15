@@ -542,8 +542,43 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         }
     }
 
+    static volatile NovaActivity instance;
+
+    // ---- recipe book search (native/recipebook.inc): the game's own keyboard, the text goes to the book while it is up
+    private volatile boolean recipeSearch;
+
+    void recipeKeyboard(final boolean show, final String text) {
+        recipeSearch = show;
+        runOnUiThread(new Runnable() {
+            public void run() {
+                try {
+                    if (show) showKeyboard(text == null ? "" : text, 40, false, false);
+                    else hideKeyboard();
+                } catch (Throwable t) { Log.w(TAG, "recipe keyboard", t); }
+            }
+        });
+    }
+
+    @Override
+    public void nativeSetTextboxText(String text) {
+        if (recipeSearch) { ModBridge.nativeRecipeSearch(text == null ? "" : text, 0); return; }
+        super.nativeSetTextboxText(text);
+    }
+
+    @Override
+    public void nativeReturnKeyPressed() {
+        if (recipeSearch) {
+            recipeSearch = false;
+            ModBridge.nativeRecipeSearch(null, 1);
+            try { hideKeyboard(); } catch (Throwable t) { }
+            return;
+        }
+        super.nativeReturnKeyPressed();
+    }
+
     @Override
     public void onCreate(Bundle state) {
+        instance = this;
         // must be ready before super.onCreate(): the native lib starts loading assets there
         try {
             overrides = PackManager.buildIndex(this);

@@ -875,6 +875,7 @@
 
   "crafting_screen@common.inventory_screen_common": {
     "controls": [
+      { "nova_rb@crafting.nova_rb": { } },
       { "@common.container_gamepad_helpers": { } },
       { "@common.screen_background": { } },
       {
@@ -939,6 +940,7 @@
 
   "survival_inventory_screen@common.inventory_screen_common": {
     "controls": [
+      { "nova_rb@crafting.nova_rb": { } },
       { "@common.container_gamepad_helpers": { } },
       { "@common.screen_background": { } },
       {
@@ -1251,6 +1253,17 @@
     "$panel_name": "miscellaneous_pane",
     "$content": "miscellaneous_inventory_list",
     "$grid_list": "crafting.miscellaneous_inventory_grid"
+  },
+
+  // NOVA: recipe book (libnova draws it over the whole screen: the book button above the inventory, the curtain to
+  // the left of it, the recipe window; native/recipebook.inc). Drawn after the inventory: listed first, highest layer.
+  "nova_rb": {
+    "type": "custom",
+    "renderer": "debug_overlay_renderer",
+    "size": [ "100%", "100%" ],
+    "anchor_from": "top_left",
+    "anchor_to": "top_left",
+    "layer": 60
   },
 
   // NOVA: label of the creative tab (libnova draws it: the game's name on page 1, a mod tab's name on others)
