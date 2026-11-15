@@ -36,7 +36,7 @@ static void (*o_pt_rfi)(void *scr, float x, float y, float z, void *lr, void *en
 static void (*pt_render_level)(void *lr, void *ent, void *c1, void *c2, float f, float a);
 static void (*pt_frustum_ctor)(void *fd);
 static float *(*pt_top)(void *stack);
-static void *pt_view, *pt_proj;
+static void *pt_view, *pt_proj, *pt_world;
 static void (*pt_move_to)(void *ent, float *pos, float *rot);
 static void *(*pt_local_player)(void *client);
 
@@ -162,6 +162,7 @@ static struct {
     GLint (*GetUniformLocation)(GLuint, const char *);
     void (*UniformMatrix4fv)(GLint, GLint, unsigned char, const float *), (*Uniform4f)(GLint, float, float, float, float);
     void (*Uniform1f)(GLint, float);
+    void (*ReadPixels)(GLint, GLint, GLint, GLint, GLenum, GLenum, void *);
 } gl;
 static GLuint pt_prog; static GLint pt_u_mvp, pt_u_col, pt_u_far;
 
@@ -175,7 +176,7 @@ static int pt_gl_init(void) {
     G(ClearStencil) G(Clear) G(ColorMask) G(DepthMask) G(DepthFunc) G(UseProgram) G(BindBuffer) G(VertexAttribPointer)
     G(EnableVertexAttribArray) G(DisableVertexAttribArray) G(GetVertexAttribiv) G(GetVertexAttribPointerv) G(DrawArrays)
     G(CreateShader) G(CreateProgram) G(ShaderSource) G(CompileShader) G(AttachShader) G(BindAttribLocation) G(LinkProgram)
-    G(GetShaderiv) G(GetProgramiv) G(GetShaderInfoLog) G(GetUniformLocation) G(UniformMatrix4fv) G(Uniform4f) G(Uniform1f)
+    G(GetShaderiv) G(GetProgramiv) G(GetShaderInfoLog) G(GetUniformLocation) G(UniformMatrix4fv) G(Uniform4f) G(Uniform1f) G(ReadPixels)
     #undef G
     gl.GetIntegerv(GL_STENCIL_BITS, &pt_stencil_bits);
     if (pt_stencil_bits <= 0) { LOGE("portals: the screen has no stencil buffer, see-through is off"); return 0; }
@@ -279,6 +280,44 @@ static int pt_on_screen(const float *mvp, float c[4][3], const float *cam) {
     return !(behind == 4 || left == 4 || right == 4 || below == 4 || above == 4);
 }
 static int pt_debug;                                                    /* 1: the pass over the whole screen */
+/* portal.report(): one frame of facts into NOVA-portal.txt (next to NOVA-crash.txt) */
+static int pt_report_req;
+static char pt_rep[6144];
+static int pt_rep_n;
+static int pt_cnt_draw, pt_cnt_sdis, pt_cnt_sfs, pt_cnt_sos, pt_cnt_smask, pt_cnt_fb, pt_last_fb;
+static void pt_rp(const char *fmt, ...) {
+    __builtin_va_list ap;
+    __builtin_va_start(ap, fmt);
+    int vsnprintf(char *, size_t, const char *, __builtin_va_list);
+    if (pt_rep_n < (int)sizeof pt_rep - 1) pt_rep_n += vsnprintf(pt_rep + pt_rep_n, sizeof pt_rep - pt_rep_n, fmt, ap);
+    if (pt_rep_n > (int)sizeof pt_rep - 1) pt_rep_n = sizeof pt_rep - 1;
+    __builtin_va_end(ap);
+}
+static void pt_rp_mat(const char *name, const float *m) {
+    pt_rp("%s:", name);
+    for (int i = 0; i < 16; i++) pt_rp(" %.3f", m[i]);
+    pt_rp("\n");
+}
+static void pt_rp_pixel(const char *when, const float *mvp, float c[4][3], const float *cam) {
+    float ctr[3] = {0, 0, 0}, o[4];
+    for (int k = 0; k < 4; k++) for (int i = 0; i < 3; i++) ctr[i] += (c[k][i] - cam[i]) / 4;
+    pt_xform(mvp, ctr, 1, o);
+    GLint vp[4] = {0, 0, 0, 0};
+    gl.GetIntegerv(0x0BA2, vp);
+    if (o[3] <= 0) { pt_rp("pixel %s: behind\n", when); return; }
+    int x = vp[0] + (int)((o[0] / o[3] * 0.5f + 0.5f) * vp[2]), y = vp[1] + (int)((o[1] / o[3] * 0.5f + 0.5f) * vp[3]);
+    unsigned char px[4] = {0, 0, 0, 0};
+    gl.ReadPixels(x, y, 1, 1, 0x1908, 0x1401, px);
+    pt_rp("pixel %s at %d,%d: %d %d %d %d\n", when, x, y, px[0], px[1], px[2], px[3]);
+}
+static void pt_rp_gl(const char *when) {
+    GLint sb = 0, db = 0, fb = 0, vp[4] = {0, 0, 0, 0}, sf = 0, sr = 0, svm = 0, swm = 0;
+    gl.GetIntegerv(GL_STENCIL_BITS, &sb); gl.GetIntegerv(0x0D56, &db); gl.GetIntegerv(0x8CA6, &fb); gl.GetIntegerv(0x0BA2, vp);
+    gl.GetIntegerv(GL_STENCIL_FUNC, &sf); gl.GetIntegerv(GL_STENCIL_REF, &sr); gl.GetIntegerv(GL_STENCIL_VALUE_MASK, &svm);
+    gl.GetIntegerv(GL_STENCIL_WRITEMASK, &swm);
+    pt_rp("gl %s: stencil bits %d, depth bits %d, framebuffer %d, viewport %d %d %d %d, stencil test %d func 0x%x ref %d mask 0x%x wmask 0x%x, depth test %d\n",
+          when, sb, db, fb, vp[0], vp[1], vp[2], vp[3], gl.IsEnabled(GL_STENCIL_TEST), sf, sr, svm, swm, gl.IsEnabled(GL_DEPTH_TEST));
+}
 static int pt_layers_v[11], pt_layers_m[11];                            /* chunks queued per layer: our pass, the game's */
 static void pt_count_layers(void *lr, int *out) {                      /* render queues: lr + 0x1ae0 + 0x1c + layer * 12 */
     for (int l = 0; l < 11; l++) {
@@ -302,6 +341,20 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
     memcpy(Vs, V, 64); memcpy(Ps, Pm, 64);
     pt_mul(Ps, Vs, mvp);
     pt_corners(P, A, c);
+    int rep = pt_report_req == 1;
+    if (rep) {
+        pt_rp("end %d of portal: A %.2f %.2f %.2f face %d, B %.2f %.2f %.2f face %d, %gx%g\n", from, A->o[0], A->o[1], A->o[2], A->face,
+              B->o[0], B->o[1], B->o[2], B->face, P->w, P->h);
+        pt_rp("camera %.2f %.2f %.2f side %.3f on screen %d\n", cam[0], cam[1], cam[2], pt_side(A, cam), pt_on_screen(mvp, c, cam));
+        for (int k = 0; k < 4; k++) {
+            float v[3] = {c[k][0] - cam[0], c[k][1] - cam[1], c[k][2] - cam[2]}, o[4];
+            pt_xform(mvp, v, 1, o);
+            pt_rp("corner %d: clip %.3f %.3f %.3f %.3f\n", k, o[0], o[1], o[2], o[3]);
+        }
+        pt_rp_mat("View", Vs); pt_rp_mat("Proj", Ps);
+        float *W = pt_top(pt_world);
+        pt_rp_mat("World", W);
+    }
     if (!pt_on_screen(mvp, c, cam)) return;
     memcpy(pt_undo.V, Vs, 64); memcpy(pt_undo.P, Ps, 64); pt_undo.e = 0; pt_undo.on = 1;
     float turn = pt_turn(A, B), vcam[3], R[16], V2[16], P2[16];
@@ -316,6 +369,8 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
         pt_xform(V2, n, 0, nc);
         float C[4] = {nc[0], nc[1], nc[2], -(nc[0] * qc[0] + nc[1] * qc[1] + nc[2] * qc[2])};
         if (C[3] < 0) pt_oblique(P2, C);
+        if (rep) pt_rp("vcam %.2f %.2f %.2f turn %.0f clip plane %.3f %.3f %.3f %.3f (oblique %s)\n", vcam[0], vcam[1], vcam[2], turn,
+                       C[0], C[1], C[2], C[3], C[3] < 0 ? "yes" : "no");
     }
     PtGl s;
     pt_gl_save(&s);
@@ -341,6 +396,7 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
         gl.DepthFunc(GL_ALWAYS); gl.DepthMask(1);
         gl.ColorMask(1, 1, 1, 1);
         pt_quad(mvp, c, cam, 1, clear);
+        if (rep) { pt_rp("sky colour %.2f %.2f %.2f\n", clear[0], clear[1], clear[2]); pt_rp_pixel("after sky fill", mvp, c, cam); }
         pt_gl_restore(&s);
         gl.Enable(GL_STENCIL_TEST);
         gl.StencilFunc(GL_EQUAL, 1, 0xff);
@@ -361,10 +417,23 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
     memcpy(ent + 8, vcam, 12); memcpy(ent + 0x20, vcam, 12);          /* the camera entity at the virtual eye */
     *(float *)(ent + 0x3c) += turn; *(float *)(ent + 0x44) += turn;
     pt_count_layers(lr, pt_layers_m);                                  /* what the game's last pass queued */
+    if (rep) { pt_rp_mat("View2", V2); pt_rp_mat("Proj2", P2); pt_rp_gl("before pass"); }
+    pt_cnt_draw = pt_cnt_sdis = pt_cnt_sfs = pt_cnt_sos = pt_cnt_smask = pt_cnt_fb = 0;
     pt_inpass = 1;
     pt_render_level(lr, ent, pt_cull[0], pt_cull[1], *(float *)((char *)lr + 0x1634), a);
     pt_inpass = 0;
     pt_count_layers(lr, pt_layers_v);
+    if (rep) {
+        pt_rp_gl("after pass");
+        pt_rp("pass: draws %d, stencil off blocked %d, func %d, op %d, mask %d, framebuffer binds %d (last %d)\n", pt_cnt_draw,
+              pt_cnt_sdis, pt_cnt_sfs, pt_cnt_sos, pt_cnt_smask, pt_cnt_fb, pt_last_fb);
+        pt_rp("layers pass:"); for (int l = 0; l < 11; l++) pt_rp(" %d", pt_layers_v[l]);
+        pt_rp("\nlayers game:"); for (int l = 0; l < 11; l++) pt_rp(" %d", pt_layers_m[l]);
+        pt_rp("\nculler pos %.2f %.2f %.2f, lr camera %.2f %.2f %.2f\n", *(float *)(pt_cull[0] + 0x4c0), *(float *)(pt_cull[0] + 0x4c4),
+              *(float *)(pt_cull[0] + 0x4c8), *(float *)((char *)lr + 0x1bb4), *(float *)((char *)lr + 0x1bb8), *(float *)((char *)lr + 0x1bbc));
+        pt_rp_pixel("after pass", mvp, c, cam);
+        pt_report_req = 2;                                              /* the first end seen is enough */
+    }
     memcpy(ent + 8, keep, 12); memcpy(ent + 0x20, keep + 3, 12); memcpy(ent + 0x38, keep + 6, 16);
     pt_undo.e = 0;
     memcpy(pt_top(pt_view), Vs, 64);
@@ -459,6 +528,12 @@ static void pt_passes_draw(void *scr, void *lr, void *ent, float *cam, float a, 
     }
     nova_guard = crash_path[0] != 0;
     pt_passes = 0;
+    if (pt_report_req == 1) {
+        pt_rep_n = 0;
+        pt_rp("NOVA portal report\nportals ready %d, gl %d, stencil bits %d, drawing %d, debug %d, view area hook %d\n", pt_ok, pt_gl_ok,
+              pt_stencil_bits, pt_render_on && !pt_broken, pt_debug, pt_view_hooked);
+        pt_rp_gl("frame start");
+    }
     for (int i = 0; i < PT_MAX; i++) {
         Portal *P = &pt[i];
         if (!P->used || P->dim != dim) continue;
@@ -471,6 +546,23 @@ static void pt_passes_draw(void *scr, void *lr, void *ent, float *cam, float a, 
     }
     nova_guard = 0;
     pt_last_us = (int)(now_ms() - t0);
+    if (pt_report_req) {
+        if (pt_report_req == 1) pt_rp("no end of a portal was drawn this frame (not facing / too far / off screen)\n");
+        pt_rp("passes %d, %d ms\n", pt_passes, pt_last_us);
+        char path[300];
+        snprintf(path, sizeof path, "/storage/emulated/0/Download/NOVA-portal.txt");   /* where NOVA-crash.txt goes */
+        int fd = open(path, 01 | 0100 | 01000, 0644);
+        if (fd < 0) {                                                  /* no storage access: the app's own files */
+            int n = 0;
+            while (crash_path[n] && n < 255) { path[n] = crash_path[n]; n++; }
+            while (n > 0 && path[n - 1] != '/') n--;
+            snprintf(path + n, sizeof path - n, "NOVA-portal.txt");
+            fd = open(path, 01 | 0100 | 01000, 0644);
+        }
+        if (fd >= 0) { write(fd, pt_rep, pt_rep_n); close(fd); LOG("portals: report written to %s", path); }
+        else LOGE("portals: report: cannot write %s", path);
+        pt_report_req = 0;
+    }
 }
 
 static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, float a) {
@@ -492,10 +584,14 @@ static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, 
  * during our pass the stencil stays ours. */
 static void (*o_gl_disable)(GLenum), (*o_gl_sfs)(GLenum, GLenum, GLint, GLuint), (*o_gl_sos)(GLenum, GLenum, GLenum, GLenum);
 static void (*o_gl_smask)(GLuint), (*o_gl_clear)(GLuint);
-static void w_gl_disable(GLenum cap) { if (pt_inpass && cap == GL_STENCIL_TEST) return; o_gl_disable(cap); }
-static void w_gl_sfs(GLenum f, GLenum fn, GLint r, GLuint m) { if (!pt_inpass) o_gl_sfs(f, fn, r, m); }
-static void w_gl_sos(GLenum f, GLenum a, GLenum b, GLenum c) { if (!pt_inpass) o_gl_sos(f, a, b, c); }
-static void w_gl_smask(GLuint m) { if (!pt_inpass) o_gl_smask(m); }
+static void w_gl_disable(GLenum cap) { if (pt_inpass && cap == GL_STENCIL_TEST) { pt_cnt_sdis++; return; } o_gl_disable(cap); }
+static void w_gl_sfs(GLenum f, GLenum fn, GLint r, GLuint m) { if (!pt_inpass) o_gl_sfs(f, fn, r, m); else pt_cnt_sfs++; }
+static void w_gl_sos(GLenum f, GLenum a, GLenum b, GLenum c) { if (!pt_inpass) o_gl_sos(f, a, b, c); else pt_cnt_sos++; }
+static void w_gl_smask(GLuint m) { if (!pt_inpass) o_gl_smask(m); else pt_cnt_smask++; }
+static void (*o_gl_de)(GLenum, GLint, GLenum, const void *), (*o_gl_da)(GLenum, GLint, GLint), (*o_gl_bfb)(GLenum, GLuint);
+static void w_gl_de(GLenum m, GLint n, GLenum t, const void *i) { if (pt_inpass) pt_cnt_draw++; o_gl_de(m, n, t, i); }
+static void w_gl_da(GLenum m, GLint f, GLint n) { if (pt_inpass) pt_cnt_draw++; o_gl_da(m, f, n); }
+static void w_gl_bfb(GLenum t, GLuint f) { if (pt_inpass) { pt_cnt_fb++; pt_last_fb = (int)f; } o_gl_bfb(t, f); }
 static void w_gl_clear(GLuint bits) { if (pt_inpass) bits &= ~(GLuint)GL_STENCIL_BUFFER_BIT; if (bits) o_gl_clear(bits); }
 static int pt_got(u32 base, u32 off, void *fn, void **orig) {
     u32 *slot = (u32 *)(base + off);
@@ -511,6 +607,9 @@ static int pt_got(u32 base, u32 off, void *fn, void **orig) {
 #define GOT_GLSTENCILOPSEP 0x75aa0c
 #define GOT_GLSTENCILMASK 0x75aa18
 #define GOT_GLCLEAR 0x75aa58
+#define GOT_GLDRAWARRAYS 0x75aa74
+#define GOT_GLDRAWELEMENTS 0x75aa78
+#define GOT_GLBINDFRAMEBUFFER 0x75aa38
 
 /* RenderChunk::_chooseMaterial(layer, double time, bool): layers 8..10 fade a chunk in after it was (re)built or
  * came into sight; in our pass every chunk would be "new" each frame (transparent ground) - drawn settled there */
@@ -555,6 +654,7 @@ static void portals_init(void *mc) {
     S(pt_top, "_ZN11MatrixStack6getTopEv");
     S(pt_view, "_ZN11MatrixStack4ViewE");
     S(pt_proj, "_ZN11MatrixStack10ProjectionE");
+    S(pt_world, "_ZN11MatrixStack5WorldE");
     S(pt_move_to, "_ZN6Entity6moveToERK4Vec3RK4Vec2");
     S(pt_local_player, "_ZN15MinecraftClient14getLocalPlayerEv");
     #undef S
@@ -576,6 +676,8 @@ static void portals_init(void *mc) {
             pt_got(base, GOT_GLSTENCILOPSEP, w_gl_sos, (void **)&o_gl_sos) |
             pt_got(base, GOT_GLSTENCILMASK, w_gl_smask, (void **)&o_gl_smask) |
             pt_got(base, GOT_GLCLEAR, w_gl_clear, (void **)&o_gl_clear);
+    if (pt_got(base, GOT_GLDRAWARRAYS, w_gl_da, (void **)&o_gl_da) | pt_got(base, GOT_GLDRAWELEMENTS, w_gl_de, (void **)&o_gl_de) |
+        pt_got(base, GOT_GLBINDFRAMEBUFFER, w_gl_bfb, (void **)&o_gl_bfb)) LOGE("portals: draw counters not hooked");
     if (g) { pt_view_hooked = 0; LOGE("portals: GL imports not hooked: crossing only, no see-through"); }
     pt_ok = 1;
     LOG("portals: ready");
@@ -589,6 +691,7 @@ static int pt_op(int op, const double *a, int n, double *out, void *ent) {
     case OP_PORTAL_CLEAR: memset(pt, 0, sizeof pt); return 0;
     case OP_PORTAL_RENDER: pt_render_on = n > 0 && a[0] != 0; return 0;
     case OP_PORTAL_DEBUG: pt_debug = n > 0 ? (int)a[0] : 0; return 0;
+    case OP_PORTAL_REPORT: pt_report_req = 1; return 0;
     case OP_PORTAL_STATUS: {
         int cnt = 0;
         for (int i = 0; i < PT_MAX; i++) if (pt[i].used) cnt++;

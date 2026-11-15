@@ -366,3 +366,7 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 ## alpha57: порталы — трафарет игры
 - Причина «в портале ничего, в небе куски мира, пропадают грани»: игра сама ставит состояние трафарета с каждым материалом (импорты glStencilFuncSeparate/OpSeparate/Mask, glDisable(GL_STENCIL_TEST)) — во время нашего прохода наш трафарет выключался, мир «за порталом» рисовался на весь экран поверх неба и писал глубину.
 - Импорты игры (GOT: glDisable 0x75a9e4, glStencilFuncSeparate 0x75aa08, glStencilOpSeparate 0x75aa0c, glStencilMask 0x75aa18, glClear 0x75aa58) переведены на обёртки: во время прохода игра не трогает трафарет.
+
+## alpha58: отчёт о проходе портала
+- portal.report() / «/portal report»: один кадр фактов в Download/NOVA-portal.txt — матрицы View/Proj/World и View2/Proj2, плоскость среза, углы в clip-координатах, состояние GL до/после (трафарет, framebuffer, viewport), сколько отрисовок было в проходе и сколько вызовов трафарета игры заблокировано, привязки framebuffer, очереди по слоям, цвет пикселя в центре проёма после заливки неба и после прохода.
+- Счётчики через импорты игры glDrawArrays/glDrawElements/glBindFramebuffer (GOT 0x75aa74/0x75aa78/0x75aa38).

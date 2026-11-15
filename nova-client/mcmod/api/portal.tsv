@@ -5,3 +5,4 @@ portal.clear	-	-	native:PORTAL_CLEAR	wip	Убрать все порталы
 portal.render	on:bool	-	native:PORTAL_RENDER	wip	Рисовать ли вид сквозь порталы (проход работает всегда)
 portal.status	-	list	native:PORTAL_STATUS	wip	Состояние: [готов, GL готов (1/0/-1), бит трафарета, рисует, проходов в кадре, мс на кадр, порталов]
 portal.debug	mode:num	-	native:PORTAL_DEBUG	wip	Отладка: 1 — второй проход на весь экран (видно, что именно он рисует), 0 — обычный режим
+portal.report	-	-	native:PORTAL_REPORT	wip	Записать один кадр фактов о проходе портала в NOVA-portal.txt (рядом с NOVA-crash.txt): матрицы, состояние GL, сколько нарисовано, цвет пикселя в проёме
