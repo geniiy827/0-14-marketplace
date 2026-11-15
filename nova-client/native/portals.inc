@@ -279,6 +279,13 @@ static int pt_on_screen(const float *mvp, float c[4][3], const float *cam) {
     return !(behind == 4 || left == 4 || right == 4 || below == 4 || above == 4);
 }
 static int pt_debug;                                                    /* 1: the pass over the whole screen */
+static int pt_layers_v[11], pt_layers_m[11];                            /* chunks queued per layer: our pass, the game's */
+static void pt_count_layers(void *lr, int *out) {                      /* render queues: lr + 0x1ae0 + 0x1c + layer * 12 */
+    for (int l = 0; l < 11; l++) {
+        char **v = (char **)((char *)lr + 0x1ae0 + 0x1c + l * 12);
+        out[l] = v[0] && v[1] >= v[0] ? (int)((v[1] - v[0]) / 4) : -1;
+    }
+}
 static void pt_gl_ours(void) {
     gl.UseProgram(pt_prog);
     gl.BindBuffer(GL_ARRAY_BUFFER, 0);
@@ -353,9 +360,11 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
     memcpy(pt_undo.ent, keep, 40); pt_undo.e = ent;
     memcpy(ent + 8, vcam, 12); memcpy(ent + 0x20, vcam, 12);          /* the camera entity at the virtual eye */
     *(float *)(ent + 0x3c) += turn; *(float *)(ent + 0x44) += turn;
+    pt_count_layers(lr, pt_layers_m);                                  /* what the game's last pass queued */
     pt_inpass = 1;
     pt_render_level(lr, ent, pt_cull[0], pt_cull[1], *(float *)((char *)lr + 0x1634), a);
     pt_inpass = 0;
+    pt_count_layers(lr, pt_layers_v);
     memcpy(ent + 8, keep, 12); memcpy(ent + 0x20, keep + 3, 12); memcpy(ent + 0x38, keep + 6, 16);
     pt_undo.e = 0;
     memcpy(pt_top(pt_view), Vs, 64);
@@ -477,6 +486,12 @@ static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, 
     o_pt_rfi(scr, cam[0], cam[1], cam[2], lr, ent, a);
 }
 
+/* RenderChunk::_chooseMaterial(layer, double time, bool): layers 8..10 fade a chunk in after it was (re)built or
+ * came into sight; in our pass every chunk would be "new" each frame (transparent ground) - drawn settled there */
+static u64 hc_pt_material(u32 orig, u32 *w) {
+    if (pt_inpass) { w[2] = 0; w[3] = 0x41CDCD65; }                     /* time = 1e9 s */
+    return nh_callw(orig, w);
+}
 static u64 hc_pt_view_area(u32 orig, u32 *w) {            /* LevelRenderer::updateViewArea: not for our pass */
     if (pt_inpass) return 0;
     return nh_callw(orig, w);
@@ -524,6 +539,8 @@ static void portals_init(void *mc) {
         return;
     }
     if (patch_slot(vt, 77, h_pt_rfi, (void **)&o_pt_rfi) != 0) { LOGE("portals: screen hook failed, off"); return; }
+    void *cm = dlsym(mc, "_ZN11RenderChunk15_chooseMaterialE12TerrainLayerdb");
+    if (cm && nh_hook_c((u32)cm, hc_pt_material) < 0) LOGE("portals: chooseMaterial hook failed");
     int r = nh_hook_c((u32)va, hc_pt_view_area);
     pt_view_hooked = r >= 0;
     if (!pt_view_hooked) LOGE("portals: updateViewArea hook failed (%d): crossing only, no see-through", r);
@@ -544,7 +561,8 @@ static int pt_op(int op, const double *a, int n, double *out, void *ent) {
         for (int i = 0; i < PT_MAX; i++) if (pt[i].used) cnt++;
         out[0] = pt_ok; out[1] = pt_gl_ok; out[2] = pt_stencil_bits; out[3] = pt_render_on && pt_view_hooked && !pt_broken;
         out[4] = pt_passes; out[5] = pt_last_us; out[6] = cnt;
-        return 7;
+        for (int l = 0; l < 11; l++) { out[7 + l] = pt_layers_v[l]; out[18 + l] = pt_layers_m[l]; }
+        return 29;
     }
     }
     return -1;

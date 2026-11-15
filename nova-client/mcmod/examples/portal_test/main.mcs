@@ -114,6 +114,16 @@ on chat(e) {
     } else if cmd == "info" {
         var s = portal.status()
         chat.send("§bПорталы:§f готов {s[0]}, GL {s[1]}, трафарет {s[2]} бит, рисует {s[3]}, проходов {s[4]}, {s[5]} мс, связей {s[6]}")
+        if s.len() >= 29 {
+            var v = ""
+            var m = ""
+            for i in 0..10 {
+                v = v + " " + str(s[7 + i])
+                m = m + " " + str(s[18 + i])
+            }
+            chat.send("§7чанков по слоям, портал:{v}")
+            chat.send("§7чанков по слоям, мир:{m}")
+        }
     } else {
         chat.send("/portal a | b | demo | size W H | clear | off | on | info | debug 1/0")
     }
