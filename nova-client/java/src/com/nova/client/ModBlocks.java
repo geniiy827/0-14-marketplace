@@ -409,6 +409,17 @@ final class ModBlocks {
         return new float[]{(float) r[0] / ATLAS_W, (float) r[1] / ATLAS_H, (float) (r[0] + r[2]) / ATLAS_W, (float) (r[1] + r[3]) / ATLAS_H};
     }
 
+    /** a piece of a bitmap; Bitmap.createBitmap(src, x, y, w, h) draws through a Canvas, which refuses the
+     *  non-premultiplied bitmaps the atlas code decodes (inPremultiplied = false) */
+    static Bitmap crop(Bitmap src, int x, int y, int w, int h) {
+        int[] px = new int[w * h];
+        src.getPixels(px, 0, w, x, y, w, h);
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        out.setPremultiplied(false);
+        out.setPixels(px, 0, w, 0, 0, w, h);
+        return out;
+    }
+
     // animated textures (a vertical strip of square frames, like Java + .mcmeta): the atlas gets frame 0,
     // libnova plays the strip with the game's FlipbookTexture (like still lava / water in 0.14)
     final List<Double> animData = new ArrayList<Double>();     // x, y, w, h (atlas base px), ticks per frame
@@ -442,7 +453,7 @@ final class ModBlocks {
         }
         int w = bm.getWidth(), h = bm.getHeight();
         boolean anim = !edge && animMod != null && dir != null && w > 0 && h > w && h % w == 0 && !ref.startsWith("bbmodel");
-        if (anim) { bm = Bitmap.createBitmap(bm, 0, 0, w, w); h = w; }
+        if (anim) { bm = crop(bm, 0, 0, w, w); h = w; }
         if (w > 256 || h > 256) {
             double k = 256.0 / Math.max(w, h);
             w = Math.max(1, (int) (w * k));

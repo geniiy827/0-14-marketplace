@@ -422,12 +422,14 @@ fn useOne() {                     // минус один предмет из р�
 }
 
 fn give(id, count, aux = 0) {      // себе в инвентарь (игра сама сообщает хосту об изменении слотов)
+    if id >= 65536 { aux = math.floor(id / 65536); id = id % 65536 }     // предмет по данным: номер + 65536 * данные
     var it = mem.alloc(64)
     mc.call("ItemInstance::ItemInstance(int, int, int)", it, id, count, aux)
     mc.call("Inventory::add(ItemInstance&, bool)", inventory(), it, true)
 }
 
 fn replaceHand(id, aux = 0) {      // предмет в руке становится другим (на том же месте)
+    if id >= 65536 { aux = math.floor(id / 65536); id = id % 65536 }
     var it = hand()
     if it == 0 { return }
     mc.call("ItemInstance::ItemInstance(int, int, int)", it, id, 1, aux)
@@ -702,8 +704,8 @@ on chat(e) {
         give(259, 1)
         give(potion_cold_resist, 1)
         give(potion_heat_resist, 1)
-        give(ice_chunk % 65536, 8, math.floor(ice_chunk / 65536))
-        give(magma_chunk % 65536, 8, math.floor(magma_chunk / 65536))
+        give(ice_chunk, 8)
+        give(magma_chunk, 8)
         ui.tip("§6Adventure Craft: §fпредметы жажды и температуры выданы")
     } else if e.text == "/thirst 0" or e.text == "/thirst 20" {
         e.cancel()

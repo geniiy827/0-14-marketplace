@@ -86,19 +86,24 @@ final class ModItems {
         for (Object[] d : decls) {
             if (!(d[2] instanceof Map)) { out.add(d); continue; }
             Map<?, ?> p = (Map<?, ?>) d[2];
+            // plain items share a number (one per data); so do items with the same action button and stack size
             boolean plain = p.get("variants") == null && p.get("tool") == null && p.get("armor") == null && p.get("type") == null
-                    && p.get("durability") == null && p.get("action") == null && p.get("hand") == null && p.get("stack") == null
+                    && p.get("durability") == null && p.get("hand") == null
                     && p.get("frames") == null && p.get("size") == null && p.get("tabIcon") == null && p.get("category") == null
                     && !Boolean.FALSE.equals(p.get("pack")) && p.get("texture") != null;
             if (!plain) { out.add(d); continue; }
             ModRuntime.Mod m = (ModRuntime.Mod) d[0];
             String tab = p.get("tab") == null ? "" : String.valueOf(p.get("tab"));
-            String ck = m.id + "\u0000" + tab;
+            String act = p.get("action") == null ? "" : String.valueOf(p.get("action"));
+            String stk = p.get("stack") == null ? "" : String.valueOf(p.get("stack"));
+            String ck = m.id + "\u0000" + tab + "\u0000" + act + "\u0000" + stk;
             Object[] c = carrier.get(ck);
             if (c == null || ((List<?>) ((Map<?, ?>) c[2]).get("variants")).size() >= MAX_VARIANTS) {
                 Map<String, Object> cp = new java.util.LinkedHashMap<String, Object>();
                 cp.put("variants", new ArrayList<Object>());
                 if (p.get("tab") != null) cp.put("tab", p.get("tab"));
+                if (p.get("action") != null) cp.put("action", p.get("action"));
+                if (p.get("stack") != null) cp.put("stack", p.get("stack"));
                 int n = 0;
                 for (Object[] o : out) if (o[0] == m && String.valueOf(o[1]).startsWith("items_")) n++;
                 c = new Object[]{m, "items_" + n, cp, d[3]};
@@ -327,7 +332,7 @@ final class ModItems {
         int w = bm.getWidth(), h = bm.getHeight();
         if (frame >= 0) {
             if (h < w * (frame + 1)) throw new Exception("картинка " + file + ": нужна полоска кадров " + w + "x" + w + " сверху вниз (кадр " + frame + " не помещается)");
-            bm = Bitmap.createBitmap(bm, 0, frame * w, w, w);
+            bm = ModBlocks.crop(bm, 0, frame * w, w, w);
             h = w;
         }
         if (w != h) throw new Exception("картинка " + ref + " должна быть квадратной (сейчас " + w + "x" + h + ")");
