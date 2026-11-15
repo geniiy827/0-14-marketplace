@@ -284,9 +284,9 @@ static int pt_debug;                                                    /* 1: th
  * gets 0x10 there: our pass draws only where it is 0x10, and the game's own world afterwards skips the opening
  * (alpha57: its sky / world went over our view - "nothing in the portal"). Cleared back to 0 after the game's pass. */
 #define PT_MARK 0x10
-static int pt_marked;
+static int pt_marked, pt_force, pt_active;          /* pt_force: the game's own pass, its stencil calls ignored */
 /* portal.report(): one frame of facts into NOVA-portal.txt (next to NOVA-crash.txt) */
-static int pt_report_req;
+static int pt_report_req, pt_rep_x = -1, pt_rep_y = -1;
 static char pt_rep[6144];
 static int pt_rep_n;
 static int pt_cnt_draw, pt_cnt_sdis, pt_cnt_sfs, pt_cnt_sos, pt_cnt_smask, pt_cnt_fb, pt_last_fb;
@@ -314,6 +314,7 @@ static void pt_rp_pixel(const char *when, const float *mvp, float c[4][3], const
     unsigned char px[4] = {0, 0, 0, 0};
     gl.ReadPixels(x, y, 1, 1, 0x1908, 0x1401, px);
     pt_rp("pixel %s at %d,%d: %d %d %d %d\n", when, x, y, px[0], px[1], px[2], px[3]);
+    pt_rep_x = x; pt_rep_y = y;
 }
 static void pt_rp_gl(const char *when) {
     GLint sb = 0, db = 0, fb = 0, vp[4] = {0, 0, 0, 0}, sf = 0, sr = 0, svm = 0, swm = 0;
@@ -498,7 +499,7 @@ static int pt_cross(char *ent, float *cam, int dim) {
             if (!(s0 > 0 && s1 <= 0)) continue;
             float t = s0 / (s0 - s1), hit[3];
             for (int j = 0; j < 3; j++) hit[j] = pt_prev_eye[j] + (cam[j] - pt_prev_eye[j]) * t;
-            if (!pt_inside(P, A, hit, 0.05f)) continue;
+            if (!pt_inside(P, A, hit, 0.3f)) continue;
             float turn = pt_turn(A, B), h = *(float *)(ent + 0xc0);
             float feet[3] = {*(float *)(ent + 8), *(float *)(ent + 0xc) - h, *(float *)(ent + 0x10)}, nf[3];
             pt_map(A, B, feet, nf);
@@ -565,10 +566,21 @@ static void pt_passes_draw(void *scr, void *lr, void *ent, float *cam, float a, 
     if (pt_report_req) {
         if (pt_report_req == 1) pt_rp("no end of a portal was drawn this frame (not facing / too far / off screen)\n");
         pt_rp("passes %d, %d ms\n", pt_passes, pt_last_us);
+        pt_report_req = 3;                                              /* written after the game's world */
+    }
+}
+static void pt_report_write(void) {
+    if (pt_rep_x >= 0) {
+        unsigned char px[4] = {0, 0, 0, 0};
+        gl.ReadPixels(pt_rep_x, pt_rep_y, 1, 1, 0x1908, 0x1401, px);
+        pt_rp("pixel after the game's world at %d,%d: %d %d %d %d\n", pt_rep_x, pt_rep_y, px[0], px[1], px[2], px[3]);
+    }
+    pt_rp_gl("after the game's world");
+    {
         char path[300];
         snprintf(path, sizeof path, "/storage/emulated/0/Download/NOVA-portal.txt");   /* where NOVA-crash.txt goes */
         int fd = open(path, 01 | 0100 | 01000, 0644);
-        if (fd < 0) {                                                  /* no storage access: the app's own files */
+        if (fd < 0) {
             int n = 0;
             while (crash_path[n] && n < 255) { path[n] = crash_path[n]; n++; }
             while (n > 0 && path[n - 1] != '/') n--;
@@ -577,8 +589,8 @@ static void pt_passes_draw(void *scr, void *lr, void *ent, float *cam, float a, 
         }
         if (fd >= 0) { write(fd, pt_rep, pt_rep_n); close(fd); LOG("portals: report written to %s", path); }
         else LOGE("portals: report: cannot write %s", path);
-        pt_report_req = 0;
     }
+    pt_report_req = 0; pt_rep_x = -1;
 }
 
 static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, float a) {
@@ -587,20 +599,40 @@ static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, 
     for (int i = 0; i < PT_MAX; i++) if (pt[i].used) any = 1;
     void *me = g_client && pt_local_player ? pt_local_player(g_client) : 0;
     int dim = any ? pt_cur_dim(ent) : 0;
+    pt_active = any;
     if (any && ent && ent == me) pt_cross((char *)ent, cam, dim);
     if (any && pt_render_on && pt_view_hooked && !pt_broken && !pt_inpass && ent && pt_gl_init() == 1)
         pt_passes_draw(scr, lr, ent, cam, a, dim);                     /* the views first, the game's world after */
     if (pt_debug && pt_passes > 0) return;                             /* debug: only what the portal pass drew */
+    /* The game's world: everywhere but the opening. Its materials set the stencil themselves (alpha59 report: 6
+     * func calls in one pass - the world goes with ALWAYS), so for its pass the stencil is ours too. */
+    GLint keep[8];
+    int forced = pt_marked && pt_gl_ok == 1;
+    if (forced) {
+        keep[0] = gl.IsEnabled(GL_STENCIL_TEST);
+        gl.GetIntegerv(GL_STENCIL_FUNC, &keep[1]); gl.GetIntegerv(GL_STENCIL_REF, &keep[2]);
+        gl.GetIntegerv(GL_STENCIL_VALUE_MASK, &keep[3]); gl.GetIntegerv(GL_STENCIL_WRITEMASK, &keep[4]);
+        gl.GetIntegerv(GL_STENCIL_FAIL, &keep[5]); gl.GetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, &keep[6]);
+        gl.GetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, &keep[7]);
+        gl.Enable(GL_STENCIL_TEST);
+        gl.StencilFunc(0x0205 /* NOTEQUAL */, PT_MARK, 0xf0);
+        gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        gl.StencilMask(0);
+        pt_force = 1;
+    }
     o_pt_rfi(scr, cam[0], cam[1], cam[2], lr, ent, a);
-    if (pt_marked && pt_gl_ok == 1) {                                  /* the opening's mark off: hand, HUD draw there */
-        GLint wm = 0xff;
-        gl.GetIntegerv(GL_STENCIL_WRITEMASK, &wm);
+    if (forced) {                                                      /* the opening's mark off: hand, HUD draw there */
+        pt_force = 0;
         gl.StencilMask(0xff);
         gl.ClearStencil(0);
         gl.Clear(GL_STENCIL_BUFFER_BIT);
-        gl.StencilMask((GLuint)wm);
-        pt_marked = 0;
+        pt_en(GL_STENCIL_TEST, keep[0]);
+        gl.StencilFunc((GLenum)keep[1], keep[2], (GLuint)keep[3]);
+        gl.StencilOp((GLenum)keep[5], (GLenum)keep[6], (GLenum)keep[7]);
+        gl.StencilMask((GLuint)keep[4]);
     }
+    pt_marked = 0;
+    if (pt_report_req == 3 && pt_gl_ok == 1) pt_report_write();
 }
 
 /* The game sets the stencil state itself with every material (glStencilFuncSeparate / OpSeparate / Mask, and
@@ -609,15 +641,15 @@ static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, 
  * during our pass the stencil stays ours. */
 static void (*o_gl_disable)(GLenum), (*o_gl_sfs)(GLenum, GLenum, GLint, GLuint), (*o_gl_sos)(GLenum, GLenum, GLenum, GLenum);
 static void (*o_gl_smask)(GLuint), (*o_gl_clear)(GLuint);
-static void w_gl_disable(GLenum cap) { if (pt_inpass && cap == GL_STENCIL_TEST) { pt_cnt_sdis++; return; } o_gl_disable(cap); }
-static void w_gl_sfs(GLenum f, GLenum fn, GLint r, GLuint m) { if (!pt_inpass) o_gl_sfs(f, fn, r, m); else pt_cnt_sfs++; }
-static void w_gl_sos(GLenum f, GLenum a, GLenum b, GLenum c) { if (!pt_inpass) o_gl_sos(f, a, b, c); else pt_cnt_sos++; }
-static void w_gl_smask(GLuint m) { if (!pt_inpass) o_gl_smask(m); else pt_cnt_smask++; }
+static void w_gl_disable(GLenum cap) { if ((pt_inpass || pt_force) && cap == GL_STENCIL_TEST) { pt_cnt_sdis++; return; } o_gl_disable(cap); }
+static void w_gl_sfs(GLenum f, GLenum fn, GLint r, GLuint m) { if (!pt_inpass && !pt_force) o_gl_sfs(f, fn, r, m); else pt_cnt_sfs++; }
+static void w_gl_sos(GLenum f, GLenum a, GLenum b, GLenum c) { if (!pt_inpass && !pt_force) o_gl_sos(f, a, b, c); else pt_cnt_sos++; }
+static void w_gl_smask(GLuint m) { if (!pt_inpass && !pt_force) o_gl_smask(m); else pt_cnt_smask++; }
 static void (*o_gl_de)(GLenum, GLint, GLenum, const void *), (*o_gl_da)(GLenum, GLint, GLint), (*o_gl_bfb)(GLenum, GLuint);
 static void w_gl_de(GLenum m, GLint n, GLenum t, const void *i) { if (pt_inpass) pt_cnt_draw++; o_gl_de(m, n, t, i); }
 static void w_gl_da(GLenum m, GLint f, GLint n) { if (pt_inpass) pt_cnt_draw++; o_gl_da(m, f, n); }
 static void w_gl_bfb(GLenum t, GLuint f) { if (pt_inpass) { pt_cnt_fb++; pt_last_fb = (int)f; } o_gl_bfb(t, f); }
-static void w_gl_clear(GLuint bits) { if (pt_inpass) bits &= ~(GLuint)GL_STENCIL_BUFFER_BIT; if (bits) o_gl_clear(bits); }
+static void w_gl_clear(GLuint bits) { if (pt_inpass || pt_force) bits &= ~(GLuint)GL_STENCIL_BUFFER_BIT; if (bits) o_gl_clear(bits); }
 static int pt_got(u32 base, u32 off, void *fn, void **orig) {
     u32 *slot = (u32 *)(base + off);
     u32 page = (u32)slot & ~4095u;
@@ -639,7 +671,7 @@ static int pt_got(u32 base, u32 off, void *fn, void **orig) {
 /* RenderChunk::_chooseMaterial(layer, double time, bool): layers 8..10 fade a chunk in after it was (re)built or
  * came into sight; in our pass every chunk would be "new" each frame (transparent ground) - drawn settled there */
 static u64 hc_pt_material(u32 orig, u32 *w) {
-    if (pt_inpass) { w[2] = 0; w[3] = 0x41CDCD65; }                     /* time = 1e9 s */
+    if (pt_inpass || pt_active) { w[2] = 0; w[3] = 0x41CDCD65; }        /* time = 1e9 s: no fade while portals are up */
     return nh_callw(orig, w);
 }
 static u64 hc_pt_view_area(u32 orig, u32 *w) {            /* LevelRenderer::updateViewArea: not for our pass */
