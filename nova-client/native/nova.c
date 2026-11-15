@@ -1236,6 +1236,7 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "winter.inc"
 #include "env.inc"
 #include "recipebook.inc"
+#include "dims.inc"
 
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
@@ -1271,6 +1272,7 @@ __attribute__((constructor)) static void nova_init(void) {
     env_init(mc);
     flip_init(mc);
     recipebook_init(mc);
+    dims_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }

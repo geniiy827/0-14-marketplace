@@ -729,6 +729,7 @@ static void mcmod_register_blocks(void) {
 }
 
 static void mcmod_register_items(void);
+static void wd_register(void);
 static void v15_register(void);
 static void v15_creative(void);
 static void v15_model(ModBlock *m, int data);
@@ -744,6 +745,7 @@ static void h_init_creative(void) {
         if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && mblocks[i].special != 4 && mblocks[i].special < 10 &&
             !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, (short)(mblocks[i].pdata > 0 ? mblocks[i].pdata : 0));   /* not lit lamps; 0.15 blocks: v15_creative */
     mcmod_register_items();
+    wd_register();                                           /* the wooden dimension's portal (dims.inc) */
     /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
     if (list) {
         int total = (int)((list[1] - list[0]) / 20), k = total - before;

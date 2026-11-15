@@ -182,11 +182,11 @@ public final class ModBridge {
                 mb.prepare(dirs);
                 if (mb.count > 0) {
                     try { nativeDefineBlocks(mb.data, mb.names); } catch (Throwable t) { Log.e(TAG, "native blocks", t); }
-                    if (!mb.animData.isEmpty()) {
-                        double[] ad = new double[mb.animData.size()];
-                        for (int i = 0; i < ad.length; i++) ad[i] = mb.animData.get(i);
-                        try { nativeBlockAnims(ad, mb.animPaths.toString()); } catch (Throwable t) { Log.e(TAG, "block animations", t); }
-                    }
+                }
+                if (!mb.animData.isEmpty()) {                // mods' animated blocks and the wooden portal
+                    double[] ad = new double[mb.animData.size()];
+                    for (int i = 0; i < ad.length; i++) ad[i] = mb.animData.get(i);
+                    try { nativeBlockAnims(ad, mb.animPaths.toString()); } catch (Throwable t) { Log.e(TAG, "block animations", t); }
                 }
                 blocks = mb;
                 ModItems mi = new ModItems(c, rt);
