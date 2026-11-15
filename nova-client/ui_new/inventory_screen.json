@@ -1314,6 +1314,7 @@
   "creative_inventory_screen@common.inventory_screen_common": {
     "scroll_report": [ "building_block_pane", "decorations_pane", "tools_pane", "miscellaneous_pane" ],
     "controls": [
+      { "nova_rb_c@crafting.nova_rb": { } },
       { "@common.container_gamepad_helpers": { } },
       { "@common.screen_background": { } },
       {

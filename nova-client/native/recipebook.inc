@@ -1,5 +1,6 @@
 /* recipebook.inc - NOVA recipe book (like Java's recipe book / JEI), drawn by the game in the survival inventory and
- * at the crafting table: a small book button above the inventory's top-left corner opens a curtain to the left of it.
+ * creative inventory and at the crafting table: a small book button in the screen's top-left corner opens a curtain to the
+ * left of the inventory. Style: JEI's layout in NOVA's own inventory colours (tools/gen_recipebook.py bakes the pieces).
  *
  *   tabs (top): all craftable items of the game | search | one per mod that has recipes (icon of its creative tab)
  *   panel: pages of items (25 px buttons), page arrows; tap = a window in the middle with the recipe (crafting grid or
@@ -90,7 +91,7 @@ static RBIt rb_hit_it[RB_HITS];
 static int rb_hit_n;
 
 /* ---------------- drawing helpers ---------------- */
-#define RB_TEX 40
+#define RB_TEX 96
 static struct { const char *name; u32 tex[16]; int ok; } rb_tex[RB_TEX];
 static u32 *rb_texture(void *client, const char *name) {
     int i;
@@ -344,89 +345,161 @@ static int rb_cycle_aux(int id, int aux) {
 }
 
 /* ---------------- drawing ---------------- */
-static void rb_panel_bg(void *client, float x, float y, float w, float h) {
-    rb_blit(client, "bg_tl", x, y, 4, 4);
-    rb_blit(client, "bg_t", x + 4, y, w - 8, 4);
-    rb_blit(client, "bg_tr", x + w - 4, y, 4, 4);
-    rb_blit(client, "bg_l", x, y + 4, 4, h - 8);
-    rb_blit(client, "bg_c", x + 4, y + 4, w - 8, h - 8);
-    rb_blit(client, "bg_r", x + w - 4, y + 4, 4, h - 8);
-    rb_blit(client, "bg_bl", x, y + h - 4, 4, 4);
-    rb_blit(client, "bg_b", x + 4, y + h - 4, w - 8, 4);
-    rb_blit(client, "bg_br", x + w - 4, y + h - 4, 4, 4);
+static const char *rb_nine_names[5][9];
+static const char *rb_nine_pre[5] = {"panel", "cell", "btn", "btnh", "btnx"};
+static const char *rb_nine_suf[9] = {"tl", "t", "tr", "l", "c", "r", "bl", "b", "br"};
+static char rb_nine_buf[5][9][16];
+/* a nine-slice picture of NOVA's inventory: 0 panel (4 px corners), 1 slot (1 px), 2 button, 3 button lit, 4 red button */
+static void rb_nine(void *client, int kind, float x, float y, float w, float h) {
+    if (!rb_nine_names[kind][0])
+        for (int i = 0; i < 9; i++) {
+            snprintf(rb_nine_buf[kind][i], 16, "%s_%s", rb_nine_pre[kind], rb_nine_suf[i]);
+            rb_nine_names[kind][i] = rb_nine_buf[kind][i];
+        }
+    float n = kind == 1 ? 1 : 4;
+    if (w < 2 * n) w = 2 * n;
+    if (h < 2 * n) h = 2 * n;
+    float xs[3] = {x, x + n, x + w - n}, ws[3] = {n, w - 2 * n, n};
+    float ys[3] = {y, y + n, y + h - n}, hs[3] = {n, h - 2 * n, n};
+    for (int j = 0; j < 3; j++) for (int i = 0; i < 3; i++)
+        if (ws[i] > 0 && hs[j] > 0) rb_blit(client, rb_nine_names[kind][j * 3 + i], xs[i], ys[j], ws[i], hs[j]);
 }
+static const float RB_CYAN[4] = {0.4f, 0.95f, 0.88f, 1.f}, RB_WHITE[4] = {1, 1, 1, 1}, RB_GREY[4] = {0.82f, 0.86f, 0.95f, 1.f};
+static void rb_text(void *font, float x, float y, const char *t, const float *c) {
+    float col[4] = {c[0], c[1], c[2], c[3]};
+    if (font && t && t[0]) draw_text_col(font, x, y, t, col);
+}
+static void rb_accent(float x0, float y, float x1) {                    /* the inventory's breathing accent line */
+    float t = (float)(now_ms() % 4000) / 4000.f, k = 0.5f + 0.5f * sinf(t * 6.2831853f);
+    rb_fill(x0, y, x1, y + 1, 0.4f + 0.22f * k, 0.95f - 0.45f * k, 0.88f + 0.07f * k, 0.8f);
+}
+static void rb_click(void) {                                              /* the click of the game's buttons */
+    static void (*play)(void *client, void *name, float vol, float pitch);
+    static int looked;
+    if (!looked) { looked = 1; play = dlsym(dlopen("libminecraftpe.so", 0x4 | 0x2), "_ZN15MinecraftClient6playUIERKSsff"); }
+    if (!play || !g_client) return;
+    u32 s[1];
+    gstr(s, "random.click");
+    play(g_client, s, 1.f, 1.25f);
+    f_strdtor(s);
+}
+
+/* items the game failed to draw (a crash inside caught by the guard): skipped from then on */
+static RBIt rb_bad[32];
+static int rb_bad_n, rb_broken;
+static int rb_is_bad(int id, int aux) {
+    for (int i = 0; i < rb_bad_n; i++) if (rb_bad[i].id == id && rb_bad[i].aux == aux) return 1;
+    return 0;
+}
+static void rb_item_safe(int id, int aux, float x, float y) {
+    if (id <= 0 || rb_is_bad(id, aux)) return;
+    static long outer[128];
+    int g = nova_guard;
+    memcpy(outer, nova_guard_jb, sizeof outer);                 /* the whole book's guard, restored after the item */
+    if (crash_path[0]) {
+        if (sigsetjmp(nova_guard_jb, 1)) {
+            memcpy(nova_guard_jb, outer, sizeof outer);
+            nova_guard = g;
+            LOGE("recipe book: item %d:%d crashed the item renderer (pc rel 0x%x), skipped", id, aux, nova_guard_pc);
+            if (rb_bad_n < 32) { rb_bad[rb_bad_n].id = (short)id; rb_bad[rb_bad_n].aux = (short)aux; rb_bad_n++; }
+            return;
+        }
+        nova_guard = 1;
+    }
+    rb_item(id, aux, x, y);
+    memcpy(nova_guard_jb, outer, sizeof outer);
+    nova_guard = g;
+}
+static void rb_slot(void *client, float x, float y, float s, int id, int aux) {   /* a slot of the inventory + item */
+    rb_nine(client, 1, x, y, s, s);
+    if (id > 0) {
+        rb_item_safe(id, aux, x + (s - 16) / 2, y + (s - 16) / 2);
+        rb_hit_add(x, y, s, id, aux);
+    }
+}
+static void rb_button(void *client, float x, float y, float w, float h, const char *icon, int lit) {
+    rb_nine(client, lit ? 3 : 2, x, y, w, h);
+    if (icon) rb_blit(client, icon, x + (w - 8) / 2, y + (h - 8) / 2, 8, 8);
+}
+
 static void rb_tab_icon(int t, int *id, int *aux) {
     if (t == 0) { *id = 2; *aux = 0; return; }                  /* the game: grass block */
     if (t == 1) { *id = 345; *aux = 0; return; }                /* search: compass, as Java's search tab */
     int k = rb_tab_mod[t - 2];
     *id = rb_mods[k].icon; *aux = rb_mods[k].icon_aux;
 }
+static void rb_tab_title(int t, char *out, int n) {
+    if (t == 0) { loc_into("nova.rb.all", out, n); return; }
+    if (t == 1) { loc_into("nova.rb.search.title", out, n); return; }
+    snprintf(out, n, "%s", rb_mods[rb_tab_mod[t - 2]].title);
+}
 
+/* the recipe window: JEI-like, in the middle of the screen */
+#define RB_WW 124
+#define RB_WH 80
 static void rb_draw_window(void *client, void *font) {
     float W = rb_W, H = rb_H;
-    rb_fill(0, 0, W, H, 0, 0, 0, 0.55f);
-    float wx = (float)(int)(W / 2 - 88), wy = (float)(int)(H / 2 - 42);
-    rb_win_rect[0] = wx; rb_win_rect[1] = wy; rb_win_rect[2] = 176; rb_win_rect[3] = 84;
+    rb_fill(0, 0, W, H, 0, 0, 0, 0.5f);
+    float wx = (float)(int)(W / 2 - RB_WW / 2), wy = (float)(int)(H / 2 - RB_WH / 2);
+    rb_win_rect[0] = wx; rb_win_rect[1] = wy; rb_win_rect[2] = RB_WW; rb_win_rect[3] = RB_WH;
     if (rb_win_k >= rb_rec_n) rb_win_k = 0;
     char *r = rb_rec_n ? rb_rec[rb_win_k] : 0;
     int furnace = r && ((long)r & 1);
-    rb_blit(client, furnace ? "furnace" : "craft", wx, wy, 176, 84);
-    char nm[64];
-    rb_name(rb_win_item.id, rb_win_item.aux, nm, sizeof nm);
-    float dark[4] = {0.25f, 0.25f, 0.25f, 1.f};
-    if (font) draw_text_col(font, wx + 8, wy + 5, nm, dark);
-    rb_blit(client, rb_x_tex_name, wx + 176 - 15, wy + 3, 12, 12);
+    rb_nine(client, 0, wx, wy, RB_WW, RB_WH);
+    rb_accent(wx + 5, wy + 3, wx + RB_WW - 5);
+    char title[64];
+    loc_into(furnace ? "container.furnace" : "container.crafting", title, sizeof title);
+    rb_text(font, wx + 7, wy + 7, title, RB_CYAN);
+    rb_nine(client, 4, wx + RB_WW - 15, wy + 5, 11, 11);              /* close: the screen's red button */
+    rb_blit(client, "x", wx + RB_WW - 13, wy + 7, 7, 7);
     if (!r) return;
+    float gx = wx + 7, gy = wy + 19;
     if (furnace) {
         int k = (int)((long)r >> 1);
-        int in = rb_furn[k].in, inaux = rb_furn[k].inaux < 0 ? -1 : rb_furn[k].inaux;
+        int in = rb_furn[k].in, inaux = rb_furn[k].inaux;
         int a = rb_cycle_aux(in, inaux);
-        rb_item(in, a, wx + 56, wy + 17); rb_hit_add(wx + 56, wy + 17, 16, in, a);
+        rb_slot(client, gx + 18, gy + 18, 18, in, a);
         char *res = rb_furn[k].res;
-        rb_item(rb_ii_id(res), rb_ii_aux(res), wx + 116, wy + 35); rb_hit_add(wx + 116, wy + 35, 16, rb_ii_id(res), rb_ii_aux(res));
+        rb_blit(client, "arrow", gx + 59, gy + 21, 16, 13);
+        rb_slot(client, gx + 80, gy + 16, 22, rb_ii_id(res), rb_ii_aux(res));
     } else {
         int sl = rb_shapeless(r);
         char *res = rb_result(r);
+        int cells[9][2];
+        for (int i = 0; i < 9; i++) { cells[i][0] = 0; cells[i][1] = 0; }
         if (sl) {
             char **v = (char **)(r + 0x30);
             int i = 0;
-            for (char *p = v[0]; p && p < v[1] && i < 9; p += 20, i++) {
-                int id = rb_ii_id(p), a = rb_cycle_aux(id, rb_ii_aux(p));
-                float x = wx + 30 + (i % 3) * 18, y = wy + 17 + (i / 3) * 18;
-                rb_item(id, a, x, y); rb_hit_add(x, y, 16, id, a);
-            }
-            float grey[4] = {0.35f, 0.35f, 0.35f, 1.f};
-            if (font) draw_text_col(font, wx + 90, wy + 55, "~", grey);           /* any order */
+            for (char *p = v[0]; p && p < v[1] && i < 9; p += 20, i++) { cells[i][0] = rb_ii_id(p); cells[i][1] = rb_ii_aux(p); }
         } else {
             int w = *(int *)(r + 0x30), h = *(int *)(r + 0x34);
             char **v = (char **)(r + 0x38);
             for (int y = 0; y < h && y < 3; y++) for (int x = 0; x < w && x < 3; x++) {
                 char *p = v[0] + (y * w + x) * 20;
-                if (!v[0] || p >= v[1]) continue;
-                int id = rb_ii_id(p);
-                if (!id) continue;
-                int a = rb_cycle_aux(id, rb_ii_aux(p));
-                float ix = wx + 30 + x * 18, iy = wy + 17 + y * 18;
-                rb_item(id, a, ix, iy); rb_hit_add(ix, iy, 16, id, a);
+                if (v[0] && p < v[1]) { cells[y * 3 + x][0] = rb_ii_id(p); cells[y * 3 + x][1] = rb_ii_aux(p); }
             }
         }
+        for (int i = 0; i < 9; i++) {
+            int id = cells[i][0];
+            rb_slot(client, gx + (i % 3) * 18, gy + (i / 3) * 18, 18, id, id ? rb_cycle_aux(id, cells[i][1]) : 0);
+        }
+        rb_blit(client, "arrow", gx + 58, gy + 21, 16, 13);
+        if (sl) rb_text(font, gx + 61, gy + 8, "~", RB_CYAN);              /* shapeless: any order */
         if (res) {
-            rb_item(rb_ii_id(res), rb_ii_aux(res), wx + 124, wy + 35); rb_hit_add(wx + 124, wy + 35, 16, rb_ii_id(res), rb_ii_aux(res));
+            rb_slot(client, gx + 80, gy + 16, 22, rb_ii_id(res), rb_ii_aux(res));
             int cnt = *(unsigned char *)res;
-            if (cnt > 1 && font) {
+            if (cnt > 1) {
                 char c[8]; snprintf(c, sizeof c, "%d", cnt);
-                float white[4] = {1, 1, 1, 1};
-                draw_text_col(font, wx + 141 - rb_text_w(font, c), wy + 44, c, white);
+                rb_text(font, gx + 101 - rb_text_w(font, c), gy + 30, c, RB_WHITE);
             }
         }
     }
-    if (rb_rec_n > 1) {                                        /* several recipes: 1/3 and arrows under the result */
+    if (rb_rec_n > 1) {                                        /* several recipes: < 1/3 > under the result */
         char pg[16]; snprintf(pg, sizeof pg, "%d/%d", rb_win_k + 1, rb_rec_n);
-        float grey[4] = {0.25f, 0.25f, 0.25f, 1.f};
-        int tw = rb_text_w(font, pg);
-        if (font) draw_text_col(font, wx + 132 - tw / 2, wy + 64, pg, grey);
-        rb_blit(client, "arrow_prev", wx + 110, wy + 59, 12, 17);
-        rb_blit(client, "arrow_next", wx + 144, wy + 59, 12, 17);
+        float by = gy + 42;
+        rb_button(client, gx + 76, by, 10, 10, "arrowLeft", 0);
+        rb_button(client, gx + 106, by, 10, 10, "arrowRight", 0);
+        rb_text(font, gx + 96 - rb_text_w(font, pg) / 2.f, by + 1, pg, RB_GREY);
     }
 }
 
@@ -434,194 +507,214 @@ static void rb_tooltip(void *client, void *font) {
     if (!rb_down || now_ms() - rb_down_at < 350) return;
     for (int i = 0; i < rb_hit_n; i++) {
         float *h = rb_hit[i];
-        if (rb_mx < h[0] - 2 || rb_mx >= h[0] + h[2] + 2 || rb_my < h[1] - 2 || rb_my >= h[1] + h[2] + 2) continue;
+        if (rb_mx < h[0] || rb_mx >= h[0] + h[2] || rb_my < h[1] || rb_my >= h[1] + h[2]) continue;
         char nm[64];
         rb_name(rb_hit_it[i].id, rb_hit_it[i].aux, nm, sizeof nm);
         if (!nm[0] || !font) return;
         int tw = rb_text_w(font, nm);
-        float x = rb_mx - tw / 2.f, y = rb_my - 28;                /* above the finger, as Java's tooltip */
+        float x = rb_mx - tw / 2.f, y = rb_my - 24;                /* above the finger */
         if (x < 4) x = 4;
         if (x + tw + 4 > rb_W) x = rb_W - tw - 4;
-        if (y < 4) y = rb_my + 14;
-        rb_fill(x - 4, y - 4, x + tw + 4, y + 12, 0.06f, 0.0f, 0.06f, 0.94f);
-        rb_fill(x - 3, y - 3, x + tw + 3, y - 2, 0.31f, 0.0f, 1.0f, 0.5f);
-        rb_fill(x - 3, y + 10, x + tw + 3, y + 11, 0.16f, 0.0f, 0.5f, 0.5f);
-        float white[4] = {1, 1, 1, 1};
-        draw_text_col(font, x, y, nm, white);
+        if (y < 4) y = rb_my + 16;
+        rb_fill(x - 4, y - 4, x + tw + 4, y + 12, 0.4f, 0.95f, 0.88f, 1.f);
+        rb_fill(x - 3, y - 3, x + tw + 3, y + 11, 0.12f, 0.14f, 0.22f, 0.96f);
+        rb_text(font, x, y, nm, RB_WHITE);
+        return;
+    }
+}
+static void rb_press_highlight(void) {                             /* the finger on an item: the inventory's highlight */
+    if (!rb_down || rb_moved) return;
+    for (int i = 0; i < rb_hit_n; i++) {
+        float *h = rb_hit[i];
+        if (rb_mx < h[0] || rb_mx >= h[0] + h[2] || rb_my < h[1] || rb_my >= h[1] + h[2]) continue;
+        rb_fill(h[0] + 1, h[1] + 1, h[0] + h[2] - 1, h[1] + h[2] - 1, 0.4f, 0.95f, 0.88f, 0.45f);
         return;
     }
 }
 
 static void rb_handle_tap(float x, float y);
 
-static int rb_ui_render(void *client, char *cc) {
-    const char *nm = sdata(cc + 0xc);
-    if (!nm || !streq(nm, "nova_rb")) return 0;
-    if (!f_blit || !f_gettex || !f_textures || !f_sr) return 1;
+/* geometry */
+static float rb_tabs_x0, rb_tabs_y, rb_grid_y;
+static int rb_fit, rb_tab_arrows;
+static int rb_draw(void *client, char *cc, int creative) {
     float W = *(float *)(cc + 0x18), H = *(float *)(cc + 0x1c);
     rb_W = W; rb_H = H;
     rb_drawn_at = now_ms();
     void *font = *(void **)((char *)client + 0x7c);
+    if (rb_tap_pending) { rb_tap_pending = 0; rb_handle_tap(rb_tap_x, rb_tap_y); }   /* with last frame's hit boxes */
     rb_hit_n = 0;
-    if (rb_tap_pending) { rb_tap_pending = 0; rb_handle_tap(rb_tap_x, rb_tap_y); }
-    float rx = (float)(int)(W / 2 - 78), ry = (float)(int)(H / 2 - 74);      /* common.root_panel: 156 x 148, centred */
-    /* the book button: above the inventory's top-left corner */
-    rb_btn[0] = rx + 1; rb_btn[1] = ry - 20; rb_btn[2] = 20; rb_btn[3] = 18;
-    rb_blit(client, rb_open ? "button_on" : "button", rb_btn[0], rb_btn[1], 20, 18);
+    float rx = (float)(int)(W / 2 - 78), ry = (float)(int)(H / 2 - 74) + (creative ? 10 : 0);   /* common.root_panel */
+    /* the book button: the screen's top-left corner */
+    rb_btn[0] = 4; rb_btn[1] = 4; rb_btn[2] = 20; rb_btn[3] = 20;
+    rb_nine(client, rb_open ? 3 : 2, 4, 4, 20, 20);
+    rb_blit(client, "book", 5, 6, 18, 16);
     if (!rb_open) { rb_tooltip(client, font); return 1; }
     if (rb_gen_built != rc_gen || rb_built_mods != rc_count) { rb_build(); rb_tabs(); rb_query_dirty = 1; }
-    /* the curtain: left of the inventory, as wide as fits (Java's book is 147 x 166) */
-    float pw = rx - 7;
-    if (pw > 147) pw = 147;
-    if (pw < 80) pw = 80;
-    float ph = H - 36 - 6;
-    if (ph > 166) ph = 166;
-    float px = rx - 3 - pw, py = (float)(int)((H - ph - 26) / 2 + 26);
-    if (px < 2) px = 2;
-    rb_panel[0] = px; rb_panel[1] = py - 28; rb_panel[2] = pw; rb_panel[3] = ph + 28;
-    /* tabs on top: the open one drawn over the panel's edge */
-    int fit = (int)((pw - 4) / 27);
-    if (fit < 2) fit = 2;
-    if (rb_tab_off > rb_tab_n - fit) rb_tab_off = rb_tab_n - fit;
+    /* the curtain: from the screen's left edge to the inventory, under the button */
+    float x1 = rx - 3, x0 = x1 - 160;
+    if (x0 < 4) x0 = 4;
+    float y0 = ry < 28 ? 28 : ry, y1 = ry + 148;
+    if (y1 > H - 2) y1 = H - 2;
+    float pw = x1 - x0, ph = y1 - y0;
+    if (pw < 60 || ph < 70) return 1;
+    rb_panel[0] = x0; rb_panel[1] = y0; rb_panel[2] = pw; rb_panel[3] = ph;
+    rb_nine(client, 0, x0, y0, pw, ph);
+    rb_accent(x0 + 5, y0 + 3, x1 - 5);
+    /* tabs: a row of buttons with the tab's item */
+    rb_fit = (int)((pw - 10) / 19);
+    rb_tab_arrows = rb_tab_n > rb_fit;
+    if (rb_tab_arrows) rb_fit = (int)((pw - 10 - 22) / 19);
+    if (rb_fit < 1) rb_fit = 1;
+    if (rb_tab_off > rb_tab_n - rb_fit) rb_tab_off = rb_tab_n - rb_fit;
     if (rb_tab_off < 0) rb_tab_off = 0;
-    for (int pass = 0; pass < 2; pass++) {
-        if (pass == 1) rb_panel_bg(client, px, py, pw, ph);
-        for (int i = 0; i < fit && rb_tab_off + i < rb_tab_n; i++) {
-            int t = rb_tab_off + i, on = t == rb_tab;
-            if (on != pass) continue;
-            float tx = px + 3 + i * 27, ty = py - 28;
-            rb_blit(client, on ? "tab_on" : "tab", tx, ty, 26, on ? 32 : 30);
-            int id, aux;
-            rb_tab_icon(t, &id, &aux);
-            rb_item(id, aux, tx + 5, ty + 9);
-        }
+    rb_tabs_y = y0 + 6;
+    rb_tabs_x0 = x0 + 5 + (rb_tab_arrows ? 11 : 0);
+    if (rb_tab_arrows) {
+        rb_button(client, x0 + 5, rb_tabs_y, 10, 18, "arrowLeft", 0);
+        rb_button(client, x1 - 15, rb_tabs_y, 10, 18, "arrowRight", 0);
     }
-    if (rb_tab_n > fit) {                                      /* more tabs than fit: arrows on the tab row */
-        float ay = py - 26;
-        rb_blit(client, "arrow_prev", px - 13 < 0 ? 0 : px - 13, ay, 12, 17);
-        rb_blit(client, "arrow_next", px + pw + 1, ay, 12, 17);
+    for (int i = 0; i < rb_fit && rb_tab_off + i < rb_tab_n; i++) {
+        int t = rb_tab_off + i, id, aux;
+        float tx = rb_tabs_x0 + i * 19;
+        rb_nine(client, t == rb_tab ? 3 : 2, tx, rb_tabs_y, 18, 18);
+        rb_tab_icon(t, &id, &aux);
+        rb_item_safe(id, aux, tx + 1, rb_tabs_y + 1);
     }
     if (rb_query_dirty) { rb_query_dirty = 0; rb_filter(); }
-    /* search field */
-    float gy0 = py + 8;
+    /* title + page */
+    char title[64];
+    rb_tab_title(rb_tab, title, sizeof title);
+    rb_text(font, x0 + 6, y0 + 27, title, RB_CYAN);
+    float gy = y0 + 38;
     rb_search[2] = 0;
-    if (rb_tab == 1) {
-        rb_search[0] = px + 8; rb_search[1] = py + 7; rb_search[2] = pw - 16; rb_search[3] = 14;
-        rb_fill(px + 8, py + 7, px + pw - 8, py + 21, 0.63f, 0.63f, 0.63f, 1.f);
-        rb_fill(px + 9, py + 8, px + pw - 9, py + 20, 0, 0, 0, 1.f);
-        float col[4] = {0.88f, 0.88f, 0.88f, 1.f}, hint[4] = {0.5f, 0.5f, 0.5f, 1.f};
-        if (font) {
-            if (rb_query[0]) draw_text_col(font, px + 12, py + 10, rb_query, col);
-            else { char hs[48]; loc_into("nova.rb.search", hs, sizeof hs); draw_text_col(font, px + 12, py + 10, rb_kbd ? "_" : hs, hint); }
-        }
-        gy0 = py + 25;
+    if (rb_tab == 1) {                                         /* search field: a slot-like box */
+        rb_search[0] = x0 + 5; rb_search[1] = gy; rb_search[2] = pw - 10; rb_search[3] = 13;
+        rb_nine(client, 1, x0 + 5, gy, pw - 10, 13);
+        if (rb_kbd) rb_fill(x0 + 5, gy, x1 - 5, gy + 1, 0.4f, 0.95f, 0.88f, 1.f);
+        if (rb_query[0]) {
+            char shown[64];
+            snprintf(shown, sizeof shown, "%s%s", rb_query, rb_kbd && (now_ms() / 500) % 2 ? "_" : "");
+            rb_text(font, x0 + 8, gy + 3, shown, RB_WHITE);
+        } else { char hs[48]; loc_into("nova.rb.search", hs, sizeof hs); rb_text(font, x0 + 8, gy + 3, rb_kbd ? "_" : hs, RB_GREY); }
+        gy += 16;
     }
-    /* item pages */
-    rb_cols = (int)((pw - 12) / 25); if (rb_cols < 1) rb_cols = 1;
-    rb_rows = (int)((py + ph - 26 - gy0) / 25); if (rb_rows < 1) rb_rows = 1;
+    rb_grid_y = gy;
+    rb_cols = (int)((pw - 10) / 18); if (rb_cols < 1) rb_cols = 1;
+    rb_rows = (int)((y1 - 18 - gy) / 18); if (rb_rows < 1) rb_rows = 1;
     int per = rb_cols * rb_rows, pages = (rb_view_n + per - 1) / per;
     if (pages < 1) pages = 1;
     if (rb_page >= pages) rb_page = pages - 1;
     if (rb_page < 0) rb_page = 0;
-    rb_gx = (int)(px + (pw - rb_cols * 25) / 2); rb_gy = (int)gy0;
-    for (int k = 0; k < per; k++) {
+    rb_gx = (int)(x0 + (pw - rb_cols * 18) / 2); rb_gy = (int)gy;
+    for (int k = 0; k < per; k++) {                            /* JEI: items in a grid of the inventory's slots */
         int vi = rb_page * per + k;
         if (vi >= rb_view_n) break;
-        float x = rb_gx + (k % rb_cols) * 25, y = rb_gy + (k / rb_cols) * 25;
-        rb_blit(client, "slot", x, y, 25, 25);
         RBIt it = rb_items[rb_view[vi]];
-        rb_item(it.id, it.aux, x + 4, y + 4);
-        rb_hit_add(x + 4, y + 4, 17, it.id, it.aux);
+        rb_slot(client, rb_gx + (k % rb_cols) * 18, rb_gy + (k / rb_cols) * 18, 18, it.id, it.aux);
     }
-    if (!rb_view_n && font) {
-        float grey[4] = {0.6f, 0.6f, 0.6f, 1.f};
-        draw_text_col(font, px + 10, gy0 + 4, "-", grey);
-    }
+    /* pages: < 3/26 > */
     char pg[16];
     snprintf(pg, sizeof pg, "%d/%d", rb_page + 1, pages);
-    float white[4] = {1, 1, 1, 1};
-    float by = py + ph - 23;
-    if (font) draw_text_col(font, px + pw / 2 - rb_text_w(font, pg) / 2.f, by + 5, pg, white);
-    if (pages > 1) {
-        rb_blit(client, "arrow_prev", px + pw / 2 - 34, by, 12, 17);
-        rb_blit(client, "arrow_next", px + pw / 2 + 22, by, 12, 17);
-    }
+    float by = y1 - 16;
+    rb_button(client, x0 + 5, by, 16, 12, "arrowLeft", 0);
+    rb_button(client, x1 - 21, by, 16, 12, "arrowRight", 0);
+    rb_text(font, x0 + pw / 2 - rb_text_w(font, pg) / 2.f, by + 2, pg, RB_GREY);
+    rb_press_highlight();
     if (rb_win) rb_draw_window(client, font);
+    rb_press_highlight();
     rb_tooltip(client, font);
+    return 1;
+}
+
+static int rb_ui_render(void *client, char *cc) {
+    const char *nm = sdata(cc + 0xc);
+    if (!nm || nm[0] != 'n' || memcmp(nm, "nova_rb", 7)) return 0;
+    if (!f_blit || !f_gettex || !f_textures || !f_sr || rb_broken) return 1;
+    if (crash_path[0] && sigsetjmp(nova_guard_jb, 1)) {             /* a crash inside: the book goes away, the game stays */
+        nova_guard = 0;
+        rb_broken = 1;
+        LOGE("recipe book: crashed (pc rel 0x%x), off until restart", nova_guard_pc);
+        return 1;
+    }
+    nova_guard = crash_path[0] != 0;
+    rb_draw(client, cc, nm[7] == '_');
+    nova_guard = 0;
     return 1;
 }
 
 /* ---------------- input ---------------- */
 static void rb_keyboard(int show);
 static int rb_in(float x, float y, float x0, float y0, float w, float h) { return x >= x0 && x < x0 + w && y >= y0 && y < y0 + h; }
-static void rb_open_item(RBIt it, int push) {
+static int rb_open_item(RBIt it, int push) {
     rb_find(it);
-    if (!rb_rec_n) return;
+    if (!rb_rec_n) return 0;
     if (push && rb_win && rb_hist_n < 16) rb_hist[rb_hist_n++] = rb_win_item;
     rb_win_item = it; rb_win_k = 0; rb_win = 1;
+    return 1;
 }
 static void rb_handle_tap(float x, float y) {
     if (rb_in(x, y, rb_btn[0] - 3, rb_btn[1] - 3, rb_btn[2] + 6, rb_btn[3] + 6) && !rb_win) {
         rb_open = !rb_open;
         if (!rb_open && rb_kbd) rb_keyboard(0);
+        rb_click();
         return;
     }
     if (!rb_open) return;
     if (rb_win) {
         float *w = rb_win_rect;
-        if (rb_in(x, y, w[0] + 176 - 20, w[1], 20, 18) || !rb_in(x, y, w[0], w[1], w[2], w[3])) {   /* X or outside */
-            if (rb_hist_n > 0 && rb_in(x, y, w[0], w[1], w[2], w[3])) { rb_open_item(rb_hist[--rb_hist_n], 0); return; }
-            rb_win = 0; rb_hist_n = 0;
+        if (!rb_in(x, y, w[0], w[1], w[2], w[3]) || rb_in(x, y, w[0] + RB_WW - 18, w[1], 18, 18)) {   /* outside or X */
+            rb_win = 0; rb_hist_n = 0; rb_click();
             return;
         }
-        if (rb_rec_n > 1 && rb_in(x, y, w[0] + 106, w[1] + 56, 20, 24)) { rb_win_k = (rb_win_k + rb_rec_n - 1) % rb_rec_n; return; }
-        if (rb_rec_n > 1 && rb_in(x, y, w[0] + 140, w[1] + 56, 20, 24)) { rb_win_k = (rb_win_k + 1) % rb_rec_n; return; }
+        float gx = w[0] + 7, by = w[1] + 19 + 42;
+        if (rb_rec_n > 1 && rb_in(x, y, gx + 72, by - 4, 16, 18)) { rb_win_k = (rb_win_k + rb_rec_n - 1) % rb_rec_n; rb_click(); return; }
+        if (rb_rec_n > 1 && rb_in(x, y, gx + 102, by - 4, 18, 18)) { rb_win_k = (rb_win_k + 1) % rb_rec_n; rb_click(); return; }
         for (int i = 0; i < rb_hit_n; i++) {
             float *h = rb_hit[i];
-            if (!rb_in(x, y, h[0] - 1, h[1] - 1, h[2] + 2, h[2] + 2)) continue;
+            if (!rb_in(x, y, h[0], h[1], h[2], h[2])) continue;
             RBIt it = rb_hit_it[i];
-            if ((it.id != rb_win_item.id || it.aux != rb_win_item.aux) && rb_has_recipe(it.id, it.aux)) rb_open_item(it, 1);
+            if ((it.id != rb_win_item.id || it.aux != rb_win_item.aux) && rb_has_recipe(it.id, it.aux) && rb_open_item(it, 1)) rb_click();
             return;
         }
+        if (rb_hist_n > 0) { rb_open_item(rb_hist[--rb_hist_n], 0); rb_click(); }   /* empty place: back */
         return;
     }
-    float px = rb_panel[0], py = rb_panel[1] + 28, pw = rb_panel[2], ph = rb_panel[3] - 28;
-    /* tabs */
-    int fit = (int)((pw - 4) / 27);
-    if (fit < 2) fit = 2;
-    for (int i = 0; i < fit && rb_tab_off + i < rb_tab_n; i++)
-        if (rb_in(x, y, px + 3 + i * 27, py - 28, 26, 30)) {
+    float x0 = rb_panel[0], pw = rb_panel[2], x1 = x0 + pw, y1 = rb_panel[1] + rb_panel[3];
+    if (rb_tab_arrows) {
+        if (rb_in(x, y, x0 + 3, rb_tabs_y - 2, 14, 22)) { if (rb_tab_off > 0) { rb_tab_off--; rb_click(); } return; }
+        if (rb_in(x, y, x1 - 17, rb_tabs_y - 2, 14, 22)) { if (rb_tab_off < rb_tab_n - rb_fit) { rb_tab_off++; rb_click(); } return; }
+    }
+    for (int i = 0; i < rb_fit && rb_tab_off + i < rb_tab_n; i++)
+        if (rb_in(x, y, rb_tabs_x0 + i * 19, rb_tabs_y - 2, 19, 22)) {
             int t = rb_tab_off + i;
-            if (t != rb_tab) { rb_tab = t; rb_page = 0; rb_query_dirty = 1; }
+            if (t != rb_tab) { rb_tab = t; rb_page = 0; rb_query_dirty = 1; rb_click(); }
             if (t == 1 && !rb_kbd) rb_keyboard(1);
             if (t != 1 && rb_kbd) rb_keyboard(0);
             return;
         }
-    if (rb_tab_n > fit) {
-        if (rb_in(x, y, px - 16, py - 28, 16, 22)) { if (rb_tab_off > 0) rb_tab_off--; return; }
-        if (rb_in(x, y, px + pw, py - 28, 16, 22)) { if (rb_tab_off < rb_tab_n - fit) rb_tab_off++; return; }
-    }
     if (rb_search[2] > 0 && rb_in(x, y, rb_search[0], rb_search[1] - 2, rb_search[2], rb_search[3] + 4)) { rb_keyboard(1); return; }
-    float by = py + ph - 23;
-    if (rb_in(x, y, px + pw / 2 - 40, by - 3, 22, 23)) { rb_page--; if (rb_page < 0) rb_page = 1 << 20; return; }   /* wraps */
-    if (rb_in(x, y, px + pw / 2 + 18, by - 3, 22, 23)) {
+    float by = y1 - 16;
+    if (rb_in(x, y, x0 + 3, by - 4, 22, 20)) { rb_page = rb_page > 0 ? rb_page - 1 : 1 << 20; rb_click(); return; }   /* wraps */
+    if (rb_in(x, y, x1 - 25, by - 4, 22, 20)) {
         int per = rb_cols * rb_rows, pages = (rb_view_n + per - 1) / per;
         rb_page = rb_page + 1 >= pages ? 0 : rb_page + 1;
+        rb_click();
         return;
     }
     for (int i = 0; i < rb_hit_n; i++) {
         float *h = rb_hit[i];
-        if (rb_in(x, y, h[0] - 4, h[1] - 4, 25, 25)) { rb_open_item(rb_hit_it[i], 0); return; }
+        if (rb_in(x, y, h[0], h[1], h[2], h[2])) { if (rb_open_item(rb_hit_it[i], 0)) rb_click(); return; }
     }
 }
 
-/* Multitouch::feed(button, state, x, y, pointer): 1 = the screen shows the book (the touch is ours) */
+/* Multitouch::feed(button, state, x, y, pointer): 1 = the touch is the book's */
 static int rb_touch(u32 *w, float scale) {
-    if (now_ms() - rb_drawn_at > 300) { rb_down = 0; return 0; }
+    if (now_ms() - rb_drawn_at > 300 || rb_broken) { rb_down = 0; return 0; }
     float x = (short)w[2] / scale, y = (short)w[3] / scale;
     int button = w[0] & 0xff, state = w[1] & 0xff;
     int ours = rb_in(x, y, rb_btn[0] - 3, rb_btn[1] - 3, rb_btn[2] + 6, rb_btn[3] + 6) ||
-               (rb_open && (rb_win || rb_in(x, y, rb_panel[0] - 16, rb_panel[1], rb_panel[2] + 32, rb_panel[3])));
+               (rb_open && (rb_win || rb_in(x, y, rb_panel[0], rb_panel[1], rb_panel[2], rb_panel[3])));
     if (button == 0) {                                         /* finger moves */
         if (rb_down) { rb_mx = x; rb_my = y; if ((x - rb_dx) * (x - rb_dx) + (y - rb_dy) * (y - rb_dy) > 36) rb_moved = 1; }
         return rb_down;

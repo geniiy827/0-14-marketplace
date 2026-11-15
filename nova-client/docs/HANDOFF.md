@@ -114,7 +114,10 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha44 выпущена)
+## 4. Где остановились (alpha45 выпущена)
+
+alpha45: книга рецептов переделана в стиле JEI под цвета клиента, кнопка в левом верхнем углу, есть в творческом, тап/звуки/защита от вылетов. Ждём скрины и NOVA-crash.txt, если вылеты остались.
+
 
 alpha44: книга рецептов — `native/recipebook.inc`, контрол `nova_rb` в `ui_new/inventory_screen.json`, картинки
 `tools/gen_recipebook.py` -> `assets_new/images/gui/nova/rb/`. alpha43: crop картинок, упаковка предметов с action.

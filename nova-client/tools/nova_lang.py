@@ -62,6 +62,10 @@ T = {
 }
 # mods (alpha5)
 EXTRA = {
+ 'nova.rb.all': {'en_US': 'Recipes', 'ru_RU': 'Рецепты', 'de_DE': 'Rezepte', 'es_ES': 'Recetas', 'fr_FR': 'Recettes',
+                    'it_IT': 'Ricette', 'pt_BR': 'Receitas', 'ja_JP': 'レシピ', 'ko_KR': '제작법', 'zh_CN': '配方', 'zh_TW': '配方'},
+ 'nova.rb.search.title': {'en_US': 'Search', 'ru_RU': 'Поиск', 'de_DE': 'Suche', 'es_ES': 'Búsqueda', 'fr_FR': 'Recherche',
+                    'it_IT': 'Ricerca', 'pt_BR': 'Pesquisa', 'ja_JP': '検索', 'ko_KR': '검색', 'zh_CN': '搜索', 'zh_TW': '搜尋'},
  'nova.rb.search': {'en_US': 'Search...', 'ru_RU': 'Поиск...', 'de_DE': 'Suchen...', 'es_ES': 'Buscar...', 'fr_FR': 'Rechercher...',
                     'it_IT': 'Cerca...', 'pt_BR': 'Pesquisar...', 'ja_JP': '検索...', 'ko_KR': '검색...', 'zh_CN': '搜索...', 'zh_TW': '搜尋...'},
  'nova.mods.none': {'en_US': 'No mods yet. Import a .mcmod file on the Import tab', 'ru_RU': 'Модов нет. Импортируйте файл мода на вкладке «Импорт»',

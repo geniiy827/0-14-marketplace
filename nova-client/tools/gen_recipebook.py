@@ -1,60 +1,60 @@
-"""Pictures of the NOVA recipe book (native/recipebook.inc) cut from Java 1.19.4 GUI textures.
+"""Pictures of the NOVA recipe book (native/recipebook.inc), in the colours of NOVA's own inventory (ui_new/ui_common.json):
+panel = dialog-background-atlas.png uv 0,80 16x16 nineslice 4 tinted 0.44 0.49 0.62; slot = Indent.png nineslice 1 tinted
+0.62 0.69 0.86; button = gui/nova/btn_square.png nineslice 4 (0.47 0.53 0.68, hover 0.34 0.8 0.82); close = the
+screen close button (red 0.75 0.28 0.34 + X); arrows gui/newgui/arrow*.png. libnova's blit has no tint or uv, so the
+tinted nine-slice pieces are baked here. The book on the button: Java 1.19.4 gui/recipe_button.png.
 
-  python3 tools/gen_recipebook.py <Java textures dir> <assets_new dir>
-  -> images/gui/nova/rb/*.png (loaded by libnova as "gui/nova/rb/<name>.png")
+  python3 tools/gen_recipebook.py <game assets/images> <Java textures> <assets_new>
 """
-import os, sys
+import os, shutil, sys
 from PIL import Image
 
-J, OUT = sys.argv[1], os.path.join(sys.argv[2], 'images/gui/nova/rb')
-os.makedirs(OUT, exist_ok=True)
+G, J, A = sys.argv[1], sys.argv[2], sys.argv[3]
+OUT = os.path.join(A, 'images/gui/nova/rb')
+shutil.rmtree(OUT, ignore_errors=True)
+os.makedirs(OUT)
 
 
-def img(p):
-    return Image.open(os.path.join(J, p)).convert('RGBA')
+def tint(im, c, a=1.0):
+    im = im.convert('RGBA')
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, al = px[x, y]
+            px[x, y] = (int(r * c[0]), int(g * c[1]), int(b * c[2]), int(al * a))
+    return im
 
 
-def save(im, name):
-    im.save(os.path.join(OUT, name + '.png'))
+def nine(im, n, prefix):
+    W, H = im.size
+    xs, ys = [0, n, W - n, W], [0, n, H - n, H]
+    names = [['tl', 't', 'tr'], ['l', 'c', 'r'], ['bl', 'b', 'br']]
+    for j in range(3):
+        for i in range(3):
+            im.crop((xs[i], ys[j], xs[i + 1], ys[j + 1])).save(os.path.join(OUT, '%s_%s.png' % (prefix, names[j][i])))
 
 
-btn = img('gui/recipe_button.png')
-save(btn.crop((0, 0, 20, 18)), 'button')                 # the green book
-save(btn.crop((0, 19, 20, 37)), 'button_on')             # hovered / open
+atlas = Image.open(os.path.join(G, 'gui/newgui/dialog-background-atlas.png'))
+nine(tint(atlas.crop((0, 80, 16, 96)), (0.44, 0.49, 0.62)), 4, 'panel')
+indent = Image.open(os.path.join(G, 'gui/newgui/Indent.png')).crop((0, 0, 5, 5))
+nine(tint(indent, (0.62, 0.69, 0.86)), 1, 'cell')
+btn = Image.open(os.path.join(A, 'images/gui/nova/btn_square.png'))
+nine(tint(btn, (0.47, 0.53, 0.68), 0.92), 4, 'btn')
+nine(tint(btn, (0.34, 0.8, 0.82)), 4, 'btnh')
+nine(tint(btn, (0.75, 0.28, 0.34)), 4, 'btnx')
+tint(Image.open(os.path.join(G, 'gui/newgui/arrow.png')), (0.4, 0.95, 0.88)).save(os.path.join(OUT, 'arrow.png'))
+tint(Image.open(os.path.join(G, 'gui/newgui/X.png')), (1.0, 1.0, 1.0)).save(os.path.join(OUT, 'x.png'))
+for n in ('arrowLeft', 'arrowRight'):
+    Image.open(os.path.join(G, 'gui/newgui/%s.png' % n)).convert('RGBA').save(os.path.join(OUT, n + '.png'))
 
-book = img('gui/recipe_book.png')
-bg = book.crop((1, 1, 148, 167))                          # 147 x 166 panel, cut in 9 for any size
-B = 4
-W, H = bg.size
-parts = {'tl': (0, 0, B, B), 't': (B, 0, W - B, B), 'tr': (W - B, 0, W, B),
-         'l': (0, B, B, H - B), 'c': (B + 4, B + 30, W - B - 4, H - B - 4), 'r': (W - B, B, W, H - B),
-         'bl': (0, H - B, B, H), 'b': (B, H - B, W - B, H), 'br': (W - B, H - B, W, H)}
-for k, r in parts.items():
-    save(bg.crop(r), 'bg_' + k)
-save(book.crop((29, 206, 54, 231)), 'slot')              # 25 x 25 recipe button
-save(book.crop((1, 208, 13, 225)), 'arrow_next')          # page arrows 12 x 17
-save(book.crop((14, 208, 26, 225)), 'arrow_prev')
-save(book.crop((1, 226, 13, 243)), 'arrow_next_on')
-save(book.crop((14, 226, 26, 243)), 'arrow_prev_on')
-
-tabs = img('gui/container/creative_inventory/tabs.png')
-save(tabs.crop((0, 0, 26, 32)), 'tab')                    # top tab, not selected
-save(tabs.crop((0, 32, 26, 64)), 'tab_on')                # selected
-
-
-def window(src, h=80):
-    """the top part of a container picture (title, slots) + its bottom rim"""
-    s = img(src)
-    w = Image.new('RGBA', (176, h + 4))
-    w.paste(s.crop((0, 0, 176, h)), (0, 0))
-    w.paste(s.crop((0, 162, 176, 166)), (0, h))
-    return w
-
-
-save(window('gui/container/crafting_table.png'), 'craft')     # grid 3x3 at 30,17 (18 px), result 124,35 (center)
-fur = window('gui/container/furnace.png')
-f = img('gui/container/furnace.png')
-fur.alpha_composite(f.crop((176, 0, 190, 14)), (56, 36))       # lit flame
-fur.alpha_composite(f.crop((176, 14, 200, 31)), (79, 34))      # full progress arrow
-save(fur, 'furnace')                                       # input 56,17  fuel 56,53  result 116,35 (slot corners)
+# the green book of Java's recipe button, without its grey frame
+rb = Image.open(os.path.join(J, 'gui/recipe_button.png')).convert('RGBA').crop((1, 1, 19, 17))
+px = rb.load()
+frame = px[1, 8]
+for y in range(rb.height):
+    for x in range(rb.width):
+        p = px[x, y]
+        if abs(p[0] - p[1]) < 10 and abs(p[1] - p[2]) < 10 and p[0] > 140:   # light greys of the button face
+            px[x, y] = (0, 0, 0, 0)
+rb.save(os.path.join(OUT, 'book.png'))
 print('ok')

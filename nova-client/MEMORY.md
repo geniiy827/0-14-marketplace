@@ -297,3 +297,10 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Multitouch::feed(button, state, x, y, pointer): 1/1 нажатие, 1/0 отпускание, 0 - движение (net.inc hc_touch).
 - MainActivity.showKeyboard(String, int, boolean, boolean) / hideKeyboard / nativeSetTextboxText(String) — текст
   клавиатуры игры; NovaActivity переопределяет nativeSetTextboxText и nativeReturnKeyPressed (поиск книги рецептов).
+
+## alpha45: книга рецептов, переделка
+- Кнопка в левом верхнем углу экрана (4,4), есть и в творческом инвентаре (контрол `nova_rb_c`, корень +10).
+- Стиль JEI в цветах инвентаря NOVA: панель/ячейки/кнопки — тонированные 9-slice куски из `tools/gen_recipebook.py` (dialog-background-atlas, Indent, btn_square, arrow, X). Java-книга только иконкой на кнопке.
+- Тап открывает рецепт (тап обрабатывается до сброса `rb_hit_n`, по хитбоксам прошлого кадра).
+- Звук `MinecraftClient::playUI("random.click",1,1.25)` на кнопках, вкладках, предметах.
+- Защита от вылетов: весь рендер книги под `nova_guard` (сбой → книга выключается до рестарта), каждый предмет под своим guard (сбойный предмет пропускается, в лог).
