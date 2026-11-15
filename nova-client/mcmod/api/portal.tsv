@@ -1,0 +1,6 @@
+# portal.* — сквозные порталы: видно, что за ними, и проходишь без экрана загрузки (в одном измерении)
+portal.add	x1:num, y1:num, z1:num, face1:num, x2:num, y2:num, z2:num, face2:num, w:num=2, h:num=3	num	native:PORTAL_ADD	wip	Связать два прямоугольника w x h (x, y, z — середина нижнего края; face — куда смотрит лицевая сторона: 0 юг, 1 запад, 2 север, 3 восток). Возвращает номер портала или -1
+portal.remove	id:num	-	native:PORTAL_REMOVE	wip	Убрать портал по номеру
+portal.clear	-	-	native:PORTAL_CLEAR	wip	Убрать все порталы
+portal.render	on:bool	-	native:PORTAL_RENDER	wip	Рисовать ли вид сквозь порталы (проход работает всегда)
+portal.status	-	list	native:PORTAL_STATUS	wip	Состояние: [готов, GL готов (1/0/-1), бит трафарета, рисует, проходов в кадре, мс на кадр, порталов]

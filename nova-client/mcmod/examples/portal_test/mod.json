@@ -1,0 +1,8 @@
+{
+  "id": "portal_test",
+  "name": "Portal Test",
+  "version": "1.0.0",
+  "author": "NOVA",
+  "description": "Проверка сквозных порталов NOVA: видно, что за порталом, проходишь без загрузки. Команды: /portal a, /portal b, /portal demo, /portal size W H, /portal clear, /portal off, /portal on, /portal info.",
+  "main": "main.mcs"
+}

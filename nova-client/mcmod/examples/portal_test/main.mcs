@@ -1,0 +1,115 @@
+// Portal Test - инструменты для проверки сквозных порталов NOVA (portal.*).
+//  /portal a         - вход A в 3 блоках перед тобой: рамка из кварца, проём W x H, лицом к тебе
+//  /portal b         - выход B так же; когда есть A и B - они связаны, можно смотреть и проходить
+//  /portal demo      - сразу пара: перед тобой и в 12 блоках справа, повёрнутая боком
+//  /portal size W H  - размер проёма для следующих (1..8 x 2..8), по умолчанию 2 x 3
+//  /portal clear     - убрать все связи (рамки остаются)
+//  /portal off | on  - выключить / включить рисование вида сквозь портал (проход работает всегда)
+//  /portal info      - состояние: готово ли, есть ли трафарет, сколько проходов и мс на кадр
+// Порталы живут, пока ты в мире: при входе в мир всё сбрасывается.
+
+var FRAME = 155        // кварцевый блок
+var w = 2
+var h = 3
+var endA = null
+var pairs = 0
+
+on world.join(e) {
+    portal.clear()
+    endA = null
+    pairs = 0
+}
+
+fn look() {
+    var y = ((player.yaw() % 360) + 360) % 360
+    return math.round(y / 90) % 4            // куда смотришь: 0 юг, 1 запад, 2 север, 3 восток
+}
+
+fn stepX(d) {
+    var v = [0, -1, 0, 1]
+    return v[d]
+}
+
+fn stepZ(d) {
+    var v = [1, 0, -1, 0]
+    return v[d]
+}
+
+// рамка в ряду блоков (bx, bz): проём w x h, кварц по краям
+fn build(bx, by, bz, face) {
+    var ax = 0
+    var az = 0
+    if face == 0 || face == 2 { ax = 1 } else { az = 1 }
+    var half = math.floor(w / 2)
+    for i in -1..w {
+        for j in -1..h {
+            var x = bx + ax * (i - half)
+            var z = bz + az * (i - half)
+            var edge = i == -1 || i == w || j == -1 || j == h
+            if edge { world.setBlock(x, by + j, z, FRAME) } else { world.setBlock(x, by + j, z, 0) }
+        }
+    }
+    var cx = bx + 0.5
+    var cz = bz + 0.5
+    if ax == 1 { cx = bx - half + w / 2 } else { cz = bz - half + w / 2 }
+    return [cx, by, cz, face]
+}
+
+fn place(dist, side, turn) {
+    var d = look()
+    var r = (d + 1) % 4
+    var bx = math.floor(player.x()) + stepX(d) * dist + stepX(r) * side
+    var by = math.floor(player.y())
+    var bz = math.floor(player.z()) + stepZ(d) * dist + stepZ(r) * side
+    return build(bx, by, bz, (d + 2 + turn) % 4)
+}
+
+fn link(a, b) {
+    var id = portal.add(a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3], w, h)
+    if id < 0 {
+        chat.send("§cПортал не создан: порталы недоступны в этой сборке или их уже 16 (/portal info)")
+        return
+    }
+    pairs = pairs + 1
+    chat.send("§aПортал {id} готов: смотри в проём и проходи.")
+}
+
+on chat(e) {
+    if !e.text.starts("/portal") { return }
+    e.cancel()
+    var p = e.text.trim().split(" ")
+    var cmd = p.len() > 1 ? p[1] : ""
+    if cmd == "a" {
+        endA = place(3, 0, 0)
+        chat.send("§eВход A поставлен. Теперь /portal b там, где должен быть выход.")
+    } else if cmd == "b" {
+        if endA == null { chat.send("§cСначала /portal a"); return }
+        var b = place(3, 0, 0)
+        link(endA, b)
+        endA = null
+    } else if cmd == "demo" {
+        var a = place(3, 0, 0)
+        var b = place(3, 12, 1)
+        link(a, b)
+    } else if cmd == "size" {
+        if p.len() < 4 { chat.send("Пример: /portal size 3 4"); return }
+        w = math.clamp(num(p[2]), 1, 8)
+        h = math.clamp(num(p[3]), 2, 8)
+        chat.send("Проём следующих порталов: {w} x {h}")
+    } else if cmd == "clear" {
+        portal.clear()
+        endA = null
+        chat.send("Связи порталов убраны.")
+    } else if cmd == "off" {
+        portal.render(false)
+        chat.send("Вид сквозь порталы выключен (проход работает).")
+    } else if cmd == "on" {
+        portal.render(true)
+        chat.send("Вид сквозь порталы включён.")
+    } else if cmd == "info" {
+        var s = portal.status()
+        chat.send("§bПорталы:§f готов {s[0]}, GL {s[1]}, трафарет {s[2]} бит, рисует {s[3]}, проходов {s[4]}, {s[5]} мс, связей {s[6]}")
+    } else {
+        chat.send("/portal a | b | demo | size W H | clear | off | on | info")
+    }
+}
