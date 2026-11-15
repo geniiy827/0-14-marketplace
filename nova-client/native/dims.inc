@@ -177,7 +177,12 @@ static u64 hc_wd_new(u32 orig, u32 *w) {                     /* Dimension::creat
         u32 *vt = D->respawn ? wd_dim_vt_r : wd_dim_vt;
         char *d = f_new(0xb4);
         memset(d, 0, 0xb4);
-        wd_dim_ctor(d, (void *)w[2], D->id);
+        wd_dim_ctor(d, (void *)w[2], 0);           /* the constructor names it from a table of the game's dimensions */
+        *(int *)(d + 0x10) = D->id;                 /* by number: past 2 that read garbage (alpha51 crash) */
+        char nm[24];                                 /* +0xc: the name its saved data is kept under, its own */
+        snprintf(nm, sizeof nm, "NovaDimension%d", D->id);
+        f_strdtor(d + 0xc);
+        gstr(d + 0xc, nm);
         ((u32 *)d)[0] = (u32)(vt + 2);
         ((u32 *)d)[1] = (u32)(vt + 49);
         *(void **)w[0] = d;
@@ -273,25 +278,33 @@ static void wd_neighbor(void *b, void *bs, MPos *pos, MPos *from) {
 }
 
 /* who stood in the wooden portal lately */
-static struct { void *e; long t; Dim *d; } wd_marks[32];
+static struct { void *e; long t; Dim *d; MPos p; } wd_marks[32];
 static void *wd_traveller;
+/* the portal a player last left a dimension through, per (dimension, portal kind): the way back leads there */
+static struct { int dim; Dim *d; MPos p; } wd_links[16];
+static void wd_link(int dim, Dim *d, MPos p) {
+    int k = 15;
+    for (int i = 0; i < 16; i++) if ((wd_links[i].d == d && wd_links[i].dim == dim) || !wd_links[i].d) { k = i; break; }
+    wd_links[k].dim = dim; wd_links[k].d = d; wd_links[k].p = p;
+}
 static Dim *wd_trav_dim;
-static void wd_mark(void *e, Dim *d) {
+static void wd_mark(void *e, Dim *d, MPos *p) {
     long now = now_ms();
     int k = 0;
     for (int i = 0; i < 32; i++) {
         if (wd_marks[i].e == e) { k = i; break; }
         if (wd_marks[i].t < wd_marks[k].t) k = i;
     }
-    wd_marks[k].e = e; wd_marks[k].t = now; wd_marks[k].d = d;
+    wd_marks[k].e = e; wd_marks[k].t = now; wd_marks[k].d = d; wd_marks[k].p = *p;
 }
-static Dim *wd_marked(void *e) {
-    for (int i = 0; i < 32; i++) if (wd_marks[i].e == e && now_ms() - wd_marks[i].t < 1500) { wd_marks[i].e = 0; return wd_marks[i].d; }
+static Dim *wd_marked(void *e, MPos *at) {
+    for (int i = 0; i < 32; i++)
+        if (wd_marks[i].e == e && now_ms() - wd_marks[i].t < 1500) { wd_marks[i].e = 0; *at = wd_marks[i].p; return wd_marks[i].d; }
     return 0;
 }
 static void wd_inside(void *b, void *bs, void *pos, void *ent) {
     Dim *D = dm_by_portal(*((u8 *)b + 4));
-    if (ent && D) wd_mark(ent, D);
+    if (ent && D && pos) wd_mark(ent, D, (MPos *)pos);
     if (wd_pb_inside) wd_pb_inside(b, bs, pos, ent);
 }
 
@@ -299,12 +312,14 @@ static u64 hc_wd_request(u32 orig, u32 *w) {                 /* Level::requestPl
     void *pl = (void *)w[1];
     char *req = w[2] ? *(char **)w[2] : 0;
     if (pl == wd_traveller) wd_traveller = 0;
-    Dim *D = wd_ok && req && pl ? wd_marked(pl) : 0;
+    MPos at = {0, 0, 0};
+    Dim *D = wd_ok && req && pl ? wd_marked(pl, &at) : 0;
     if (D) {
         int from = *(int *)(req + 8);
         *(int *)(req + 0xc) = from == D->id ? 0 : D->id;
         wd_traveller = pl;
         wd_trav_dim = D;
+        wd_link(from, D, at);                                          /* the portal block stepped in */
         LOG("dims: player goes %d -> %d", from, *(int *)(req + 0xc));
     }
     return nh_callw(orig, w);
@@ -330,8 +345,17 @@ static void wd_arrive(void *forcer, void *ent, Dim *D) {
     if (y0 < 1) y0 = 1;
     if (y1 > 126) y1 = 126;
     MPos at = {0, 0, 0};
-    for (int dx = -12; dx <= 12; dx++)
-        for (int dz = -12; dz <= 12; dz++)
+    for (int i = 0; i < 16; i++) {                                     /* the portal we left this dimension through */
+        if (wd_links[i].d != D || wd_links[i].dim != dim) continue;
+        MPos l = wd_links[i].p;
+        int ddx = l.x - bx, ddz = l.z - bz;
+        if (ddx * ddx + ddz * ddz > 64 * 64 || (int)wd_id(bs, l.x, l.y, l.z) != P) break;
+        while (l.y > 1 && (int)wd_id(bs, l.x, l.y - 1, l.z) == P) l.y--;
+        at = l; best = 0;
+        break;
+    }
+    for (int dx = -12; dx <= 12 && best; dx++)
+        for (int dz = -12; dz <= 12 && best; dz++)
             for (int y = y0; y <= y1; y++) {
                 if ((int)wd_id(bs, bx + dx, y, bz + dz) != P) continue;
                 int yy = y;
