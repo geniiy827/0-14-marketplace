@@ -58,14 +58,9 @@ final class ModSet {
 
     private String signature() {
         if (mods.isEmpty()) return "";
-        List<String> lines = new ArrayList<String>();
-        for (M m : mods) lines.add("m " + m.uuid + "=" + m.sha1.toLowerCase(java.util.Locale.US));
-        for (Map.Entry<String, Integer> e : blocks.entrySet()) lines.add("b " + e.getKey() + "=" + e.getValue());
-        for (Map.Entry<String, Integer> e : items.entrySet()) lines.add("i " + e.getKey() + "=" + e.getValue());
-        Collections.sort(lines);
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-1");
-            for (String l : lines) md.update((l + "\n").getBytes("UTF-8"));
+            for (String l : lines()) md.update((l + "\n").getBytes("UTF-8"));
             return PackManager.hex(md.digest());
         } catch (Exception e) {
             return "";
@@ -132,15 +127,48 @@ final class ModSet {
         mergeIds(new File(PackManager.root(c), "itemids.json"), items);
     }
 
-    private static void mergeIds(File f, Map<String, Integer> host) throws Exception {
+    /** The host's numbers for the host's mods replace everything this phone kept for those mods (an older version of
+     *  a mod leaves keys the host does not have: they made the signature differ forever, "download" after every
+     *  restart); this phone's other mods lose the numbers the host uses. */
+    private void mergeIds(File f, Map<String, Integer> host) throws Exception {
         TreeMap<String, Integer> m = readIds(f);
+        java.util.Set<Integer> hostNums = new java.util.HashSet<Integer>();
+        for (Map.Entry<String, Integer> e : host.entrySet()) if (!e.getKey().startsWith("data:")) hostNums.add(e.getValue());
+        java.util.Set<String> dropPacked = new java.util.HashSet<String>();
         java.util.Iterator<Map.Entry<String, Integer>> it = m.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<String, Integer> e = it.next();
-            if (host.containsValue(e.getValue()) && !host.containsKey(e.getKey())) it.remove();   // that number is the host's
+            String k = e.getKey();
+            if (modOf(k, mods) != null) { it.remove(); continue; }                     // the host's mod: the host's numbers
+            if (k.startsWith("data:")) continue;
+            if (hostNums.contains(e.getValue())) {                                      // that number is the host's
+                it.remove();
+                if (k.startsWith("pdn:")) dropPacked.add(k.substring(4));
+            }
         }
+        for (String b : dropPacked) m.remove("data:" + b);
         m.putAll(host);
         PackManager.writeText(f, new JSONObject(m).toString(2));
+    }
+
+    /** the mod a key of the id files belongs to: "mod:name", "pdn:mod:name", "data:mod:name", "pack:mod|..." */
+    private static M modOf(String k, List<M> mods) {
+        String b = k.startsWith("pdn:") ? k.substring(4) : k.startsWith("data:") ? k.substring(5) : k;
+        for (M m : mods) {
+            String id = m.uuid.substring(4);
+            if (b.startsWith(id + ":") || k.startsWith("pack:" + id + "|")) return m;
+        }
+        return null;
+    }
+
+    /** the lines the signature is made of (for a report when two phones still differ) */
+    List<String> lines() {
+        List<String> lines = new ArrayList<String>();
+        for (M m : mods) lines.add("m " + m.uuid + "=" + m.sha1.toLowerCase(java.util.Locale.US));
+        for (Map.Entry<String, Integer> e : blocks.entrySet()) lines.add("b " + e.getKey() + "=" + e.getValue());
+        for (Map.Entry<String, Integer> e : items.entrySet()) lines.add("i " + e.getKey() + "=" + e.getValue());
+        Collections.sort(lines);
+        return lines;
     }
 
     // ------------------------------------------------------------------ helpers
@@ -155,15 +183,16 @@ final class ModSet {
         while (it.hasNext()) {
             String k = it.next();
             int v = j.optInt(k, -1);
-            if (v > 0 && v < 4096 && k.length() < 128) m.put(k, v);
+            if ((v > 0 || (v == 0 && k.startsWith("data:"))) && v < 4096 && k.length() < 128) m.put(k, v);
         }
         return m;
     }
 
+    /** the keys of these mods, packed blocks included ("pack:", "pdn:", "data:" - the same ore under the same
+     *  number and data on both phones) */
     private static TreeMap<String, Integer> onlyMods(TreeMap<String, Integer> ids, List<M> mods) {
         TreeMap<String, Integer> out = new TreeMap<String, Integer>();
-        for (Map.Entry<String, Integer> e : ids.entrySet())
-            for (M m : mods) if (e.getKey().startsWith(m.uuid.substring(4) + ":")) { out.put(e.getKey(), e.getValue()); break; }
+        for (Map.Entry<String, Integer> e : ids.entrySet()) if (modOf(e.getKey(), mods) != null) out.put(e.getKey(), e.getValue());
         return out;
     }
 }

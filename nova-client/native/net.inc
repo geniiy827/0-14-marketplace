@@ -351,6 +351,20 @@ static void net_frame(void *client) {
 }
 static void net_draw(void *client) { draw_banner(client); }
 
+/* CreateWorldScreen keeps the world's game mode at +0x9c (from the world's LevelSummary at +0x154 when editing)
+ * and takes its description from an array of two (survival, creative): a world with another mode (2 adventure,
+ * 3 spectator, or a damaged level.dat) read past it - a crash in Label::Label when its settings were opened. */
+static int (*f_cw_edit)(void *);
+static void cw_clamp(char *scr, int off) { int *m = (int *)(scr + off); if (*m < 0 || *m > 1) *m = 0; }
+static u64 hc_cw_init(u32 orig, u32 *w) {
+    if (w[0] && f_cw_edit && f_cw_edit((void *)w[0])) cw_clamp((char *)w[0], 0x154);
+    return nh_callw(orig, w);
+}
+static u64 hc_cw_desc(u32 orig, u32 *w) {                      /* _getDescription() const: this in w[0] */
+    if (w[0]) cw_clamp((char *)w[0], 0x9c);
+    return nh_callw(orig, w);
+}
+
 /* ---------------- setup --------------------------------------------------------------------------------- */
 static void net_init(void *mc) {
     if (!menus_ok) return;
@@ -378,6 +392,10 @@ static void net_init(void *mc) {
         patch_slot(vt_cw, 53, h_cw_setup, (void **)&o_cw_setup);
         patch_slot(vt_cw, 67, h_cw_click, (void **)&o_cw_click);
     }
+    f_cw_edit = dlsym(mc, "_ZNK17CreateWorldScreen10isEditModeEv");
+    void *cwi = dlsym(mc, "_ZN17CreateWorldScreen4initEv"), *cwd = dlsym(mc, "_ZNK17CreateWorldScreen15_getDescriptionEv");
+    int ci = cwi ? nh_hook_c((u32)cwi, hc_cw_init) : -1, cd = cwd ? nh_hook_c((u32)cwd, hc_cw_desc) : -1;
+    if (ci < 0 || cd < 0) LOGE("create world guard: init %d, description %d", ci, cd);
     void *h = dlsym(mc, "_ZN14RakNetInstance4hostERKSsii");
     void *d = dlsym(mc, "_ZN14RakNetInstance10disconnectEv");
     void *t = dlsym(mc, "_ZN10Multitouch4feedEccssi");

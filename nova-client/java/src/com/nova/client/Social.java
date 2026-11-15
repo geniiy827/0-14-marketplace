@@ -323,7 +323,7 @@ final class Social implements NovaNet.Listener {
         final String what = f[0], tag = f.length > 1 ? f[1].trim() : "";
         if (what.equals("x") || busy) return;
         if (what.equals("join")) { join(tag); return; }
-        if (what.equals("mods")) { syncMods(tag, "friends"); return; }
+        if (what.equals("mods")) { if (tag.equalsIgnoreCase(justSynced)) join(tag); else syncMods(tag, "friends"); return; }
         if (tag.length() == 0) { NovaActivity.postToast(t("Введите тег друга", "Enter your friend's tag"), ""); return; }
         final String op = what.equals("request") ? "friends.request" : what.equals("accept") ? "friends.accept"
                 : what.equals("decline") ? "friends.decline" : "friends.remove";
@@ -359,8 +359,12 @@ final class Social implements NovaNet.Listener {
                             if (!(o instanceof Map) || !tag.equalsIgnoreCase(String.valueOf(((Map<String, Object>) o).get("tag")))) continue;
                             Object w = ((Map<String, Object>) o).get("world");
                             if (w instanceof Map && !ModSet.local(act).matches((Map<String, Object>) w)) {
-                                syncMods(tag, "join");
-                                return;
+                                if (!tag.equalsIgnoreCase(justSynced)) {
+                                    syncMods(tag, "join");
+                                    return;
+                                }
+                                // the mods were just made the host's and still differ: no second round, say what differs
+                                modReport(n, tag);
                             }
                         }
                     }
@@ -445,6 +449,25 @@ final class Social implements NovaNet.Listener {
         });
     }
 
+    private volatile String justSynced;
+
+    /** files/nova/mods_diff.txt: the lines of the mod signature only one phone has */
+    private void modReport(NovaNet n, String tag) {
+        try {
+            ModSet host = ModSet.parse(new String(n.download(tag, new int[]{ModSet.MANIFEST}, null)[0], "UTF-8"));
+            host.sig = "";
+            List<String> h = host.lines(), mine = ModSet.local(act).lines();
+            StringBuilder sb = new StringBuilder("NOVA mods: host " + tag + " vs this phone\n");
+            for (String l : h) if (!mine.contains(l)) sb.append("host only: ").append(l).append('\n');
+            for (String l : mine) if (!h.contains(l)) sb.append("mine only: ").append(l).append('\n');
+            PackManager.writeText(new java.io.File(act.getFilesDir(), "nova/mods_diff.txt"), sb.toString());
+            Log.w(TAG, sb.toString());
+        } catch (Throwable e) {
+            Log.w(TAG, "mods report", e);
+        }
+        NovaActivity.postToast(t("Моды всё ещё отличаются от хоста", "Mods still differ from the host"), t("вход без повторной загрузки", "joining anyway"));
+    }
+
     private java.io.File afterFile() { return new java.io.File(act.getFilesDir(), "nova/after_restart.properties"); }
 
     /** ~6 s after the start: what syncMods asked for */
@@ -457,6 +480,7 @@ final class Social implements NovaNet.Listener {
         if (System.currentTimeMillis() - NovaActivity.parseLong(p.getProperty("time", "0")) > 5 * 60 * 1000L) return;
         String tag = p.getProperty("tag", "");
         if (tag.length() == 0 || net == null) return;
+        justSynced = tag;
         if ("join".equals(p.getProperty("action"))) join(tag);
         else openFriends(1, null);
     }

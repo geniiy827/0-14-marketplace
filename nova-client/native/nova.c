@@ -78,20 +78,22 @@ static char *dupn(const char *s, int n) {
 /* ---------------- part registry: part ptr -> geometry + bone key ------- */
 typedef struct { void *part; const char *geo; const char *key; float bind[3]; float pos[3]; int pos_ok; } PartInfo;
 #define PCAP 8192
+#define DEAD ((void *)1)          /* a forgotten entry of an open-addressing table */
 static PartInfo parts[PCAP];
 
 static PartInfo *pinfo(void *part, int create) {
     u32 h = ((u32)part >> 3) * 2654435761u;
+    PartInfo *free_e = 0;
     for (int i = 0; i < PCAP; i++) {
         PartInfo *e = &parts[(h + i) & (PCAP - 1)];
         if (e->part == part) return e;
-        if (!e->part) {
-            if (!create) return 0;
-            e->part = part;
-            return e;
-        }
+        if (e->part == DEAD && !free_e) free_e = e;             /* a forgotten part: reusable */
+        if (!e->part) { if (!free_e) free_e = e; break; }
     }
-    return 0;
+    if (!create || !free_e) return 0;
+    memset(free_e, 0, sizeof *free_e);
+    free_e->part = part;
+    return free_e;
 }
 
 static const char *geo_name(char *geo) {
@@ -436,7 +438,8 @@ static ModelAnim *model_anim(void *model) {
             slot = m;
             break;
         }
-        if (!m->model) { slot = m; break; }
+        if (m->model == DEAD && !slot) slot = m;
+        if (!m->model) { if (!slot) slot = m; break; }
     }
     if (!slot) return 0;
     slot->model = model; slot->set = 0; slot->bp = 0; slot->vt = vt; slot->first = first;
@@ -644,7 +647,8 @@ static void ensure_rebuilt(void *model) {
     for (int i = 0; i < DONE_CAP; i++) {
         int j = (h + i) & (DONE_CAP - 1);
         if (done_models[j] == model) return;
-        if (!done_models[j]) { slot = j; break; }
+        if (done_models[j] == DEAD && slot < 0) slot = j;
+        if (!done_models[j]) { if (slot < 0) slot = j; break; }
     }
     if (slot < 0) return;
     done_models[slot] = model;
@@ -696,6 +700,53 @@ static void hook_render(void *model, void *ent, float a, float b, float c, float
     }
 }
 
+/* A model is destroyed (leaving a world) and the next world's model is often made at the same address: forget
+ * everything kept for the old one (rebuilt mark, animation binding, bone bind poses), or the new model is taken
+ * for the old one - not rebuilt from its geometry, animated with the old parts' poses: limbs out of place. */
+static void forget_part(void *part, int depth) {
+    if (!part || depth > 16) return;
+    PartInfo *pi = pinfo(part, 0);
+    if (pi) { pi->part = DEAD; pi->key = 0; pi->pos_ok = 0; }
+    void **c = *(void ***)((char *)part + 0x28), **e = *(void ***)((char *)part + 0x2c);
+    for (; c && c < e && e - c < 256; c++) forget_part(*c, depth + 1);
+}
+static void forget_model(void *model) {
+    u32 h = ((u32)model >> 3) * 2654435761u;
+    for (int i = 0; i < DONE_CAP; i++) {
+        int j = (h + i) & (DONE_CAP - 1);
+        if (done_models[j] == model) { done_models[j] = DEAD; break; }
+        if (!done_models[j]) break;
+    }
+    for (int i = 0; i < MCAP; i++) {
+        ModelAnim *m = &models[(h + i) & (MCAP - 1)];
+        if (m->model == model) {
+            if (m->bp && m->set) for (int k = 0; k < m->set->nbone; k++) free(m->bp[k].parts);
+            free(m->bp);
+            m->model = DEAD; m->set = 0; m->bp = 0; m->vt = 0; m->first = 0;
+            break;
+        }
+        if (!m->model) break;
+    }
+    void **b = *(void ***)((char *)model + 0xa8), **e = *(void ***)((char *)model + 0xac);
+    for (; b && b < e && e - b < 256; b++) forget_part(*b, 0);
+    u32 vt = *(u32 *)model;
+    for (int i = 0; i < nrbs; i++) {                            /* rebuilt parts that are not registered */
+        if (rbs[i].vt != vt) continue;
+        for (int k = 0; k < rbs[i].n; k++) forget_part((char *)model + rbs[i].offs[k], 0);
+    }
+}
+typedef void *(*dtor_fn)(void *);
+typedef struct { u32 vt; dtor_fn d1, d0; } VtDtor;
+static VtDtor vtdtor[64];
+static int nvtd;
+static VtDtor *dtor_of(void *model) {
+    u32 vt = *(u32 *)model;
+    for (int i = 0; i < nvtd; i++) if (vtdtor[i].vt == vt) return &vtdtor[i];
+    return 0;
+}
+static void *hook_dtor1(void *model) { VtDtor *d = dtor_of(model); forget_model(model); return d ? d->d1(model) : model; }
+static void *hook_dtor0(void *model) { VtDtor *d = dtor_of(model); forget_model(model); return d ? d->d0(model) : model; }
+
 static const char *const VTABLES[] = {
     "_ZTV14QuadrupedModel", "_ZTV8CowModel", "_ZTV8PigModel", "_ZTV10SheepModel",
     "_ZTV13HumanoidModel", "_ZTV11ZombieModel", "_ZTV13SkeletonModel", "_ZTV19VillagerZombieModel",
@@ -724,6 +775,16 @@ static void hook_vtables(void *mc) {
             vtrender[nvtr].orig = (render_fn)*rslot;
             nvtr++;
             *rslot = (u32)hook_render;
+        }
+        u32 *d1 = (u32 *)(vt + 8), *d0 = (u32 *)(vt + 12);          /* ~Model(), deleting ~Model() */
+        if (nvtd < 64 && mprotect((void *)((u32)d1 & ~4095u), 8192, 3) == 0) {
+            vtdtor[nvtd].vt = vt + 8;
+            vtdtor[nvtd].d1 = (dtor_fn)*d1;
+            vtdtor[nvtd].d0 = (dtor_fn)*d0;
+            nvtd++;
+            *d1 = (u32)hook_dtor1;
+            *d0 = (u32)hook_dtor0;
+            mprotect((void *)((u32)d1 & ~4095u), 8192, 1);
         }
         mprotect((void *)page, 8192, 1);
         hooked_vt++;

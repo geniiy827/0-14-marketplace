@@ -310,3 +310,9 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Вкладки 22x22, иконка целиком внутри.
 - Поиск: «вылет» инвентаря был нажатием «назад» — клавиатура игры при закрытии/тапе мимо зовёт nativeBackPressed. Пока ищем, NovaActivity перехватывает nativeBackPressed/nativeBackSpacePressed. Текст берётся своим TextWatcher на MainActivity.textInputWidget (рефлексия) плюс nativeSetTextboxText.
 - Iron Chests: исходники открыты (github progwml6/ironchest, GPL-3.0) — можно портировать.
+
+## alpha47: багфикс
+- Модель игрока при повторном входе в мир: модели уничтожаются и новые встают по тем же адресам; libnova считала их старыми (не перестраивала из геометрии, анимировала со старыми позами костей). Теперь деструкторы моделей (слоты 0/1 тех же vtable) забывают модель: done_models, models[] (анимации), PartInfo костей (DEAD-метки в открытой адресации).
+- Моды у друга («скачать» после каждого перезапуска): ModSet.mergeIds теперь заменяет ВСЕ ключи модов хоста его ключами (старая версия мода оставляла лишние ключи → подпись никогда не совпадала). В манифест и подпись входят ключи упакованных блоков (pack:/pdn:/data:), иначе руды могли встать у друга под другими data. Повторная синхронизация после перезапуска не идёт: вход + files/nova/mods_diff.txt. Хост и друг оба должны быть на alpha47 (подпись изменилась).
+- Краш друга (Label::Label из CreateWorldScreen::init): режим мира вне 0/1 → чтение за массив из двух описаний. Ограничение режима в init (+0x154) и _getDescription (+0x9c).
+- Измерения (исследование): Level хранит unordered_map<int, unique_ptr<Dimension>>, Dimension::createNew(id) знает 0/1, Dimension 0xb4 байт, vtable 45 слотов + thunk (второй vptr +4), _createGenerator(GeneratorType), ключи чанков в LevelDB с номером измерения, ChangeDimensionPacket — байт. Путь: свой класс измерения (копия vtable Normal/Hell с заменами), хук createNew для id>=2, свой генератор, переход без PortalForcer.
