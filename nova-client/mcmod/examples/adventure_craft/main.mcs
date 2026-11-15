@@ -2,7 +2,9 @@
 //  - Постройки: генератор мира NOVA ставит их по structures.bin в новых чанках (авторы - CREDITS.txt).
 //  - Жажда: перенос системы жажды SimpleDifficulty (Charles445, MIT), которая сама сделана по Tough As Nails.
 //    Числа те же, что в SimpleDifficulty: ModConfig.thirst, ThirstEnum, ItemJuice.JuiceEnum.
-// Команды: /adventure - что есть в моде, /thirst - жажда сейчас, /ac give - выдать предметы жажды.
+//  - Температура: перенос температуры SimpleDifficulty (шарик над хотбаром, термометр, шерстяная и ледяная броня,
+//    нагреватель/охладитель, костёр, осколки льда и магмы, обморожение/перегрев, зелья сопротивления).
+// Команды: /adventure - что есть в моде, /thirst - жажда, /temperature - температура, /ac give - выдать предметы.
 
 // ================================================================ предметы жажды
 item canteen {
@@ -84,6 +86,250 @@ item juice_pumpkin {
     texture: "textures/juice_pumpkin.png"
     stack: 1
     action: "Выпить"
+}
+
+// ================================================================ температура (SimpleDifficulty): предметы
+item thermometers {
+    variants: [
+        {name: "thermometer", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_00.png"},
+        {name: "thermometer_01", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_01.png"},
+        {name: "thermometer_02", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_02.png"},
+        {name: "thermometer_03", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_03.png"},
+        {name: "thermometer_04", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_04.png"},
+        {name: "thermometer_05", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_05.png"},
+        {name: "thermometer_06", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_06.png"},
+        {name: "thermometer_07", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_07.png"},
+        {name: "thermometer_08", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_08.png"},
+        {name: "thermometer_09", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_09.png"},
+        {name: "thermometer_10", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_10.png"},
+        {name: "thermometer_11", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_11.png"},
+        {name: "thermometer_12", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_12.png"},
+        {name: "thermometer_13", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_13.png"},
+        {name: "thermometer_14", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_14.png"},
+        {name: "thermometer_15", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_15.png"},
+        {name: "thermometer_16", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_16.png"},
+        {name: "thermometer_17", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_17.png"},
+        {name: "thermometer_18", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_18.png"},
+        {name: "thermometer_19", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_19.png"},
+        {name: "thermometer_20", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_20.png"},
+        {name: "thermometer_21", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_21.png"},
+        {name: "thermometer_22", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_22.png"},
+        {name: "thermometer_23", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_23.png"},
+        {name: "thermometer_24", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_24.png"},
+        {name: "thermometer_25", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_25.png"}
+    ]
+}
+item ice_chunk {
+    name: {ru: "Ледяной осколок", en: "Ice Chunk"}
+    texture: "textures/temperature/items/ice_chunk.png"
+}
+item magma_chunk {
+    name: {ru: "Огненный осколок", en: "Magma Chunk"}
+    texture: "textures/temperature/items/magma_chunk.png"
+}
+// броня: материал SDWOOL / SDICE (прочность 2, защита 1 в каждом слоте, зачаровываемость 5)
+item wool_helmet {
+    name: {ru: "Шерстяная шапка", en: "Wool Hood"}
+    texture: "textures/temperature/items/wool_helmet.png"
+    armor: "helmet"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/wool"
+}
+item wool_chestplate {
+    name: {ru: "Шерстяная шуба", en: "Wool Coat"}
+    texture: "textures/temperature/items/wool_chestplate.png"
+    armor: "chestplate"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/wool"
+}
+item wool_leggings {
+    name: {ru: "Шерстяные штаны", en: "Wool Pants"}
+    texture: "textures/temperature/items/wool_leggings.png"
+    armor: "leggings"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/wool"
+}
+item wool_boots {
+    name: {ru: "Шерстяные сапоги", en: "Wool Boots"}
+    texture: "textures/temperature/items/wool_boots.png"
+    armor: "boots"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/wool"
+}
+item ice_helmet {
+    name: {ru: "Ледяной шлем", en: "Ice Helmet"}
+    texture: "textures/temperature/items/ice_helmet.png"
+    armor: "helmet"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/ice"
+}
+item ice_chestplate {
+    name: {ru: "Ледяной нагрудник", en: "Ice Chestplate"}
+    texture: "textures/temperature/items/ice_chestplate.png"
+    armor: "chestplate"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/ice"
+}
+item ice_leggings {
+    name: {ru: "Ледяные поножи", en: "Ice Leggings"}
+    texture: "textures/temperature/items/ice_leggings.png"
+    armor: "leggings"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/ice"
+}
+item ice_boots {
+    name: {ru: "Ледяные ботинки", en: "Ice Boots"}
+    texture: "textures/temperature/items/ice_boots.png"
+    armor: "boots"
+    defense: 1
+    durability: 2
+    enchant: 5
+    armorTexture: "textures/temperature/armor/ice"
+}
+// зелья сопротивления (в 0.14 варочная стойка берёт в нижние слоты только зелья игры - варятся на верстаке)
+item potion_cold_resist {
+    name: {ru: "Зелье сопротивления холоду (1:00)", en: "Potion of Cold Resistance (1:00)"}
+    texture: "textures/temperature/items/potion_cold_resist.png"
+    stack: 1
+    action: "Выпить"
+}
+item potion_cold_resist_long {
+    name: {ru: "Зелье сопротивления холоду (2:00)", en: "Potion of Cold Resistance (2:00)"}
+    texture: "textures/temperature/items/potion_cold_resist.png"
+    stack: 1
+    action: "Выпить"
+}
+item potion_heat_resist {
+    name: {ru: "Зелье сопротивления теплу (1:00)", en: "Potion of Heat Resistance (1:00)"}
+    texture: "textures/temperature/items/potion_heat_resist.png"
+    stack: 1
+    action: "Выпить"
+}
+item potion_heat_resist_long {
+    name: {ru: "Зелье сопротивления теплу (2:00)", en: "Potion of Heat Resistance (2:00)"}
+    texture: "textures/temperature/items/potion_heat_resist.png"
+    stack: 1
+    action: "Выпить"
+}
+
+// ================================================================ температура: блоки
+// нагреватель / охладитель: работают от сигнала редстоуна (как лампа), BlockTemperature + TileEntityTemperature
+block heater {
+    name: {ru: "Нагреватель", en: "Heater"}
+    model: "models/heater.bbmodel"
+    hardness: 0.5
+    sound: "metal"
+    transparent: true
+    redstone: {type: "lamp", on: "heater_on"}
+}
+block heater_on {
+    name: {ru: "Нагреватель", en: "Heater"}
+    model: "models/heater_on.bbmodel"
+    hardness: 0.5
+    sound: "metal"
+    transparent: true
+    light: 7
+    redstone: {type: "lamp_on", off: "heater"}
+}
+block chiller {
+    name: {ru: "Охладитель", en: "Chiller"}
+    model: "models/chiller.bbmodel"
+    hardness: 0.5
+    sound: "metal"
+    transparent: true
+    redstone: {type: "lamp", on: "chiller_on"}
+}
+block chiller_on {
+    name: {ru: "Охладитель", en: "Chiller"}
+    model: "models/chiller_on.bbmodel"
+    hardness: 0.5
+    sound: "metal"
+    transparent: true
+    light: 7
+    redstone: {type: "lamp_on", off: "chiller"}
+}
+// костёр (BlockCampfire): возраст 0..7 в данных блока, модель по возрасту, горящий - свой блок (свет 15); ничего не выпадает
+block campfire {
+    name: {ru: "Костёр", en: "Campfire"}
+    model: "models/campfire.bbmodel"
+    hardness: 0.5
+    sound: "wood"
+    transparent: true
+    collision: "none"
+    drop: {item: "campfire", count: 0}
+}
+block campfire_lit {
+    name: {ru: "Костёр", en: "Campfire"}
+    model: "models/campfire.bbmodel"
+    hardness: 0.5
+    sound: "wood"
+    transparent: true
+    collision: "none"
+    light: 15
+    drop: {item: "campfire", count: 0}
+}
+block campfire_half {
+    name: {ru: "Костёр", en: "Campfire"}
+    model: "models/campfire_half.bbmodel"
+    hardness: 0.5
+    sound: "wood"
+    transparent: true
+    collision: "none"
+    drop: {item: "campfire", count: 0}
+}
+block campfire_half_lit {
+    name: {ru: "Костёр", en: "Campfire"}
+    model: "models/campfire_half.bbmodel"
+    hardness: 0.5
+    sound: "wood"
+    transparent: true
+    collision: "none"
+    light: 15
+    drop: {item: "campfire", count: 0}
+}
+block campfire_burnt {
+    name: {ru: "Костёр", en: "Campfire"}
+    model: "models/campfire_burnt.bbmodel"
+    hardness: 0.5
+    sound: "wood"
+    transparent: true
+    collision: "none"
+    drop: {item: "campfire", count: 0}
+}
+block campfire_burnt_lit {
+    name: {ru: "Костёр", en: "Campfire"}
+    model: "models/campfire_burnt.bbmodel"
+    hardness: 0.5
+    sound: "wood"
+    transparent: true
+    collision: "none"
+    light: 15
+    drop: {item: "campfire", count: 0}
+}
+// блок магмы из 1.10 (в 0.14 его нет, а из него SimpleDifficulty берёт огненные осколки): Ад, высоты 27..36
+block magma {
+    name: {ru: "Блок магмы", en: "Magma Block"}
+    texture: "textures/temperature/blocks/magma.png"
+    hardness: 0.5
+    sound: "stone"
+    light: 3
+    harvest: 0
+    drop: {item: "magma_chunk", count: [0, 2]}
+    ore: {count: 4, size: 33, min: 27, max: 36, in: "netherrack"}
 }
 
 // ================================================================ числа SimpleDifficulty
@@ -361,7 +607,11 @@ on action(e) {
     }
     if JUICES.has(str(id)) {
         var j = JUICES[str(id)]
-        if drink([j[0], j[1], 0]) { useOne(); give(374, 1) }
+        if drink([j[0], j[1], 0]) {
+            useOne()
+            give(374, 1)
+            if id == juice_cactus { tmods["drink"] = [1, 1200] }     // JsonConfig.consumableTemperature
+        }
         return
     }
     // пустая рука: из воды или дождь
@@ -449,7 +699,7 @@ on tick(e) {
 on chat(e) {
     if e.text == "/adventure" {
         e.cancel()
-        ui.tip("§6Adventure Craft§f: постройки (113) и жажда. /thirst - жажда, /ac give - предметы")
+        ui.tip("§6Adventure Craft§f: постройки (113), жажда и температура. /thirst, /temperature, /ac give - предметы")
     } else if e.text == "/thirst" {
         e.cancel()
         chat.send("§bЖажда {thirst}/20, насыщенность {math.roundTo(sat, 1)}, усталость {math.roundTo(ex, 2)}" + (thirsty > 0 ? ", §2грязная вода {math.floor(thirsty / 20)} с" : ""))
@@ -460,12 +710,680 @@ on chat(e) {
         give(purified_water_bottle, 4)
         give(juice_apple, 2)
         give(juice_melon, 2)
-        ui.tip("§6Adventure Craft: §fпредметы жажды выданы")
+        give(thermometer, 1)
+        for a in [wool_helmet, wool_chestplate, wool_leggings, wool_boots] { give(a, 1) }
+        give(heater, 1)
+        give(chiller, 1)
+        give(campfire, 2)
+        give(17, 8)
+        give(259, 1)
+        give(potion_cold_resist, 1)
+        give(potion_heat_resist, 1)
+        give(ice_chunk % 65536, 8, math.floor(ice_chunk / 65536))
+        give(magma_chunk % 65536, 8, math.floor(magma_chunk / 65536))
+        ui.tip("§6Adventure Craft: §fпредметы жажды и температуры выданы")
     } else if e.text == "/thirst 0" or e.text == "/thirst 20" {
         e.cancel()
         thirst = e.text == "/thirst 0" ? 0 : 20
         sat = 0
         hudKey = ""
         save()
+    }
+}
+
+// ================================================================ температура (SimpleDifficulty, Charles445, MIT)
+// Перенос TemperatureCapability / TemperatureUtil / Modifier* / TemperatureGui. Числа - ModConfig.server.temperature.
+// Температуру каждый игрок считает у себя (как жажду), а хост мира: урон от обморожения/перегрева, костры (горение,
+// угли, дождь), список нагревателей и костров для всех, осколки из льда, поджигание у костра.
+var T_TICK_MAX = 400              // temperatureTickMax
+var T_TICK_MIN = 20               // temperatureTickMin
+var T_DANGER_BOOST = 60           // temperatureTickDangerBoost
+var T_ALTITUDE = 3                // altitudeMultiplier
+var T_BIOME = 10                  // biomeMultiplier
+var T_CUTOFF = 30                 // undergroundEffectCutoff
+var T_TIME = 3                    // timeMultiplier
+var T_TIME_BIOME = 1.25           // timeBiomeMultiplier
+var T_SHADE = -2                  // timeTemperatureShade
+var T_SNOW = -10                  // snowValue
+var T_SPRINT = 3                  // sprintingValue
+var T_WET = -7                    // wetValue
+var T_HEATER = 10                 // heaterTemperature
+var T_HEATER_FULL = 16            // heaterFullPowerRange
+var T_HEATER_MAX = 32             // heaterMaxRange
+var T_STACK_LIMIT = 3             // stackingTemperatureLimit
+var T_EFFECT_TICKS = 400          // temperatureDamageDuration
+var T_DEFAULT = 12                // ModifierDefault: (NORMAL.upper 14 + COLD.upper 10) / 2
+var RESIST_SHORT = 1200           // resistancePotionDurationShort
+var RESIST_LONG = 2400            // resistancePotionDurationLong
+
+var temp = 12                     // температура тела 0..25: 0-5 замерзание, 6-10 холодно, 11-14 норма, 15-19 жарко, 20-25 пекло
+var tempTimer = 0                 // ticktimer
+var target = 12                   // куда идёт температура (пересчёт раз в 5 тиков)
+var hypo = 0                      // тиков эффекта «Обморожение»
+var hyper = 0                     // «Перегрев»
+var resistCold = 0                // «Сопротивление холоду»
+var resistHeat = 0                // «Сопротивление теплу»
+var thermiaHurt = 0.0             // урон эффектов копится по 0.5 (в 0.14 урон целый: 1 = полсердца)
+var tmods = {}                    // временные модификаторы: группа -> [температура, тиков] (еда, напитки)
+var tkey = ""
+var updateCounter = 0             // TemperatureGui.updateCounter
+var oldTemp = -1
+var rising = false
+var arrowFrame = -1
+var startArrow = false
+var shakeSide = false
+var worldTemp = 12                // для термометра (температура мира без игрока)
+var hasTherm = false
+var hudCache = {}                 // slot -> что сейчас показано (не дёргать ui.image зря)
+var machines = []                 // [x, y, z] нагревателей, охладителей и костров (ведёт хост, рассылает всем)
+var machinesKey = ""
+var pendingPlace = []             // [x, y, z, блок, тиков] - поставили, проверить и сообщить хосту
+var lastThermia = {}              // у хоста: когда игрок последний раз получил урон эффекта
+var lastFloor = {}
+
+var CAMPFIRES = []                // все виды костра
+var CAMPFIRES_LIT = []
+var HEATERS = []
+var BLOCK_TEMPS = []              // [блок, температура] для ModifierBlocksTiles (JsonConfigInternal.postInit)
+var ARMOR_TEMPS = {}              // предмет -> температура (registerArmorTemperature)
+
+fn temperatureInit() {
+    CAMPFIRES = [campfire, campfire_lit, campfire_half, campfire_half_lit, campfire_burnt, campfire_burnt_lit]
+    CAMPFIRES_LIT = [campfire_lit, campfire_half_lit, campfire_burnt_lit]
+    HEATERS = [heater, heater_on, chiller, chiller_on]
+    // torch 1, lit_furnace 4, lava/flowing_lava 12.5, magma 10, campfire burning 7, огонь (Material.FIRE) 5
+    BLOCK_TEMPS = [[50, 1], [62, 4], [10, 12.5], [11, 12.5], [magma, 10], [51, 5],
+                   [campfire_lit, 7], [campfire_half_lit, 7], [campfire_burnt_lit, 7]]
+    for a in [wool_helmet, wool_chestplate, wool_leggings, wool_boots] { ARMOR_TEMPS[str(a)] = 2 }
+    for a in [ice_helmet, ice_chestplate, ice_leggings, ice_boots] { ARMOR_TEMPS[str(a)] = -2 }
+}
+
+fn isMachine(b) { return HEATERS.contains(b) or CAMPFIRES.contains(b) }
+fn tempEnum(t) {                  // 0 FREEZING, 1 COLD, 2 NORMAL, 3 HOT, 4 BURNING
+    if t <= 5 { return 0 }
+    if t <= 10 { return 1 }
+    if t <= 14 { return 2 }
+    if t <= 19 { return 3 }
+    return 4
+}
+fn clampT(t) { return math.clamp(t, 0, 25) }
+
+fn tsave() {
+    if tkey == "" { return }
+    var m = []
+    for k in tmods.keys() { m.add([k, tmods[k][0], tmods[k][1]]) }
+    data.save(tkey, [temp, hypo, hyper, resistCold, resistHeat, m])
+}
+
+// ---------------------------------------------------------------- модификаторы мира (ITemperatureModifier.getWorldInfluence)
+fn surface() { return mc.calli("Entity::getDimensionId() const", mc.player()) == 0 }
+
+fn biomeT(x, y, z) { return math.clamp(world.biomeTemp(x, y, z), 0, 1.35) / 1.35 }   // getTempForBiome
+fn plusMinus(v) { return v * 2 - 1 }
+
+fn underground(t, x, y, z) {      // applyUndergroundEffect
+    if y >= 64 or not surface() { return t }
+    if world.sky(x, y, z) or world.sky(x, y + 1, z) { return t }
+    if y <= T_CUTOFF { return 0 }
+    return t * (y - T_CUTOFF) / (64 - T_CUTOFF)
+}
+
+fn consolidate(hottest, hotTotal, coldest, coldTotal) {     // ModifierBlocksTiles.consolidateHeat (stacking)
+    hotTotal -= hottest
+    coldTotal -= coldest
+    var hotLog = hottest * math.sqrt(math.log(math.abs(hotTotal) + 10, 10))
+    var coldLog = coldest * math.sqrt(math.log(math.abs(coldTotal) + 10, 10))
+    var r = hotLog + coldLog
+    if r > hottest { return math.min(hottest + T_STACK_LIMIT, r) }
+    if r < coldest { return math.max(coldest - T_STACK_LIMIT, r) }
+    return r
+}
+
+fn unprotected(x, y, z) {         // TileEntityTemperature.isUnprotected
+    if not world.sky(x, y, z) { return false }
+    return world.rainTop(x, y, z) <= y
+}
+
+fn heaterStrict(px, py, pz, hx, hy, hz, t) {     // handleStrict: путь от игрока до нагревателя под крышей
+    if unprotected(px, py, pz) or unprotected(hx, hy, hz) { return 0 }
+    var x = px
+    var y = py
+    var z = pz
+    var n = 0
+    while (x != hx or y != hy or z != hz) and n < 200 {
+        if x != hx { x += x < hx ? 1 : -1 }
+        if y != hy { y += y < hy ? 1 : -1 }
+        if z != hz { z += z < hz ? 1 : -1 }
+        if unprotected(x, y, z) { return 0 }
+        n += 1
+    }
+    return t
+}
+
+fn blocksTiles(x, y, z) {         // ModifierBlocksTiles: блоки в 9x5x9 и нагреватели до 50 блоков, отдельно
+    var ids = []
+    for b in BLOCK_TEMPS { ids.add(b[0]) }
+    var c = world.count(x - 4, y - 3, z - 4, x + 4, y + 1, z + 4, ids)
+    var hottest = 0
+    var hotTotal = 0
+    var coldest = 0
+    var coldTotal = 0
+    var i = 0
+    while i < len(BLOCK_TEMPS) {
+        var t = BLOCK_TEMPS[i][1]
+        if c[i] > 0 {
+            if t > 0 { hotTotal += t * c[i]; hottest = math.max(hottest, t) }
+            else { coldTotal += t * c[i]; coldest = math.min(coldest, t) }
+        }
+        i += 1
+    }
+    var r = consolidate(hottest, hotTotal, coldest, coldTotal)
+    hottest = 0
+    hotTotal = 0
+    coldest = 0
+    coldTotal = 0
+    for m in machines {
+        var b = world.block(m[0], m[1], m[2])
+        if b != heater_on and b != chiller_on { continue }
+        var d = (m[0] - x) * (m[0] - x) + (m[1] - y) * (m[1] - y) + (m[2] - z) * (m[2] - z)
+        if d >= 2500 { continue }
+        var a = (b == heater_on ? 1 : -1) * T_HEATER
+        var full = T_HEATER_FULL * T_HEATER_FULL
+        var t = 0
+        if d < full { t = heaterStrict(x, y, z, m[0], m[1], m[2], a) }
+        else { t = heaterStrict(x, y, z, m[0], m[1], m[2], a * math.max(0, 1 - (d - full) / (T_HEATER_MAX * T_HEATER_MAX - full))) }
+        if t > 0 { hotTotal += t; hottest = math.max(hottest, t) }
+        else if t < 0 { coldTotal += t; coldest = math.min(coldest, t) }
+    }
+    return r + consolidate(hottest, hotTotal, coldest, coldTotal)
+}
+
+fn worldTemperature(x, y, z) {    // TemperatureUtilInternal.getWorldTemperature (без игрока)
+    var sum = T_DEFAULT
+    var surf = surface()
+    // Altitude
+    if surf { sum += -1 * math.abs((64 - y) / 64 * T_ALTITUDE + 1) }
+    // Biome: среднее по 9 точкам
+    var avg = (biomeT(x + 10, y, z) + biomeT(x - 10, y, z) + biomeT(x, y, z + 10) + biomeT(x, y, z - 10) +
+               biomeT(x + 7, y, z + 7) + biomeT(x + 7, y, z - 7) + biomeT(x - 7, y, z + 7) + biomeT(x - 7, y, z - 7) +
+               biomeT(x, y, z)) / 9
+    sum += underground(plusMinus(avg) * T_BIOME, x, y, z)
+    // BlocksTiles
+    sum += blocksTiles(x, y, z)
+    // Snow: снегопад над головой
+    if world.raining() and world.sky(x, y, z) {
+        if world.biomeSnow(x, y, z) or world.snowTemp(x, y, z) { sum += T_SNOW }
+    }
+    // Time
+    if surf {
+        var t = world.time() % 24000
+        var tt = (math.abs(((t % 12000) - 6000) / 6000) - 1) * T_TIME
+        if t < 12000 { tt *= -1 }
+        tt *= 1 + math.abs(plusMinus(biomeT(x, y, z))) * (T_TIME_BIOME - 1)
+        if tt > 0 and T_SHADE != 0 and not world.sky(x, y, z) and not world.sky(x, y + 1, z) { tt = math.max(0, tt + T_SHADE) }
+        sum += underground(tt, x, y, z)
+    }
+    // Wet: в воде или под дождём
+    var b = world.block(x, y, z)
+    if b == 8 or b == 9 or world.rainingAt(x, y, z) { sum += T_WET }
+    return sum
+}
+
+fn playerInfluence() {            // getPlayerInfluence: броня, бег, предметы в руке, временные
+    var p = mc.player()
+    var sum = 0
+    var s = 0
+    while s < 4 {
+        var a = player.armor(s)
+        if a != 0 and ARMOR_TEMPS.has(str(a)) { sum += ARMOR_TEMPS[str(a)] }
+        s += 1
+    }
+    if mc.call("Mob::isSprinting() const", p) != 0 { sum += T_SPRINT }
+    var h = player.item()
+    if h == 50 { sum += 1 }                       // факел
+    else if h == magma { sum += 3 }               // блок магмы
+    for k in tmods.keys() { sum += tmods[k][0] }
+    return sum
+}
+
+fn feet() {
+    var p = player.pos()
+    return [math.floor(p.x), math.floor(p.y), math.floor(p.z)]
+}
+
+// ---------------------------------------------------------------- эффекты
+fn healthOk() {
+    var hp = mc.calli("Mob::getHealth() const", mc.player())
+    return healthAboveDifficulty(hp)
+}
+
+fn thermiaTick() {                // PotionThermia.performEffect: раз в 50 тиков 0.5 урона (у нас 1 урон раз в 100)
+    var hot = hyper > 0
+    var d = hot ? hyper : hypo
+    if d <= 0 { return }
+    if d % 50 == 0 and resistHeat <= 0 and difficulty() != 0 and healthOk() {
+        thermiaHurt += 0.5
+        if thermiaHurt >= 1 {
+            thermiaHurt -= 1
+            host.send("thermia", hot ? 1 : 0)
+        }
+    }
+}
+
+// ---------------------------------------------------------------- HUD (TemperatureGui: современный вид + «ощущение» снаружи)
+fn img(slot, pic, x, y, size) {
+    var k = "{pic}:{x}:{y}"
+    if hudCache.has(slot) and hudCache[slot] == k { return }
+    hudCache[slot] = k
+    ui.image(slot, pic, x, y, size, "bottom")
+}
+
+fn shakeFreq(t) {
+    var e = tempEnum(t)
+    if e == 0 {
+        if t == 5 { return 0 }
+        return t > 3 ? 2 : 1
+    }
+    if e == 4 {
+        if t == 20 { return 0 }
+        return t >= 22 ? 1 : 2
+    }
+    return 0
+}
+
+fn tempHud() {
+    var P = "textures/temperature/hud/"
+    if not active {
+        for s in ["t_ring", "t_core", "t_arrow", "t_therm", "t_fx0", "t_fx1"] { img(s, "", 0, 0, 16) }
+        return
+    }
+    var xo = 0
+    var f = shakeFreq(temp)
+    if f > 0 {
+        if updateCounter % f == 0 { shakeSide = math.floor(updateCounter / f) % 2 == 0 }
+        xo = shakeSide ? 1 : -1
+    }
+    // кольцо: температура снаружи (куда тянет), под ним ядро: температура тела
+    var a = clampT(target)
+    var ring = a >= 20 ? "ring_hot" : (a < 6 ? "ring_0" : "ring_{math.floor(a / 2) - 2}")
+    img("t_ring", P + ring + ".png", -16 + xo, 30, 32)
+    var core = 0
+    if temp < 6 { core = updateCounter % 5 }
+    else if temp >= 20 { core = 12 + updateCounter % 4 }
+    else { core = math.floor(temp / 2) + 2 }
+    img("t_core", P + "core_" + (core < 10 ? "0" : "") + str(core) + ".png", -8 + xo, 38, 16)
+    // стрелки при изменении температуры
+    if arrowFrame >= 0 {
+        var fr = 14 - arrowFrame
+        img("t_arrow", P + (rising ? "arrow_up_" : "arrow_down_") + (fr < 10 ? "0" : "") + str(fr) + ".png", -8, 38, 16)
+    } else { img("t_arrow", "", 0, 0, 16) }
+    // термометр в инвентаре: температура мира над ядром
+    if hasTherm { img("t_therm", P + "therm_" + (worldTemp < 10 ? "0" : "") + str(worldTemp) + ".png", -8, 56, 16) }
+    else { img("t_therm", "", 0, 0, 16) }
+    // значки эффектов справа от кольца
+    var fx = []
+    if hypo > 0 { fx.add("hypothermia") }
+    if hyper > 0 { fx.add("hyperthermia") }
+    if resistCold > 0 { fx.add("resist_cold") }
+    if resistHeat > 0 { fx.add("resist_heat") }
+    var i = 0
+    while i < 2 {
+        if i < len(fx) { img("t_fx{i}", "textures/temperature/effects/" + fx[i] + ".png", 20 + i * 20, 23, 32) }
+        else { img("t_fx{i}", "", 0, 0, 16) }
+        i += 1
+    }
+}
+
+// ---------------------------------------------------------------- такт температуры (TemperatureCapability.tickUpdate)
+fn tickLimit() {
+    var range = math.abs(temp - target)
+    var escaping = temp <= target ? tempEnum(temp) == 0 : tempEnum(temp) == 4
+    return math.max(T_TICK_MIN, T_TICK_MAX - math.floor(range * (T_TICK_MAX - T_TICK_MIN) / 25) - (escaping ? T_DANGER_BOOST : 0))
+}
+
+fn temperatureTick() {
+    var f = feet()
+    if tickN % 5 == 1 { target = int(worldTemperature(f[0], f[1], f[2]) + playerInfluence()) }
+    tempTimer += 1
+    if tempTimer >= tickLimit() {
+        tempTimer = 0
+        var dest = clampT(target)
+        if temp != dest { temp += temp > dest ? -1 : 1 }
+        var e = tempEnum(temp)
+        if active and e == 4 and temp > 22 and resistHeat <= 0 { hyper = T_EFFECT_TICKS }
+        else if active and e == 0 and temp <= 2 and resistCold <= 0 { hypo = T_EFFECT_TICKS }
+    }
+    // эффекты
+    if hypo > 0 or hyper > 0 { thermiaTick() }
+    if hypo > 0 { hypo -= 1 }
+    if hyper > 0 { hyper -= 1 }
+    if resistCold > 0 { if resistCold % 50 == 0 { hypo = math.min(hypo, 1) }; resistCold -= 1 }
+    if resistHeat > 0 { if resistHeat % 50 == 0 { hyper = math.min(hyper, 1) }; resistHeat -= 1 }
+    for k in tmods.keys() {
+        tmods[k][1] -= 1
+        if tmods[k][1] <= 0 { tmods.remove(k) }
+    }
+    // HUD
+    updateCounter += 1
+    if arrowFrame >= 0 { arrowFrame -= 1 }
+    if startArrow { arrowFrame = 14; startArrow = false }
+    if oldTemp == -1 { oldTemp = temp }
+    if oldTemp != temp { rising = oldTemp < temp; oldTemp = temp; startArrow = true }
+    if updateCounter % 15 == 12 {
+        hasTherm = player.has(thermometer)
+        var p = player.pos()
+        worldTemp = clampT(int(worldTemperature(math.floor(p.x), math.floor(p.y + 0.5), math.floor(p.z))))
+        if player.item() % 65536 == thermometer % 65536 and hand() != 0 { mem.setShort(hand() + 2, worldTemp) }   // стрелка термометра
+    }
+    tempHud()
+    // блок магмы жжёт ноги (BlockMagma.onEntityWalk), если не присесть
+    if tickN % 10 == 0 and not player.sneaking() and player.onGround() {
+        if world.block(f[0], f[1] - 1, f[2]) == magma { host.send("hot_floor") }
+    }
+    // проверить поставленные нагреватели и костры
+    var i = len(pendingPlace) - 1
+    while i >= 0 {
+        var q = pendingPlace[i]
+        q[4] -= 1
+        if isMachine(world.block(q[0], q[1], q[2])) { host.send("machine", [q[0], q[1], q[2]]); pendingPlace.removeAt(i) }
+        else if q[4] <= 0 { pendingPlace.removeAt(i) }
+        i -= 1
+    }
+}
+
+// ---------------------------------------------------------------- хост: костры, нагреватели, урон
+fn machinesSave() {
+    if machinesKey != "" and host.isMe() { data.save(machinesKey, machines) }
+}
+fn machineIndex(x, y, z) {
+    var i = 0
+    while i < len(machines) {
+        var m = machines[i]
+        if m[0] == x and m[1] == y and m[2] == z { return i }
+        i += 1
+    }
+    return -1
+}
+
+fn campfireBlock(age, lit) {
+    if age <= 2 { return lit ? campfire_lit : campfire }
+    if age <= 5 { return lit ? campfire_half_lit : campfire_half }
+    return lit ? campfire_burnt_lit : campfire_burnt
+}
+
+fn campfireUse(x, y, z, what) {  // BlockCampfire.onBlockActivated (сторона сервера)
+    var b = world.block(x, y, z)
+    if not CAMPFIRES.contains(b) { return }
+    var age = world.data(x, y, z)
+    var lit = CAMPFIRES_LIT.contains(b)
+    if what == "log" {
+        if age > 0 {
+            age = math.max(0, age - (3 + (age == 7 ? 1 : 0)))
+            world.setBlock(x, y, z, campfireBlock(age, lit), age)
+        }
+    } else if not lit and age < 7 and not world.rainingAt(x, y + 1, z) {
+        if what == "flint" or math.randInt(0, 4) == 0 { world.setBlock(x, y, z, campfireBlock(age, true), age) }
+    }
+}
+
+fn hostTick() {
+    // костры: случайный такт (3 из 4096 блоков секции за тик): дождь тушит, угли прогорают
+    for m in machines {
+        var b = world.block(m[0], m[1], m[2])
+        if not CAMPFIRES_LIT.contains(b) { continue }
+        if math.randInt(0, 4095) < 3 {
+            var age = world.data(m[0], m[1], m[2])
+            if world.rainingAt(m[0], m[1] + 1, m[2]) { world.setBlock(m[0], m[1], m[2], campfireBlock(age, false), age) }
+            else if math.randInt(0, 1) == 0 {
+                age += 1
+                if age >= 7 { world.setBlock(m[0], m[1], m[2], campfireBlock(7, false), 7) }
+                else { world.setBlock(m[0], m[1], m[2], campfireBlock(age, true), age) }
+            }
+        }
+    }
+    // горящий костёр поджигает того, кто в нём стоит (onEntityCollidedWithBlock)
+    if tickN % 10 == 0 {
+        var lit = []
+        for m in machines { if CAMPFIRES_LIT.contains(world.block(m[0], m[1], m[2])) { lit.add(m) } }
+        if len(lit) > 0 {
+            for name in players.list() {
+                var p = players.pos(name)
+                if p == null { continue }
+                for m in lit {
+                    if p.x > m[0] - 0.3 and p.x < m[0] + 1.3 and p.z > m[2] - 0.3 and p.z < m[2] + 1.3 and p.y > m[1] - 1.8 and p.y < m[1] + 1 { players.fire(name, 1) }
+                }
+            }
+            for en in entity.list(64) {
+                var p = entity.pos(en)
+                if p == null { continue }
+                for m in lit {
+                    if p.x > m[0] - 0.3 and p.x < m[0] + 1.3 and p.z > m[2] - 0.3 and p.z < m[2] + 1.3 and p.y > m[1] - 1.8 and p.y < m[1] + 1 { entity.setFire(en, 1) }
+                }
+            }
+        }
+    }
+    // раз в 5 секунд: убрать то, чего больше нет (0 = чанк не загружен - оставить)
+    if tickN % 100 == 50 {
+        var i = len(machines) - 1
+        var changed = false
+        while i >= 0 {
+            var m = machines[i]
+            var b = world.block(m[0], m[1], m[2])
+            if b != 0 and not isMachine(b) { machines.removeAt(i); changed = true }
+            i -= 1
+        }
+        if changed { machinesSave(); players.sendAll("machines", machines) }
+    }
+}
+
+on host.receive(e) {
+    if e.channel == "thermia" {
+        if lastThermia.has(e.player) and tickN - lastThermia[e.player] < 60 { return }
+        lastThermia[e.player] = tickN
+        var hp = players.health(e.player)
+        if difficulty() != 0 and hp > 0 and healthAboveDifficulty(hp) { players.hurt(e.player, 1, e.data == 1 ? 7 : 0) }
+    } else if e.channel == "hot_floor" {
+        if lastFloor.has(e.player) and tickN - lastFloor[e.player] < 10 { return }
+        lastFloor[e.player] = tickN
+        players.hurt(e.player, 1, 6)
+    } else if e.channel == "machine" {
+        var d = e.data
+        if machineIndex(d[0], d[1], d[2]) < 0 {
+            machines.add([d[0], d[1], d[2]])
+            machinesSave()
+            players.sendAll("machines", machines)
+        }
+    } else if e.channel == "unmachine" {
+        var d = e.data
+        var i = machineIndex(d[0], d[1], d[2])
+        if i >= 0 { machines.removeAt(i); machinesSave(); players.sendAll("machines", machines) }
+    } else if e.channel == "cf" {
+        var d = e.data
+        campfireUse(d[0], d[1], d[2], d[3])
+        if machineIndex(d[0], d[1], d[2]) < 0 { machines.add([d[0], d[1], d[2]]); machinesSave(); players.sendAll("machines", machines) }
+    } else if e.channel == "drop" {
+        var d = e.data
+        world.drop(d[0] + 0.5, d[1] + 0.5, d[2] + 0.5, d[3], d[4])
+    } else if e.channel == "machines?" {
+        players.send(e.player, "machines", machines)
+    }
+}
+
+on client.receive(e) {
+    if e.channel == "machines" and e.data != null { machines = e.data }
+}
+
+on players.join(e) { players.send(e.player, "machines", machines) }
+on players.leave(e) { lastThermia.remove(e.player); lastFloor.remove(e.player) }
+
+// ---------------------------------------------------------------- игрок: костёр, лёд, постановка блоков, зелья, еда
+fn faceOffset(face) {             // 0 низ, 1 верх, 2 север (z-1), 3 юг, 4 запад (x-1), 5 восток
+    if face == 0 { return [0, -1, 0] }
+    if face == 1 { return [0, 1, 0] }
+    if face == 2 { return [0, 0, -1] }
+    if face == 3 { return [0, 0, 1] }
+    if face == 4 { return [-1, 0, 0] }
+    return [1, 0, 0]
+}
+
+fn enchant(id) {                  // уровень чар предмета в руке (16 шёлковое касание, 18 удача)
+    var it = hand()
+    if it == 0 { return 0 }
+    return mc.calli("EnchantUtils::getEnchantLevel(int, ItemInstance const&)", id, it)
+}
+
+on block.use(e) {
+    if CAMPFIRES.contains(e.block) and not player.sneaking() {
+        var id = e.item % 65536
+        var lit = CAMPFIRES_LIT.contains(e.block)
+        if e.item == 0 { e.cancel(); return }
+        if id == 17 or id == 162 {
+            e.cancel()
+            if world.data(e.x, e.y, e.z) > 0 {
+                if not creative() { useOne() }
+                host.send("cf", [e.x, e.y, e.z, "log"])
+            }
+            return
+        }
+        if not lit and world.data(e.x, e.y, e.z) < 7 and not world.rainingAt(e.x, e.y + 1, e.z) {
+            if id == 280 {
+                e.cancel()
+                if not creative() { useOne() }
+                host.send("cf", [e.x, e.y, e.z, "stick"])
+                return
+            }
+            if id == 259 {
+                e.cancel()
+                host.send("cf", [e.x, e.y, e.z, "flint"])
+                if not creative() { mc.call("ItemInstance::hurtAndBreak(int, Mob*)", hand(), 1, mc.player()) }
+                return
+            }
+        }
+        e.cancel()                                // костёр не даёт ставить блоки на себя (только присев)
+        return
+    }
+    // ставят нагреватель / охладитель / костёр: запомнить место, через пару тиков сообщить хосту
+    if e.item == heater or e.item == chiller or e.item == campfire {
+        var o = faceOffset(e.face)
+        var b = e.block
+        if b == 31 or b == 32 or b == 78 or b == 106 or b == 175 { o = [0, 0, 0] }    // трава, снег - ставится на их место
+        pendingPlace.add([e.x + o[0], e.y + o[1], e.z + o[2], e.item, 10])
+    }
+}
+
+on block.break(e) {
+    if isMachine(e.block) { host.send("unmachine", [e.x, e.y, e.z]) }
+    // BlockHandler.onHarvestDrops: лёд даёт осколки (без шёлкового касания), удача добавляет
+    if e.block == 79 and not creative() and enchant(16) == 0 {
+        var fortune = enchant(18)
+        var n = math.randInt(0, fortune) + math.randInt(0, 1)
+        if n > 0 { host.send("drop", [e.x, e.y, e.z, ice_chunk, n]) }
+    }
+}
+
+fn drinkResist(cold, ticks) {
+    if cold { resistCold = ticks; hypo = 0 } else { resistHeat = ticks; hyper = 0 }
+    useOne()
+    give(374, 1)
+    ui.tip(cold ? "§bСопротивление холоду" : "§6Сопротивление теплу")
+}
+
+on action(e) {
+    var id = player.item()
+    if id == potion_cold_resist { drinkResist(true, RESIST_SHORT) }
+    else if id == potion_cold_resist_long { drinkResist(true, RESIST_LONG) }
+    else if id == potion_heat_resist { drinkResist(false, RESIST_SHORT) }
+    else if id == potion_heat_resist_long { drinkResist(false, RESIST_LONG) }
+}
+
+// JsonConfig.consumableTemperature: грибной суп +1 на минуту (группа food), кактусовый сок +1 (группа drink)
+on item.use(e) {
+    if e.item == 282 { tmods["food"] = [1, 1200] }
+}
+
+fn temperatureRecipes() {
+    recipe.shaped(thermometer, [" G ", "GRG", " G "], {G: 20, R: 331})
+    recipe.shaped(heater, ["C C", "CSC", "SRS"], {C: magma_chunk, S: 4, R: 331})
+    recipe.shaped(chiller, ["C C", "CSC", "SRS"], {C: ice_chunk, S: 4, R: 331})
+    recipe.shaped(campfire, [" L ", "LLL", "WWW"], {L: [17, -1], W: [5, -1]})
+    recipe.shaped(campfire, [" L ", "LLL", "WWW"], {L: [162, -1], W: [5, -1]})
+    recipe.shaped(wool_helmet, ["SSS", "S S"], {S: [35, -1]})
+    recipe.shaped(wool_chestplate, ["S S", "SSS", "SSS"], {S: [35, -1]})
+    recipe.shaped(wool_leggings, ["SSS", "S S", "S S"], {S: [35, -1]})
+    recipe.shaped(wool_boots, ["S S", "S S"], {S: [35, -1]})
+    recipe.shaped(ice_helmet, ["SSS", "S S"], {S: ice_chunk})
+    recipe.shaped(ice_chestplate, ["S S", "SSS", "SSS"], {S: ice_chunk})
+    recipe.shaped(ice_leggings, ["SSS", "S S", "S S"], {S: ice_chunk})
+    recipe.shaped(ice_boots, ["S S", "S S"], {S: ice_chunk})
+    recipe.shaped(79, ["MM", "MM"], {M: ice_chunk})
+    recipe.shaped(174, ["MMM", "MMM", "MMM"], {M: ice_chunk})
+    recipe.shaped(magma, ["MM", "MM"], {M: magma_chunk})
+    // варка (PotionHelper.addMix): неловкое зелье + осколок, зелье + редстоун = долгое
+    recipe.shaped(potion_cold_resist, ["PI"], {P: [373, 4], I: ice_chunk})
+    recipe.shaped(potion_heat_resist, ["PI"], {P: [373, 4], I: magma_chunk})
+    recipe.shaped(potion_cold_resist_long, ["PR"], {P: potion_cold_resist, R: 331})
+    recipe.shaped(potion_heat_resist_long, ["PR"], {P: potion_heat_resist, R: 331})
+}
+
+on world.join(e) {
+    if len(CAMPFIRES) == 0 { temperatureInit() }
+    var seed = str(mc.call("Level::getSeed()", mc.level()))
+    tkey = "temp_" + seed
+    machinesKey = "machines_" + seed
+    var s = data.load(tkey, null)
+    temp = 12
+    hypo = 0
+    hyper = 0
+    resistCold = 0
+    resistHeat = 0
+    tmods = {}
+    if s != null {
+        temp = s[0]
+        hypo = s[1]
+        hyper = s[2]
+        resistCold = s[3]
+        resistHeat = s[4]
+        for m in s[5] { tmods[m[0]] = [m[1], m[2]] }
+    }
+    target = temp
+    tempTimer = 0
+    oldTemp = -1
+    arrowFrame = -1
+    hudCache = {}
+    pendingPlace = []
+    machines = []
+    if host.isMe() { machines = data.load(machinesKey, []) }
+    else { host.send("machines?") }
+    temperatureRecipes()
+}
+
+on world.leave(e) {
+    tsave()
+    machinesSave()
+    for s in ["t_ring", "t_core", "t_arrow", "t_therm", "t_fx0", "t_fx1"] { ui.image(s, "") }
+}
+
+on tick(e) {
+    var p = mc.player()
+    if p == null or p == 0 or len(CAMPFIRES) == 0 { return }
+    temperatureTick()
+    if host.isMe() { hostTick() }
+    if tickN % 100 == 3 { tsave() }
+}
+
+// ================================================================ команды температуры
+on chat(e) {
+    if e.text == "/temperature" or e.text == "/temp" {
+        e.cancel()
+        var names = ["замерзание", "холодно", "норма", "жарко", "пекло"]
+        var fx = (hypo > 0 ? ", §bобморожение {math.floor(hypo / 20)} с" : "") + (hyper > 0 ? ", §6перегрев {math.floor(hyper / 20)} с" : "") +
+                 (resistCold > 0 ? ", §bсопр. холоду {math.floor(resistCold / 20)} с" : "") + (resistHeat > 0 ? ", §6сопр. теплу {math.floor(resistHeat / 20)} с" : "")
+        chat.send("§eТемпература {temp}/25 ({names[tempEnum(temp)]}), тянет к {target}, вокруг {worldTemp}" + fx)
+    } else if e.text.startsWith("/temperature ") {
+        e.cancel()
+        var v = num(e.text.sub(13))
+        if v == null { ui.tip("Пример: /temperature 12"); return }
+        temp = clampT(math.floor(v))
+        tsave()
     }
 }

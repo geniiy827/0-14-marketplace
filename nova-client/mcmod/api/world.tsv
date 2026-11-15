@@ -6,3 +6,13 @@ world.fill	x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, block:block, data:num
 world.time	-	num	native:WORLD_TIME	wip	Время мира в тиках (24000 = сутки)
 world.setTime	ticks:num	-	native:WORLD_SET_TIME	wip	Задать время
 world.day	-	num	script	wip	Номер текущих суток
+world.biomeTemp	x:num, y:num, z:num	num	native:WORLD_ENV#0	wip	Температура биома в точке (как Biome.getDefaultTemperature в Java: пустыня 2, равнины 0.8, тайга 0.25, ледяные равнины 0)
+world.biomeSnow	x:num, y:num, z:num	bool	native:WORLD_ENV#1	wip	Биом снежный (Biome::isSnowCovered)
+world.snowTemp	x:num, y:num, z:num	bool	native:WORLD_ENV#2	wip	Здесь достаточно холодно для снега (BlockSource::isSnowTemperature)
+world.sky	x:num, y:num, z:num	bool	native:WORLD_ENV#3	wip	Из точки видно небо (BlockSource::canSeeSky)
+world.rainingAt	x:num, y:num, z:num	bool	native:WORLD_ENV#4	wip	Сюда падает дождь (как World.isRainingAt в Java: идёт дождь, небо видно, биом не снежный)
+world.rainTop	x:num, y:num, z:num	num	native:WORLD_ENV#5	wip	Высота, до которой долетают осадки в этом столбце (getTopRainBlockPos)
+world.raining	-	bool	native:WORLD_RAIN#0	wip	Идёт дождь/снег (Weather::isRaining)
+world.count	x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, ids:any	list	java:world.count	wip	Сколько блоков каждого номера из ids (до 10) в коробке (до 65536 блоков): быстрый подсчёт в C
+__count	x1:num	list	native:WORLD_COUNT	wip	внутреннее: world.count
+world.drop	x:num, y:num, z:num, item:item, count:num=1	bool	native:WORLD_DROP#0	wip	ХОСТ: выбросить предмет из блока (как выпадение при ломании), false у гостя

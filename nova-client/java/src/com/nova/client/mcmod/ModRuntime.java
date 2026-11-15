@@ -507,6 +507,31 @@ public final class ModRuntime {
                 host.nativeApi(ApiOps.HUD, new double[]{a.get(2) instanceof Double ? (Double) a.get(2) : 0, side, a.size() > 4 && a.get(4) instanceof Double ? (Double) a.get(4) : 0}, sb.toString());
                 return null;
             }
+            case "ui.image": {                   // one picture of the mod -> nova/mod/<id>/<file>, drawn by libnova (hud.inc)
+                Mod m = modOf(in);
+                String f = a.get(1) == null ? "" : Interp.str(a.get(1));
+                String pic = f.length() == 0 ? "" : f.indexOf('/') < 0 && !f.endsWith(".png") ? f : "nova/mod/" + m.id + "/" + f;
+                double anchor = "bottom".equals(Interp.str(a.get(5))) ? 1 : 0;
+                host.nativeApi(ApiOps.HUD_IMAGE, new double[]{Interp.num(a.get(2), line), Interp.num(a.get(3), line),
+                        Interp.num(a.get(4), line), anchor}, Interp.str(a.get(0)).replace('|', ' ') + "|" + pic);
+                return null;
+            }
+            case "world.count": {                // -> native env.inc: block counts in a box, one per id
+                Object ids = a.get(6);
+                if (!(ids instanceof List) || ((List<?>) ids).isEmpty() || ((List<?>) ids).size() > 10)
+                    throw new ScriptError("world.count: ids - список из 1..10 блоков", line);
+                List<?> il = (List<?>) ids;
+                double[] nums = new double[6 + il.size()];
+                for (int i = 0; i < 6; i++) nums[i] = Interp.num(a.get(i), line);
+                for (int i = 0; i < il.size(); i++) nums[6 + i] = resolveId(il.get(i), "block", line);
+                double[] r = host.nativeApi(ApiOps.WORLD_COUNT, nums, "");
+                if (r == null) throw new ScriptError("world.count(): нужно находиться в мире", line);
+                List<Object> out = new ArrayList<Object>();
+                for (int i = 0; i < il.size(); i++) out.add(i < r.length ? r[i] : 0.0);
+                return out;
+            }
+            case "players.fire":
+                return host.nativeApiStr(1012, new double[]{Interp.num(a.get(1), line)}, netName(a.get(0))) != null;
             case "data.save": {
                 Mod m = modOf(in);
                 data(m).put(Interp.str(a.get(0)), Json.copy(a.get(1), line));

@@ -263,3 +263,16 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   старый логотип). В дереве остались неиспользуемые tools/classic_ui.py, classic_gui.py, gen_title.py, ui115_assets.py,
   native/nui.inc + nui_game.inc + tools/nui_preview (NUI-движок для JSON 1.1.5, рисует и 0.14-экраны на ПК) — не в сборке.
 - Рецепты модов: см. BACKLOG «Срочно» (отложенное добавление, sigsetjmp-защита, nova_guard в menus.inc).
+
+## alpha40-41 (ноябрь 2026)
+- Нативный мост модов: void-функции (ui.hud, рецепты, weather.*) должны отвечать [] — null Java считает «не в мире»
+  и обрывает скрипт (баг alpha39). В `Java_..._nativeApi` все ветки идут через `r`.
+- env.inc: Biome+0x4c температура (getTemperature), +0x54>0 isSnowCovered, +0x8c может дождь; Mob броня =
+  pl+0xb8c+слот*20 (ItemInstance 20 байт: +0 count, +2 aux, +8 tag, +0xc Item*, +0x10 Block*);
+  Block::popResource — метод (this не используется); FillingContainer::hasResource(id); инвентарь pl+0xda0.
+- Причины урона 0.14 (EntityDamageSource::getDeathMessage): 5 fall, 6 inFire, 7 onFire, 8 lava, 9 drown,
+  10/11 explosion, 12 outOfWorld, 14 magic, 15 wither, 16 starve, 17 anvil, остальное generic.
+- Варочная стойка 0.14: нижние слоты (_canSet 0x4c4008) пускают только Item::mPotion/mSplash_potion; ингредиент —
+  PotionBrewing::isIngredient; варка PotionBrewing::mix(sret, potion, ingredient) из BrewingStandBlockEntity::brew.
+- Сутки в 0.14 тоже 24000 тиков (Dimension::getTimeOfDay: 0x5dc0).
+- ui.image: hud.inc kind 1, слоты не освобождаются при "" (порядок рисования = порядок появления).

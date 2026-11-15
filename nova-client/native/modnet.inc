@@ -17,6 +17,7 @@ static int (*nf_client_side)(void *level);
 static u32 *(*nf_players)(void *level);              /* vector<Player*> */
 static u32 *(*nf_nametag)(void *e);                   /* std::string const& */
 static void (*nf_dmg_ctor)(void *src, int cause);
+static void (*nf_set_fire)(void *e, int seconds);
 static void (*nf_heal)(void *mob, int n);
 static int (*nf_health)(void *mob);
 static void *(*nf_spawn_item)(void *e, void *ii, float dy);
@@ -178,7 +179,7 @@ static int net_to_player(char *pl, const char *body) {
 }
 
 /* Java: nativeApiStr(1000 + op, numbers, text) -> text or null (not possible here: not the host, no such player) */
-enum { NET_IS_HOST = 1, NET_TO_HOST, NET_TO_PLAYER, NET_PLAYERS, NET_HURT, NET_HEAL, NET_TELEPORT, NET_GIVE, NET_INFO, NET_TELL, NET_MY_NAME };
+enum { NET_IS_HOST = 1, NET_TO_HOST, NET_TO_PLAYER, NET_PLAYERS, NET_HURT, NET_HEAL, NET_TELEPORT, NET_GIVE, NET_INFO, NET_TELL, NET_MY_NAME, NET_FIRE };
 static void *net_api(void **env, int op, void *darr, void *jstr) {
     void **f = *(void ***)env;
     double a[8] = {0};
@@ -254,6 +255,8 @@ static void *net_api(void **env, int op, void *darr, void *jstr) {
                 int v[4] = {(int)(p[0] * 100), (int)((p[1] - 1.62f) * 100), (int)(p[2] * 100), nf_health ? nf_health(pl) : 0};
                 snprintf(out, sizeof out, "%d\x1f%d\x1f%d\x1f%d", v[0], v[1], v[2], v[3]);     /* x y z in 1/100 */
                 ok = out;
+            } else if (op == NET_FIRE && nf_set_fire) {
+                nf_set_fire(pl, (int)a[0]);                               /* Entity::setOnFire(seconds) */
             } else if (op == NET_TELL) {
                 if (pl == mm_player()) { if (mf_gd_msg && f_guidata && g_client) { u32 st[1]; gstr(st, rest); mf_gd_msg(f_guidata(g_client), st); f_strdtor(st); } }
                 else if (!net_raw_to(pl, 0, rest)) return 0;
@@ -288,6 +291,7 @@ static void modnet_init(void *mc) {
     nf_nametag = dlsym(mc, "_ZNK6Entity10getNameTagEv");
     nf_dmg_ctor = dlsym(mc, "_ZN18EntityDamageSourceC2E17EntityDamageCause");
     nf_heal = dlsym(mc, "_ZN3Mob4healEi");
+    nf_set_fire = dlsym(mc, "_ZN6Entity9setOnFireEi");
     nf_health = dlsym(mc, "_ZNK3Mob9getHealthEv");
     nf_spawn_item = dlsym(mc, "_ZN6Entity15spawnAtLocationERK12ItemInstancef");
     nf_text_vt = dlsym(mc, "_ZTV10TextPacket");

@@ -11,3 +11,4 @@ players.give	player:str, item:any, count:num=1	bool	java:players.give	wip	ХОС
 players.pos	player:str	any	java:players.pos	wip	ХОСТ: позиция игрока {x, y, z} или null
 players.health	player:str	num	java:players.health	wip	ХОСТ: здоровье игрока (половинки сердца), -1 если нет такого
 players.tell	player:str, text:str	bool	java:players.tell	wip	ХОСТ: строка в чат одному игроку
+players.fire	player:str, seconds:num	bool	java:players.fire	wip	ХОСТ: поджечь игрока на seconds секунд

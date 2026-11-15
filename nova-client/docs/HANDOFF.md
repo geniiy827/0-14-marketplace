@@ -114,7 +114,13 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha40 выпущена)
+## 4. Где остановились (alpha41 выпущена)
+
+alpha41: температура SimpleDifficulty в Adventure Craft 0.4.0 (см. BACKLOG). Ассеты делает
+`tools/port_sd_temp.py <SimpleDifficulty> <Java textures> mcmod/examples/adventure_craft` (исходники SD:
+`git clone https://github.com/Charles445/SimpleDifficulty`). Новое API — `native/env.inc`, `ui.image` в `hud.inc`.
+
+### alpha40
 
 alpha40: void-функции модов (weather.*, ui.hud, __recipe) больше не дают «нужно находиться в мире» (мост в
 `mcmod.inc` возвращал null); снег ставится пачкой раз в секунду. Ждём отзыв по снегу и FPS.

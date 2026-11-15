@@ -16,3 +16,5 @@ player.itemData	-	num	native:PLAYER_STATE#3	wip	Данные (aux) предме�
 player.target	-	map	native:PLAYER_TARGET:kind,x,y,z,face,entity	wip	Куда смотрит игрок: kind 0 — блок (x y z face), 1 — сущность (entity), -1 — ничего
 player.give	item:any, count:num=1	bool	java:player.give	wip	Дать себе предмет (в одиночной игре и хосту; гостю в чужом мире — false: выдаёт хост через players.give)
 player.name	-	str	java:player.name	wip	Имя игрока
+player.armor	slot:num	num	native:PLAYER_ARMOR#0	wip	Номер предмета брони в слоте: 0 шлем, 1 нагрудник, 2 поножи, 3 ботинки (0 — пусто)
+player.has	item:item	bool	native:PLAYER_HAS#0	wip	Предмет есть где-то в инвентаре

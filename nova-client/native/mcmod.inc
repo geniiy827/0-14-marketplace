@@ -183,6 +183,8 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
 }
 
 static int hud_op(double *a, int n, char *s);
+static int hud_image_op(double *a, int n, char *s);
+static int env_op(int op, const double *a, int n, double *out);
 static int rc_op(int op, double *a, int n, char *s);
 static int wt_op(int op, double *a, int n);
 static void wt_frame(void *bs);
@@ -203,10 +205,13 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     double out[72];
     int r;                                             /* void ops still answer [] : null means "not in a world" */
     if (op == OP_HUD) { hud_op(a, n, s); r = 0; }
+    else if (op == OP_HUD_IMAGE) { hud_image_op(a, n, s); r = 0; }
+    else if (op == OP_WORLD_ENV || op == OP_WORLD_RAIN || op == OP_WORLD_COUNT || op == OP_WORLD_DROP || op == OP_PLAYER_ARMOR || op == OP_PLAYER_HAS)
+        r = env_op(op, a, n, out);
     else if (op == OP_RECIPE || op == OP_SMELT) { rc_op(op, a, n, s); r = 0; }
     else if (op == OP_WEATHER_RAIN || op == OP_WEATHER_FREEZE || op == OP_WEATHER_SNOW) { wt_op(op, a, n); r = 0; }
     else r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
-        : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_PLAYER_ID)
+        : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_ENTITY_FIRE || op == OP_PLAYER_ID)
         ? sc_op(op, a, n, out) : mm_op(op, a, n, s, out);
     if (r < 0) return 0;
     void *arr = ((void *(*)(void *, int))f[182])(env, r);
@@ -411,7 +416,7 @@ static int mb_drop_aux(void *b, unsigned char data) {          /* getSpawnResour
 }
 static int mb_drop_count(void *b, void *rnd, int data, int fortune) {
     ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
-    if (!m || m->dmax <= 0) return 1;
+    if (!m || (m->drop <= 0 && m->dmax <= 0)) return 1;     /* drop: {item: .., count: 0} = nothing drops */
     return mb_rand_range(rnd, m->dmin, m->dmax);
 }
 static int mb_drop_xp(void *b, void *rnd) {

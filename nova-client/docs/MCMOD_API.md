@@ -16,6 +16,8 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `__recipe(result:num)` | - | в работе | внутреннее: recipe.shaped |
 | `__smelt(input:num)` | - | в работе | внутреннее: recipe.smelt |
 | `__hud(slot:str)` | - | в работе | внутреннее: ui.hud |
+| `__hudimg(slot:str)` | - | в работе | внутреннее: ui.image |
+| `__count(x1:num)` | list | в работе | внутреннее: world.count |
 
 ## chat
 
@@ -40,6 +42,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `entity.pos(e:num)` | vec | в работе | Позиция (ноги) |
 | `entity.scale(e:num)` | num | в работе | Размер (1 = обычный) |
 | `entity.setScale(e:num, s:num)` | - | в работе | Изменить размер (0.05..16): хитбокс, глаза, шаг, прыжок, скорость, модель — всё вместе |
+| `entity.setFire(e:num, seconds:num)` | - | в работе | ХОСТ: поджечь сущность на seconds секунд |
 
 ## host
 
@@ -119,6 +122,8 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `player.target()` | map | в работе | Куда смотрит игрок: kind 0 — блок (x y z face), 1 — сущность (entity), -1 — ничего |
 | `player.give(item:any, count:num=1)` | bool | в работе | Дать себе предмет (в одиночной игре и хосту; гостю в чужом мире — false: выдаёт хост через players.give) |
 | `player.name()` | str | в работе | Имя игрока |
+| `player.armor(slot:num)` | num | в работе | Номер предмета брони в слоте: 0 шлем, 1 нагрудник, 2 поножи, 3 ботинки (0 — пусто) |
+| `player.has(item:item)` | bool | в работе | Предмет есть где-то в инвентаре |
 
 ## players
 
@@ -134,6 +139,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `players.pos(player:str)` | any | в работе | ХОСТ: позиция игрока {x, y, z} или null |
 | `players.health(player:str)` | num | в работе | ХОСТ: здоровье игрока (половинки сердца), -1 если нет такого |
 | `players.tell(player:str, text:str)` | bool | в работе | ХОСТ: строка в чат одному игроку |
+| `players.fire(player:str, seconds:num)` | bool | в работе | ХОСТ: поджечь игрока на seconds секунд |
 
 ## recipe
 
@@ -151,6 +157,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `ui.toast(title:any, text:any="")` | - | в работе | Уведомление NOVA сверху экрана |
 | `ui.action(text:str)` | - | в работе | Показать свою кнопку действия (как «Сесть» у лодки) с этой подписью; "" — убрать. Нажатие — событие action |
 | `ui.hud(slot:str, icons:any, row:num=0, side:str="right", shake:num=0)` | - | в работе | Ряд иконок над хотбаром, как сердца и голод: icons — картинки мода 16x16 (иконка 9x9 в левом верхнем углу), до 20, слева направо; row 0 — под голодом/сердцами, 1 — ещё ряд ниже, 2 — ниже; side "right" (сторона голода) или "left" (сердца); shake N>0 — иконки дрожат, как голод: раз в N тиков; [] — убрать |
+| `ui.image(slot:str, image:str, x:num=0, y:num=0, size:num=16, anchor:str="top")` | - | в работе | Картинка мода на HUD: x — сдвиг от центра экрана (левый край картинки), y — от верха (anchor "top") или низа ("bottom"), size — сторона в пикселях интерфейса; картинки рисуются в порядке, в котором слоты появились; "" — спрятать |
 
 ## vec
 
@@ -191,6 +198,15 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `world.time()` | num | в работе | Время мира в тиках (24000 = сутки) |
 | `world.setTime(ticks:num)` | - | в работе | Задать время |
 | `world.day()` | num | в работе | Номер текущих суток |
+| `world.biomeTemp(x:num, y:num, z:num)` | num | в работе | Температура биома в точке (как Biome.getDefaultTemperature в Java: пустыня 2, равнины 0.8, тайга 0.25, ледяные равнины 0) |
+| `world.biomeSnow(x:num, y:num, z:num)` | bool | в работе | Биом снежный (Biome::isSnowCovered) |
+| `world.snowTemp(x:num, y:num, z:num)` | bool | в работе | Здесь достаточно холодно для снега (BlockSource::isSnowTemperature) |
+| `world.sky(x:num, y:num, z:num)` | bool | в работе | Из точки видно небо (BlockSource::canSeeSky) |
+| `world.rainingAt(x:num, y:num, z:num)` | bool | в работе | Сюда падает дождь (как World.isRainingAt в Java: идёт дождь, небо видно, биом не снежный) |
+| `world.rainTop(x:num, y:num, z:num)` | num | в работе | Высота, до которой долетают осадки в этом столбце (getTopRainBlockPos) |
+| `world.raining()` | bool | в работе | Идёт дождь/снег (Weather::isRaining) |
+| `world.count(x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, ids:any)` | list | в работе | Сколько блоков каждого номера из ids (до 10) в коробке (до 65536 блоков): быстрый подсчёт в C |
+| `world.drop(x:num, y:num, z:num, item:item, count:num=1)` | bool | в работе | ХОСТ: выбросить предмет из блока (как выпадение при ломании), false у гостя |
 
 ## События
 

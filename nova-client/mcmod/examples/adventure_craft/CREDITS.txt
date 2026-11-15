@@ -5,3 +5,6 @@ Adventure Craft - постройки перенесены в Minecraft PE 0.14 (
 Блоки и предметы заменены на те, что есть в 0.14 (tools/port_rs.py).
 - Жажда: SimpleDifficulty - Charles445 - MIT - https://github.com/Charles445/SimpleDifficulty
   (механика, числа и текстуры фляги, бутылки чистой воды, соков и капель жажды)
+- Температура: SimpleDifficulty - Charles445 - MIT - https://github.com/Charles445/SimpleDifficulty
+  (механика, числа, HUD, термометр, броня, нагреватель, охладитель, костёр, осколки, текстуры и модели)
+- Блок магмы и бутылка зелья - текстуры Minecraft Java Edition (Mojang)

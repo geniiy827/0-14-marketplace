@@ -142,6 +142,8 @@ static void h_chat_send(void *scr) {
     o_chat_send(scr);
 }
 
+static void (*nf_set_fire)(void *e, int seconds);           /* modnet.inc */
+
 /* mod API */
 static int sc_op(int op, const double *a, int n, double *out) {
     char *pl = mm_player();
@@ -175,6 +177,7 @@ static int sc_op(int op, const double *a, int n, double *out) {
     }
     case OP_ENTITY_SCALE: out[0] = sc_of(e); return 1;
     case OP_ENTITY_SET_SCALE: sc_set(e, n > 1 ? (float)a[1] : 1.f); return 0;
+    case OP_ENTITY_FIRE: if (nf_set_fire) nf_set_fire(e, n > 1 ? (int)a[1] : 1); return 0;   /* Entity::setOnFire */
     }
     return -1;
 }
