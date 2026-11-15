@@ -357,6 +357,11 @@ public final class ModRuntime {
         return r.length > 0 ? r[0] : null;
     }
 
+    /** a block for declarations ("planks", "minecraft:log", a mod's block, a number); -1 if unknown */
+    public double blockId(Object v) {
+        try { return resolveId(v, "block", 0); } catch (ScriptError e) { return -1; }
+    }
+
     private double resolveId(Object v, String t, int line) {
         if (v instanceof Double) return (Double) v;
         String s = Interp.str(v).trim().toLowerCase();
@@ -650,7 +655,7 @@ public final class ModRuntime {
                 Double id = customIds.get(m.id + ":" + d.name);
                 if ((d.kind.equals("block") || d.kind.equals("item")) && id != null) { m.in.globals.vars.put(d.name, id); continue; }
                 m.in.globals.vars.put(d.name, m.id + ":" + d.name);
-                if (!d.kind.equals("block") && !d.kind.equals("item"))
+                if (!d.kind.equals("block") && !d.kind.equals("item") && !d.kind.equals("dimension"))
                     report(m, new ScriptError("'" + d.kind + "' появится в следующих версиях", d.line));
             }
             String pre = m.id + ":";                      // names of items by data (variants: [{name: ..}])

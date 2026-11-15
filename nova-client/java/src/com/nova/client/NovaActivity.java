@@ -841,6 +841,17 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
             int[] px = packIcon(np);
             if (px != null) return px;
         }
+        if (np != null && np.contains("nova/dimportal/")) {    // portals of mod dimensions (ModDims): strips made in code
+            Bitmap sb = ModDims.strip(np);
+            if (sb != null) {
+                int w = sb.getWidth(), h = sb.getHeight();
+                int[] px = new int[w * h + 2];
+                px[0] = w;
+                px[1] = h;
+                sb.getPixels(px, 2, w, 0, 0, w, h);
+                return px;
+            }
+        }
         if (np != null && np.contains("nova/mod/")) {          // ui.hud pictures of mods (textures go through here)
             byte[] d = fileData(path);
             Bitmap mb = d == null ? null : BitmapFactory.decodeByteArray(d, 0, d.length);

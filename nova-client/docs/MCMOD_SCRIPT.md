@@ -434,3 +434,31 @@ every 1 seconds { item.frame(thermometer, 12) }
 ```
 **Частицы и звуки** (видно и слышно на этом телефоне): `world.particle("flame" | "smoke" | "largesmoke" | "lava" |
 "cloud" | номер, x, y, z, vx, vy, vz)`, `world.sound("fire.fire", x, y, z, громкость, высота)`.
+
+
+## Измерения (alpha49)
+
+```
+dimension wood {
+    name: {ru: "Деревянный мир", en: "Wooden world"}
+    portal: {frame: "planks", color: "#e8a040"}      // или texture: "textures/portal.png" - полоса квадратных кадров
+    generator: {
+        type: "islands"            // "islands" - парящие острова, "flat" - слои
+        height: 62                 // высота островов
+        size: 56                   // размер островов (больше - крупнее)
+        density: 0.56              // 0..1: больше - меньше островов
+        top: "grass", filler: "dirt", filler_depth: 3
+        body: ["planks:0", "planks:1"]   // тело острова полосами по 3 блока
+        roots: "log"               // свисают снизу (без :data - разные породы)
+        trees: 0.035, grass: 0.18  // доля столбиков с деревом / травой
+        biome: "forest"            // биом игры: цвет травы, мобы
+    }
+    respawn: false                 // false: умер там - возрождаешься дома
+}
+// flat: generator: {type: "flat", layers: [{block: "bedrock"}, {block: "dirt", count: 3}, {block: "grass"}]}
+```
+
+- Портал строится из блока `frame` как адский (внутри 2..21 в ширину, 3..21 в высоту), зажигается огнём. Из обычного мира ведёт в измерение, из измерения - домой. По прибытии ищется портал рядом (16 блоков), иначе строится новый (над пустотой - на площадке).
+- Блоки: имя игры (`"planks"`, `"minecraft:log"`), `"имя:data"`, блок своего мода, номер.
+- Не больше 4 измерений из модов. Номера (2, 3, ...) хранятся в files/nova/dimids.json.
+- Пример: mcmod/examples/wood_world.

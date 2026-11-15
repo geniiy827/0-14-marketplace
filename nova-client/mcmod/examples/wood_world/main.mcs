@@ -1,0 +1,29 @@
+// Деревянный мир - пример измерения.
+// Портал: рамка из досок любой породы, как у адского портала (внутри от 2x3 до 21x21), зажечь огнивом.
+// Заливка - портал игры в янтарном цвете. Обратно - тем же порталом. Умер там - возродишься дома.
+
+dimension wood {
+    name: {ru: "Деревянный мир", en: "Wooden world"}
+    portal: {frame: "planks", color: "#e8a040"}
+    generator: {
+        type: "islands"
+        height: 62
+        size: 56
+        top: "grass"
+        filler: "dirt"
+        filler_depth: 3
+        body: ["planks:0", "planks:1", "planks:2", "planks:3", "planks:4", "planks:5"]
+        roots: "log"
+        trees: 0.035
+        grass: 0.18
+        biome: "forest"
+    }
+    respawn: false
+}
+
+on chat(e) {
+    if e.text == "/wood" {
+        e.cancel()
+        chat.send("§6Деревянный мир:§f построй рамку из досок как у адского портала и зажги её огнивом.")
+    }
+}

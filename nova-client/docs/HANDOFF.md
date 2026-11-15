@@ -114,7 +114,10 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha48 выпущена)
+## 4. Где остановились (alpha49 выпущена)
+
+alpha49: краш поджога исправлен, измерения — API модов (`dimension`), пример wood_world. Ждём проверки.
+
 
 alpha48: деревянное измерение (номер 2) с порталом из досок — native/dims.inc. Ждём проверки на телефоне.
 

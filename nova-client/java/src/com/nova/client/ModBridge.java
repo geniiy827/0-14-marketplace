@@ -21,6 +21,7 @@ public final class ModBridge {
     static native int nativeDefineBlocks(double[] data, String names);
     static native int nativeStructures(byte[] data);
     static native int nativeBlockExtra(double[] data);
+    static native int nativeDimensions(double[] data, String paths);
     static native int nativeBlockAnims(double[] data, String paths);
     static native int nativeRecipeMods(String spec);
     static native void nativeRecipeSearch(String text, int done);
@@ -180,10 +181,15 @@ public final class ModBridge {
             if (blocks == null) {                       // blocks are registered once per game process
                 ModBlocks mb = new ModBlocks(c, rt);
                 mb.prepare(dirs);
+                ModDims md = new ModDims(c, rt);                // dimensions: their portals' tiles join the atlas
+                md.prepare(dirs, mb);
                 if (mb.count > 0) {
                     try { nativeDefineBlocks(mb.data, mb.names); } catch (Throwable t) { Log.e(TAG, "native blocks", t); }
                 }
-                if (!mb.animData.isEmpty()) {                // mods' animated blocks and the wooden portal
+                if (md.count > 0) {
+                    try { nativeDimensions(md.numbers(), md.names.toString()); } catch (Throwable t) { Log.e(TAG, "dimensions", t); }
+                }
+                if (!mb.animData.isEmpty()) {                // mods' animated blocks and portals of mod dimensions
                     double[] ad = new double[mb.animData.size()];
                     for (int i = 0; i < ad.length; i++) ad[i] = mb.animData.get(i);
                     try { nativeBlockAnims(ad, mb.animPaths.toString()); } catch (Throwable t) { Log.e(TAG, "block animations", t); }

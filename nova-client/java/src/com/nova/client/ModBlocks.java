@@ -163,7 +163,6 @@ final class ModBlocks {
             return;
         }
         if (NovaActivity.playVersion >= 15) builtin015();
-        builtinWoodPortal();
         Map<String, Integer> ids = loadIds();
         List<Double> out = new ArrayList<Double>();
         List<Object[]> rsRefs = new ArrayList<Object[]>();
@@ -673,26 +672,15 @@ final class ModBlocks {
         return m;
     }
 
-    /** the wooden dimension's portal (native/dims.inc): its first frame in the atlas as "nova_wood_portal", the strip
-     *  (images/nova/wood_portal.png, 32 frames like the game's portal) played over it */
-    private void builtinWoodPortal() {
-        try {
-            byte[] png = readAsset("images/nova/wood_portal.png");
-            if (png == null) return;
-            BitmapFactory.Options op = new BitmapFactory.Options();
-            op.inPremultiplied = false;
-            Bitmap strip = BitmapFactory.decodeByteArray(png, 0, png.length, op);
-            int w = strip.getWidth();
-            Bitmap first = crop(strip, 0, 0, w, w);
-            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
-            first.compress(Bitmap.CompressFormat.PNG, 100, o);
-            int[] r = pack(null, "builtin:wood_portal", o.toByteArray());
-            named.put("nova_wood_portal", r);
-            animData.add((double) r[0]); animData.add((double) r[1]); animData.add((double) r[2]); animData.add((double) r[3]);
-            animData.add(1.0);
-            if (animPaths.length() > 0) animPaths.append('\u001f');
-            animPaths.append("nova/wood_portal.png");
-        } catch (Exception e) { Log.e(TAG, "wood portal texture", e); }
+    /** an animated tile from code (portals of mod dimensions, ModDims): its first frame in the atlas under name, the
+     *  strip (square frames, top to bottom) played over it by the game's FlipbookTexture from animPath */
+    void addAnimated(String name, byte[] firstFrame, String animPath, int ticks) throws Exception {
+        int[] r = pack(null, "builtin:" + name, firstFrame);
+        named.put(name, r);
+        animData.add((double) r[0]); animData.add((double) r[1]); animData.add((double) r[2]); animData.add((double) r[3]);
+        animData.add((double) ticks);
+        if (animPaths.length() > 0) animPaths.append('\u001f');
+        animPaths.append(animPath);
     }
 
     /** pictures of the blocks 0.15 added (native/v015.inc looks them up by these terrain.meta names) */

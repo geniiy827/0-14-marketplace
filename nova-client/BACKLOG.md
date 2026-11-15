@@ -550,3 +550,8 @@
 - Поджиг: хук FireBlock::onPlace — рамка из досок (id 5, любая порода) 2..21 x 3..21, как адская.
 - Переход: родная логика портала (+0xec, ожидание, оверлей), хук Level::requestPlayerChangeDimension меняет цель на 2 (из 2 → 0), translatePosAcrossDimension без x8, findPortal пропускается, PortalForcer::force → свой: ищет деревянный портал в радиусе 16, иначе строит рамку с площадкой.
 - Не сделано: экран перехода пишет «ад» (pushNetherProgressScreen), частицы портала фиолетовые.
+
+## alpha49: измерения через моды
+- Краш alpha48 при любом поджоге: BlockSource::getBlockID(int,int,int) возвращает BlockID через sret (r0 = out, r1 = this). Теперь wd_get_id(out, bs, x, y, z).
+- Деревянное измерение вынесено в мод (mcmod/examples/wood_world). Объявление `dimension name { portal: {frame, color|texture}, generator: {type islands|flat, ...}, respawn }` → ModDims.java → nativeDimensions → dims.inc (до 4 измерений, номера 2.. в files/nova/dimids.json, у каждого свой блок портала с конца свободных номеров вне POOL).
+- Текстура портала: полоса portal.png игры в цвете color или своя; отдаётся игре как nova/dimportal/<n>.png (NovaActivity), первый кадр в атласе как nova_portal_tex_<n> (ModBlocks.addAnimated).
