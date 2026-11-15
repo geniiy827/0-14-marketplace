@@ -278,21 +278,31 @@ static int pt_on_screen(const float *mvp, float c[4][3], const float *cam) {
     }
     return !(behind == 4 || left == 4 || right == 4 || below == 4 || above == 4);
 }
+static int pt_debug;                                                    /* 1: the pass over the whole screen */
+static void pt_gl_ours(void) {
+    gl.UseProgram(pt_prog);
+    gl.BindBuffer(GL_ARRAY_BUFFER, 0);
+    gl.EnableVertexAttribArray(0);
+    gl.Disable(GL_BLEND); gl.Disable(GL_CULL_FACE); gl.Disable(GL_SCISSOR_TEST);
+}
+/* Drawn BEFORE the game's world, so the game's own pass is the last one of the frame (its chunk lists, sorting and
+ * visibility stay its own): the rectangle in the stencil, inside it the world beyond, then the rectangle's own depth
+ * inside it - the game's world behind the portal plane is then hidden there, what stands in front still shows. */
 static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, float a, Portal *P, int from) {
     PEnd *A = &P->e[from], *B = &P->e[1 - from];
     float *V = pt_top(pt_view), *Pm = pt_top(pt_proj);
     float Vs[16], Ps[16], mvp[16], c[4][3];
     memcpy(Vs, V, 64); memcpy(Ps, Pm, 64);
-    memcpy(pt_undo.V, Vs, 64); memcpy(pt_undo.P, Ps, 64); pt_undo.e = 0; pt_undo.on = 1;
     pt_mul(Ps, Vs, mvp);
     pt_corners(P, A, c);
     if (!pt_on_screen(mvp, c, cam)) return;
+    memcpy(pt_undo.V, Vs, 64); memcpy(pt_undo.P, Ps, 64); pt_undo.e = 0; pt_undo.on = 1;
     float turn = pt_turn(A, B), vcam[3], R[16], V2[16], P2[16];
     pt_map(A, B, cam, vcam);
     pt_rot_inv_mat(turn, R);
     pt_mul(Vs, R, V2);
     memcpy(P2, Ps, 64);
-    {                                                                  /* near plane on the exit */
+    {                                                                  /* near plane on the exit (drawing only) */
         float q[3] = {B->o[0] - vcam[0], B->o[1] - vcam[1], B->o[2] - vcam[2]}, qc[4], nc[4];
         float n[3] = {pt_n[B->face][0], 0, pt_n[B->face][2]};
         pt_xform(V2, q, 1, qc);
@@ -305,37 +315,39 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
     float clear[4] = {0.5f, 0.7f, 1.f, 1.f};
     gl.GetFloatv(GL_COLOR_CLEAR_VALUE, clear);
     clear[3] = 1.f;
-    gl.UseProgram(pt_prog);
-    gl.BindBuffer(GL_ARRAY_BUFFER, 0);
-    gl.EnableVertexAttribArray(0);
-    gl.Disable(GL_BLEND); gl.Disable(GL_CULL_FACE); gl.Disable(GL_SCISSOR_TEST);
-    gl.Enable(GL_STENCIL_TEST);
-    gl.StencilMask(0xff);
-    gl.ClearStencil(0);
-    gl.Clear(GL_STENCIL_BUFFER_BIT);
-    /* 1: the rectangle where it is seen */
-    gl.Enable(GL_DEPTH_TEST); gl.DepthFunc(GL_LEQUAL); gl.DepthMask(0);
-    gl.ColorMask(0, 0, 0, 0);
-    gl.StencilFunc(GL_ALWAYS, 1, 0xff);
-    gl.StencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-    pt_quad(mvp, c, cam, 0, clear);
-    /* 2: there: far depth, the sky's colour */
-    gl.StencilFunc(GL_EQUAL, 1, 0xff);
-    gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-    gl.DepthFunc(GL_ALWAYS); gl.DepthMask(1);
-    gl.ColorMask(1, 1, 1, 1);
-    pt_quad(mvp, c, cam, 1, clear);
-    /* 3: the world beyond, only there */
-    pt_gl_restore(&s);
-    gl.Enable(GL_STENCIL_TEST);
-    gl.StencilFunc(GL_EQUAL, 1, 0xff);
-    gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-    gl.StencilMask(0);
+    if (!pt_debug) {
+        pt_gl_ours();
+        gl.Enable(GL_STENCIL_TEST);
+        gl.StencilMask(0xff);
+        gl.ClearStencil(0);
+        gl.Clear(GL_STENCIL_BUFFER_BIT);
+        /* 1: the rectangle (nothing of the world is drawn yet: no depth test) */
+        gl.Disable(GL_DEPTH_TEST); gl.DepthMask(0);
+        gl.ColorMask(0, 0, 0, 0);
+        gl.StencilFunc(GL_ALWAYS, 1, 0xff);
+        gl.StencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        pt_quad(mvp, c, cam, 0, clear);
+        /* 2: inside: far depth, the sky's colour under the world beyond */
+        gl.Enable(GL_DEPTH_TEST);
+        gl.StencilFunc(GL_EQUAL, 1, 0xff);
+        gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        gl.DepthFunc(GL_ALWAYS); gl.DepthMask(1);
+        gl.ColorMask(1, 1, 1, 1);
+        pt_quad(mvp, c, cam, 1, clear);
+        pt_gl_restore(&s);
+        gl.Enable(GL_STENCIL_TEST);
+        gl.StencilFunc(GL_EQUAL, 1, 0xff);
+        gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        gl.StencilMask(0);
+    }
+    /* 3: the world beyond. Cullers from the plain projection (an oblique one has a skewed far plane: it threw away
+     *    whole chunks - the holes of alpha54), drawing with the oblique one */
     memcpy(pt_top(pt_view), V2, 64);
-    memcpy(pt_top(pt_proj), P2, 64);
+    memcpy(pt_top(pt_proj), Ps, 64);
     for (int i = 0; i < 2; i++) { memset(pt_cull[i], 0, sizeof pt_cull[i]); pt_frustum_ctor(pt_cull[i]); }
     ((void (*)(void *, void *, void *))(*(u32 **)scr)[86])(scr, pt_cull[0], pt_cull[1]);   /* _prepareCuller */
     for (int i = 0; i < 2; i++) memcpy(pt_cull[i] + 0x4c0, vcam, 12);
+    memcpy(pt_top(pt_proj), P2, 64);
     float keep[16];
     memcpy(keep, ent + 8, 12); memcpy(keep + 3, ent + 0x20, 12); memcpy(keep + 6, ent + 0x38, 16);
     memcpy(pt_undo.ent, keep, 40); pt_undo.e = ent;
@@ -348,6 +360,20 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
     pt_undo.e = 0;
     memcpy(pt_top(pt_view), Vs, 64);
     memcpy(pt_top(pt_proj), Ps, 64);
+    if (!pt_debug) {
+        /* 4: the rectangle's own depth inside it: the game's world behind the portal plane stays hidden there */
+        PtGl s2;
+        pt_gl_save(&s2);
+        pt_gl_ours();
+        gl.Enable(GL_STENCIL_TEST);
+        gl.StencilFunc(GL_EQUAL, 1, 0xff);
+        gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        gl.StencilMask(0);
+        gl.Enable(GL_DEPTH_TEST); gl.DepthFunc(GL_ALWAYS); gl.DepthMask(1);
+        gl.ColorMask(0, 0, 0, 0);
+        pt_quad(mvp, c, cam, 0, clear);
+        pt_gl_restore(&s2);
+    }
     pt_en(GL_STENCIL_TEST, s.stencil);
     gl.StencilMask((GLuint)s.swmask);
     gl.StencilFunc((GLenum)s.sfunc, s.sref, (GLuint)s.svmask);
@@ -403,15 +429,7 @@ static int pt_cross(char *ent, float *cam, int dim) {
     return moved;
 }
 
-static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, float a) {
-    float cam[3] = {x, y, z};
-    int any = 0;
-    for (int i = 0; i < PT_MAX; i++) if (pt[i].used) any = 1;
-    void *me = g_client && pt_local_player ? pt_local_player(g_client) : 0;
-    int dim = any ? pt_cur_dim(ent) : 0;
-    if (any && ent && ent == me) pt_cross((char *)ent, cam, dim);
-    o_pt_rfi(scr, cam[0], cam[1], cam[2], lr, ent, a);
-    if (!any || !pt_render_on || !pt_view_hooked || pt_broken || pt_inpass || !ent || pt_gl_init() != 1) return;
+static void pt_passes_draw(void *scr, void *lr, void *ent, float *cam, float a, int dim) {
     long t0 = now_ms();
     if (crash_path[0] && sigsetjmp(nova_guard_jb, 1)) {
         nova_guard = 0;
@@ -444,6 +462,19 @@ static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, 
     }
     nova_guard = 0;
     pt_last_us = (int)(now_ms() - t0);
+}
+
+static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, float a) {
+    float cam[3] = {x, y, z};
+    int any = 0;
+    for (int i = 0; i < PT_MAX; i++) if (pt[i].used) any = 1;
+    void *me = g_client && pt_local_player ? pt_local_player(g_client) : 0;
+    int dim = any ? pt_cur_dim(ent) : 0;
+    if (any && ent && ent == me) pt_cross((char *)ent, cam, dim);
+    if (any && pt_render_on && pt_view_hooked && !pt_broken && !pt_inpass && ent && pt_gl_init() == 1)
+        pt_passes_draw(scr, lr, ent, cam, a, dim);                     /* the views first, the game's world after */
+    if (pt_debug && pt_passes > 0) return;                             /* debug: only what the portal pass drew */
+    o_pt_rfi(scr, cam[0], cam[1], cam[2], lr, ent, a);
 }
 
 static u64 hc_pt_view_area(u32 orig, u32 *w) {            /* LevelRenderer::updateViewArea: not for our pass */
@@ -507,6 +538,7 @@ static int pt_op(int op, const double *a, int n, double *out, void *ent) {
     case OP_PORTAL_REMOVE: { int i = n > 0 ? (int)a[0] : -1; if (i >= 0 && i < PT_MAX) pt[i].used = 0; return 0; }
     case OP_PORTAL_CLEAR: memset(pt, 0, sizeof pt); return 0;
     case OP_PORTAL_RENDER: pt_render_on = n > 0 && a[0] != 0; return 0;
+    case OP_PORTAL_DEBUG: pt_debug = n > 0 ? (int)a[0] : 0; return 0;
     case OP_PORTAL_STATUS: {
         int cnt = 0;
         for (int i = 0; i < PT_MAX; i++) if (pt[i].used) cnt++;

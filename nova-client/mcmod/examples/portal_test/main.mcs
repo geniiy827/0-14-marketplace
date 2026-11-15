@@ -6,6 +6,7 @@
 //  /portal clear     - убрать все связи (рамки остаются)
 //  /portal off | on  - выключить / включить рисование вида сквозь портал (проход работает всегда)
 //  /portal info      - состояние: готово ли, есть ли трафарет, сколько проходов и мс на кадр
+//  /portal debug 1   - на весь экран только второй проход (что видно сквозь портал), /portal debug 0 - обычно
 // Порталы живут, пока ты в мире: при входе в мир всё сбрасывается.
 
 var FRAME = 155        // кварцевый блок
@@ -106,10 +107,14 @@ on chat(e) {
     } else if cmd == "on" {
         portal.render(true)
         chat.send("Вид сквозь порталы включён.")
+    } else if cmd == "debug" {
+        var m = p.len() > 2 ? num(p[2]) : 1
+        portal.debug(m)
+        chat.send(m == 1 ? "Отладка: на весь экран только то, что рисует проход портала (/portal debug 0 - обычно)" : "Отладка выключена")
     } else if cmd == "info" {
         var s = portal.status()
         chat.send("§bПорталы:§f готов {s[0]}, GL {s[1]}, трафарет {s[2]} бит, рисует {s[3]}, проходов {s[4]}, {s[5]} мс, связей {s[6]}")
     } else {
-        chat.send("/portal a | b | demo | size W H | clear | off | on | info")
+        chat.send("/portal a | b | demo | size W H | clear | off | on | info | debug 1/0")
     }
 }

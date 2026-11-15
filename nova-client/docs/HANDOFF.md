@@ -114,7 +114,10 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha54 выпущена)
+## 4. Где остановились (alpha55 выпущена)
+
+alpha55: порядок проходов портала, каттеры, режим отладки. Ждём скрины.
+
 
 alpha54: сквозные порталы (portals.inc, docs/PORTALS.md), тест-мод portal_test. Не проверено на телефоне — ждём /portal info и скрины.
 
