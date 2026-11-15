@@ -280,6 +280,11 @@ static int pt_on_screen(const float *mvp, float c[4][3], const float *cam) {
     return !(behind == 4 || left == 4 || right == 4 || below == 4 || above == 4);
 }
 static int pt_debug;                                                    /* 1: the pass over the whole screen */
+/* The game draws everything with the stencil test on: EQUAL 0 under mask 0xf0 (seen in NOVA-portal.txt). The opening
+ * gets 0x10 there: our pass draws only where it is 0x10, and the game's own world afterwards skips the opening
+ * (alpha57: its sky / world went over our view - "nothing in the portal"). Cleared back to 0 after the game's pass. */
+#define PT_MARK 0x10
+static int pt_marked;
 /* portal.report(): one frame of facts into NOVA-portal.txt (next to NOVA-crash.txt) */
 static int pt_report_req;
 static char pt_rep[6144];
@@ -386,12 +391,12 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
         /* 1: the rectangle (nothing of the world is drawn yet: no depth test) */
         gl.Disable(GL_DEPTH_TEST); gl.DepthMask(0);
         gl.ColorMask(0, 0, 0, 0);
-        gl.StencilFunc(GL_ALWAYS, 1, 0xff);
+        gl.StencilFunc(GL_ALWAYS, PT_MARK, 0xff);
         gl.StencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         pt_quad(mvp, c, cam, 0, clear);
         /* 2: inside: far depth, the sky's colour under the world beyond */
         gl.Enable(GL_DEPTH_TEST);
-        gl.StencilFunc(GL_EQUAL, 1, 0xff);
+        gl.StencilFunc(GL_EQUAL, PT_MARK, 0xf0);
         gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
         gl.DepthFunc(GL_ALWAYS); gl.DepthMask(1);
         gl.ColorMask(1, 1, 1, 1);
@@ -399,14 +404,39 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
         if (rep) { pt_rp("sky colour %.2f %.2f %.2f\n", clear[0], clear[1], clear[2]); pt_rp_pixel("after sky fill", mvp, c, cam); }
         pt_gl_restore(&s);
         gl.Enable(GL_STENCIL_TEST);
-        gl.StencilFunc(GL_EQUAL, 1, 0xff);
+        gl.StencilFunc(GL_EQUAL, PT_MARK, 0xf0);
         gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
         gl.StencilMask(0);
+        pt_marked = 1;
     }
     /* 3: the world beyond. Cullers from the plain projection (an oblique one has a skewed far plane: it threw away
      *    whole chunks - the holes of alpha54), drawing with the oblique one */
+    /* culling only what can be seen through the opening: the projection stretched so the opening's screen box
+     * fills the frustum (alpha58: 1758 draws, 104 ms - the whole world was drawn for a 2x3 hole) */
+    float Pc[16];
+    memcpy(Pc, Ps, 64);
+    {
+        float x0 = 1, x1 = -1, y0 = 1, y1 = -1;
+        int ok = 1;
+        for (int k = 0; k < 4; k++) {
+            float v[3] = {c[k][0] - cam[0], c[k][1] - cam[1], c[k][2] - cam[2]}, o[4];
+            pt_xform(mvp, v, 1, o);
+            if (o[3] <= 0.05f) { ok = 0; break; }
+            float nx = o[0] / o[3], ny = o[1] / o[3];
+            if (nx < x0) x0 = nx; if (nx > x1) x1 = nx; if (ny < y0) y0 = ny; if (ny > y1) y1 = ny;
+        }
+        if (ok) {
+            if (x0 < -1) x0 = -1; if (x1 > 1) x1 = 1; if (y0 < -1) y0 = -1; if (y1 > 1) y1 = 1;
+            float hx = (x1 - x0) / 2 + 0.02f, hy = (y1 - y0) / 2 + 0.02f, cx = (x1 + x0) / 2, cy = (y1 + y0) / 2;
+            if (hx > 0.02f && hy > 0.02f && hx < 1.02f && hy < 1.02f)
+                for (int col = 0; col < 4; col++) {               /* x' = (x - cx w) / hx, y' = (y - cy w) / hy */
+                    Pc[col * 4 + 0] = (Ps[col * 4 + 0] - cx * Ps[col * 4 + 3]) / hx;
+                    Pc[col * 4 + 1] = (Ps[col * 4 + 1] - cy * Ps[col * 4 + 3]) / hy;
+                }
+        }
+    }
     memcpy(pt_top(pt_view), V2, 64);
-    memcpy(pt_top(pt_proj), Ps, 64);
+    memcpy(pt_top(pt_proj), Pc, 64);
     for (int i = 0; i < 2; i++) { memset(pt_cull[i], 0, sizeof pt_cull[i]); pt_frustum_ctor(pt_cull[i]); }
     ((void (*)(void *, void *, void *))(*(u32 **)scr)[86])(scr, pt_cull[0], pt_cull[1]);   /* _prepareCuller */
     for (int i = 0; i < 2; i++) memcpy(pt_cull[i] + 0x4c0, vcam, 12);
@@ -438,20 +468,6 @@ static void pt_view_through(void *scr, void *lr, char *ent, const float *cam, fl
     pt_undo.e = 0;
     memcpy(pt_top(pt_view), Vs, 64);
     memcpy(pt_top(pt_proj), Ps, 64);
-    if (!pt_debug) {
-        /* 4: the rectangle's own depth inside it: the game's world behind the portal plane stays hidden there */
-        PtGl s2;
-        pt_gl_save(&s2);
-        pt_gl_ours();
-        gl.Enable(GL_STENCIL_TEST);
-        gl.StencilFunc(GL_EQUAL, 1, 0xff);
-        gl.StencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-        gl.StencilMask(0);
-        gl.Enable(GL_DEPTH_TEST); gl.DepthFunc(GL_ALWAYS); gl.DepthMask(1);
-        gl.ColorMask(0, 0, 0, 0);
-        pt_quad(mvp, c, cam, 0, clear);
-        pt_gl_restore(&s2);
-    }
     pt_en(GL_STENCIL_TEST, s.stencil);
     gl.StencilMask((GLuint)s.swmask);
     gl.StencilFunc((GLenum)s.sfunc, s.sref, (GLuint)s.svmask);
@@ -576,6 +592,15 @@ static void h_pt_rfi(void *scr, float x, float y, float z, void *lr, void *ent, 
         pt_passes_draw(scr, lr, ent, cam, a, dim);                     /* the views first, the game's world after */
     if (pt_debug && pt_passes > 0) return;                             /* debug: only what the portal pass drew */
     o_pt_rfi(scr, cam[0], cam[1], cam[2], lr, ent, a);
+    if (pt_marked && pt_gl_ok == 1) {                                  /* the opening's mark off: hand, HUD draw there */
+        GLint wm = 0xff;
+        gl.GetIntegerv(GL_STENCIL_WRITEMASK, &wm);
+        gl.StencilMask(0xff);
+        gl.ClearStencil(0);
+        gl.Clear(GL_STENCIL_BUFFER_BIT);
+        gl.StencilMask((GLuint)wm);
+        pt_marked = 0;
+    }
 }
 
 /* The game sets the stencil state itself with every material (glStencilFuncSeparate / OpSeparate / Mask, and

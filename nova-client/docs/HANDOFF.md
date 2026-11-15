@@ -114,7 +114,10 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha58 выпущена)
+## 4. Где остановились (alpha59 выпущена)
+
+alpha59: порталы — метка проёма в битах трафарета игры, отсечение по рамке проёма.
+
 
 alpha58: «/portal report» пишет Download/NOVA-portal.txt — ждём файл, чиним по фактам.
 
