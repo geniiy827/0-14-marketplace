@@ -3,7 +3,7 @@
 set -e
 T0=$(date +%s)
 V=$(cat VERSION 2>/dev/null || echo dev); APK=out/NOVA-0.14.3-$V.apk
-W=/home/claude/work; cd $W
+W=/home/claude/work; cd $W; mkdir -p out
 python3 -I tools/validate.py ui_new ui_orig /home/claude/apk/x/assets/images:/home/claude/work/assets_new/images
 python3 -I tools/make_manifest.py /home/claude/apk/x/AndroidManifest.xml AndroidManifest.nova.xml > /dev/null
 python3 -I tools/gen_entities.py /home/claude/apk/x/assets assets_new

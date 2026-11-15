@@ -17,6 +17,8 @@
   (ключ подписи `nova.jks`, `pass.txt`, RSA-ключ аккаунтов `nova_accounts_private.pem`), `*.db`, разбор `re014/`,
   `genisys/`, `raklib/`, `mega/`, `nukkit/`, `a13/` — `tools/sync_repo.sh` их уже исключает.
 - Порт стороннего «Ice-Cream Craft» на 64 бита — отказано, не возвращаться.
+- `keys/nova.jks` + `pass.txt` были в публичной истории git с alpha8 до коммита 332cc35 — ключ подписи считать
+  скомпрометированным (решение о смене ключа / чистке истории — за пользователем).
 
 ## 1. Где что лежит
 
@@ -112,7 +114,7 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha39, НЕ выпущена)
+## 4. Где остановились (alpha39 выпущена)
 
 Направление: гибрид 0.15→1.1.5 **отменён**, продолжаем NOVA на 0.14.
 Сделано в рабочей копии (закоммичено как WIP):
@@ -124,6 +126,6 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Мод `mcmod/examples/infinity_winter` (Infinity Winter): всё это при входе в мир, команды `/winter`,
   `/winter speed N`, `/winter limit N` (меняет хост), сохранение в `data`. `check_mods` — 0 ошибок.
 
-Осталось: `echo alpha39 > VERSION`, собрать, выпустить, отправить APK + `out/infinity_winter.mcmod`, объяснить
-игру с друзьями (мод включить у всех; сугробы растит хост). Дописать раздел `weather.*` в `docs/MCMOD_SCRIPT.md`.
+alpha39 выпущена (APK + `out/infinity_winter.mcmod` отправлены). Мод включать у всех; сугробы растит хост.
+Раздел `weather.*` в `docs/MCMOD_SCRIPT.md` дописан. В чистом контейнере `build.sh` сам создаёт `out/`.
 Ждём отзыв: модель игрока после перезахода в мир (фикс alpha38 — проверка `anim_valid`), поршни (теперь спят).
