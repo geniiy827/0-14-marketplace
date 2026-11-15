@@ -95,6 +95,10 @@ def build_new(spec, old):
     kind = spec[0]
     if kind == 'tint':
         return tint(jtile(spec[1]), avg(old)).resize(size, Image.NEAREST)
+    if kind == 'leather':
+        base = jtile('item/leather_' + spec[1])
+        base.alpha_composite(jtile('item/leather_%s_overlay' % spec[1]))
+        return base.resize(size, Image.NEAREST)
     if kind == 'rot90':
         return jtile(spec[1]).transpose(Image.Transpose.ROTATE_90).resize(size, Image.NEAREST)
     if kind == 'opaque':
@@ -149,6 +153,9 @@ def main():
             for e in lst:
                 if e['name'] in ('flowing_water', 'flowing_lava'):
                     e['uvs'] = [[u[0], u[1], u[2] + (u[2] - u[0]), u[3] + (u[3] - u[1]), u[4], u[5]] for u in e['uvs']]
+        if tag == 'i':      # untinted leather overlays (libnova draws them over dyed leather in slots): free row y 160
+            entries = entries + [{'name': 'leather_overlay', 'uvs': [[16 * k, 160, 16 * k + 16, 176, 512, 512] for k in range(4)]}]
+            src_entries = entries
         im = Image.open(os.path.join(SRC, 'images', atlas)).convert('RGBA')
         old_n = new_n = 0
         for e in src_entries:

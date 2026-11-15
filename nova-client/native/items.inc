@@ -74,6 +74,9 @@ int Java_com_nova_client_ModBridge_nativeDefineItems(void **env, void *cls, void
 
 static int mv_has(int id);
 static void mv_setup(char *it);
+static int ms_has(int id);
+static int ms_indexed;
+static void ms_setup(char *it);
 static void (*mi_digger_ctor[4])(void *it, void *name, int id, MTier *t);   /* pickaxe, axe, shovel, - */
 static void (*mi_hoe_ctor)(void *it, void *name, int id, MTier t);
 static void (*mi_armor_ctor)(void *it, void *name, int id, int *mat, int render, int slot);
@@ -180,6 +183,7 @@ static void mcmod_register_items(void) {
         if (!it) { LOGE("mcmod: item %s: kind %d unavailable", m->name, m->kind); continue; }
         mi_set_icon(it, &m->tex);
         if (m->kind == 0 && mv_has(m->id)) mv_setup(it);
+        else if (m->kind == 0 && ms_has(m->id)) ms_setup(it);
         if (m->kind == 0) {
             if (m->tool && mi_hand_eq) mi_hand_eq(it);
             if (mi_stack) mi_stack(it, (unsigned char)m->stack);
@@ -328,7 +332,7 @@ static u64 hc_prepare_armor(u32 orig, u32 *w) {     /* prepareArmor(this, Mob&, 
  * PickaxeItem::canDestroySpecial(this, Block const*); the tier pointer is at +0x44 (level first) */
 static u64 hc_pick_special(u32 orig, u32 *w) {
     char *b = (char *)w[1];
-    ModBlock *m = b ? mblock_of[*(unsigned char *)(b + 4)] : 0;
+    ModBlock *m = b ? mb_of(b, mb_ctx_data) : 0;                /* packed: the data being dug */
     if (m && m->block == b && m->harvest > 0) {
         int *t = *(int **)((char *)w[0] + 0x44);
         return t && t[0] >= m->harvest;
@@ -338,7 +342,40 @@ static u64 hc_pick_special(u32 orig, u32 *w) {
 
 static void doors_init(void *mc);
 static void bowbucket_init(void *mc);
+
+/* dyed leather in slots: ItemRenderer::iconBlit(this, tex, x, y, uv, w, h, ?, ?, color, alpha, foil) draws the tinted
+ * icon; Java draws the overlay (laces, buckles) again untinted. 0.14 tints the whole tile, so after a tinted blit of a
+ * leather tile we blit tile 'leather_overlay' k (items atlas row y 160, AtlasBuilder) with color -1 (no tint). */
+static const float lo_base[4][2] = {{320, 48}, {272, 16}, {64, 64}, {400, 0}};   /* helmet, chest, legs, boots (meta) */
+static float lo_uv[4][16];
+static u64 hc_iconblit(u32 orig, u32 *w) {
+    u64 r = nh_callw(orig, w);
+    float *uv = (float *)w[4];
+    if (!uv || (int)w[9] == -1) return r;
+    for (int k = 0; k < 4; k++) {
+        float du = uv[0] * 512.f - lo_base[k][0], dv = uv[1] * 512.f - lo_base[k][1];
+        if (du < -0.6f || du > 0.6f || dv < -0.6f || dv > 0.6f) continue;
+        float *o = lo_uv[k];
+        memcpy(o, uv, sizeof lo_uv[k]);
+        float uw = uv[2] - uv[0], vh = uv[3] - uv[1];                     /* keep the game's inset, move the tile */
+        o[0] = uv[0] - lo_base[k][0] / 512.f + (16.f * k) / 512.f;
+        o[1] = uv[1] - lo_base[k][1] / 512.f + 160.f / 512.f;
+        o[2] = o[0] + uw;
+        o[3] = o[1] + vh;
+        u32 w2[16];
+        for (int i = 0; i < 16; i++) w2[i] = w[i];
+        w2[4] = (u32)o;
+        w2[9] = (u32)-1;
+        w2[11] = 0;                                                      /* no second glint */
+        nh_callw(orig, w2);
+        break;
+    }
+    return r;
+}
+
 static void armor_init(void *mc) {
+    void *ib = dlsym(mc, "_ZN12ItemRenderer8iconBlitERKN3mce10TexturePtrEffRK22TextureUVCoordinateSetffffifb");
+    LOG("leather overlay: %d", ib ? nh_hook_c((u32)ib, hc_iconblit) : -1);
     doors_init(mc);
     bowbucket_init(mc);
     void *pa = dlsym(mc, "_ZN19HumanoidMobRenderer12prepareArmorER3Mob9ArmorSlotf");
@@ -371,6 +408,7 @@ int Java_com_nova_client_ModBridge_nativeItemVariants(void **env, void *cls, voi
         if (*np == '\x1f') np++;
     }
     mv_indexed = 0;
+    ms_indexed = 0;
     return mvar_count;
 }
 
@@ -415,6 +453,45 @@ static void mv_setup(char *it) {
     }
     *(u32 **)it = mv_vtable + 2;
     ((void (*)(void *, int))(mv_vtable[2 + 6]))(it, 1);        /* setStackedByData(true) */
+}
+
+/* ---- picture-strip items (frames: N): one item, the picture picked by the script, like ClockItem / CompassItem pick
+ * theirs: item.frame(item, k) for every stack of the item (in hand, inventory, chests). Frames: MVar aux 2000 + k. ---- */
+static u32 *ms_vtable;
+static short ms_first[512], ms_n[512];
+static unsigned char ms_frame[512];
+static void ms_index(void) {
+    for (int i = 0; i < 512; i++) { ms_first[i] = -1; ms_n[i] = 0; }
+    for (int i = 0; i < mvar_count; i++) {
+        int id = mvars[i].id;
+        if (id < 0 || id >= 512 || mvars[i].aux < 2000 || mvars[i].aux >= 2064) continue;
+        if (ms_first[id] < 0) ms_first[id] = (short)i;
+        ms_n[id]++;
+    }
+    ms_indexed = 1;
+}
+static int ms_has(int id) { if (!ms_indexed) ms_index(); return id >= 0 && id < 512 && ms_first[id] >= 0; }
+static void *ms_get_icon(char *it, int aux, int frame, int inv) {
+    int id = *(unsigned short *)(it + 0x12);
+    if (!ms_has(id)) return *(void **)(it + 0x30);
+    int k = ms_frame[id];
+    if (k >= ms_n[id]) k = ms_n[id] - 1;
+    MVar *v = &mvars[ms_first[id] + k];
+    return v->id == id ? (void *)&v->tex : *(void **)(it + 0x30);
+}
+static void ms_setup(char *it) {
+    if (!ms_vtable) {
+        u32 *vp = *(u32 **)it;
+        ms_vtable = f_new(64 * 4);
+        for (int i = 0; i < 64; i++) ms_vtable[i] = (vp - 2)[i];
+        ms_vtable[2 + 50] = (u32)ms_get_icon;
+    }
+    *(u32 **)it = ms_vtable + 2;
+}
+static void ms_set_frame(int code, int k) {
+    int id = code & 0xffff;
+    if (id < 0 || id >= 512) return;
+    ms_frame[id] = (unsigned char)(k < 0 ? 0 : k > 63 ? 63 : k);
 }
 
 /* a mod door item: DoorItem::useOn picks the game's door block by DoorType and calls DoorItem::place(BlockSource*,

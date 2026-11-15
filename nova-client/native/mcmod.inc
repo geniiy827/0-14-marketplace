@@ -170,8 +170,10 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
         return 2;
     case OP_WORLD_SET_BLOCK: {
         if (!bs || !mf_setblock || FL(1) < 0 || FL(1) > 127) return 0;
-        MBlockID id = {(unsigned char)(int)A(3)};
-        mf_setblock(bs, FL(0), FL(1), FL(2), &id, (unsigned char)(int)A(4), 3);
+        long code = (long)A(3);                               /* a packed block: number + 65536 * data */
+        MBlockID id = {(unsigned char)(code & 0xff)};
+        int data = code >= 65536 ? (int)(code >> 16) : (int)A(4);
+        mf_setblock(bs, FL(0), FL(1), FL(2), &id, (unsigned char)data, 3);
         return 0;
     }
     case OP_WORLD_TIME: out[0] = lvl && mf_gettime ? mf_gettime(lvl) : 0; return 1;
@@ -184,7 +186,9 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
 
 static int hud_op(double *a, int n, char *s);
 static int hud_image_op(double *a, int n, char *s);
+static void ms_set_frame(int code, int k);
 static int env_op(int op, const double *a, int n, double *out);
+static int env_sound(const double *a, int n, const char *name);
 static int rc_op(int op, double *a, int n, char *s);
 static int wt_op(int op, double *a, int n);
 static void wt_frame(void *bs);
@@ -206,6 +210,9 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     int r;                                             /* void ops still answer [] : null means "not in a world" */
     if (op == OP_HUD) { hud_op(a, n, s); r = 0; }
     else if (op == OP_HUD_IMAGE) { hud_image_op(a, n, s); r = 0; }
+    else if (op == OP_ITEM_FRAME) { ms_set_frame(n > 0 ? (int)(long)a[0] : 0, n > 1 ? (int)a[1] : 0); r = 0; }
+    else if (op == OP_WORLD_SOUND) { env_sound(a, n, s); r = 0; }
+    else if (op == OP_WORLD_PARTICLE) { env_op(op, a, n, out); r = 0; }
     else if (op == OP_WORLD_ENV || op == OP_WORLD_RAIN || op == OP_WORLD_COUNT || op == OP_WORLD_DROP || op == OP_PLAYER_ARMOR || op == OP_PLAYER_HAS)
         r = env_op(op, a, n, out);
     else if (op == OP_RECIPE || op == OP_SMELT) { rc_op(op, a, n, s); r = 0; }
@@ -250,11 +257,24 @@ typedef struct {
     int ore_count, ore_size, ore_min, ore_max, ore_in;    /* world generation: veins per chunk, size, heights, replaces */
     int special, sp_base, sp_arg;                         /* the game's own block class: 1 stairs, 2 bars, 3 pressure plate, 4 door */
     char sp_tex[3][64];                                   /* atlas names (terrain.meta entries NOVA adds for mod textures) */
+    int pdata;                                            /* packed: this block is data pdata of a shared number; -1 own number */
+    char title[64];                                       /* packed: the name shown for this data */
 } ModBlock;
 static int ct_has(int id);
 static ModBlock mblocks[MB_MAX];
 static int mblock_count, mblocks_done;
 static ModBlock *mblock_of[256];
+/* packed blocks: plain blocks of one mod with the same light, sound, solidity and look share a block number, one per
+ * data value (0..15), like wool. Per data: textures, model, boxes, hardness, harvest, drops, ore, name. */
+static ModBlock *mblock_sub[256][16];
+static unsigned char mblock_packed[256];
+static int mb_ctx_data = -1;                              /* data of the block being dug / broken (getDestroyProgress) */
+static ModBlock *mb_of(void *b, int data) {
+    int id = *((unsigned char *)b + 4);
+    ModBlock *m = mblock_of[id];
+    if (m && mblock_packed[id] && data >= 0 && data < 16 && mblock_sub[id][data]) return mblock_sub[id][data];
+    return m;
+}
 
 static void **mf_blocks, **mf_items;
 static unsigned char *mf_light_emission, *mf_light_block, *mf_solid;
@@ -314,19 +334,31 @@ int Java_com_nova_client_ModBridge_nativeDefineBlocks(void **env, void *cls, voi
         if (p + 4 > n) break;
         m->rs = (int)d[p]; m->rs_power = (int)d[p + 1]; m->rs_on = (int)d[p + 2]; m->rs_off = (int)d[p + 3];
         p += 4;
+        m->pdata = p < n ? (int)d[p] : -1;
+        p++;
         int k = 0;
-        while (*np && *np != '\x1f' && k < 63) m->name[k++] = *np++;
+        while (*np && *np != '\x1f' && *np != '\x1e' && k < 63) m->name[k++] = *np++;
         m->name[k] = 0;
+        k = 0;
+        if (*np == '\x1e') { np++; while (*np && *np != '\x1f' && k < 63) m->title[k++] = *np++; }
+        m->title[k] = 0;
+        while (*np && *np != '\x1f') np++;
         if (*np == '\x1f') np++;
         if (m->id > 0 && m->id < 256) mblock_count++;
+    }
+    for (int i = 0; i < mblock_count; i++) {
+        ModBlock *m = &mblocks[i];
+        if (m->pdata < 0 || m->pdata > 15) { m->pdata = -1; continue; }
+        mblock_packed[m->id] = 1;
+        mblock_sub[m->id][m->pdata] = m;
     }
     LOG("mcmod: %d block definition(s)", mblock_count);
     return mblock_count;
 }
 
 /* texture getters of mod blocks (Block vtable slots 76, 77, 78 and getCarriedTexture 7) */
-static TexSet *mb_tex(void *block, int face) {
-    ModBlock *m = mblock_of[*((unsigned char *)block + 4)];
+static TexSet *mb_tex_d(void *block, int face, int data) {
+    ModBlock *m = mb_of(block, data);
     if (!m) return (TexSet *)((char *)block + 16);
     if (face < 0 || face > 5) face = 0;
     TexSet *t = &m->tex[face];
@@ -336,15 +368,19 @@ static TexSet *mb_tex(void *block, int face) {
     }
     return t;
 }
+static TexSet *mb_tex(void *block, int face) { return mb_tex_d(block, face, 0); }
+static int mb_data_at(void *bs, MPos *pos) { return bs && pos && mf_getdata ? mf_getdata(bs, pos->x, pos->y, pos->z) : 0; }
 static void *mb_tex_a(void *b, signed char f) { return mb_tex(b, f); }
-static void *mb_tex_ai(void *b, signed char f, int d) { return mb_tex(b, f); }
-static void *mb_tex_world(void *b, void *bs, void *pos, signed char f) { return mb_tex(b, f); }
+static void *mb_tex_ai(void *b, signed char f, int d) { return mb_tex_d(b, f, d); }
+static void *mb_tex_world(void *b, void *bs, void *pos, signed char f) {
+    return mblock_packed[*((unsigned char *)b + 4)] ? mb_tex_d(b, f, mb_data_at(bs, pos)) : mb_tex(b, f);
+}
 
 /* collision: any number of boxes per block */
 typedef struct { float v[6]; unsigned char empty, pad[3]; } MAABB;
 static int (*mf_add_aabb)(void *b, MAABB *box, void *clip, void *vec);
 static void mb_add_shapes(void *b, void *bs, MPos *pos, void *clip, void *vec, void *ent) {
-    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    ModBlock *m = mblock_packed[*((unsigned char *)b + 4)] ? mb_of(b, mb_data_at(bs, pos)) : mblock_of[*((unsigned char *)b + 4)];
     if (!m || !mf_add_aabb) return;
     for (int i = 0; i < m->ncol; i++) {
         float *c = m->col + i * 6;
@@ -353,7 +389,7 @@ static void mb_add_shapes(void *b, void *bs, MPos *pos, void *clip, void *vec, v
     }
 }
 static MAABB *mb_get_aabb(void *b, void *bs, MPos *pos, MAABB *out, int x, int y, int z) {
-    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    ModBlock *m = mblock_packed[*((unsigned char *)b + 4)] ? mb_of(b, mb_data_at(bs, pos)) : mblock_of[*((unsigned char *)b + 4)];
     float *s = m ? m->sel : 0;
     float def[6] = {0, 0, 0, 1, 1, 1};
     if (!s) s = def;
@@ -407,20 +443,21 @@ static int mb_rand_range(void *rnd, int lo, int hi) {
     return lo + (int)(((unsigned long long)r * (u32)(hi - lo + 1)) >> 32);
 }
 static int mb_drop_id(void *b, void *rnd, int data, int fortune) {
-    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    ModBlock *m = mb_of(b, data);
     return m && m->drop > 0 ? (m->drop & 0xffff) : *((unsigned char *)b + 4);
 }
 static int mb_drop_aux(void *b, unsigned char data) {          /* getSpawnResourcesAuxValue: data of an item by data */
-    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
-    return m && m->drop > 0 ? (m->drop >> 16) : 0;
+    ModBlock *m = mb_of(b, data);
+    if (m && m->drop > 0) return m->drop >> 16;
+    return m && m->pdata >= 0 ? m->pdata : 0;                   /* a packed block drops itself with its data */
 }
 static int mb_drop_count(void *b, void *rnd, int data, int fortune) {
-    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    ModBlock *m = mb_of(b, data);
     if (!m || (m->drop <= 0 && m->dmax <= 0)) return 1;     /* drop: {item: .., count: 0} = nothing drops */
     return mb_rand_range(rnd, m->dmin, m->dmax);
 }
 static int mb_drop_xp(void *b, void *rnd) {
-    ModBlock *m = mblock_of[*((unsigned char *)b + 4)];
+    ModBlock *m = mb_of(b, mb_ctx_data);
     return m && m->xmax > 0 ? mb_rand_range(rnd, m->xmin, m->xmax) : 0;
 }
 
@@ -432,10 +469,11 @@ int Java_com_nova_client_ModBridge_nativeBlockExtra(void **env, void *cls, void 
     ((void (*)(void *, void *, int, int, double *))f[206])(env, darr, 0, n, d);
     int done = 0;
     for (int p = 0; p + 12 <= n; p += 12) {
-        int id = (int)d[p];
+        long code = (long)d[p];                               /* number + 65536 * data for packed blocks */
+        int id = (int)(code & 0xffff), data = (int)(code >> 16);
         for (int i = 0; i < mblock_count; i++) {
             ModBlock *m = &mblocks[i];
-            if (m->id != id) continue;
+            if (m->id != id || (m->pdata >= 0 && m->pdata != data)) continue;
             m->harvest = (int)d[p + 1]; m->drop = (int)d[p + 2]; m->dmin = (int)d[p + 3]; m->dmax = (int)d[p + 4];
             m->xmin = (int)d[p + 5]; m->xmax = (int)d[p + 6];
             m->ore_count = (int)d[p + 7]; m->ore_size = (int)d[p + 8]; m->ore_min = (int)d[p + 9];
@@ -559,6 +597,45 @@ static int mb_special(ModBlock *m, void *mat) {
     return 1;
 }
 
+/* ---- packed blocks: the shared Block and BlockItem pick per data what Block / Item only know per number ---- */
+static u32 *mb_pk_vtable, *mb_pk_item_vt;
+static float (*mb_base_progress)(void *b, void *player);
+static void (*mb_base_pdestroy)(void *b, void *player, MPos *pos, int data);
+static char *(*mf_hit)(void *level);
+static float mb_pk_progress(char *b, char *player) {          /* Block::getDestroyProgress(Player&): the dug block's data */
+    int data = 0;
+    void *bs = player ? mm_region(player) : 0;
+    void *lvl = bs && mf_getlevel ? mf_getlevel(bs) : 0;
+    char *hr = lvl && mf_hit ? mf_hit(lvl) : 0;
+    if (hr && *(int *)hr == 0) data = mf_getdata ? mf_getdata(bs, *(int *)(hr + 8), *(int *)(hr + 12), *(int *)(hr + 16)) : 0;
+    ModBlock *m = mb_of(b, data);
+    float keep = *(float *)(b + 112);
+    if (m) *(float *)(b + 112) = m->hardness;
+    mb_ctx_data = data;
+    float r = mb_base_progress(b, player);
+    mb_ctx_data = -1;
+    *(float *)(b + 112) = keep;
+    return r;
+}
+static void mb_pk_pdestroy(void *b, void *player, MPos *pos, int data) {   /* playerDestroy: drops / xp of this data */
+    mb_ctx_data = data;
+    mb_base_pdestroy(b, player, pos, data);
+    mb_ctx_data = -1;
+}
+static ModBlock *mb_pk_by_item(char *it, char *ii) {
+    int id = *(unsigned short *)(it + 0x12), aux = ii ? *(short *)(ii + 2) : 0;
+    if (id <= 0 || id >= 256 || !mblock_packed[id] || aux < 0 || aux > 15) return 0;
+    return mblock_sub[id][aux];
+}
+static void *(*mb_base_item_desc)(void *out, void *it, void *ii);
+static void *mb_pk_item_desc(void *out, char *it, char *ii) {        /* the name of this data */
+    ModBlock *m = mb_pk_by_item(it, ii);
+    if (!m) return mb_base_item_desc(out, it, ii);
+    gstr(out, m->title[0] ? m->title : m->name);
+    return out;
+}
+static int mb_pk_level_data(void *it, int aux) { return aux & 15; }  /* getLevelDataForAuxValue: placed with its data */
+
 static void mcmod_register_blocks(void) {
     if (mblocks_done || !mblock_count) return;
     mblocks_done = 1;
@@ -580,10 +657,21 @@ static void mcmod_register_blocks(void) {
         mb_vtable[2 + 63] = (u32)mb_drop_xp;                /* getExperienceDrop */
         mb_vtable[2 + 107] = (u32)mb_drop_aux;              /* getSpawnResourcesAuxValue */
     }
+    mb_pk_vtable = f_new(VT_BLOCK_WORDS * 4);
+    for (int i = 0; i < VT_BLOCK_WORDS; i++) mb_pk_vtable[i] = mb_vtable[i];
+    *(u32 *)&mb_base_progress = base[2 + 51];
+    *(u32 *)&mb_base_pdestroy = base[2 + 61];
+    mb_pk_vtable[2 + 51] = (u32)mb_pk_progress;
+    mb_pk_vtable[2 + 61] = (u32)mb_pk_pdestroy;
     int done = 0;
     for (int i = 0; i < mblock_count; i++) {
         ModBlock *m = &mblocks[i];
         if (m->special >= 10) continue;                      /* 0.15 blocks (v015.inc) are made there */
+        if (m->pdata >= 0 && mblock_of[m->id] && mblock_of[m->id]->block) {   /* one more data of a shared number */
+            m->block = mblock_of[m->id]->block;
+            done++;
+            continue;
+        }
         if (mf_blocks[m->id] && mf_items[m->id]) { LOGE("mcmod: block id %d is taken, %s skipped", m->id, m->name); continue; }
         void *from = m->matfrom > 0 && m->matfrom < 256 ? mf_blocks[m->matfrom] : 0;
         if (!from) from = mf_blocks[1];
@@ -596,6 +684,7 @@ static void mcmod_register_blocks(void) {
         mf_block_ctor(b, nm, m->id, mat);
         u32 *vt = m->rs ? mb_rs_vtable(m) : 0;
         if (m->rs && !vt) LOGE("mcmod: redstone of %s unavailable", m->name);
+        if (m->pdata >= 0) vt = mb_pk_vtable;
         *(u32 *)b = (u32)((vt ? vt : mb_vtable) + 2);
         mblock_of[m->id] = m;
         m->block = b;
@@ -622,6 +711,18 @@ static void mcmod_register_blocks(void) {
         f_strdtor(nm);
         mf_items[m->id] = it;
         if (mf_item_setcat) mf_item_setcat(it, m->kind == 1 ? 2 : 1);
+        if (m->pdata >= 0) {                                  /* an item per data, placed with that data */
+            if (!mb_pk_item_vt) {
+                u32 *vp = *(u32 **)it;
+                mb_pk_item_vt = f_new(64 * 4);
+                for (int k = 0; k < 64; k++) mb_pk_item_vt[k] = (vp - 2)[k];
+                *(u32 *)&mb_base_item_desc = mb_pk_item_vt[2 + 40];
+                mb_pk_item_vt[2 + 40] = (u32)mb_pk_item_desc;
+                mb_pk_item_vt[2 + 13] = (u32)mb_pk_level_data;
+            }
+            *(u32 **)it = mb_pk_item_vt + 2;
+            ((void (*)(void *, int))(mb_pk_item_vt[2 + 6]))(it, 1);   /* setStackedByData(true) */
+        }
         done++;
     }
     LOG("mcmod: %d block(s) registered", done);
@@ -641,7 +742,7 @@ static void h_init_creative(void) {
     mcmod_register_blocks();
     for (int i = 0; i < mblock_count; i++)
         if (mblocks[i].block && mf_add_creative && mblocks[i].rs != 3 && mblocks[i].special != 4 && mblocks[i].special < 10 &&
-            !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, 0);   /* not lit lamps; 0.15 blocks: v15_creative */
+            !ct_has(mblocks[i].id)) mf_add_creative((short)mblocks[i].id, (short)(mblocks[i].pdata > 0 ? mblocks[i].pdata : 0));   /* not lit lamps; 0.15 blocks: v15_creative */
     mcmod_register_items();
     /* mod blocks and items first in every creative tab (ItemInstance = 20 bytes, moved bitwise) */
     if (list) {
@@ -784,14 +885,15 @@ static void mb_emit(void *t, ModBlock *m, float px, float py, float pz, float br
 }
 
 static void v15_model(ModBlock *m, int data);
-static ModBlock *mb_model_of_id(int id) {
+static ModBlock *mb_model_of_id(int id, int data) {
     ModBlock *m = (id > 0 && id < 256) ? mblock_of[id] : 0;
+    if (m && mblock_packed[id] && data >= 0 && data < 16 && mblock_sub[id][data]) m = mblock_sub[id][data];
     return m && m->kind == 1 && m->block && m->ncubes ? m : 0;
 }
 
 static int (*o_tess)(void *bt, void *block, MPos *pos, unsigned char data, int b);
 static int h_tess(void *bt, void *block, MPos *pos, unsigned char data, int b) {
-    ModBlock *m = block ? mblock_of[*((unsigned char *)block + 4)] : 0;
+    ModBlock *m = block ? mb_of(block, data) : 0;
     if (!m || m->kind != 1 || m->block != block) return o_tess(bt, block, pos, data, b);
     void *t = *(void **)((char *)bt + 0x2cc);
     if (!t || !mf_tess_color || !mf_tess_vertex || !mf_bt_light || !mf_touv || !mf_tex1) return o_tess(bt, block, pos, data, b);
@@ -805,7 +907,7 @@ static int h_tess(void *bt, void *block, MPos *pos, unsigned char data, int b) {
 /* item in hand / dropped item mesh: like the anvil branch of appendTessellatedBlock */
 static void (*o_append)(void *bt, unsigned char *fb);
 static void h_append(void *bt, unsigned char *fb) {
-    ModBlock *m = fb ? mb_model_of_id(fb[0]) : 0;
+    ModBlock *m = fb ? mb_model_of_id(fb[0], fb[1]) : 0;
     if (m && m->special >= 10) v15_model(m, fb[1] ? fb[1] : 1);   /* an item (data 0): the piston points up */
     void *t = *(void **)((char *)bt + 0x2cc);
     if (!m || !t || !mf_tess_addoff) { o_append(bt, fb); return; }
@@ -820,7 +922,7 @@ static void h_append(void *bt, unsigned char *fb) {
 /* inventory icon: like the anvil branch of renderGuiBlock (begin, tessellate at 0..1, draw with the bt material) */
 static void (*o_gui)(void *bt, unsigned char *fb, void *tex, float bright, float alpha);
 static void h_gui(void *bt, unsigned char *fb, void *tex, float bright, float alpha) {
-    ModBlock *m = fb ? mb_model_of_id(fb[0]) : 0;
+    ModBlock *m = fb ? mb_model_of_id(fb[0], fb[1]) : 0;
     void *t = *(void **)((char *)bt + 0x2cc);
     if (!m || !t || !mf_tess_begin || !mf_tess_draw || !mf_tess_instance) { o_gui(bt, fb, tex, bright, alpha); return; }
     if (m->special >= 10) v15_model(m, fb[1] ? fb[1] : 1);   /* the icon: a piston pointing up */
@@ -893,6 +995,7 @@ static void mcmod_init(void *mc, u32 base) {
     S(mf_plate_ctor, "_ZN18PressurePlateBlockC1ERKSsiS1_RK8MaterialNS_11SensitivityE");
     S(mf_door_ctor, "_ZN9DoorBlockC1ERKSsiRK8MaterialNS_8DoorTypeE");
     S(mf_texset, "_ZN5Block25getTextureUVCoordinateSetERKSsi");
+    S(mf_hit, "_ZN5Level12getHitResultEv");
     S(mf_bs_dim, "_ZN11BlockSource12getDimensionEv");
     S(mf_dim_circuit, "_ZN9Dimension16getCircuitSystemEv");
     S(mf_isclient, "_ZNK5Level12isClientSideEv");

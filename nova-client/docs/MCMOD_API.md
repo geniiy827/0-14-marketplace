@@ -18,6 +18,8 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `__hud(slot:str)` | - | в работе | внутреннее: ui.hud |
 | `__hudimg(slot:str)` | - | в работе | внутреннее: ui.image |
 | `__count(x1:num)` | list | в работе | внутреннее: world.count |
+| `__particle(type:num)` | - | в работе | внутреннее: world.particle |
+| `__sound(name:str)` | - | в работе | внутреннее: world.sound |
 
 ## chat
 
@@ -56,6 +58,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | функция | возвращает | статус | описание |
 |---|---|---|---|
 | `item.id(name:str)` | num | в работе | Номер предмета/блока по имени ("stone", "diamond_sword" или свой блок мода), -1 если нет |
+| `item.frame(item:item, frame:num)` | - | в работе | Кадр картинки предмета с frames: N (полоска кадров сверху вниз, как у часов/компаса) — у всех таких предметов сразу: в руке, инвентаре, сундуках |
 
 ## math
 
@@ -207,6 +210,8 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `world.raining()` | bool | в работе | Идёт дождь/снег (Weather::isRaining) |
 | `world.count(x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, ids:any)` | list | в работе | Сколько блоков каждого номера из ids (до 10) в коробке (до 65536 блоков): быстрый подсчёт в C |
 | `world.drop(x:num, y:num, z:num, item:item, count:num=1)` | bool | в работе | ХОСТ: выбросить предмет из блока (как выпадение при ломании), false у гостя |
+| `world.particle(type:any, x:num, y:num, z:num, vx:num=0, vy:num=0, vz:num=0, data:num=0)` | - | в работе | Частица только на этом телефоне: "smoke", "largesmoke", "flame", "lava", "cloud" или номер ParticleType 0.14 |
+| `world.sound(name:str, x:num, y:num, z:num, volume:num=1, pitch:num=1)` | - | в работе | Звук игры в точке, слышно на этом телефоне ("fire.fire", "fire.ignite", "random.fizz", "random.click"...) |
 
 ## События
 

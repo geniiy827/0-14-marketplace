@@ -814,6 +814,7 @@ static void mcmod_frame(void *client);
 static void net_frame(void *client);
 static void net_draw(void *client);
 static void hud_draw(void *client);
+static void flip_frame(void *client);
 static void (*o_client_update)(void *);
 static void h_client_update(void *client) {
     g_client = client;
@@ -911,6 +912,7 @@ static void draw_text_col(void *font, float x, float y, const char *txt, float *
 
 static void draw_toast(void *client) {
     net_draw(client);
+    flip_frame(client);
     hud_draw(client);
     if (!toast_on || !f_fill || !f_sr || !f_guidata || !f_screenw) return;
     long now = now_ms();

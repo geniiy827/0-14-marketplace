@@ -21,6 +21,7 @@ public final class ModBridge {
     static native int nativeDefineBlocks(double[] data, String names);
     static native int nativeStructures(byte[] data);
     static native int nativeBlockExtra(double[] data);
+    static native int nativeBlockAnims(double[] data, String paths);
     static native int nativeCreativeTabs(String spec);
     static native int nativeArmorTextures(String spec);
     static native int nativeItemVariants(double[] data, String names);
@@ -173,6 +174,11 @@ public final class ModBridge {
                 mb.prepare(dirs);
                 if (mb.count > 0) {
                     try { nativeDefineBlocks(mb.data, mb.names); } catch (Throwable t) { Log.e(TAG, "native blocks", t); }
+                    if (!mb.animData.isEmpty()) {
+                        double[] ad = new double[mb.animData.size()];
+                        for (int i = 0; i < ad.length; i++) ad[i] = mb.animData.get(i);
+                        try { nativeBlockAnims(ad, mb.animPaths.toString()); } catch (Throwable t) { Log.e(TAG, "block animations", t); }
+                    }
                 }
                 blocks = mb;
                 ModItems mi = new ModItems(c, rt);

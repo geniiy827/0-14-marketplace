@@ -89,35 +89,11 @@ item juice_pumpkin {
 }
 
 // ================================================================ температура (SimpleDifficulty): предметы
-item thermometers {
-    variants: [
-        {name: "thermometer", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_00.png"},
-        {name: "thermometer_01", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_01.png"},
-        {name: "thermometer_02", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_02.png"},
-        {name: "thermometer_03", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_03.png"},
-        {name: "thermometer_04", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_04.png"},
-        {name: "thermometer_05", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_05.png"},
-        {name: "thermometer_06", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_06.png"},
-        {name: "thermometer_07", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_07.png"},
-        {name: "thermometer_08", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_08.png"},
-        {name: "thermometer_09", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_09.png"},
-        {name: "thermometer_10", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_10.png"},
-        {name: "thermometer_11", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_11.png"},
-        {name: "thermometer_12", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_12.png"},
-        {name: "thermometer_13", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_13.png"},
-        {name: "thermometer_14", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_14.png"},
-        {name: "thermometer_15", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_15.png"},
-        {name: "thermometer_16", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_16.png"},
-        {name: "thermometer_17", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_17.png"},
-        {name: "thermometer_18", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_18.png"},
-        {name: "thermometer_19", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_19.png"},
-        {name: "thermometer_20", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_20.png"},
-        {name: "thermometer_21", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_21.png"},
-        {name: "thermometer_22", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_22.png"},
-        {name: "thermometer_23", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_23.png"},
-        {name: "thermometer_24", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_24.png"},
-        {name: "thermometer_25", title: {ru: "Термометр", en: "Thermometer"}, texture: "textures/temperature/items/thermometer_25.png"}
-    ]
+// термометр как часы игры: одна картинка-полоска из 26 кадров, кадр = температура вокруг (item.frame)
+item thermometer {
+    name: {ru: "Термометр", en: "Thermometer"}
+    texture: "textures/temperature/items/thermometer.png"
+    frames: 26
 }
 item ice_chunk {
     name: {ru: "Ледяной осколок", en: "Ice Chunk"}
@@ -264,6 +240,7 @@ block chiller_on {
 }
 // костёр (BlockCampfire): возраст 0..7 в данных блока, модель по возрасту, горящий - свой блок (свет 15); ничего не выпадает
 block campfire {
+    data: true                          // возраст 0..7 в данных блока: свой номер
     name: {ru: "Костёр", en: "Campfire"}
     model: "models/campfire.bbmodel"
     hardness: 0.5
@@ -273,6 +250,7 @@ block campfire {
     drop: {item: "campfire", count: 0}
 }
 block campfire_lit {
+    data: true                          // возраст 0..7 в данных блока: свой номер
     name: {ru: "Костёр", en: "Campfire"}
     model: "models/campfire.bbmodel"
     hardness: 0.5
@@ -283,6 +261,7 @@ block campfire_lit {
     drop: {item: "campfire", count: 0}
 }
 block campfire_half {
+    data: true                          // возраст 0..7 в данных блока: свой номер
     name: {ru: "Костёр", en: "Campfire"}
     model: "models/campfire_half.bbmodel"
     hardness: 0.5
@@ -292,6 +271,7 @@ block campfire_half {
     drop: {item: "campfire", count: 0}
 }
 block campfire_half_lit {
+    data: true                          // возраст 0..7 в данных блока: свой номер
     name: {ru: "Костёр", en: "Campfire"}
     model: "models/campfire_half.bbmodel"
     hardness: 0.5
@@ -302,6 +282,7 @@ block campfire_half_lit {
     drop: {item: "campfire", count: 0}
 }
 block campfire_burnt {
+    data: true                          // возраст 0..7 в данных блока: свой номер
     name: {ru: "Костёр", en: "Campfire"}
     model: "models/campfire_burnt.bbmodel"
     hardness: 0.5
@@ -311,6 +292,7 @@ block campfire_burnt {
     drop: {item: "campfire", count: 0}
 }
 block campfire_burnt_lit {
+    data: true                          // возраст 0..7 в данных блока: свой номер
     name: {ru: "Костёр", en: "Campfire"}
     model: "models/campfire_burnt.bbmodel"
     hardness: 0.5
@@ -323,7 +305,8 @@ block campfire_burnt_lit {
 // блок магмы из 1.10 (в 0.14 его нет, а из него SimpleDifficulty берёт огненные осколки): Ад, высоты 27..36
 block magma {
     name: {ru: "Блок магмы", en: "Magma Block"}
-    texture: "textures/temperature/blocks/magma.png"
+    texture: "textures/temperature/blocks/magma.png"       // полоска из 3 кадров: переливается, как в Java
+    frametime: 8
     hardness: 0.5
     sound: "stone"
     light: 3
@@ -774,6 +757,7 @@ var startArrow = false
 var shakeSide = false
 var worldTemp = 12                // для термометра (температура мира без игрока)
 var hasTherm = false
+var thermFrame = -1
 var hudCache = {}                 // slot -> что сейчас показано (не дёргать ui.image зря)
 var machines = []                 // [x, y, z] нагревателей, охладителей и костров (ведёт хост, рассылает всем)
 var machinesKey = ""
@@ -1034,6 +1018,42 @@ fn tempHud() {
     }
 }
 
+// ---------------------------------------------------------------- костёр: пламя и треск (BlockCampfire.randomDisplayTick)
+fn axisNear(d, r) { return math.max(0, 1 - math.abs(d) / r) }
+
+fn campfireFx() {
+    var p = player.pos()
+    for m in machines {
+        var dx = m[0] + 0.5 - p.x
+        var dy = m[1] + 0.5 - p.y
+        var dz = m[2] + 0.5 - p.z
+        if math.abs(dx) > 32 or math.abs(dy) > 32 or math.abs(dz) > 32 { continue }
+        // как часто клиент Java вызывает randomDisplayTick у блока: 667 точек у игрока (радиус 16 и 32)
+        var ch = 0.163 * axisNear(dx, 16) * axisNear(dy, 16) * axisNear(dz, 16) + 0.02 * axisNear(dx, 32) * axisNear(dy, 32) * axisNear(dz, 32)
+        if not math.chance(ch) { continue }
+        var b = world.block(m[0], m[1], m[2])
+        if not CAMPFIRES_LIT.contains(b) { continue }
+        var age = world.data(m[0], m[1], m[2])
+        if math.rand(0, 1) < 1 - age / 7 {
+            var n = math.randInt(1, 6)
+            while n > 0 {
+                var yo = math.rand(0, 1) * 0.35 + 0.35            // пирамида пламени
+                var adj = (0.7 - yo) * 2.28571428
+                world.particle("flame", m[0] + (math.rand(0, 1) - 0.5) * adj + 0.5, m[1] + yo, m[2] + (math.rand(0, 1) - 0.5) * adj + 0.5,
+                               0, math.rand(0, 1) * 0.015 + 0.005, 0)
+                n -= 1
+            }
+        }
+        if math.randInt(0, 29) == 0 { world.sound("fire.fire", m[0] + 0.5, m[1] + 0.5, m[2] + 0.5, 0.5, 1) }
+    }
+}
+
+fn campfireExtinguishFx(x, y, z) {   // effectExtinguish: шипение и 5 клубов дыма
+    world.sound("random.fizz", x + 0.5, y + 0.5, z + 0.5, 1, 1)
+    world.particle("largesmoke", x + 0.5, y + 0.25, z + 0.5, 0, 0.1, 0)
+    for o in [[0.75, 0.75], [0.75, 0.25], [0.25, 0.75], [0.25, 0.25]] { world.particle("largesmoke", x + o[0], y + 0.25, z + o[1], 0, 0.05, 0) }
+}
+
 // ---------------------------------------------------------------- такт температуры (TemperatureCapability.tickUpdate)
 fn tickLimit() {
     var range = math.abs(temp - target)
@@ -1073,9 +1093,10 @@ fn temperatureTick() {
         hasTherm = player.has(thermometer)
         var p = player.pos()
         worldTemp = clampT(int(worldTemperature(math.floor(p.x), math.floor(p.y + 0.5), math.floor(p.z))))
-        if player.item() % 65536 == thermometer % 65536 and hand() != 0 { mem.setShort(hand() + 2, worldTemp) }   // стрелка термометра
+        if worldTemp != thermFrame { thermFrame = worldTemp; item.frame(thermometer, worldTemp) }    // стрелка термометра
     }
     tempHud()
+    campfireFx()
     // блок магмы жжёт ноги (BlockMagma.onEntityWalk), если не присесть
     if tickN % 10 == 0 and not player.sneaking() and player.onGround() {
         if world.block(f[0], f[1] - 1, f[2]) == magma { host.send("hot_floor") }
@@ -1133,7 +1154,10 @@ fn hostTick() {
         if not CAMPFIRES_LIT.contains(b) { continue }
         if math.randInt(0, 4095) < 3 {
             var age = world.data(m[0], m[1], m[2])
-            if world.rainingAt(m[0], m[1] + 1, m[2]) { world.setBlock(m[0], m[1], m[2], campfireBlock(age, false), age) }
+            if world.rainingAt(m[0], m[1] + 1, m[2]) {
+                world.setBlock(m[0], m[1], m[2], campfireBlock(age, false), age)
+                players.sendAll("cf_fx", [m[0], m[1], m[2]])
+            }
             else if math.randInt(0, 1) == 0 {
                 age += 1
                 if age >= 7 { world.setBlock(m[0], m[1], m[2], campfireBlock(7, false), 7) }
@@ -1211,6 +1235,7 @@ on host.receive(e) {
 
 on client.receive(e) {
     if e.channel == "machines" and e.data != null { machines = e.data }
+    if e.channel == "cf_fx" and e.data != null { campfireExtinguishFx(e.data[0], e.data[1], e.data[2]) }
 }
 
 on players.join(e) { players.send(e.player, "machines", machines) }
@@ -1254,6 +1279,7 @@ on block.use(e) {
             }
             if id == 259 {
                 e.cancel()
+                world.sound("fire.ignite", e.x + 0.5, e.y + 0.5, e.z + 0.5, 1, math.rand(0, 1) * 0.4 + 0.8)
                 host.send("cf", [e.x, e.y, e.z, "flint"])
                 if not creative() { mc.call("ItemInstance::hurtAndBreak(int, Mob*)", hand(), 1, mc.player()) }
                 return
@@ -1350,6 +1376,7 @@ on world.join(e) {
     oldTemp = -1
     arrowFrame = -1
     hudCache = {}
+    thermFrame = -1
     pendingPlace = []
     machines = []
     if host.isMe() { machines = data.load(machinesKey, []) }

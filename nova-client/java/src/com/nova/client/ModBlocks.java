@@ -176,12 +176,19 @@ final class ModBlocks {
             try {
                 File dir = modDirs.get(m.id);
                 String key = m.id + ":" + name;
-                int id = pickId(ids, key, p.get("id"));
-                if (id < 0) throw new Exception("закончились свободные номера блоков (" + POOL.length + "; выключи лишние моды с блоками)");
-                List<Double> one = new ArrayList<Double>();
                 String type = p.get("type") == null ? "" : String.valueOf(p.get("type"));
                 int ti = java.util.Arrays.asList(TYPES).indexOf(type);
                 if (ti < 0) throw new Exception("type: \"stairs\", \"bars\", \"pressure_plate\" или \"door\"");
+                // plain blocks share a number, one per data value (0..15): see packKey
+                String pk = ti == 0 ? packKey(m.id, p) : null;
+                int pdata = -1, id;
+                if (pk != null) {
+                    int[] slot = packSlot(ids, pk, key);
+                    id = slot[0];
+                    pdata = slot[1];
+                } else id = pickId(ids, key, p.get("id"));
+                if (id < 0) throw new Exception("закончились свободные номера блоков (" + POOL.length + " номеров по 16 простых блоков; выключи лишние моды с блоками)");
+                List<Double> one = new ArrayList<Double>();
                 if (ti == 4 && p.get("texture") == null && p.get("textures") instanceof Map) {
                     Object lo = ((Map<?, ?>) p.get("textures")).get("lower");
                     if (lo != null) { p = new java.util.HashMap<String, Object>(p); p.remove("textures"); p.put("texture", lo); }
@@ -192,7 +199,10 @@ final class ModBlocks {
                             p = new java.util.HashMap<String, Object>(p); p.put("texture", ((Map<?, ?>) bd[2]).get("texture"));
                         }
                 }
+                animMod = m.id;
+                animTicks = (int) Math.max(1, Math.min(200, num(p.get("frametime"), 1)));
                 build(one, dir, id, p);
+                animMod = null;
                 if (ti > 0) {
                     double a = 0, b2 = 0;
                     String t0 = "", t1 = "";
@@ -230,15 +240,19 @@ final class ModBlocks {
                     if (on != null) rsRefs.add(new Object[]{out.size() + one.size() - 2, m.id + ":" + on, m, line});
                     if (off != null) rsRefs.add(new Object[]{out.size() + one.size() - 1, m.id + ":" + off, m, line});
                 }
+                one.add((double) pdata);
                 out.addAll(one);
                 String internal = (m.id + "_" + name).toLowerCase(Locale.US).replaceAll("[^a-z0-9_]", "_");
                 if (nm.length() > 0) nm.append('\u001f');
                 nm.append(internal);
                 String display = text(p.get("name"), name);
+                if (pdata >= 0) nm.append('\u001e').append(display.replace('\u001f', ' ').replace('\u001e', ' '));
                 lang.put("tile." + internal + ".name", display);
                 lang.put("item." + internal + ".name", display);
-                idsOut.put(key, (double) id);
-                idsOut.put(name.toLowerCase(Locale.US), (double) id);
+                double code = id + (pdata > 0 ? 65536.0 * pdata : 0);  // a packed block: number + 65536 * data
+                idsOut.put(key, code);
+                idsOut.put(name.toLowerCase(Locale.US), code);
+                if (pdata >= 0) { packedIds.add(id); rt.blockCarriers.add(id); rt.carriers.add(id); }
                 rt.customIds.putAll(idsOut);
                 count++;
             } catch (Exception e) {
@@ -395,6 +409,13 @@ final class ModBlocks {
         return new float[]{(float) r[0] / ATLAS_W, (float) r[1] / ATLAS_H, (float) (r[0] + r[2]) / ATLAS_W, (float) (r[1] + r[3]) / ATLAS_H};
     }
 
+    // animated textures (a vertical strip of square frames, like Java + .mcmeta): the atlas gets frame 0,
+    // libnova plays the strip with the game's FlipbookTexture (like still lava / water in 0.14)
+    final List<Double> animData = new ArrayList<Double>();     // x, y, w, h (atlas base px), ticks per frame
+    final StringBuilder animPaths = new StringBuilder();       // "nova/mod/<id>/<file>" separated by \u001f
+    private String animMod;
+    private int animTicks = 1;
+
     /** places an image into the atlas strip once; returns x, y, w, h (base pixels) */
     private int[] pack(File dir, String ref, byte[] png) throws Exception {
         String key = (dir == null ? "" : dir.getPath()) + "|" + ref;
@@ -420,6 +441,8 @@ final class ModBlocks {
             bm = t;
         }
         int w = bm.getWidth(), h = bm.getHeight();
+        boolean anim = !edge && animMod != null && dir != null && w > 0 && h > w && h % w == 0 && !ref.startsWith("bbmodel");
+        if (anim) { bm = Bitmap.createBitmap(bm, 0, 0, w, w); h = w; }
         if (w > 256 || h > 256) {
             double k = 256.0 / Math.max(w, h);
             w = Math.max(1, (int) (w * k));
@@ -435,6 +458,14 @@ final class ModBlocks {
         shelfH = Math.max(shelfH, h);
         int[] r = {e.x, e.y, w, h};
         packed.put(key, r);
+        if (anim) {
+            animData.add((double) e.x); animData.add((double) e.y); animData.add((double) w); animData.add((double) h);
+            animData.add((double) animTicks);
+            if (animPaths.length() > 0) animPaths.append('\u001f');
+            String rp = ref.replace('\\', '/');
+            if (rp.startsWith("/")) rp = rp.substring(1);
+            animPaths.append("nova/mod/").append(animMod).append('/').append(rp);
+        }
         return r;
     }
 
@@ -659,6 +690,70 @@ final class ModBlocks {
     }
 
     private final java.util.Set<Integer> usedNow = new java.util.HashSet<Integer>();
+    final java.util.Set<Integer> packedIds = new java.util.HashSet<Integer>();
+
+    /** Plain blocks that may share a number: the game keeps light, sound (material), solidity, render layer and the
+     *  cube shape per number, so blocks with the same of these share one; textures, models, boxes, hardness, harvest,
+     *  drops, ore and the name go per data. A block that keeps its own data (world.data / setBlock with data, like a
+     *  campfire's age) says data: true; redstone and id: N also keep their own number. */
+    private static String packKey(String mod, Map<String, Object> p) {
+        if (Boolean.TRUE.equals(p.get("data")) || p.get("redstone") != null || p.get("id") != null) return null;
+        boolean model = p.get("model") != null;
+        boolean transparent = Boolean.TRUE.equals(p.get("transparent"));
+        Object col = p.get("collision");
+        String box = p.get("box") instanceof List ? String.valueOf(p.get("box")) : "";
+        boolean full = box.isEmpty();
+        boolean solid = !model && !transparent && full && (col == null || "full".equals(col));
+        return mod + "|" + (model ? "m" : "c") + "|" + solid + "|" + transparent + "|" + (int) num(p.get("light"), 0)
+                + "|" + soundBlock(p.get("sound")) + "|" + box;
+    }
+
+    private final Map<String, int[]> packOpen = new HashMap<String, int[]>();   // "pack:<key>#k" -> {number, used data mask}
+
+    private int[] packCarrier(Map<String, Integer> ids, String ck) {
+        int[] c = packOpen.get(ck);
+        if (c != null) return c;
+        int n = pickId(ids, ck, null);
+        if (n < 0) return null;
+        c = new int[]{n, 0};
+        packOpen.put(ck, c);
+        return c;
+    }
+
+    /** {number, data} of a packed block; kept in the id file: "pack:<key>#k" -> number, "pdn:" / "data:" + block */
+    private int[] packSlot(Map<String, Integer> ids, String pk, String key) {
+        Integer sn = ids.get("pdn:" + key), sd = ids.get("data:" + key);
+        if (sn != null && sd != null && sd >= 0 && sd < 16) {            // the same number and data as last time
+            for (int k = 0; k < 64; k++) {
+                Integer n = ids.get("pack:" + pk + "#" + k);
+                if (n == null || !n.equals(sn)) continue;
+                int[] c = packCarrier(ids, "pack:" + pk + "#" + k);
+                if (c != null && c[0] == sn && (c[1] & (1 << sd)) == 0) { c[1] |= 1 << sd; return new int[]{c[0], sd}; }
+            }
+        }
+        for (int k = 0; k < 64; k++) {
+            int[] c = packCarrier(ids, "pack:" + pk + "#" + k);
+            if (c == null) break;
+            for (int dt = 0; dt < 16; dt++) {
+                if ((c[1] & (1 << dt)) != 0 || reservedData(ids, c[0], dt, key)) continue;
+                c[1] |= 1 << dt;
+                ids.put("data:" + key, dt);
+                ids.put("pdn:" + key, c[0]);
+                return new int[]{c[0], dt};
+            }
+        }
+        return new int[]{-1, -1};
+    }
+
+    /** a data value another block of this shared number had last time (a world may hold it) */
+    private static boolean reservedData(Map<String, Integer> ids, int num, int dt, String self) {
+        for (Map.Entry<String, Integer> e : ids.entrySet()) {
+            if (!e.getKey().startsWith("data:") || e.getKey().equals("data:" + self) || e.getValue() != dt) continue;
+            Integer n = ids.get("pdn:" + e.getKey().substring(5));
+            if (n != null && n == num) return true;
+        }
+        return false;
+    }
 
     private int pickId(Map<String, Integer> ids, String key, Object want) {
         if (want instanceof Double) {

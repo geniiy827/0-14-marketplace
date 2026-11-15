@@ -61,6 +61,8 @@ public final class ModRuntime {
     public final Map<String, Double> customIds = new HashMap<String, Double>();
     /** numbers of items by data (variants, packed plain items): for scripts such an item is number + 65536 * data */
     public final java.util.Set<Integer> carriers = new java.util.HashSet<Integer>();
+    /** block numbers shared by several plain mod blocks (one per data): world.block / events say number + 65536 * data */
+    public final java.util.Set<Integer> blockCarriers = new java.util.HashSet<Integer>();
     /** what a script sees for the item (id, data) */
     public double itemCode(double id, double data) {
         return carriers.contains((int) id) ? id + 65536.0 * (((int) data) & 0x7fff) : id;
@@ -237,6 +239,12 @@ public final class ModRuntime {
                     if (r instanceof Double && !carriers.isEmpty() && name.equals("player.item") && carriers.contains((int) (double) (Double) r)) {
                         double[] st = host.nativeApi(op, new double[0], "");            // PLAYER_STATE: [.., item, itemData]
                         if (st != null && st.length > 3) return itemCode((Double) r, st[3]);
+                    }
+                    if (r instanceof Double && !blockCarriers.isEmpty() && name.equals("world.block") && blockCarriers.contains((int) (double) (Double) r)) {
+                        double[] nums = new double[3];                                  // WORLD_BLOCK: [id, data]
+                        for (int i = 0; i < 3; i++) nums[i] = Interp.num(a.get(i), line);
+                        double[] st = host.nativeApi(op, nums, "");
+                        if (st != null && st.length > 1) return (Double) r + 65536.0 * (((int) st[1]) & 15);
                     }
                     return r;
                 }
@@ -530,6 +538,28 @@ public final class ModRuntime {
                 for (int i = 0; i < il.size(); i++) out.add(i < r.length ? r[i] : 0.0);
                 return out;
             }
+            case "world.particle": {             // -> env.inc: Level::addParticle (ParticleType of 0.14: torch = smoke 3 + flame 6)
+                Object t = a.get(0);
+                double type;
+                if (t instanceof Double) type = (Double) t;
+                else {
+                    String tn = Interp.str(t);
+                    if (tn.equals("smoke")) type = 3; else if (tn.equals("cloud")) type = 4; else if (tn.equals("largesmoke")) type = 5;
+                    else if (tn.equals("flame")) type = 6; else if (tn.equals("lava")) type = 7;
+                    else throw new ScriptError("world.particle: \"smoke\", \"largesmoke\", \"flame\", \"lava\", \"cloud\" или номер", line);
+                }
+                double[] nums = new double[8];
+                nums[0] = type;
+                for (int i = 1; i < 8; i++) nums[i] = Interp.num(a.get(i), line);
+                host.nativeApi(ApiOps.WORLD_PARTICLE, nums, "");
+                return null;
+            }
+            case "world.sound": {
+                double[] nums = new double[5];
+                for (int i = 0; i < 5; i++) nums[i] = Interp.num(a.get(i + 1), line);
+                host.nativeApi(ApiOps.WORLD_SOUND, nums, Interp.str(a.get(0)));
+                return null;
+            }
             case "players.fire":
                 return host.nativeApiStr(1012, new double[]{Interp.num(a.get(1), line)}, netName(a.get(0))) != null;
             case "data.save": {
@@ -704,6 +734,11 @@ public final class ModRuntime {
             }
         }
 
+        if (!blockCarriers.isEmpty() && e.get("block") instanceof Double && blockCarriers.contains((int) (double) (Double) e.get("block"))) {
+            Object bd = e.get("data");                     // a packed block: e.block is the number scripts know it by
+            int dv = bd instanceof Double ? ((int) (double) (Double) bd) & 15 : 0;
+            e.put("block", (Double) e.get("block") + 65536.0 * dv);
+        }
         if (!carriers.isEmpty() && e.get("item") instanceof Double && carriers.contains((int) (double) (Double) e.get("item"))) {
             Object dv = e.get("itemData");                  // items by data: e.item is the same number scripts know them by
             double data = dv instanceof Double ? (Double) dv : 0;

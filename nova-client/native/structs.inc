@@ -348,7 +348,7 @@ static int st_any_ores(void) {
     return 0;
 }
 static float st_rf(u32 *h) { *h = *h * 1664525u + 1013904223u; return (*h >> 8) * (1.f / 16777216.f); }
-static void st_vein(void *bs, int id, int in, int size, int x, int y, int z, u32 *h) {
+static void st_vein(void *bs, int id, int data, int in, int size, int x, int y, int z, u32 *h) {
     float a = st_rf(h) * 3.14159265f;
     float sa = sinf(a) * size / 8.f, ca = cosf(a) * size / 8.f;
     float x0 = x + sa, x1 = x - sa, z0 = z + ca, z1 = z - ca;
@@ -371,7 +371,7 @@ static void st_vein(void *bs, int id, int in, int size, int x, int y, int z, u32
                 for (int zz = az; zz <= bz; zz++) {
                     float dz = (zz + .5f - czf) / rad;
                     if (dx * dx + dy * dy + dz * dz >= 1.f) continue;
-                    if (st_get(bs, xx, yy, zz) == in) st_set(bs, xx, yy, zz, id, 0);
+                    if (st_get(bs, xx, yy, zz) == in) st_set(bs, xx, yy, zz, id, data);
                 }
             }
         }
@@ -383,13 +383,13 @@ static void st_ores(void *bs, int cx, int cz, u32 seed, int nether) {
         if (m->ore_count <= 0 || !m->block) continue;
         int in = m->ore_in > 0 ? m->ore_in : 1;
         if ((in == 87) != nether) continue;
-        u32 h = st_hash(seed ^ 0x0BE5u, (u32)cx * 31u + (u32)m->id, (u32)cz);
+        u32 h = st_hash(seed ^ 0x0BE5u, (u32)cx * 31u + (u32)m->id + (u32)(m->pdata > 0 ? m->pdata * 977 : 0), (u32)cz);
         int lo = m->ore_min < 1 ? 1 : m->ore_min, hi = m->ore_max > 126 ? 126 : m->ore_max;
         if (hi < lo) continue;
         for (int c = 0; c < m->ore_count; c++) {
             int x = cx * 16 + (int)(st_rf(&h) * 16), z = cz * 16 + (int)(st_rf(&h) * 16);
             int y = lo + (int)(st_rf(&h) * (hi - lo + 1));
-            st_vein(bs, m->id, in, m->ore_size > 0 ? m->ore_size : 4, x, y, z, &h);
+            st_vein(bs, m->id, m->pdata > 0 ? m->pdata : 0, in, m->ore_size > 0 ? m->ore_size : 4, x, y, z, &h);
         }
     }
 }

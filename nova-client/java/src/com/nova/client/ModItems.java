@@ -148,8 +148,10 @@ final class ModItems {
                 if (tex == null && vars != null && !vars.isEmpty() && vars.get(0) instanceof Map) tex = ((Map<?, ?>) vars.get(0)).get("texture");
                 if (tex == null) throw new Exception("нужен texture: \"textures/....png\" или имя предмета игры");
                 boolean pixel = "pixel".equals(p.get("size"));
+                int strip = p.get("frames") instanceof Double ? (int) (double) (Double) p.get("frames") : 0;
+                if (strip > 64) throw new Exception("frames: не больше 64 кадров");
                 float[] uv = new float[4];
-                double handScale = icon(dir, String.valueOf(tex), pixel, uv);
+                double handScale = icon(dir, String.valueOf(tex) + (strip > 0 ? "#0" : ""), pixel, uv);
                 // real tools / armor of the game: tool: "pickaxe" | "axe" | "shovel" | "sword" | "hoe", tier: {...}
                 //                               armor: "helmet" | "chestplate" | "leggings" | "boots", defense, ...
                 String toolKind = p.get("tool") == null ? "" : String.valueOf(p.get("tool"));
@@ -175,6 +177,16 @@ final class ModItems {
                     Double db = rt.customIds.get(m.id + ":" + p.get("door"));
                     if (db == null) throw new Exception("door: блок-дверь этого мода (block .. { type: \"door\" })");
                     doorBlock = db;
+                }
+                if (strip > 0) {                               // like the clock: one picture-strip, the script picks the frame
+                    for (int k = 0; k < strip; k++) {
+                        float[] fuv = new float[4];
+                        icon(dir, String.valueOf(tex) + "#" + k, pixel, fuv);
+                        varData.add((double) id); varData.add(2000.0 + k);
+                        for (float f : fuv) varData.add((double) f);
+                        if (varNames.length() > 0) varNames.append('\u001f');
+                        varNames.append(text(p.get("name"), name).replace('\u001f', ' '));
+                    }
                 }
                 if (p.get("frames") instanceof List) {         // bow: 3 pulling pictures; bucket: empty, water, lava, milk
                     List<?> fr = (List<?>) p.get("frames");
@@ -302,13 +314,22 @@ final class ModItems {
             }
             throw new Exception("нет текстуры предмета \"" + ref + "\" в игре");
         }
-        byte[] png = find(dir, ref);
-        if (png == null) throw new Exception("нет картинки " + ref);
+        int frame = -1;                                   // "strip.png#k": frame k of a vertical strip (frames: N)
+        String file = ref;
+        int hash = ref.lastIndexOf('#');
+        if (hash > 0) { frame = Integer.parseInt(ref.substring(hash + 1)); file = ref.substring(0, hash); }
+        byte[] png = find(dir, file);
+        if (png == null) throw new Exception("нет картинки " + file);
         BitmapFactory.Options op = new BitmapFactory.Options();
         op.inPremultiplied = false;
         Bitmap bm = BitmapFactory.decodeByteArray(png, 0, png.length, op);
-        if (bm == null) throw new Exception("не удалось прочитать картинку " + ref);
+        if (bm == null) throw new Exception("не удалось прочитать картинку " + file);
         int w = bm.getWidth(), h = bm.getHeight();
+        if (frame >= 0) {
+            if (h < w * (frame + 1)) throw new Exception("картинка " + file + ": нужна полоска кадров " + w + "x" + w + " сверху вниз (кадр " + frame + " не помещается)");
+            bm = Bitmap.createBitmap(bm, 0, frame * w, w, w);
+            h = w;
+        }
         if (w != h) throw new Exception("картинка " + ref + " должна быть квадратной (сейчас " + w + "x" + h + ")");
         if (w > 128) { bm = Bitmap.createScaledBitmap(bm, 128, 128, false); w = h = 128; }
         // footprint in base atlas pixels: hd = one item tile (16), pixel = the real size

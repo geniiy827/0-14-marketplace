@@ -1205,6 +1205,7 @@ __attribute__((constructor)) static void nova_init(void) {
     v015_init(mc);
     winter_init(mc);
     env_init(mc);
+    flip_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }

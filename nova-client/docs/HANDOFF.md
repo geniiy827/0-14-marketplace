@@ -114,7 +114,13 @@ hook "Mob::hurt" (self, src, dmg) { original() }    // перехват любо
 - Полный язык — `docs/MCMOD_SCRIPT.md`, все функции — `docs/MCMOD_API.md`, пример большой игры —
   `mcmod/examples/adventure_craft`.
 
-## 4. Где остановились (alpha41 выпущена)
+## 4. Где остановились (alpha42 выпущена)
+
+alpha42: упаковка простых блоков по данным (ModBlocks.packKey/packSlot, mcmod.inc mblock_sub/mb_of, ключи
+"pack:/pdn:/data:" в файле номеров), анимации блоков (FlipbookTexture), предметы с кадрами (item.frame),
+частицы/звуки, оверлей кожаной брони. Подробно — BACKLOG.
+
+### alpha41
 
 alpha41: температура SimpleDifficulty в Adventure Craft 0.4.0 (см. BACKLOG). Ассеты делает
 `tools/port_sd_temp.py <SimpleDifficulty> <Java textures> mcmod/examples/adventure_craft` (исходники SD:

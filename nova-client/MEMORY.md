@@ -276,3 +276,15 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   PotionBrewing::isIngredient; варка PotionBrewing::mix(sret, potion, ingredient) из BrewingStandBlockEntity::brew.
 - Сутки в 0.14 тоже 24000 тиков (Dimension::getTimeOfDay: 0x5dc0).
 - ui.image: hud.inc kind 1, слоты не освобождаются при "" (порядок рисования = порядок появления).
+
+## alpha42 (ноябрь 2026)
+- ItemRenderer::iconBlit — метод: w0 this, w1 TexturePtr*, w2 x, w3 y, w4 uv*, w5 16f, w6 16f, w7 ?, w8 1f,
+  w9 цвет ARGB (-1 = без окраски), w10 alpha, w11 foil. Все иконки GUI идут через него (renderGuiItemInChunk / New).
+- ClockItem/CompassItem: 64 TextureUVCoordinateSet (0x18 байт) с +0x40, getIcon(aux, frame, inInventory).
+  Item::getIcon: usat aux 0..15 -> TextureAtlasTextureItem[aux].
+- FlipbookTexture(TextureGroup&, uv, std::string file, int 1, int ticksPerFrame) + TextureGroup::addTickingTexture
+  (unique_ptr по указателю на слот); кадры = высота/ширина файла. MinecraftClient::init делает так лаву/воду/огонь.
+- ParticleType 0.14: 3 smoke, 4/5 cloud/largesmoke (один класс), 6 flame, 7 lava; Level::addParticle только на клиенте.
+- Block vt: 51 getDestroyProgress(Player&) (без позиции: данные берём из Level::getHitResult), 61 playerDestroy(.., data),
+  63 getExperienceDrop, 107 getSpawnResourcesAuxValue. Item vt: 13 getLevelDataForAuxValue, 40 buildDescriptionName.
+- Упакованные блоки: прочность подменяется на время getDestroyProgress (b+112), кирка / опыт — через mb_ctx_data.

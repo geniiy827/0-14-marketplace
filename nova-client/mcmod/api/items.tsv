@@ -1,2 +1,3 @@
 # item.* — номера предметов и блоков
 item.id	name:str	num	native:ITEM_ID	wip	Номер предмета/блока по имени ("stone", "diamond_sword" или свой блок мода), -1 если нет
+item.frame	item:item, frame:num	-	native:ITEM_FRAME	wip	Кадр картинки предмета с frames: N (полоска кадров сверху вниз, как у часов/компаса) — у всех таких предметов сразу: в руке, инвентаре, сундуках

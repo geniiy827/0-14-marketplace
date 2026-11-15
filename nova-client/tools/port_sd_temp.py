@@ -43,8 +43,10 @@ for e in ('hypothermia', 'hyperthermia', 'resist_cold', 'resist_heat'):   # 18x1
     save(c, 'effects', e + '.png')
 
 # ---------------------------------------------------------------- items and armor
+strip = Image.new('RGBA', (16, 16 * 26))           # like the clock: one picture, 26 frames top to bottom
 for t in range(26):
-    save(tex('items/thermometer_%02d.png' % t), 'items', 'thermometer_%02d.png' % t)
+    strip.paste(tex('items/thermometer_%02d.png' % t), (0, 16 * t))
+save(strip, 'items', 'thermometer.png')
 for n in ('ice_chunk', 'magma_chunk', 'wool_helmet', 'wool_chestplate', 'wool_leggings', 'wool_boots',
           'ice_helmet', 'ice_chestplate', 'ice_leggings', 'ice_boots'):
     save(tex('items/%s.png' % n), 'items', n + '.png')
@@ -70,7 +72,7 @@ def potion(color):                                       # vanilla bottle + liqu
 save(potion(0x8EF1FF), 'items', 'potion_cold_resist.png')    # PotionResistCold liquid color
 save(potion(0xFFCD72), 'items', 'potion_heat_resist.png')    # PotionResistHeat
 mag = Image.open(os.path.join(JT, 'block/magma.png')).convert('RGBA')
-save(mag.crop((0, 0, 16, 16)), 'blocks', 'magma.png')       # 1.10 magma block (not in 0.14): first animation frame
+save(mag, 'blocks', 'magma.png')       # 1.10 magma block (not in 0.14): the whole animation strip (frametime 8)
 
 # ---------------------------------------------------------------- Java block models -> .bbmodel
 
