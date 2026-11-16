@@ -113,7 +113,6 @@ static char *mm_second(char *s) {
     return p;
 }
 
-static int pt_op(int op, const double *a, int n, double *out, void *ent);   /* portals.inc */
 static int mm_op(int op, const double *a, int n, char *s, double *out) {
     char *pl = mm_player();
     void *bs = mm_region(pl);
@@ -139,8 +138,6 @@ static int mm_op(int op, const double *a, int n, char *s, double *out) {
         f_strdtor(st);
         return 0;
     }
-    case OP_PORTAL_ADD: case OP_PORTAL_REMOVE: case OP_PORTAL_CLEAR: case OP_PORTAL_RENDER: case OP_PORTAL_STATUS: case OP_PORTAL_DEBUG: case OP_PORTAL_REPORT:
-        return pt_op(op, a, n, out, pl);
     case OP_ITEM_ID: {
         if (!mf_item_lookup) return -1;
         gstr(st, s);
