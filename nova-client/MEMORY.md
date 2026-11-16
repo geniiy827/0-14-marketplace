@@ -411,3 +411,20 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   слой шляпы сверху (у старых 64x32 сплошная шляпа = нет шляпы), тёмная рамка 1 px. Native следит за выбранным скином
   (client+0x158 -> repo+0x2c Skin*, +0x14 тип 0 = свой, +0x10 путь) и перезагружает текстуру (tex_reload).
 - Интро летит в настоящий прямоугольник title_image: nativeInfo(11..14) (px), title_gate пишет его.
+
+## octa3: скин-паки Bedrock, фон виден, без музыки
+- Фон octa2 не рисовался (кроме градиента): четырёхугольники шли в обратном обходе и отсекались. Правильный порядок —
+  как ItemRenderer::iconBlit: (x0,y1)(x1,y1)(x1,y0)(x0,y0). Холмы теперь всегда одинаковые (mb_height: долина под луной),
+  ели в фиксированных местах (MB_TREES, доли ширины). Музыка удалена совсем (по просьбе).
+- Жёлтая надпись меньше: обёртка SplashTextRenderer::render (слот 5) ставит флаг, хук Font::drawTransformed умножает масштаб на 0.62.
+- Скин-паки (native/skinpacks.inc, java SkinPacks.java): встроенные паки игры убираются (в векторе repo+0x20 остаются только
+  type 0 = стандартный), паки пользователя добавляются через SkinPack/Skin конструкторы игры (тип пака 1, скин тип 1).
+  Импорт: любой путь через PackManager.importStream (Хранилище и «открыть с помощью» — ImportActivity, .mcpack добавлен в манифест):
+  если в архиве manifest.json с модулем skin_pack -> files/nova/skinpacks/<uuid>/, в Хранилище не попадает.
+  Текстуры "nova_skins/<id>/<file>" отдаёт Java (HD ужимаются до 64x64, 64x32 раскладываются в 64x64).
+  Имена из texts/ru_RU.lang (иначе en_US.lang): skinpack.<loc>, skin.<loc>.<name>; имя кладётся в Skin как текст.
+  Выбранный скин пака хранится в files/nova_skin_sel (хук SkinRepository::setSkin), возвращается на первом кадре меню.
+  ShowSkinPackScreen: кнопка «Восстановить» (+0xa0) = «Удалить» (lang), хук _buttonClicked (слот 67): убирает пак, метка
+  <id>.deleted (Java удаляет папку при старте), handleBackEvent; экран скинов обновляется сам (OptionsScreen::onFocusGained -> refreshSkins).
+  Без паков под заголовком «Наборы скинов» текст nova.skins.empty1/2 (хук SkinsPaneStandard::render, слот 3).
+- Лицо на «Скины»: для любого выбранного скина ("P:путь"), свой скин — "C:путь".

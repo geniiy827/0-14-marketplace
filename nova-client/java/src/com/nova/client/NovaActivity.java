@@ -88,6 +88,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     static native int nativeCloseNova();
     static native int nativeReloadTexture(String name);
     static native String nativeSkinPath();
+    static native int nativeSkinPacks(String text);
     static native int nativeToast(String title, String sub, int icon);
     static native int nativeCrashFile(String path);
     static native int nativeJoin(String ip, int port);
@@ -452,6 +453,11 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
                 src = super.getImageData(p, false);
                 if (src == null || src.length < 3) src = super.getImageData(p, true);
             }
+            if ((src == null || src.length < 3) && sp != null && sp.startsWith("P:")) {
+                String p = sp.substring(2);
+                src = getImageData(p.startsWith("nova_skins/") ? p : "images/" + p, true);
+                if (src == null || src.length < 3) src = getImageData(p, true);
+            }
             if (src == null || src.length < 3) src = getImageData("images/mob/steve.png", true);
             if (src == null || src.length < 3) src = getImageData("mob/steve.png", true);
         } catch (Throwable t) { Log.w(TAG, "skin face", t); }
@@ -695,6 +701,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
                 try { nativeSetVersion(playVersion); } catch (Throwable t) { Log.w(TAG, "version", t); }
                 Log.i(TAG, "plays as version 0." + playVersion);
                 try { nativeSetDataDir(getFilesDir().getAbsolutePath()); } catch (Throwable t) { Log.w(TAG, "data dir", t); }
+                try { nativeSkinPacks(SkinPacks.describeAll(this)); } catch (Throwable t) { Log.w(TAG, "skin packs", t); }
                 handleCrashReport();
                 byte[] mobs = entities.mobsJson();          // also collects per-face UVs
                 byte[] fuv = entities.faceUvBlob();
@@ -886,6 +893,10 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         String np = norm(path);
         if (np != null && np.endsWith("gui/nova/account.png")) {
             int[] px = accountIcon(path);
+            if (px != null) return px;
+        }
+        if (np != null && np.contains("nova_skins/")) {        // skins of skin packs (SkinPacks)
+            int[] px = SkinPacks.image(this, np);
             if (px != null) return px;
         }
         if (np != null && np.endsWith("gui/nova/skin_face.png")) {

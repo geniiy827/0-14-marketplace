@@ -140,7 +140,7 @@ enum { R_NONE, R_PACK_ON, R_PACK_DEL, R_NAME, R_SEED, R_SURV, R_CREAT, R_INF, R_
        R_MOBS, R_SPX, R_SPZ, R_CREATE, R_NEWTEX, R_IMPORT,
        R_ACC_TAG, R_ACC_PASS, R_ACC_PASS2, R_ACC_LOGIN, R_ACC_TOREG, R_ACC_REG, R_ACC_TOLOGIN, R_ACC_LOGOUT,
        R_FR_TAG, R_FR_SEND, R_FR_JOIN, R_FR_DEL, R_FR_ACCEPT, R_FR_DECLINE, R_FR_CANCEL,
-       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND, R_FR_MODS, R_NET_MODS, R_V015, R_MENUBG };
+       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND, R_FR_MODS, R_NET_MODS, R_V015 };
 
 static int nova_pending, nova_creating, nova_kind, nova_close, nova_ttl, nova_select = -1;
 static void *nova_screen;
@@ -533,38 +533,6 @@ static void *v015_option(void) {                       /* after newtex_option (t
     return o;
 }
 
-/* menu music (menubg.inc): on unless switched off, kept in files/nova_menubg */
-static int mb_on = 1, mb_loaded;
-static void mb_file(char *out, int n) {
-    int k = 0;
-    while (cfg_path[k] && k < n - 16) { out[k] = cfg_path[k]; k++; }
-    while (k > 0 && out[k - 1] != '/') k--;
-    const char *f = "nova_menumusic";
-    for (int i = 0; f[i]; i++) out[k++] = f[i];
-    out[k] = 0;
-}
-static void mb_load(void) {
-    if (mb_loaded || !cfg_path[0]) return;
-    mb_loaded = 1;
-    char path[300];
-    mb_file(path, sizeof path);
-    int fd = open(path, 0);
-    if (fd >= 0) { char c = '1'; if (read(fd, &c, 1) == 1) mb_on = c != '0'; close(fd); }
-}
-static void mb_save(void) {
-    if (!cfg_path[0]) return;
-    char path[300];
-    mb_file(path, sizeof path);
-    int fd = open(path, 01 | 0100 | 01000, 0644);
-    if (fd >= 0) { char c = mb_on ? '1' : '0'; write(fd, &c, 1); close(fd); }
-}
-static void *menubg_option(void) {                     /* after newtex_option (that one starts the list) */
-    mb_load();
-    OptObj *o = nopt_new(0, "nova.opt.menumusic", R_MENUBG);
-    nopt_val[nidx(o)] = mb_on;
-    return o;
-}
-
 static void options_closed(void *scr) {
     if (scr != last_screen) return;
     int tex = tex_want >= 0 ? tex_want : tex_active, ver = ver_want >= 0 ? ver_want : nova_version >= 15;
@@ -615,7 +583,6 @@ static void button_action(int i) {
 static void nopt_on_change(int i) {
     if (nopt_role[i] == R_NEWTEX) { tex_want = nopt_val[i]; return; }
     if (nopt_role[i] == R_V015) { ver_want = nopt_val[i]; return; }
-    if (nopt_role[i] == R_MENUBG) { mb_on = nopt_val[i]; mb_save(); return; }
     if (nopt_role[i] == R_NET_MAX) { netmax_caption(i); return; }
     if (nopt_button[i] && nova_kind != NOVA_ACCOUNT) { nopt_val[i] = 0; button_action(i); return; }
     if (nova_kind == NOVA_ACCOUNT && nopt_val[i]) {

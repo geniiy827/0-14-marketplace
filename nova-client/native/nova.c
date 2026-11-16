@@ -26,7 +26,7 @@ void free(void *);
 void *memset(void *, int, size_t);
 int memcmp(const void *, const void *, size_t);
 void *memcpy(void *, const void *, size_t); void *memmove(void *, const void *, size_t);
-float sinf(float), cosf(float), sqrtf(float), floorf(float), ceilf(float), fmodf(float, float), powf(float, float);
+float sinf(float), cosf(float), sqrtf(float), floorf(float), ceilf(float), fmodf(float, float), powf(float, float), expf(float);
 int __android_log_print(int, const char *, const char *, ...);
 int snprintf(char *, size_t, const char *, ...);
 struct timespec_ { long tv_sec; long tv_nsec; };
@@ -862,7 +862,6 @@ static void h_setbool(void *opts, void *opt, int v);
 static void *opt_chunks;
 static void *newtex_option(void);
 static void *v015_option(void);
-static void *menubg_option(void);
 static void *opt_sprint;
 static int last_pane_doll = -1;  /* doll toggle state the NOVA pane was built with */
 
@@ -954,7 +953,6 @@ static void *build_nova_pane(void *client) {
         void *g2 = f_cgroup(pane, str, 1);
         f_strdtor(str);
         f_ctoggle(g2, newtex_option(), client);
-        f_ctoggle(g2, menubg_option(), client);
     }
     last_pane_doll = doll | (f3 << 1);
     return pane;
@@ -1251,6 +1249,7 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "env.inc"
 #include "recipebook.inc"
 #include "dims.inc"
+#include "skinpacks.inc"
 #include "menubg.inc"
 
 __attribute__((constructor)) static void nova_init(void) {
@@ -1288,6 +1287,7 @@ __attribute__((constructor)) static void nova_init(void) {
     flip_init(mc);
     recipebook_init(mc);
     dims_init(mc);
+    skinpacks_init(mc);
     menubg_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);

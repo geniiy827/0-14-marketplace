@@ -256,6 +256,12 @@ public final class PackManager {
         }
         File dir = null;
         try {
+            String skinPrefix = SkinPacks.findPrefix(zip);   // a Bedrock skin pack: straight to the Skins screen (octa3)
+            if (skinPrefix != null) {
+                try { return SkinPacks.install(c, zip, skinPrefix); }
+                catch (PackException e) { throw e; }
+                catch (Exception e) { throw new PackException("Скин-пак не прочитан: " + e.getMessage()); }
+            }
             ZipEntry me = zip.getEntry("manifest.json");
             ZipEntry mm = zip.getEntry("mod.json");
             if (me == null && mm == null) throw new PackException("В архиве нет manifest.json (набор ресурсов) или mod.json (мод)");

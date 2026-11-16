@@ -7,7 +7,8 @@
     "layer": 3,
     "uv": [ 0, 0 ],
     "uv_size": [ 16, 16 ],
-    "size": [ 16, 16 ]
+    "size": [ 12, 12 ],
+    "offset": [ 0, -1 ]
   },
 
   "feedback_icon": {
@@ -389,7 +390,7 @@
           "uv": [ 0, 0 ],
           "uv_size": [ 10, 10 ],
           "size": [ 10, 10 ],
-          "offset": [ 6, 0 ],
+          "offset": [ 6, -1 ],
           "anchor_from": "left_middle",
           "anchor_to": "left_middle"
         }
@@ -397,6 +398,7 @@
       {
         "label@common.button_text": {
           "text": "menu.skins",
+          "offset": [ 0, 0 ],
           "anchor_from": "center",
           "anchor_to": "center"
         }
@@ -612,7 +614,8 @@
     "layer": 3,
     "uv": [ 0, 0 ],
     "uv_size": [ 16, 16 ],
-    "size": [ 16, 16 ]
+    "size": [ 12, 12 ],
+    "offset": [ 0, -1 ]
   },
 
   "packs_button@common.hyperlink_button": {
@@ -651,7 +654,8 @@
     "layer": 3,
     "uv": [ 0, 0 ],
     "uv_size": [ 16, 16 ],
-    "size": [ 16, 16 ]
+    "size": [ 12, 12 ],
+    "offset": [ 0, -1 ]
   },
 
   "account_button@common.hyperlink_button": {
@@ -722,8 +726,8 @@
           "layer": 3,
           "uv": [ 0, 0 ],
           "uv_size": [ 14, 14 ],
-          "size": [ 14, 14 ],
-          "offset": [ 4, 0 ],
+          "size": [ 12, 12 ],
+          "offset": [ 5, -1 ],
           "anchor_from": "left_middle",
           "anchor_to": "left_middle"
         }

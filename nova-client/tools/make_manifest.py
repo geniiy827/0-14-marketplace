@@ -75,9 +75,11 @@ def main(inp, out):
     f_mime = el('intent-filter', children=copy.deepcopy(view_cats) + [
         data(scheme='content'), data(scheme='file'),
         data(mimeType='application/octet-stream'), data(mimeType='application/zip'),
-        data(mimeType='application/x-zip-compressed'), data(mimeType='application/x-mcres')])
+        data(mimeType='application/x-zip-compressed'), data(mimeType='application/x-mcres'),
+        data(mimeType='application/x-mcpack')])
     path_datas = [data(scheme='file'), data(scheme='content'), data(host='*'), data(mimeType='*/*')]
-    for pp in [r'.*\.mcres', r'.*\..*\.mcres', r'.*\..*\..*\.mcres', r'.*\..*\..*\..*\.mcres']:
+    for ext in ('mcres', 'mcpack'):                                     # .mcpack: Bedrock skin packs (octa3)
+      for pp in [r'.*\.' + ext, r'.*\..*\.' + ext, r'.*\..*\..*\.' + ext, r'.*\..*\..*\..*\.' + ext]:
         path_datas.append(data(pathPattern=pp))
     f_path = el('intent-filter', children=copy.deepcopy(view_cats) + path_datas)
     f_send = el('intent-filter', children=[action('android.intent.action.SEND'), category('android.intent.category.DEFAULT'),
