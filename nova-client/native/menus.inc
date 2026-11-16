@@ -533,13 +533,13 @@ static void *v015_option(void) {                       /* after newtex_option (t
     return o;
 }
 
-/* live menu background (menubg.inc): on unless switched off, kept in files/nova_menubg */
+/* menu music (menubg.inc): on unless switched off, kept in files/nova_menubg */
 static int mb_on = 1, mb_loaded;
 static void mb_file(char *out, int n) {
     int k = 0;
     while (cfg_path[k] && k < n - 16) { out[k] = cfg_path[k]; k++; }
     while (k > 0 && out[k - 1] != '/') k--;
-    const char *f = "nova_menubg";
+    const char *f = "nova_menumusic";
     for (int i = 0; f[i]; i++) out[k++] = f[i];
     out[k] = 0;
 }
@@ -560,7 +560,7 @@ static void mb_save(void) {
 }
 static void *menubg_option(void) {                     /* after newtex_option (that one starts the list) */
     mb_load();
-    OptObj *o = nopt_new(0, "nova.opt.menubg", R_MENUBG);
+    OptObj *o = nopt_new(0, "nova.opt.menumusic", R_MENUBG);
     nopt_val[nidx(o)] = mb_on;
     return o;
 }

@@ -95,20 +95,20 @@
     ]
   },
 
-  // Client badge in the top-left corner
+  // Client badge in the top-right corner (octa1)
   "anim_badge_slide": {
     "anim_type": "offset",
     "easing": "out_back",
     "duration": 0.6,
-    "from": [ -73, 4 ],
-    "to": [ 4, 4 ]
+    "from": [ 73, 4 ],
+    "to": [ -4, 4 ]
   },
 
   "client_badge": {
     "type": "panel",
     "size": [ 73, 15 ],
-    "anchor_from": "top_left",
-    "anchor_to": "top_left",
+    "anchor_from": "top_right",
+    "anchor_to": "top_right",
     "controls": [
       {
         "badge_bg": {
@@ -119,8 +119,8 @@
           "uv_size": [ 12, 12 ],
           "size": [ 73, 15 ],
           "layer": 3,
-          "anchor_from": "top_left",
-          "anchor_to": "top_left",
+          "anchor_from": "top_right",
+          "anchor_to": "top_right",
           "color": [ 0.22, 0.26, 0.38, 1.0 ],
           "alpha": 0.85,
           "offset": "@start.anim_badge_slide",
@@ -376,44 +376,51 @@
   // Buttons
   //---------------------------------------------------------------------------
 
+  // octa1: the face of the chosen skin (custom skin, else Steve) before the word, made in Java (skinFace)
+  "skins_face": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      {
+        "icon": {
+          "type": "image",
+          "texture": "gui/nova/skin_face.png",
+          "layer": 3,
+          "uv": [ 0, 0 ],
+          "uv_size": [ 10, 10 ],
+          "size": [ 10, 10 ],
+          "offset": [ 6, 0 ],
+          "anchor_from": "left_middle",
+          "anchor_to": "left_middle"
+        }
+      },
+      {
+        "label@common.button_text": {
+          "text": "menu.skins",
+          "anchor_from": "center",
+          "anchor_to": "center"
+        }
+      }
+    ]
+  },
+
   "skins_button@common.button": {
     "$pressed_button_name": "$skins_button_name",
     "size": "$menu_button_half_size",
     "controls": [
       {
         "default@$button_state_default_base": {
-          "controls": [
-            {
-              "@common.button_text": {
-                "text": "menu.skins"
-              }
-            }
-          ]
+          "controls": [ { "@start.skins_face": { } } ]
         }
       },
       {
         "hover@$button_state_hover_base": {
-          "controls": [
-            {
-              "@common.button_text": {
-                "text": "menu.skins",
-                "color": [ 0.4, 0.95, 0.88 ]
-              }
-            }
-          ]
+          "controls": [ { "@start.skins_face": { } } ]
         }
       },
       {
         "pressed@$button_state_pressed_base": {
-          "controls": [
-            {
-              "@common.button_text": {
-                "text": "menu.skins",
-                "color": [ 0.4, 0.95, 0.88 ],
-                "alpha": 0.65
-              }
-            }
-          ]
+          "controls": [ { "@start.skins_face": { "alpha": 0.8 } } ]
         }
       }
     ]
@@ -716,7 +723,7 @@
           "uv": [ 0, 0 ],
           "uv_size": [ 14, 14 ],
           "size": [ 14, 14 ],
-          "offset": [ 5, 0 ],
+          "offset": [ 4, 0 ],
           "anchor_from": "left_middle",
           "anchor_to": "left_middle"
         }
@@ -724,7 +731,7 @@
       {
         "label@common.button_text": {
           "text": "nova.start.friends",
-          "offset": [ 9, 0 ],
+          "offset": [ 0, 0 ],
           "anchor_from": "center",
           "anchor_to": "center"
         }
@@ -913,6 +920,77 @@
     ]
   },
 
+  //---------------------------------------------------------------------------
+  // octa1: everything on the left (Java-client style), the right half is left to the snowy night
+  //---------------------------------------------------------------------------
+  "left_shade": {
+    "type": "image",
+    "texture": "gui/nova/menu/side_shade.png",
+    "uv": [ 0, 0 ],
+    "uv_size": [ 64, 4 ],
+    "size": [ "50%", "100%" ],
+    "anchor_from": "left_middle",
+    "anchor_to": "left_middle",
+    "layer": 0,
+    "alpha": 0.85
+  },
+
+  "nova_column": {
+    "type": "panel",
+    "size": [ 132, 155 ],
+    "offset": [ "5%", -6 ],
+    "anchor_from": "left_middle",
+    "anchor_to": "left_middle",
+    "controls": [
+      {
+        "title": {
+          "type": "panel",
+          "size": [ 132, 48 ],
+          "anchor_from": "top_left",
+          "anchor_to": "top_left",
+          "controls": [
+            {
+              "title_image": {
+                "type": "image",
+                "layer": 1,
+                "size": [ "100%", "100%" ],
+                "texture": "gui/title.png",
+                "uv": [ 0, 0 ],
+                "uv_size": [ 1024, 373 ],
+                "offset": "@start.anim_title_float_down"
+              }
+            },
+            { "nova_title_gate@common.nova_toast": { "size": [ 1, 1 ], "layer": 0, "anchor_from": "top_left", "anchor_to": "top_left" } },
+            {
+              "@splash_text": {
+                "offset": [ 6, -5 ]
+              }
+            }
+          ]
+        }
+      },
+      { "@play_button": { "size": [ "100%", 19 ], "offset": [ 0, 52 ], "anchor_from": "top_left", "anchor_to": "top_left" } },
+      { "@options_button": { "size": [ "100%", 19 ], "offset": [ 0, 73 ], "anchor_from": "top_left", "anchor_to": "top_left" } },
+      { "@skins_button": { "size": [ "100%", 19 ], "offset": [ 0, 94 ], "anchor_from": "top_left", "anchor_to": "top_left" } },
+      { "@friends_button": { "size": [ "100%", 19 ], "offset": [ 0, 115 ], "anchor_from": "top_left", "anchor_to": "top_left" } },
+      {
+        "small_row": {
+          "type": "panel",
+          "size": [ "100%", 19 ],
+          "offset": [ 0, 136 ],
+          "anchor_from": "top_left",
+          "anchor_to": "top_left",
+          "controls": [
+            { "@packs_button": { "size": [ 42, 19 ], "offset": [ 0, 0 ], "anchor_from": "top_left", "anchor_to": "top_left" } },
+            { "@account_button": { "size": [ 42, 19 ], "offset": [ 45, 0 ], "anchor_from": "top_left", "anchor_to": "top_left" } },
+            { "@signin_button": { "size": [ 42, 19 ], "offset": [ 45, 0 ], "anchor_from": "top_left", "anchor_to": "top_left" } },
+            { "@language_button": { "size": [ 42, 19 ], "offset": [ 90, 0 ], "anchor_from": "top_left", "anchor_to": "top_left" } }
+          ]
+        }
+      }
+    ]
+  },
+
   "gamepad_helpers": {
     "type": "panel",
     "offset": "$gamepad_helpers_offset",
@@ -1011,9 +1089,10 @@
         "$button_state_default_base": "common-classic.button_state_default",
         "$button_state_hover_base": "common-classic.button_state_hover",
         "$button_state_pressed_base": "common-classic.button_state_pressed",
-        "$title_panel": "title_panel_pocket",
+        "$title_panel": "empty_panel",
+        "$menu_layout": "nova_column",
         "$feedback_visible": false,
-        "$paper_doll_visible": true,
+        "$paper_doll_visible": false,
         "$play_button_anchor": "top_middle",
         "$achivements_visible": false,
         "$button_panel_size": [ 124, 54 ],
@@ -1037,43 +1116,29 @@
         "$skins_button_name": "button.menu_skins"
       }
     ],
+    "$menu_layout": "button_panel",
     "controls": [
       { "nova_toast@common.nova_toast": { } },
       {
-        "@$title_panel": { }
+        "@left_shade": { }
       },
       {
-        "@paper_doll_panel": { }
+        "@$title_panel": { }
       },
       {
         "@gamepad_helpers": { }
       },
       {
-        "@language_button": { }
-      },
-      {
         "@feedback_button": { }
       },
       {
-        "@button_panel": { }
+        "@$menu_layout": { }
       },
       {
         "@text_panel": { }
       },
       {
         "@client_badge": { }
-      },
-      {
-        "@packs_button": { }
-      },
-      {
-        "@account_button": { }
-      },
-      {
-        "@signin_button": { }
-      },
-      {
-        "@friends_button": { }
       }
     ],
     "button_mappings": [

@@ -396,3 +396,18 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   Фолбэк: переключатель «Живой фон меню» (вкладка NOVA, группа Текстуры, файл files/nova_menubg) или любой краш → панорама.
 - Ассеты кнопок управления 0.14 (gui.png): стрелки 22x22 @(2|28|54|80,109), центр 18x18 @(108,111), диагонали @(6,139),(28,139),
   полёт вверх (56,139) / вниз (82,135), (108,137), пауза (200,64), чат (200,82), ромбы (218,64/82), пустая (236,64) — всё 18x18.
+
+## octa2: снежная ночь, меню слева, музыка
+- menubg.inc переписан: небо (fillGradient), звёзды (материал "stars", вершинный цвет), луна environment/moon_phases.png
+  (фаза 0, uv 6..26 из 32 — диск 8x8 и ореол), материал "sun_moon" (сложение) + currentShaderColor (ShaderColor::setColor),
+  свечение gui/nova/menu/glow.png, холмы-блоки с елями (white.png + ui_texture_and_color = mScreenMaterials+0x24),
+  снег environment/snow.png тремя слоями. Четырёхугольники в порядке blitRaw: (x0,y0)(x1,y0)(x1,y1)(x0,y1).
+  MaterialPtr(RenderMaterialGroup::common, имя). Фон не выключается; при краше — панорама.
+- Музыка: tools/gen_menumusic.py -> native/menumusic.h (свой трек, 66 bpm, арфа+бас нотных блоков), MinecraftClient::playUI
+  ("note.harp"/"note.bass", громкость, pitch=2^((n-12)/12)). Играет, пока виден фон меню; переключатель «Музыка в меню» (files/nova_menumusic).
+- Меню: start_screen.json — колонка слева (nova_column 132x155: титул 132x48, Играть/Настройки/Скины/Друзья по 19, ряд из 3 по 42:
+  наборы, аккаунт|войти, язык), left_shade, значок NOVA client справа сверху, кукла убрана.
+- Лицо на «Скины»: gui/nova/skin_face.png 10x10 делает Java (NovaActivity.skinFace): свой скин (nativeSkinPath "C:путь") или Стив,
+  слой шляпы сверху (у старых 64x32 сплошная шляпа = нет шляпы), тёмная рамка 1 px. Native следит за выбранным скином
+  (client+0x158 -> repo+0x2c Skin*, +0x14 тип 0 = свой, +0x10 путь) и перезагружает текстуру (tex_reload).
+- Интро летит в настоящий прямоугольник title_image: nativeInfo(11..14) (px), title_gate пишет его.

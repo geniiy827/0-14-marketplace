@@ -1,3 +1,4 @@
 play_screen.json: lost functional text='default_worlds_panel'
 start_screen.json: lost functional binding_name='#version'
 start_screen.json: lost functional text='#version'
+start_screen.json: lost functional text='title_panel_pocket'

@@ -367,6 +367,7 @@ int Java_com_nova_client_NovaActivity_nativeStatus(void *env, void *cls) {
 
 static int menu_seen;                    /* a menu screen was drawn: the intro may hand over */
 static volatile int intro_done;          /* IntroView finished: the menu title (title_image) may show */
+static volatile int intro_rect[4];       /* where title_image is, screen px: the intro flies the title there */
 void Java_com_nova_client_NovaActivity_nativeIntroDone(void *env, void *cls) { intro_done = 1; }
 int Java_com_nova_client_NovaActivity_nativeInfo(void *env, void *cls, int what) {
     switch (what) {
@@ -381,6 +382,7 @@ int Java_com_nova_client_NovaActivity_nativeInfo(void *env, void *cls, int what)
     case 8: return stage2_ok;
     case 9: return menus_ok;
     case 10: return menu_seen;
+    case 11: case 12: case 13: case 14: return intro_rect[what - 11];   /* the menu title in px (0 = not drawn yet) */
     }
     return 0;
 }
@@ -1041,6 +1043,16 @@ static void title_gate(char *cc) {
     for (; it && it < end; it += 2) {
         char *ch = it[0];
         if (!ch || !streq(sdata(ch + 0xc), "title_image")) continue;
+        {
+            static float (*inv)(void);
+            if (!inv) inv = dlsym(dlopen("libminecraftpe.so", 6), "_ZN7GuiData14getInvGuiScaleEv");
+            float k = inv ? inv() : 0.f;
+            float *r = (float *)(ch + 0x10);              /* position, size (GUI units, screen space) */
+            if (k > 0.f && r[2] > 4.f) {
+                intro_rect[0] = (int)(r[0] / k); intro_rect[1] = (int)(r[1] / k);
+                intro_rect[2] = (int)((r[0] + r[2]) / k); intro_rect[3] = (int)((r[1] + r[3]) / k);
+            }
+        }
         int vis = (ch[0x30] >> 2) & 1, want = intro_done ? 1 : 0;
         if (vis != want) ch[0x30] = (char)((ch[0x30] & ~4) | (want << 2));
     }

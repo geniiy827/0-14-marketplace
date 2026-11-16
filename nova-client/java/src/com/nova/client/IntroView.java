@@ -55,8 +55,8 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
     static final float ELEV = 30f, DIST = 400f, FOV = 30f, TITLE_ASPECT = 1024f / 373f;
     static final float TGT_Y = 22f;
 
-    // menu title rect (ui_new/start_screen.json: title_panel_pocket)
-    static final float MENU_TOP = 0.09f, MENU_W = 0.40f;
+    // menu title rect until the game reports the real one (nativeInfo 11..14): the left column of octa1
+    static final float MENU_TOP = 0.09f, MENU_W = 0.30f;
 
     static IntroView current;
 
@@ -175,6 +175,7 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
     private FloatBuffer meshBuf;
     private int[] gFirst, gCount;
     private final float[] fit = new float[16];
+    private boolean menuRectReal;
     private float[] rectBig = new float[4], rectMenu = new float[4];   // x0,y0,x1,y1 in px
 
     // particles
@@ -233,7 +234,7 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
         float cx = W / 2f, cy = H * 0.47f;
         rectBig = new float[]{cx - tw / 2, cy - tw / TITLE_ASPECT / 2, cx + tw / 2, cy + tw / TITLE_ASPECT / 2};
         float mw = W * MENU_W, mt = H * MENU_TOP;
-        rectMenu = new float[]{cx - mw / 2, mt, cx + mw / 2, mt + mw / TITLE_ASPECT};
+        if (!menuRectReal) rectMenu = new float[]{W * 0.05f, mt, W * 0.05f + mw, mt + mw / TITLE_ASPECT};
         computeFit();
     }
 
@@ -438,6 +439,12 @@ final class IntroView extends GLSurfaceView implements GLSurfaceView.Renderer {
 
     // ---- 3. flat title -> menu ---------------------------------------------------------------
     private void drawFlat(float t) {
+        try {                                              // the real title rect, once the menu has drawn it (octa1 layout)
+            if (NovaActivity.nativeOk && !menuRectReal && NovaActivity.nativeInfo(13) > NovaActivity.nativeInfo(11) + 8) {
+                rectMenu = new float[]{NovaActivity.nativeInfo(11), NovaActivity.nativeInfo(12), NovaActivity.nativeInfo(13), NovaActivity.nativeInfo(14)};
+                menuRectReal = true;
+            }
+        } catch (Throwable ignored) { }
         float a = clamp((t - handT) / XFADE);
         float m = easeInOutCubic(clamp((t - handT - XFADE) / MOVE));
         float last = TITLE + STAGGER * (gCount.length - 1) + FLY;

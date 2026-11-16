@@ -87,6 +87,7 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
     static native String nativePollNova();
     static native int nativeCloseNova();
     static native int nativeReloadTexture(String name);
+    static native String nativeSkinPath();
     static native int nativeToast(String title, String sub, int icon);
     static native int nativeCrashFile(String path);
     static native int nativeJoin(String ip, int port);
@@ -437,6 +438,56 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** The face on the Skins button (octa1): the custom skin's face if one is chosen, else Steve's; the hat layer on
+     *  top and a dark 1-pixel frame around: 10x10. Steve comes through getImageData, so packs and new textures apply. */
+    private int[] skinFace() {
+        int[] src = null;
+        String sp = null;
+        try { sp = nativeSkinPath(); } catch (Throwable ignored) { }
+        try {
+            if (sp != null && sp.startsWith("C:")) {
+                String p = sp.substring(2);
+                src = super.getImageData(p, false);
+                if (src == null || src.length < 3) src = super.getImageData(p, true);
+            }
+            if (src == null || src.length < 3) src = getImageData("images/mob/steve.png", true);
+            if (src == null || src.length < 3) src = getImageData("mob/steve.png", true);
+        } catch (Throwable t) { Log.w(TAG, "skin face", t); }
+        if (src == null || src.length < 3) return null;
+        int w = src[0], h = src[1];
+        if (w < 64 || h < 32 || src.length < w * h + 2) return null;
+        int k = w / 64;                                   // HD skins: 128 wide = 2 texels per pixel
+        int[] out = new int[10 * 10 + 2];
+        out[0] = 10; out[1] = 10;
+        int frame = 0xff0c0d12;
+        boolean hat = true;
+        if (h * 2 == w) {                                 // old 64x32 skins: a fully solid hat layer means "no hat" (as Java)
+            boolean solid = true;
+            for (int y = 8 * k; y < 16 * k && solid; y++)
+                for (int x = 40 * k; x < 48 * k; x++) if ((src[2 + y * w + x] >>> 24) < 255) { solid = false; break; }
+            hat = !solid;
+        }
+        for (int y = 0; y < 10; y++)
+            for (int x = 0; x < 10; x++) {
+                int c = frame;
+                if (x > 0 && x < 9 && y > 0 && y < 9) {
+                    int fx = (8 + x - 1) * k, fy = (8 + y - 1) * k;
+                    c = src[2 + fy * w + fx] | 0xff000000;
+                    int hx = (40 + x - 1) * k, hy = (8 + y - 1) * k;
+                    int hc = src[2 + hy * w + hx];
+                    int a = hat ? hc >>> 24 : 0;
+                    if (a > 0) {
+                        int r = (((hc >> 16) & 255) * a + ((c >> 16) & 255) * (255 - a)) / 255;
+                        int g = (((hc >> 8) & 255) * a + ((c >> 8) & 255) * (255 - a)) / 255;
+                        int b = ((hc & 255) * a + (c & 255) * (255 - a)) / 255;
+                        c = 0xff000000 | (r << 16) | (g << 8) | b;
+                    }
+                }
+                out[2 + y * 10 + x] = c;
+            }
+        return out;
     }
 
     private void applyPacks(String r) throws Exception {
@@ -835,6 +886,10 @@ public class NovaActivity extends com.mojang.minecraftpe.MainActivity {
         String np = norm(path);
         if (np != null && np.endsWith("gui/nova/account.png")) {
             int[] px = accountIcon(path);
+            if (px != null) return px;
+        }
+        if (np != null && np.endsWith("gui/nova/skin_face.png")) {
+            int[] px = skinFace();
             if (px != null) return px;
         }
         if (np != null && np.contains("nova/pack_icon_")) {
