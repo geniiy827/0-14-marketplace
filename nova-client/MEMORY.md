@@ -428,3 +428,24 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   <id>.deleted (Java удаляет папку при старте), handleBackEvent; экран скинов обновляется сам (OptionsScreen::onFocusGained -> refreshSkins).
   Без паков под заголовком «Наборы скинов» текст nova.skins.empty1/2 (хук SkinsPaneStandard::render, слот 3).
 - Лицо на «Скины»: для любого выбранного скина ("P:путь"), свой скин — "C:путь".
+
+## octa4: своё управление (native/controls.inc, tools/gen_controls.py)
+- Ввод 0.14.3: TouchMapper::tick -> TouchControlSet (+0 vector записей 0x14: id, state (0 = нажат в этом кадре), x, y (px),
+  handled (2 = свободен; кто взял — пишет 0)) -> TouchControlSet::tick вызывает контролы. TouchGlyphButtonControl:
+  +0x30 id кнопки, +0x32 нажата, +4/+0xc/+0x10 std::function площади -> RectangleArea {x0, x1, y0, y1}, uv +0x54..+0x60
+  (gui.png), цвета нажатой +0x34 / обычной +0x44, масштаб +0x78; vtable: 2 render, 3 tick, 4 release.
+  TouchTurnInteractControl (камера) берёт только handled == 2. Кнопки — InputEventQueue::enqueueButton(id, 1/0, 0),
+  джойстик — enqueueDirection(0, x, y) (MoveInputHandler +0x5c/+0x60, +y вперёд). Id из NameRegistry::getNameId,
+  реестр ловим в TouchControlSet::addGlyphButton.
+- Шифт ваниль: два глифа "button.sneak_toggle" (binding.area.sneak, sneaking/not_sneaking, gui.png 218,82 / 218,64).
+  Прыжок — глиф button.jump. «Поменять прыжок и шифт» (Options+0xf6) двигает только площади (MinecraftBindingFactory::onConfigChanged).
+  Вперёд: видимый button.up_ignore + невидимый button.up (move_up_invisible) — поэтому можно съехать на прыжок и бежать.
+  MoveInputHandler поля: +0x4d jump, +0x4e sneak, +0x4f sprint, +0x51..+0x56 up/down/left/right/upleft/upright, +0x45/+0x46 ascend/descend.
+- Свой режим (files/nova_controls.txt, "NOVACTL 1", строки "kind cx cy size alpha"; пустой файл = классика):
+  ванильные двигательные глифы выключены (их tick/render), наши элементы забирают пальцы, которые начались на них.
+  Рисуем после MinecraftInputHandler::render (в единицах GUI), классика — gui/gui.png (паки), новое — gui/nova/controls.png.
+  Атака/действие: button.destroy_or_attack / build_or_interact, включают «разделить управление» (Options::toggle SPLIT_CONTROLS),
+  тапы по миру только камера (enqueueButton глушит button.build_or_attack / destroy_or_interact).
+- Редактор: из настроек NOVA «Настроить управление» (только в мире) -> popScreen пока isShowingMenu -> редактор поверх игры,
+  все пальцы его; ✕ / ✓ / + сверху справа, панель ассэтов 4 вкладки, выбранный: рамка, красный ✕, ползунки размер/прозрачность
+  (у прозрачности метка и прилипание к игровой 0.65, GuiData::BUTTONS_TRANSPARENCY). «Сбросить к классическому» — пустой файл.

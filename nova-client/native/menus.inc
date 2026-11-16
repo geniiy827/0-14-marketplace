@@ -140,7 +140,7 @@ enum { R_NONE, R_PACK_ON, R_PACK_DEL, R_NAME, R_SEED, R_SURV, R_CREAT, R_INF, R_
        R_MOBS, R_SPX, R_SPZ, R_CREATE, R_NEWTEX, R_IMPORT,
        R_ACC_TAG, R_ACC_PASS, R_ACC_PASS2, R_ACC_LOGIN, R_ACC_TOREG, R_ACC_REG, R_ACC_TOLOGIN, R_ACC_LOGOUT,
        R_FR_TAG, R_FR_SEND, R_FR_JOIN, R_FR_DEL, R_FR_ACCEPT, R_FR_DECLINE, R_FR_CANCEL,
-       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND, R_FR_MODS, R_NET_MODS, R_V015 };
+       R_NET_ON, R_NET_FRIENDS, R_NET_INVITE, R_NET_MAX, R_INV_SEND, R_FR_MODS, R_NET_MODS, R_V015, R_CTL_EDIT, R_CTL_RESET };
 
 static int nova_pending, nova_creating, nova_kind, nova_close, nova_ttl, nova_select = -1;
 static void *nova_screen;
@@ -580,7 +580,9 @@ static void button_action(int i) {
     }
 }
 
+static void cc_settings_action(int i);
 static void nopt_on_change(int i) {
+    if (nopt_role[i] == R_CTL_EDIT || nopt_role[i] == R_CTL_RESET) { nopt_val[i] = 0; cc_settings_action(i); return; }
     if (nopt_role[i] == R_NEWTEX) { tex_want = nopt_val[i]; return; }
     if (nopt_role[i] == R_V015) { ver_want = nopt_val[i]; return; }
     if (nopt_role[i] == R_NET_MAX) { netmax_caption(i); return; }
@@ -911,7 +913,9 @@ static void draw_text_col(void *font, float x, float y, const char *txt, float *
     f_strdtor(str);
 }
 
+static void cc_frame_tick(void *client);
 static void draw_toast(void *client) {
+    cc_frame_tick(client);
     net_draw(client);
     flip_frame(client);
     rb_frame();

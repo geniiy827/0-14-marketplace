@@ -862,6 +862,7 @@ static void h_setbool(void *opts, void *opt, int v);
 static void *opt_chunks;
 static void *newtex_option(void);
 static void *v015_option(void);
+static void controls_settings(void *pane, void *client);
 static void *opt_sprint;
 static int last_pane_doll = -1;  /* doll toggle state the NOVA pane was built with */
 
@@ -953,6 +954,7 @@ static void *build_nova_pane(void *client) {
         void *g2 = f_cgroup(pane, str, 1);
         f_strdtor(str);
         f_ctoggle(g2, newtex_option(), client);
+        controls_settings(pane, client);                 /* octa4: custom controls (controls.inc) */
     }
     last_pane_doll = doll | (f3 << 1);
     return pane;
@@ -1251,6 +1253,7 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "dims.inc"
 #include "skinpacks.inc"
 #include "menubg.inc"
+#include "controls.inc"
 
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
@@ -1289,6 +1292,7 @@ __attribute__((constructor)) static void nova_init(void) {
     dims_init(mc);
     skinpacks_init(mc);
     menubg_init(mc);
+    controls_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }
