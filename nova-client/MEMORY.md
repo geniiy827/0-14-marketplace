@@ -455,3 +455,15 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   наш TouchControlSet::tick ничего не трогает (до этого джойстик забирал касания в главном меню и паузе).
 - tools/gen_controls.py переписан: каждая фигура — функция, проверяемая в центре пикселя, всё симметрично;
   центр значка как у стрелок игры (13, 12 в клетке 26). Джойстик — квадратные пластины со скруглёнными углами.
+
+## octa6
+- Джойстик: ось x у игры смотрит влево (enqueueDirection x = -dx экрана). Кнопки-стрелки шлют названные кнопки — верно.
+- Тап по миру при кнопках атаки/действия: игра шлёт тап через InputEventQueue::enqueueButtonPressAndRelease (не enqueueButton),
+  TouchTurnInteractControl: +0x20 down/up, +0x22 тап (press&release), +0x24 удержание. Глушим build_or_attack / destroy_or_interact в обоих.
+- Выбросить: тап — "button.drop" (один), удержание 3 с — "button.hotbar_drop_all"; заливку рисует сама игра:
+  хук HotBarRenderer::_renderDropProgress ставит GuiData+0xac слот (Inventory::getSelectedSlot), +0xa8 тики (игра: 40 = полный).
+- Крестовина простая (K_DPAD_PLAIN): середина — пустая кнопка (CA_BLANK), ничего не делает.
+- Слот хотбара (K_SLOT, param 1..9 — шестое число в строке файла): тап = "button.slotN" (игра сама выбирает и синхронизирует).
+  Рисунок: gui.png слот (1,1 20x20) + рамка выбранного слота (0,22 24x24) всегда, предмет — renderGuiItemNew (последний bool 0 —
+  блеск зачарования игра берёт из ItemInstance::isFoil), прочность и количество рисуем сами. Inventory = player+0xda0, getItem — vfunc[4].
+- Краш в инвентаре (CustomRenderComponent::renderCustom -> прыжок по мусорному адресу) — не нашли причину, один раз; ждём повтора.

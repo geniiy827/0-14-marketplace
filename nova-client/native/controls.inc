@@ -17,32 +17,36 @@
  * Editor: in the game, every pointer goes to the editor; ✕ cancel, ✓ save, + the asset panel. */
 #include "controls_atlas.h"
 
-enum { K_DPAD_JUMP, K_DPAD_SNEAK, K_JOY_FIX, K_JOY_FLOAT, K_FWD, K_BACK, K_LEFT, K_RIGHT, K_UPLEFT, K_UPRIGHT,
-       K_JUMP, K_SNEAK_CLASSIC, K_SNEAK_NEW, K_SPRINT, K_FLY_UP, K_FLY_DOWN, K_ATTACK, K_INTERACT, K_F5, K_DROP, K_COUNT };
+enum { K_DPAD_JUMP, K_DPAD_SNEAK, K_DPAD_PLAIN, K_JOY_FIX, K_JOY_FLOAT, K_FWD, K_BACK, K_LEFT, K_RIGHT, K_UPLEFT, K_UPRIGHT,
+       K_JUMP, K_SNEAK_CLASSIC, K_SNEAK_NEW, K_SPRINT, K_FLY_UP, K_FLY_DOWN, K_ATTACK, K_INTERACT, K_F5, K_DROP, K_SLOT, K_COUNT };
 /* button names; index = B_* */
 enum { B_UP, B_DOWN, B_LEFT, B_RIGHT, B_UPLEFT, B_UPRIGHT, B_JUMP, B_SNEAK, B_SNEAK_TOGGLE, B_SPRINT, B_ASCEND, B_DESCEND,
-       B_ATTACK, B_INTERACT, B_F5, B_DROP, B_UP_IGNORE, B_HIDE_JUMP, B_FLIGHT, B_NO_BINDING, B_TOUCH_BUILD, B_TOUCH_DESTROY, B_N };
+       B_ATTACK, B_INTERACT, B_F5, B_DROP, B_UP_IGNORE, B_HIDE_JUMP, B_FLIGHT, B_NO_BINDING, B_TOUCH_BUILD, B_TOUCH_DESTROY,
+       B_DROP_ALL, B_SLOT1, B_SLOT2, B_SLOT3, B_SLOT4, B_SLOT5, B_SLOT6, B_SLOT7, B_SLOT8, B_SLOT9, B_N };
 static const char *CC_BNAME[B_N] = {
     "button.up", "button.down", "button.left", "button.right", "button.upleft", "button.upright", "button.jump",
     "button.sneak", "button.sneak_toggle", "button.sprint", "button.ascend", "button.descend",
     "button.destroy_or_attack", "button.build_or_interact", "button.third_person_view", "button.drop",
     "button.up_ignore", "button.hide_jump_button", "button.change_flight_height", "no_binding",
-    "button.build_or_attack", "button.destroy_or_interact"};
+    "button.build_or_attack", "button.destroy_or_interact", "button.hotbar_drop_all",
+    "button.slot1", "button.slot2", "button.slot3", "button.slot4", "button.slot5", "button.slot6", "button.slot7",
+    "button.slot8", "button.slot9"};
 static short cc_bid[B_N];
 static int cc_ids_ok;
 
 /* the asset list: lang key of the name, tab, size in "cells" (one cell = a vanilla button) */
 static const struct { const char *key; int tab; float cells; } CC_ASSET[K_COUNT] = {
-    {"nova.ctl.a.dpad_jump", 0, 3}, {"nova.ctl.a.dpad_sneak", 0, 3}, {"nova.ctl.a.joy_fix", 0, 2.6f}, {"nova.ctl.a.joy_float", 0, 2.6f},
+    {"nova.ctl.a.dpad_jump", 0, 3}, {"nova.ctl.a.dpad_sneak", 0, 3}, {"nova.ctl.a.dpad_plain", 0, 3}, {"nova.ctl.a.joy_fix", 0, 2.6f}, {"nova.ctl.a.joy_float", 0, 2.6f},
     {"nova.ctl.a.fwd", 1, 1}, {"nova.ctl.a.back", 1, 1}, {"nova.ctl.a.left", 1, 1}, {"nova.ctl.a.right", 1, 1},
     {"nova.ctl.a.upleft", 1, 1}, {"nova.ctl.a.upright", 1, 1},
     {"nova.ctl.a.jump", 2, 1}, {"nova.ctl.a.sneak_classic", 2, 1}, {"nova.ctl.a.sneak_new", 2, 1}, {"nova.ctl.a.sprint", 2, 1},
     {"nova.ctl.a.fly_up", 2, 1}, {"nova.ctl.a.fly_down", 2, 1},
-    {"nova.ctl.a.attack", 3, 1.15f}, {"nova.ctl.a.interact", 3, 1.15f}, {"nova.ctl.a.f5", 3, 0.85f}, {"nova.ctl.a.drop", 3, 0.85f}};
+    {"nova.ctl.a.attack", 3, 1.15f}, {"nova.ctl.a.interact", 3, 1.15f}, {"nova.ctl.a.f5", 3, 0.85f}, {"nova.ctl.a.drop", 3, 0.85f},
+    {"nova.ctl.a.slot", 3, 1.1f}};
 #define CC_TABS 4
 static const char *CC_TAB[CC_TABS] = {"nova.ctl.tab.move", "nova.ctl.tab.arrows", "nova.ctl.tab.actions", "nova.ctl.tab.fight"};
 
-typedef struct { int kind; float cx, cy, size, alpha; } CcEl;         /* cx, cy: of the screen size; size: of its height */
+typedef struct { int kind; float cx, cy, size, alpha; int param; } CcEl;   /* param: the hotbar slot 1..9 (K_SLOT) */         /* cx, cy: of the screen size; size: of its height */
 #define CC_MAX 48
 static CcEl cc_el[CC_MAX], cc_ed[CC_MAX];
 static int cc_n, cc_edn;
@@ -115,6 +119,11 @@ static void cc_load(void) {
             && k >= 0 && k < K_COUNT) {
             CcEl *e = &cc_el[cc_n++];
             e->kind = (int)k; e->cx = x; e->cy = y; e->size = s; e->alpha = a;
+            float pm = 1.f;
+            const char *q = p;
+            while (*q == ' ') q++;
+            if (*q != '\n' && *q && cc_parse_f(&p, &pm)) e->param = (int)pm; else e->param = 1;
+            if (e->param < 1 || e->param > 9) e->param = 1;
         }
         while (*p && *p != '\n') p++;
     }
@@ -141,7 +150,8 @@ static void cc_save(void) {
         n += cc_fmt(buf + n, e->cx); buf[n++] = ' ';
         n += cc_fmt(buf + n, e->cy); buf[n++] = ' ';
         n += cc_fmt(buf + n, e->size); buf[n++] = ' ';
-        n += cc_fmt(buf + n, e->alpha); buf[n++] = '\n';
+        n += cc_fmt(buf + n, e->alpha);
+        n += snprintf(buf + n, 8, " %d\n", e->param);
     }
     int fd = open(path, 01 | 0100 | 01000, 0644);
     if (fd >= 0) { write(fd, buf, n); close(fd); }
@@ -260,14 +270,14 @@ static void cc_default_layout(CcEl *out, int *n) {
         float jx = (J->area[0] + J->area[1]) / 2, jy = (J->area[2] + J->area[3]) / 2;
         jump_mid = jx > dx - cell / 2 && jx < dx + cell / 2 && jy > dy - cell / 2 && jy < dy + cell / 2;
     }
-    out[(*n)++] = (CcEl){jump_mid ? K_DPAD_JUMP : K_DPAD_SNEAK, dx / W, dy / H, dsz / H, cc_def_alpha};
+    out[(*n)++] = (CcEl){jump_mid ? K_DPAD_JUMP : K_DPAD_SNEAK, dx / W, dy / H, dsz / H, cc_def_alpha, 1};
     CcGlyph *O = jump_mid ? S : J;
     float ox, oy;
     if (O->ok) { ox = (O->area[0] + O->area[1]) / 2; oy = (O->area[2] + O->area[3]) / 2; }
     else { ox = W - cell * 1.6f; oy = H - cell * 2.2f; }
-    out[(*n)++] = (CcEl){jump_mid ? K_SNEAK_CLASSIC : K_JUMP, ox / W, oy / H, cell / H, cc_def_alpha};
-    out[(*n)++] = (CcEl){K_FLY_UP, (ox - cell * 1.25f) / W, (oy - cell * 0.6f) / H, cell / H, cc_def_alpha};
-    out[(*n)++] = (CcEl){K_FLY_DOWN, (ox - cell * 1.25f) / W, (oy + cell * 0.6f) / H, cell / H, cc_def_alpha};
+    out[(*n)++] = (CcEl){jump_mid ? K_SNEAK_CLASSIC : K_JUMP, ox / W, oy / H, cell / H, cc_def_alpha, 1};
+    out[(*n)++] = (CcEl){K_FLY_UP, (ox - cell * 1.25f) / W, (oy - cell * 0.6f) / H, cell / H, cc_def_alpha, 1};
+    out[(*n)++] = (CcEl){K_FLY_DOWN, (ox - cell * 1.25f) / W, (oy + cell * 0.6f) / H, cell / H, cc_def_alpha, 1};
 }
 
 static float cc_cell_frac(void) {
@@ -277,12 +287,15 @@ static float cc_cell_frac(void) {
 
 /* ---- pointers ---- */
 #define CC_PTR 10
-typedef struct { int used, id, el, fwd, cell, seen; float x, y, sx, sy, ox, oy; } CcPtr;   /* fwd: has been on forward */
+typedef struct { int used, id, el, fwd, cell, seen, done; long t0; float x, y, sx, sy, ox, oy; } CcPtr;   /* fwd: has been on forward */
 static CcPtr cc_p[CC_PTR];
 static unsigned char cc_hold[B_N], cc_sent[B_N];
 static float cc_dir[2], cc_dir_sent[2];
 static int cc_dir_on;
 static int cc_sneak_new_on, cc_sprint_armed, cc_sprint_moved;
+static int cc_pend_slot, cc_pend_drop, cc_pend_drop_all;   /* tap actions for the next send */
+static float cc_drop_prog;                                 /* 0..1 while the drop button is held */
+static void (*cc_enq_tap)(void *q, int id);
 static unsigned char cc_fwd_el[CC_MAX];      /* dpad: moving forward last frame (diagonals show) */
 static float cc_joy[CC_MAX][4];              /* joystick: base centre (px) while held, knob offset (-1..1) */
 
@@ -305,7 +318,7 @@ static int cc_is_sneaking(void) {
 
 /* slide buttons: any pointer that is on a slide button counts on every slide button it passes */
 static int cc_slide_kind(int k) {
-    return k == K_DPAD_JUMP || k == K_DPAD_SNEAK || (k >= K_FWD && k <= K_UPRIGHT) || k == K_JUMP || k == K_FLY_UP || k == K_FLY_DOWN;
+    return k == K_DPAD_JUMP || k == K_DPAD_SNEAK || k == K_DPAD_PLAIN || (k >= K_FWD && k <= K_UPRIGHT) || k == K_JUMP || k == K_FLY_UP || k == K_FLY_DOWN;
 }
 static int cc_hit(const CcEl *e, float x, float y) {
     CcBox b = cc_box(e);
@@ -347,7 +360,7 @@ static void cc_run(void *q) {
                 cc_hold[e->kind == K_FLY_UP ? B_ASCEND : B_DESCEND] = 1;
                 continue;
             }
-            if (e->kind == K_DPAD_JUMP || e->kind == K_DPAD_SNEAK) {
+            if (e->kind == K_DPAD_JUMP || e->kind == K_DPAD_SNEAK || e->kind == K_DPAD_PLAIN) {
                 int c = cc_cell(e, P->x, P->y);
                 switch (c) {
                 case 1: cc_hold[B_UP] = 1; fwd_seen = 1; fwd_now[i] = 1; break;
@@ -357,6 +370,7 @@ static void cc_run(void *q) {
                 case 5: cc_hold[B_RIGHT] = 1; break;
                 case 7: cc_hold[B_DOWN] = 1; break;
                 case 4:
+                    if (e->kind == K_DPAD_PLAIN) break;    /* an empty middle */
                     if (e->kind == K_DPAD_JUMP) {
                         cc_hold[B_JUMP] = 1;
                         if (P->fwd) { cc_hold[B_UP] = 1; fwd_seen = 1; fwd_now[i] = 1; }   /* forward and jump: slide down */
@@ -395,7 +409,7 @@ static void cc_run(void *q) {
         case K_ATTACK: cc_hold[B_ATTACK] = 1; break;
         case K_INTERACT: cc_hold[B_INTERACT] = 1; break;
         case K_F5: cc_hold[B_F5] = 1; break;
-        case K_DROP: cc_hold[B_DROP] = 1; break;
+        case K_DROP: break;                                  /* on release, or all after 3 s (cc_drop_tick) */
         case K_JOY_FIX: case K_JOY_FLOAT: {
             float R = e->size * cc_H / 2;
             float bx = cc_joy[P->el][0], by = cc_joy[P->el][1];
@@ -403,12 +417,20 @@ static void cc_run(void *q) {
             float l = sqrtf(vx * vx + vy * vy);
             if (l > 1.f) { vx /= l; vy /= l; }
             cc_joy[P->el][2] = vx; cc_joy[P->el][3] = vy;
-            cc_dir[0] += vx; cc_dir[1] += -vy;
+            cc_dir[0] += -vx; cc_dir[1] += -vy;          /* the game's x points left */
             break;
         }
         }
     }
     if (cc_sneak_new_on) cc_hold[B_SNEAK] = 1;
+    cc_drop_prog = 0;
+    for (int pi = 0; pi < CC_PTR; pi++) {                 /* drop: hold 3 s = the whole stack */
+        CcPtr *P = &cc_p[pi];
+        if (!P->used || P->el < 0 || P->el >= cc_n || cc_el[P->el].kind != K_DROP || P->done) continue;
+        float t = (float)(now_ms() - P->t0) / 3000.f;
+        if (t >= 1.f) { P->done = 1; cc_pend_drop_all = 1; }
+        else if (t > 0.08f && t > cc_drop_prog) cc_drop_prog = t;
+    }
     float dl = cc_dir[0] * cc_dir[0] + cc_dir[1] * cc_dir[1];
     if (dl > 1.f) { float l = sqrtf(dl); cc_dir[0] /= l; cc_dir[1] /= l; }
     moving = cc_hold[B_UP] || cc_hold[B_DOWN] || cc_hold[B_LEFT] || cc_hold[B_RIGHT] || cc_hold[B_UPLEFT] || cc_hold[B_UPRIGHT] || dl > 0.04f;
@@ -425,6 +447,14 @@ static void cc_run(void *q) {
         cc_sent[b] = cc_hold[b];
     }
     cc_self = 0;
+    if (cc_enq_tap) {
+        int ids[3] = {cc_pend_slot > 0 ? cc_bid[B_SLOT1 + cc_pend_slot - 1] : -1,
+                      cc_pend_drop ? cc_bid[B_DROP] : -1, cc_pend_drop_all ? cc_bid[B_DROP_ALL] : -1};
+        cc_self = 1;
+        for (int i = 0; i < 3; i++) if (ids[i] >= 0) cc_enq_tap(q, ids[i]);
+        cc_self = 0;
+    }
+    cc_pend_slot = 0; cc_pend_drop = 0; cc_pend_drop_all = 0;
     if (dl > 0.0001f || cc_dir_on) {
         if (cc_enq_dir) cc_enq_dir(q, 0, cc_dir[0], cc_dir[1]);
         cc_dir_on = dl > 0.0001f;
@@ -449,6 +479,7 @@ static void cc_press(int el) {
     CcEl *e = &cc_el[el];
     if (e->kind == K_SNEAK_NEW) cc_sneak_new_on = !cc_sneak_new_on;
     if (e->kind == K_SPRINT) { cc_sprint_armed = !cc_sprint_armed; cc_sprint_moved = 0; }
+    if (e->kind == K_SLOT) cc_pend_slot = e->param;
     if (e->kind == K_JOY_FIX || e->kind == K_JOY_FLOAT) {
         cc_joy[el][0] = e->cx * cc_W; cc_joy[el][1] = e->cy * cc_H;
     }
@@ -503,7 +534,7 @@ static CcGBox cc_delbox(const CcEl *e) {
 /* the slider panel of the selected element: two rows (size, opacity) */
 static CcGBox cc_spanel(const CcEl *e) {
     CcGBox b = cc_gbox(e);
-    float GW = cc_W * cc_inv, GH = cc_H * cc_inv, w = 104.f, h = 34.f;
+    float GW = cc_W * cc_inv, GH = cc_H * cc_inv, w = 104.f, h = e->kind == K_SLOT ? 50.f : 34.f;
     float x = (b.x0 + b.x1) / 2 - w / 2, y = b.y1 + 6.f;
     if (y + h > GH - 2.f) y = b.y0 - 6.f - h;
     if (y < 2.f) y = 2.f;
@@ -512,6 +543,7 @@ static CcGBox cc_spanel(const CcEl *e) {
     return (CcGBox){x, y, x + w, y + h};
 }
 static CcGBox cc_track(CcGBox p, int row) { return (CcGBox){p.x0 + 44.f, p.y0 + 4.f + row * 15.f, p.x1 - 6.f, p.y0 + 4.f + row * 15.f + 10.f}; }
+static CcGBox cc_digit(CcGBox p, int i) { float x = p.x0 + 5.f + i * 10.5f; return (CcGBox){x, p.y0 + 34.f, x + 9.5f, p.y0 + 46.f}; }
 static float cc_def_size(int kind) { return CC_ASSET[kind].cells * cc_cell_frac(); }
 /* size: 0.4 .. 2.5 of the default, opacity 0 .. 1 */
 static float cc_sval(const CcEl *e, int row) {
@@ -573,6 +605,13 @@ static void cc_ed_down(float x, float y) {                /* GUI units */
             if (g_in(cc_tile(i), x, y) && cc_edn < CC_MAX) {
                 CcEl *e = &cc_ed[cc_edn];
                 e->kind = it[i]; e->cx = 0.5f; e->cy = 0.5f; e->size = cc_def_size(it[i]); e->alpha = cc_def_alpha;
+                e->param = 1;
+                if (it[i] == K_SLOT)                         /* the next slot not on the screen yet */
+                    for (int d = 1; d <= 9; d++) {
+                        int used = 0;
+                        for (int j = 0; j < cc_edn; j++) if (cc_ed[j].kind == K_SLOT && cc_ed[j].param == d) used = 1;
+                        if (!used) { e->param = d; break; }
+                    }
                 cc_clamp(e);
                 cc_sel = cc_edn++;
                 cc_panel = 0;
@@ -603,6 +642,8 @@ static void cc_ed_down(float x, float y) {                /* GUI units */
             t.y0 -= 3.f; t.y1 += 3.f; t.x0 -= 4.f; t.x1 += 4.f;
             if (g_in(t, x, y)) { cc_slider = r; cc_sset(e, r, (x - (t.x0 + 4.f)) / (t.x1 - t.x0 - 8.f)); cc_clamp(e); return; }
         }
+        if (e->kind == K_SLOT)
+            for (int d = 0; d < 9; d++) if (g_in(cc_digit(sp, d), x, y)) { e->param = d + 1; rb_click(); return; }
         if (g_in(sp, x, y)) return;
     }
     for (int i = cc_edn - 1; i >= 0; i--) {
@@ -684,7 +725,7 @@ static u64 hc_ct_tick(u32 orig, u32 *w) {
                     if (!cc_p[i].used) {
                         P = &cc_p[i];
                         memset(P, 0, sizeof *P);
-                        P->used = 1; P->id = id; P->el = hit; P->sx = x; P->sy = y;
+                        P->used = 1; P->id = id; P->el = hit; P->sx = x; P->sy = y; P->t0 = now_ms();
                         if (cc_el[hit].kind == K_JOY_FLOAT) {          /* the stick comes under the finger */
                             float R = cc_el[hit].size * cc_H / 2;
                             float bx = x, by = y;
@@ -705,6 +746,7 @@ static u64 hc_ct_tick(u32 orig, u32 *w) {
         if (cc_p[i].used && !cc_p[i].seen) {
             int el = cc_p[i].el;
             if (el >= 0 && el < cc_n && (cc_el[el].kind == K_JOY_FIX || cc_el[el].kind == K_JOY_FLOAT)) cc_joy[el][2] = cc_joy[el][3] = 0;
+            if (el >= 0 && el < cc_n && cc_el[el].kind == K_DROP && !cc_p[i].done) cc_pend_drop = 1;   /* a tap: one item */
             cc_p[i].used = 0;
         }
     cc_run(q);
@@ -716,6 +758,29 @@ static u64 hc_ct_enqueue(u32 orig, u32 *w) {
     if (!cc_self && cc_active && cc_ids_ok && !cc_editing && cc_special(cc_el, cc_n)) {
         short id = (short)w[1];
         if (id == cc_bid[B_TOUCH_BUILD] || id == cc_bid[B_TOUCH_DESTROY]) return 0;
+    }
+    return nh_callw(orig, w);
+}
+
+static u64 hc_ct_enqtap(u32 orig, u32 *w) {
+    if (!cc_self && cc_active && cc_ids_ok && !cc_editing && cc_special(cc_el, cc_n)) {
+        short id = (short)w[1];
+        if (id == cc_bid[B_TOUCH_BUILD] || id == cc_bid[B_TOUCH_DESTROY]) return 0;
+    }
+    return nh_callw(orig, w);
+}
+
+/* the hotbar's fill while our drop button is held (the game's own long-press picture) */
+static void *(*cc_guidata)(void *client);
+static int (*cc_selslot)(void *inv);
+static u64 hc_ct_dropprog(u32 orig, u32 *w) {
+    char *client = (char *)w[1];
+    if (cc_drop_prog > 0.f && client && cc_guidata && cc_selslot) {
+        char *gd = cc_guidata(client), *pl = *(char **)(client + 0x120);
+        if (gd && pl) {
+            *(int *)(gd + 0xac) = cc_selslot(*(void **)(pl + 0xda0));
+            *(float *)(gd + 0xa8) = cc_drop_prog * 40.f;     /* the game drops at 40 ticks; we at 3 s */
+        }
     }
     return nh_callw(orig, w);
 }
@@ -741,6 +806,7 @@ static void *cc_texture(int i) {
     return cc_tex[i];
 }
 static int cc_cur_tex = -1, cc_quads;
+static void ct_flush_if_tex(int t) { (void)t; }
 static void cc_flush(void) {
     if (cc_cur_tex >= 0 && cc_quads) mb_tdrawtex(mb_tess, mb_screenmats + 0x24, cc_texture(cc_cur_tex));
     cc_cur_tex = -1; cc_quads = 0;
@@ -782,12 +848,56 @@ static const float FB_UP[4] = {0, 107, 26, 26}, FB_LEFT[4] = {26, 107, 26, 26}, 
                    FB_UPLEFT[4] = {26, 133, 26, 26}, FB_ASC[4] = {52, 133, 26, 26}, FB_DESC[4] = {78, 133, 26, 26},
                    FB_SNEAK[4] = {218, 64, 18, 18}, FB_SNEAK_ON[4] = {218, 82, 18, 18};
 
+/* a hotbar slot: the game's slot and its selection frame (always), the item of hotbar slot N as the hotbar draws it */
+static int (*cc_isnull)(void *ii);
+static int (*cc_dmg)(void *ii), (*cc_maxdmg)(void *ii), (*cc_damaged)(void *ii);
+static void cc_draw_slot(const CcEl *e, CcGBox B, float alpha, int live) {
+    float s = B.x1 - B.x0, k = s / 24.f;
+    int slot = e->param >= 1 && e->param <= 9 ? e->param : 1;
+    char *pl = cc_player();
+    void *inv = pl ? *(void **)(pl + 0xda0) : 0;
+    int sel = live && inv && cc_selslot && cc_selslot(inv) == slot - 1;
+    float a = alpha;
+    ct_flush_if_tex(CC_TEX_GUI);
+    cc_sprite(CC_TEX_GUI, B.x0 + 2 * k, B.y0 + 2 * k, B.x1 - 2 * k, B.y1 - 2 * k, 1, 1, 20, 20, 1, 1, 1, a);   /* slot */
+    float fk = sel ? 1.f : 0.8f;
+    cc_sprite(CC_TEX_GUI, B.x0, B.y0, B.x1, B.y1, 0, 22, 24, 24, fk, fk, fk, a);                         /* frame */
+    if (!inv || !rb_ir_instance || !rb_ir_item) return;
+    void *ii = ((void *(*)(void *, int))(*(void ***)inv)[4])(inv, slot - 1);   /* Container::getItem */
+    if (!ii || (cc_isnull && cc_isnull(ii))) return;
+    cc_flush();
+    float sc = s * (16.f / 24.f) / 16.f, cx = (B.x0 + B.x1) / 2, cy = (B.y0 + B.y1) / 2;
+    int block = *(void **)((char *)ii + 0x10) != 0;
+    float ix = block ? cx - 8.f : cx - 7.f, iy = block ? cy - 8.f : cy - 9.f;   /* where renderGuiItemNew centres */
+    rb_ir_item(rb_ir_instance(), ii, 0, ix, iy, 1.f, 1.f, sc, 0);
+    /* durability and count, as the hotbar */
+    if (cc_damaged && cc_damaged(ii) && cc_dmg && cc_maxdmg) {
+        int mx = cc_maxdmg(ii);
+        float f = mx > 0 ? 1.f - (float)cc_dmg(ii) / (float)mx : 0.f;
+        if (f < 0) f = 0;
+        float bx = cx - 6.5f * k * 1.1f, by = B.y1 - 6.f * k, bw = 13.f * k * 1.1f;
+        cc_fillr(bx, by, bx + bw, by + 2.f * k, 0, 0, 0, a);
+        cc_fillr(bx, by, bx + bw * f, by + 1.f * k, 1.f - f, f, 0, a);
+    }
+    int cnt = *(unsigned char *)ii;
+    if (cnt > 1) {
+        cc_flush();
+        char t[8];
+        snprintf(t, sizeof t, "%d", cnt);
+        void *font = g_client ? *(void **)((char *)g_client + 0x7c) : 0;
+        float tw = 6.f * (cnt > 9 ? 2 : 1);
+        if (font && f_fontwidth) { u32 st[1]; gstr(st, t); tw = (float)f_fontwidth(font, st, 1.f, 0); f_strdtor(st); }
+        const float wc[4] = {1, 1, 1, 1};
+        rb_text(font, B.x1 - 3.f * k - tw, B.y1 - 3.f * k - 8.f, t, wc);
+    }
+}
+
 /* one element in a box (GUI units); live = the running game (pressed states shown) */
 static void cc_draw_el(const CcEl *e, int idx, CcGBox B, float alpha, int live) {
     float s = B.x1 - B.x0;
     float pr = 0.72f;                                     /* our pictures, pressed */
     switch (e->kind) {
-    case K_DPAD_JUMP: case K_DPAD_SNEAK: {
+    case K_DPAD_JUMP: case K_DPAD_SNEAK: case K_DPAD_PLAIN: {
         float c = s / 3;
         int fw = live ? cc_fwd_el[idx] : 1;
         #define CELL(col, row) B.x0 + (col) * c, B.y0 + (row) * c, B.x0 + (col + 1) * c, B.y0 + (row + 1) * c
@@ -800,7 +910,11 @@ static void cc_draw_el(const CcEl *e, int idx, CcGBox B, float alpha, int live) 
             cc_gui_glyph(B_UPRIGHT, CELL(2, 0), live && cc_sent[B_UPRIGHT], alpha, FB_UPRIGHT, 0);
         }
         if (e->kind == K_DPAD_JUMP) cc_gui_glyph(B_JUMP, CELL(1, 1), live && cc_sent[B_JUMP], alpha, FB_JUMP, 0);
-        else {
+        else if (e->kind == K_DPAD_PLAIN) {                  /* the empty middle: the game's button face, no picture */
+            float nc[4] = {1, 1, 1, 1};
+            if (cc_g[B_LEFT].ok) memcpy(nc, cc_g[B_LEFT].col_n, sizeof nc);
+            cc_atlas(B.x0 + c, B.y0 + c, B.x0 + 2 * c, B.y0 + 2 * c, CA_BLANK, nc[0], nc[1], nc[2], alpha);
+        } else {
             int on = live && cc_is_sneaking();
             float m = c * 0.15f;
             cc_gui_glyph(B_SNEAK_TOGGLE, B.x0 + c + m, B.y0 + c + m, B.x0 + 2 * c - m, B.y0 + 2 * c - m, 0, alpha, on ? FB_SNEAK_ON : FB_SNEAK, on);
@@ -823,6 +937,7 @@ static void cc_draw_el(const CcEl *e, int idx, CcGBox B, float alpha, int live) 
         ATL(kxp - kr, kyp - kr, kxp + kr, kyp + kr, CA_JOY_KNOB, 1, 1, 1, alpha);
         break;
     }
+    case K_SLOT: cc_draw_slot(e, B, alpha, live); break;
     case K_FWD: cc_gui_glyph(B_UP_IGNORE, B.x0, B.y0, B.x1, B.y1, live && cc_sent[B_UP], alpha, FB_UP, 0); break;
     case K_BACK: cc_gui_glyph(B_DOWN, B.x0, B.y0, B.x1, B.y1, live && cc_sent[B_DOWN], alpha, FB_DOWN, 0); break;
     case K_LEFT: cc_gui_glyph(B_LEFT, B.x0, B.y0, B.x1, B.y1, live && cc_sent[B_LEFT], alpha, FB_LEFT, 0); break;
@@ -897,6 +1012,20 @@ static void cc_draw_editor(void) {
             float v = cc_sval(e, r), kx = t.x0 + (t.x1 - t.x0) * v;
             cc_fillr(t.x0, cy - 0.5f, kx, cy + 0.5f, 0.38f, 0.87f, 0.81f, 1);
             ATL(kx - 4, cy - 4, kx + 4, cy + 4, CA_IC_DOT, 1, 1, 1, 1);
+        }
+        if (e->kind == K_SLOT) {
+            for (int d = 0; d < 9; d++) {
+                CcGBox db = cc_digit(p, d);
+                int on = e->param == d + 1;
+                ATL(db.x0, db.y0, db.x1, db.y1, CA_IC_ROUND, on ? 0.38f : 1.f, on ? 0.87f : 1.f, on ? 0.81f : 1.f, on ? 0.9f : 0.12f);
+            }
+            cc_flush();
+            for (int d = 0; d < 9; d++) {
+                CcGBox db = cc_digit(p, d);
+                char t[4] = {(char)('1' + d), 0};
+                const float dc[4] = {1, 1, 1, 1}, dk[4] = {0.05f, 0.1f, 0.1f, 1};
+                cc_text_raw(db.x0 + 2.f, db.y0 + 2.f, t, e->param == d + 1 ? dk : dc);
+            }
         }
     }
     /* chrome */
@@ -1024,6 +1153,16 @@ static void controls_init(void *mc) {
         return;
     }
     nh_hook_c((u32)cc_enq_button, hc_ct_enqueue);
+    cc_enq_tap = dlsym(mc, "_ZN15InputEventQueue28enqueueButtonPressAndReleaseEs");
+    cc_isnull = dlsym(mc, "_ZNK12ItemInstance6isNullEv");
+    cc_dmg = dlsym(mc, "_ZNK12ItemInstance14getDamageValueEv");
+    cc_maxdmg = dlsym(mc, "_ZNK12ItemInstance12getMaxDamageEv");
+    cc_damaged = dlsym(mc, "_ZNK12ItemInstance9isDamagedEv");
+    if (cc_enq_tap) nh_hook_c((u32)cc_enq_tap, hc_ct_enqtap);
+    cc_guidata = dlsym(mc, "_ZN15MinecraftClient10getGuiDataEv");
+    cc_selslot = dlsym(mc, "_ZNK9Inventory15getSelectedSlotEv");
+    void *dp = dlsym(mc, "_ZN14HotBarRenderer19_renderDropProgressER15MinecraftClient");
+    if (dp) nh_hook_c((u32)dp, hc_ct_dropprog);
     patch_slot(vg, 2, cc_grender, (void **)&cc_o_grender);
     patch_slot(vg, 3, cc_gtick, (void **)&cc_o_gtick);
     float *bt = dlsym(mc, "_ZN7GuiData20BUTTONS_TRANSPARENCYE");   /* the game's button transparency */
