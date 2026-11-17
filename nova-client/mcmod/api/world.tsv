@@ -18,5 +18,8 @@ __count	x1:num	list	native:WORLD_COUNT	wip	внутреннее: world.count
 world.drop	x:num, y:num, z:num, item:item, count:num=1	bool	native:WORLD_DROP#0	wip	ХОСТ: выбросить предмет из блока (как выпадение при ломании), false у гостя
 world.particle	type:any, x:num, y:num, z:num, vx:num=0, vy:num=0, vz:num=0, data:num=0	-	java:world.particle	wip	Частица только на этом телефоне: "smoke", "largesmoke", "flame", "lava", "cloud" или номер ParticleType 0.14
 __particle	type:num	-	native:WORLD_PARTICLE	wip	внутреннее: world.particle
-world.sound	name:str, x:num, y:num, z:num, volume:num=1, pitch:num=1	-	java:world.sound	wip	Звук игры в точке, слышно на этом телефоне ("fire.fire", "fire.ignite", "random.fizz", "random.click"...)
+world.sound	name:str, x:num, y:num, z:num, volume:num=1, pitch:num=1	-	java:world.sound	wip	Звук мода (из sound_definitions.json мода, "ns:имя") — слышно всем рядом, громкость падает с расстоянием; или Звук игры в точке, слышно на этом телефоне ("fire.fire", "fire.ignite", "random.fizz", "random.click"...)
 __sound	name:str	-	native:WORLD_SOUND	wip	внутреннее: world.sound
+world.stopSound	name:str=""	-	java:world.stopSound	wip	Остановить звуки мода с этим именем ("" — все звуки модов); хост останавливает их и у игроков
+world.find	x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, ids:any	list	java:world.find	wip	Где в коробке (до 65536 блоков) стоят блоки из ids (до 10): до 16 штук [{x, y, z, block}], быстрый поиск в C
+__find	x1:num	list	native:WORLD_FIND	wip	внутреннее: world.find

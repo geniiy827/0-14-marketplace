@@ -17,6 +17,17 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `__mobinfo(e:num)` | - | в работе | внутреннее: entity.kind |
 | `__mobset(key:str)` | - | в работе | внутреннее: entity.set |
 | `__mobget(key:str)` | - | в работе | внутреннее: entity.get |
+| `__mobbecome(name:str)` | - | в работе | внутреннее: копия моба мода у игрока |
+| `__mobtarget(e:num)` | - | в работе | внутреннее |
+| `__mobsettarget(e:num)` | - | в работе | внутреннее |
+| `__mobmove(e:num)` | - | в работе | внутреннее |
+| `__mobfollow(e:num)` | - | в работе | внутреннее |
+| `__mobstop(e:num)` | - | в работе | внутреннее |
+| `__moblook(e:num)` | - | в работе | внутреннее |
+| `__mobattack(e:num)` | - | в работе | внутреннее |
+| `__mobstate(e:num)` | - | в работе | внутреннее |
+| `__mobspeed(e:num)` | - | в работе | внутреннее |
+| `__mobtp(e:num)` | - | в работе | внутреннее |
 | `__recipe(result:num)` | - | в работе | внутреннее: recipe.shaped |
 | `__smelt(input:num)` | - | в работе | внутреннее: recipe.smelt |
 | `__hud(slot:str)` | - | в работе | внутреннее: ui.hud |
@@ -24,6 +35,7 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `__count(x1:num)` | list | в работе | внутреннее: world.count |
 | `__particle(type:num)` | - | в работе | внутреннее: world.particle |
 | `__sound(name:str)` | - | в работе | внутреннее: world.sound |
+| `__find(x1:num)` | list | в работе | внутреннее: world.find |
 
 ## chat
 
@@ -54,6 +66,16 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `entity.set(e:num, key:str, value:num)` | - | в работе | Значение моба мода: его читают анимации и контроллеры как query.key / variable.key (сохраняется в мире) |
 | `entity.get(e:num, key:str)` | num | в работе | Прочитать значение моба мода (0, если не задано) |
 | `entity.remove(e:num)` | - | в работе | ХОСТ: убрать сущность (без смерти и выпадения) |
+| `entity.target(e:num)` | any | в работе | ХОСТ: номер цели моба мода (игрок/моб) или null |
+| `entity.setTarget(e:num, target:any)` | - | в работе | ХОСТ: задать цель (null — забыть) |
+| `entity.moveTo(e:num, x:num, y:num, z:num, speed:num=1)` | bool | в работе | ХОСТ: идти в точку (поиск пути игры), speed — множитель скорости; false если пути нет |
+| `entity.follow(e:num, target:num, speed:num=1)` | bool | в работе | ХОСТ: идти к сущности (путь пересчитывай раз в несколько тиков) |
+| `entity.stop(e:num)` | - | в работе | ХОСТ: остановиться |
+| `entity.lookAt(e:num, x:num, y:num, z:num)` | - | в работе | ХОСТ: повернуть голову к точке |
+| `entity.attack(e:num, target:num)` | bool | в работе | ХОСТ: ударить цель (урон — damage из entity { }) |
+| `entity.state(e:num)` | any | в работе | {x, y, z, speed (блоков/тик по горизонтали), health, yaw, wall (упёрся в стену), water, vy} или null |
+| `entity.setSpeed(e:num, speed:num)` | - | в работе | ХОСТ: базовая скорость моба (как speed в entity { }) |
+| `entity.teleport(e:num, x:num, y:num, z:num)` | - | в работе | ХОСТ: переместить сущность (y — ноги) |
 
 ## host
 
@@ -152,6 +174,8 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `players.health(player:str)` | num | в работе | ХОСТ: здоровье игрока (половинки сердца), -1 если нет такого |
 | `players.tell(player:str, text:str)` | bool | в работе | ХОСТ: строка в чат одному игроку |
 | `players.fire(player:str, seconds:num)` | bool | в работе | ХОСТ: поджечь игрока на seconds секунд |
+| `players.view(player:str)` | any | в работе | ХОСТ: глаза игрока и куда он смотрит {x, y, z, lx, ly, lz} (присылают сами игроки, 5 раз в секунду) или null |
+| `players.id(player:str)` | any | в работе | ХОСТ: номер сущности игрока (для entity.attack / entity.setTarget) или null |
 
 ## recipe
 
@@ -220,7 +244,9 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `world.count(x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, ids:any)` | list | в работе | Сколько блоков каждого номера из ids (до 10) в коробке (до 65536 блоков): быстрый подсчёт в C |
 | `world.drop(x:num, y:num, z:num, item:item, count:num=1)` | bool | в работе | ХОСТ: выбросить предмет из блока (как выпадение при ломании), false у гостя |
 | `world.particle(type:any, x:num, y:num, z:num, vx:num=0, vy:num=0, vz:num=0, data:num=0)` | - | в работе | Частица только на этом телефоне: "smoke", "largesmoke", "flame", "lava", "cloud" или номер ParticleType 0.14 |
-| `world.sound(name:str, x:num, y:num, z:num, volume:num=1, pitch:num=1)` | - | в работе | Звук игры в точке, слышно на этом телефоне ("fire.fire", "fire.ignite", "random.fizz", "random.click"...) |
+| `world.sound(name:str, x:num, y:num, z:num, volume:num=1, pitch:num=1)` | - | в работе | Звук мода (из sound_definitions.json мода, "ns:имя") — слышно всем рядом, громкость падает с расстоянием; или Звук игры в точке, слышно на этом телефоне ("fire.fire", "fire.ignite", "random.fizz", "random.click"...) |
+| `world.stopSound(name:str="")` | - | в работе | Остановить звуки мода с этим именем ("" — все звуки модов); хост останавливает их и у игроков |
+| `world.find(x1:num, y1:num, z1:num, x2:num, y2:num, z2:num, ids:any)` | list | в работе | Где в коробке (до 65536 блоков) стоят блоки из ids (до 10): до 16 штук [{x, y, z, block}], быстрый поиск в C |
 
 ## События
 
@@ -242,3 +268,4 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `on client.receive(e)` | $mod,$channel,$data | - | в работе | У ИГРОКА: хост прислал сообщение мода (players.send / players.sendAll). e.channel, e.data |
 | `on players.join(e)` | $player | - | в работе | У ХОСТА: игрок вошёл в мир (e.player — имя) |
 | `on players.leave(e)` | $player | - | в работе | У ХОСТА: игрок вышел (e.player — имя) |
+| `on __mobsound(e)` | type,kind,x,y,z | - | в работе | внутреннее: звук моба мода (0 удар, 1 смерть, 2 шаг, 3 бормотание) — играет ModSounds |

@@ -483,3 +483,10 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
 - Носитель PigZombie (EntityType 0x10b24): MonsterPlacerItem::spawnMobAt(r0 не используется, bs, type, Vec3*, item*)
   -> НЕ Mob*, а bool (Level::addEntity)! octa9: спавн сами: MobFactory::CreateMob(sret unique_ptr, type, bs, pos), resetAttributes, setPersistent, moveTo, Level vtable[12] addEntity(&up). vtable PigZombie 229 слотов: 113 read/114 addAdditionalSaveData, 115 _playStepSound, 205 _getAmbientSound -> const char* (null = тишина!), 206-207 hurt/death -> std::string (sret). octa8: краш при спавне был из-за записи строки в слот 205.
 - eval(): eval_nvars_hi — мобы читают до 64 значений.
+- octa10: GoalSelector'ы моба: +0xc60 (цели), +0xc6c (действия) — хук GoalSelector::tick пропускает их у ai:"script".
+  Entity: +0x2c скорость (Vec3), +0x12b horizontalCollision, +0x15a в воде, +0x178 поворот головы; Mob слоты:
+  72 getPickRadius (float), 127 onLadder(bool), 171 setTarget, 174 doHurtTarget. Атрибуты: Mob::getAttribute(SharedAttributes::X)
+  -> AttributeInstance: setMaxValue/resetToMaxValue (здоровье), setDefaultValue(v, 0). Model: материалы +0x18 entity,
+  +0x24 alphatest, +0x30 alphablend, +0x3c static, +0x48 emissive, +0x54 emissive_alpha, +0x60 change_color; +0x10 активный.
+  Повороты кубов: ModBlocks (geo блоки) понимает rotation как K(rx,-ry,-rz) ZYX в мире с x зеркалом — НЕ как Bedrock;
+  для порта блоков матрицу считать и раскладывать под это (см. ports/prehistoric_dweller/blocks, скрипт в истории).

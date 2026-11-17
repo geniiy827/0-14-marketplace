@@ -30,6 +30,17 @@ public final class ModRuntime {
         List<String[]> liveScan();
     }
 
+    /** sounds of mods (ModSounds); null in desktop tests */
+    public interface Sounds {
+        boolean play(String name, double x, double y, double z, double volume, double pitch);   // false: not a mod sound
+        void stop(String name);                                                                 // "" = all
+        void listener(double x, double y, double z, double yaw);
+        void leave();
+    }
+    public Sounds sounds;
+    /** per mod mob type: sound names {hurt, death, step, ambient} (null = none) and volume */
+    public final List<String[]> mobSounds = new ArrayList<String[]>();
+
     /** one loaded mod */
     public static final class Mod {
         public final String id, name, file;
@@ -531,6 +542,23 @@ public final class ModRuntime {
                         Interp.num(a.get(4), line), anchor}, Interp.str(a.get(0)).replace('|', ' ') + "|" + pic);
                 return null;
             }
+            case "world.find": {                 // -> native env.inc: positions of blocks in a box (up to 16)
+                Object ids = a.get(6);
+                if (!(ids instanceof List) || ((List<?>) ids).isEmpty() || ((List<?>) ids).size() > 10)
+                    throw new ScriptError("world.find: ids - список из 1..10 блоков", line);
+                List<?> il = (List<?>) ids;
+                double[] nums = new double[6 + il.size()];
+                for (int i = 0; i < 6; i++) nums[i] = Interp.num(a.get(i), line);
+                for (int i = 0; i < il.size(); i++) nums[6 + i] = resolveId(il.get(i), "block", line);
+                double[] r = host.nativeApi(ApiOps.WORLD_FIND, nums, "");
+                List<Object> out = new ArrayList<Object>();
+                if (r != null) for (int i = 0; i + 3 < r.length; i += 4) {
+                    Map<String, Object> m = new LinkedHashMap<String, Object>();
+                    m.put("x", r[i]); m.put("y", r[i + 1]); m.put("z", r[i + 2]); m.put("block", il.get((int) r[i + 3]));
+                    out.add(m);
+                }
+                return out;
+            }
             case "world.count": {                // -> native env.inc: block counts in a box, one per id
                 Object ids = a.get(6);
                 if (!(ids instanceof List) || ((List<?>) ids).isEmpty() || ((List<?>) ids).size() > 10)
@@ -564,16 +592,86 @@ public final class ModRuntime {
             case "world.sound": {
                 double[] nums = new double[5];
                 for (int i = 0; i < 5; i++) nums[i] = Interp.num(a.get(i + 1), line);
-                host.nativeApi(ApiOps.WORLD_SOUND, nums, Interp.str(a.get(0)));
+                String sn = Interp.str(a.get(0));
+                if (sounds != null && sounds.play(sn, nums[0], nums[1], nums[2], nums[3], nums[4])) {
+                    if (isHost()) novaSend("snd", java.util.Arrays.asList((Object) sn, nums[0], nums[1], nums[2], nums[3], nums[4]));
+                    return null;
+                }
+                host.nativeApi(ApiOps.WORLD_SOUND, nums, sn);
                 return null;
             }
+            case "world.stopSound": {
+                String sn = a.isEmpty() || a.get(0) == null ? "" : Interp.str(a.get(0));
+                if (sounds != null) sounds.stop(sn);
+                if (isHost()) novaSend("stop", sn);
+                return null;
+            }
+            case "players.id": {
+                String r = host.nativeApiStr(1013, null, netName(a.get(0)));
+                try { return r == null ? null : (Object) Double.valueOf(r); } catch (NumberFormatException bad) { return null; }
+            }
+            case "players.view": {
+                String who = netName(a.get(0));
+                double[] v = views.get(who);
+                if (who.equals(host.nativeApiStr(1011, null, ""))) v = localView();
+                if (v == null) return null;
+                Map<String, Object> r = new LinkedHashMap<String, Object>();
+                r.put("x", v[0]); r.put("y", v[1]); r.put("z", v[2]); r.put("lx", v[3]); r.put("ly", v[4]); r.put("lz", v[5]);
+                return r;
+            }
+            case "entity.target": {
+                double[] r = host.nativeApi(ApiOps.MOB_TARGET, new double[]{Interp.num(a.get(0), line)}, "");
+                return r == null || r.length == 0 ? null : (Object) r[0];
+            }
+            case "entity.setTarget":
+                host.nativeApi(ApiOps.MOB_SET_TARGET, new double[]{Interp.num(a.get(0), line),
+                        a.get(1) == null ? 0 : Interp.num(a.get(1), line)}, "");
+                return null;
+            case "entity.moveTo": {
+                double[] r = host.nativeApi(ApiOps.MOB_MOVE, new double[]{Interp.num(a.get(0), line), Interp.num(a.get(1), line),
+                        Interp.num(a.get(2), line), Interp.num(a.get(3), line), Interp.num(a.get(4), line)}, "");
+                return r != null && r.length > 0 && r[0] != 0;
+            }
+            case "entity.follow": {
+                double[] r = host.nativeApi(ApiOps.MOB_FOLLOW, new double[]{Interp.num(a.get(0), line), Interp.num(a.get(1), line),
+                        Interp.num(a.get(2), line)}, "");
+                return r != null && r.length > 0 && r[0] != 0;
+            }
+            case "entity.stop":
+                host.nativeApi(ApiOps.MOB_STOP, new double[]{Interp.num(a.get(0), line)}, "");
+                return null;
+            case "entity.lookAt":
+                host.nativeApi(ApiOps.MOB_LOOK, new double[]{Interp.num(a.get(0), line), Interp.num(a.get(1), line),
+                        Interp.num(a.get(2), line), Interp.num(a.get(3), line)}, "");
+                return null;
+            case "entity.attack": {
+                double[] r = host.nativeApi(ApiOps.MOB_ATTACK, new double[]{Interp.num(a.get(0), line), Interp.num(a.get(1), line)}, "");
+                return r != null && r.length > 0 && r[0] != 0;
+            }
+            case "entity.state": {
+                double[] r = host.nativeApi(ApiOps.MOB_STATE, new double[]{Interp.num(a.get(0), line)}, "");
+                if (r == null || r.length < 9) return null;
+                Map<String, Object> m = new LinkedHashMap<String, Object>();
+                String[] k = {"x", "y", "z", "speed", "health", "yaw", "wall", "water", "vy"};
+                for (int i = 0; i < k.length; i++) m.put(k[i], r[i]);
+                return m;
+            }
+            case "entity.setSpeed":
+                host.nativeApi(ApiOps.MOB_SPEED, new double[]{Interp.num(a.get(0), line), Interp.num(a.get(1), line)}, "");
+                return null;
+            case "entity.teleport":
+                host.nativeApi(ApiOps.MOB_TP, new double[]{Interp.num(a.get(0), line), Interp.num(a.get(1), line),
+                        Interp.num(a.get(2), line), Interp.num(a.get(3), line)}, "");
+                return null;
             case "entity.spawn": {
                 String nm = Interp.str(a.get(0));
                 if (nm.indexOf(':') < 0) nm = modOf(in).id + ":" + nm;
                 if (!mobNames.contains(nm)) throw new ScriptError("нет моба " + nm + " (объяви entity " + nm.substring(nm.indexOf(':') + 1) + " { })", line);
                 double[] r = host.nativeApi(ApiOps.MOB_SPAWN, new double[]{Interp.num(a.get(1), line), Interp.num(a.get(2), line),
                         Interp.num(a.get(3), line)}, nm);
-                return r == null || r.length == 0 ? null : (Object) r[0];
+                if (r == null || r.length == 0) return null;
+                syncMob(r[0], nm, null, 0);
+                return (Object) r[0];
             }
             case "entity.kind": {
                 double[] r = host.nativeApi(ApiOps.MOB_INFO, new double[]{Interp.num(a.get(0), line)}, "");
@@ -581,11 +679,13 @@ public final class ModRuntime {
                 int t = (int) r[0];
                 return t >= 0 && t < mobNames.size() ? mobNames.get(t) : null;
             }
-            case "entity.set":
-                host.nativeApi(ApiOps.MOB_SET, new double[]{Interp.num(a.get(0), line), a.get(2) instanceof Boolean
-                        ? ((Boolean) a.get(2) ? 1 : 0) : Interp.num(a.get(2), line)},
-                        Interp.str(a.get(1)));
+            case "entity.set": {
+                double ev = Interp.num(a.get(0), line), val = a.get(2) instanceof Boolean ? ((Boolean) a.get(2) ? 1 : 0) : Interp.num(a.get(2), line);
+                String key = Interp.str(a.get(1));
+                host.nativeApi(ApiOps.MOB_SET, new double[]{ev, val}, key);
+                syncMob(ev, null, key, val);
                 return null;
+            }
             case "entity.get": {
                 double[] r = host.nativeApi(ApiOps.MOB_GET, new double[]{Interp.num(a.get(0), line)}, Interp.str(a.get(1)));
                 return r == null || r.length == 0 ? (Object) 0.0 : (Object) r[0];
@@ -790,7 +890,15 @@ public final class ModRuntime {
             Object d = e.get("data");
             try { e.put("data", d == null || "".equals(d) ? null : Json.read(String.valueOf(d))); }
             catch (Exception bad) { return 0; }
+            if (onlyMod.equals("__nova")) { novaReceive(name, e); return 0; }
         }
+        if (name.equals("__mobsound")) {               // libnova: hurt / death / step / ambient of a mod mob
+            int t = (int) (double) (Double) e.get("type"), kind = (int) (double) (Double) e.get("kind");
+            if (sounds != null && t >= 0 && t < mobSounds.size() && kind >= 0 && kind < 4 && mobSounds.get(t)[kind] != null)
+                sounds.play(mobSounds.get(t)[kind], (Double) e.get("x"), (Double) e.get("y"), (Double) e.get("z"), 1, 1);
+            return 0;
+        }
+        if (tickEv) novaTick();
         for (final Mod m : mods) {
             if (m.prog == null) continue;
             if (onlyMod != null && !onlyMod.equals(m.id)) continue;
@@ -822,7 +930,10 @@ public final class ModRuntime {
                 }
             }
         }
-        if (name.equals("world.leave")) { inWorld = false; entities.clear(); }
+        if (name.equals("world.leave")) {
+            inWorld = false; entities.clear(); synced.clear(); views.clear(); hostCache = -1;
+            if (sounds != null) sounds.leave();
+        }
         return cancel[0] ? 1 : 0;
     }
 
@@ -857,4 +968,124 @@ public final class ModRuntime {
         return m.id + "\u001f" + ch + "\u001f" + js;
     }
     private static String netName(Object player) { return Interp.str(player).replace('\u001f', ' '); }
+
+    // ---------------------------------------------------------------- mod mobs and sounds across players
+    // The host's mob of a mod is a PigZombie for everybody else: the host tells the players which entity is which
+    // mob and its values (they drive the animations); sounds of mods played on the host reach the players too;
+    // players tell the host where they look (players.view). Messages of the mod "__nova".
+    private static final class MobSync { String type; final Map<String, Double> vals = new LinkedHashMap<String, Double>(); }
+    private final Map<Double, MobSync> synced = new LinkedHashMap<Double, MobSync>();
+    private final Map<String, double[]> views = new HashMap<String, double[]>();
+    private int hostCache = -1;
+    private long hostCacheTick = -100;
+
+    private boolean isHost() {
+        if (tick - hostCacheTick > 40 || hostCache < 0) {
+            hostCache = "1".equals(host.nativeApiStr(1001, null, "")) ? 1 : 0;
+            hostCacheTick = tick;
+        }
+        return hostCache == 1;
+    }
+
+    private void novaSend(String channel, Object data) {
+        try {
+            String js = Json.write(Json.copy(data, 0));
+            host.nativeApiStr(1003, null, "*\u001f__nova\u001f" + channel + "\u001f" + js);
+        } catch (Exception e) { host.log("nova sync: " + e); }
+    }
+
+    private void syncMob(double uid, String type, String key, double val) {
+        if (!isHost()) return;
+        MobSync m = synced.get(uid);
+        if (m == null) {
+            if (type == null) {
+                double[] r = host.nativeApi(ApiOps.MOB_INFO, new double[]{uid}, "");
+                int t = r == null || r.length == 0 ? -1 : (int) r[0];
+                if (t < 0 || t >= mobNames.size()) return;
+                type = mobNames.get(t);
+            }
+            m = new MobSync();
+            synced.put(uid, m);
+        }
+        if (type != null) m.type = type;
+        if (key != null) {
+            Double old = m.vals.get(key);
+            if (old != null && old == val) return;
+            m.vals.put(key, val);
+        }
+        sendMob(uid, m);
+    }
+
+    private void sendMob(double uid, MobSync m) {
+        List<Object> l = new ArrayList<Object>();
+        l.add(uid); l.add(m.type);
+        for (Map.Entry<String, Double> e : m.vals.entrySet()) { l.add(e.getKey()); l.add(e.getValue()); }
+        novaSend("mob", l);
+    }
+
+    private double[] localView() {
+        double[] p = host.nativeApi(ApiOps.PLAYER_POS, new double[0], "");
+        if (p == null || p.length < 5) return null;
+        double yaw = p[3], pitch = p[4];
+        double c = Math.cos(Math.toRadians(pitch));
+        return new double[]{p[0], p[1] + 1.62, p[2], -Math.sin(Math.toRadians(yaw)) * c, -Math.sin(Math.toRadians(pitch)),
+                Math.cos(Math.toRadians(yaw)) * c, yaw};
+    }
+
+    /** every tick (in a world): sounds follow the player, the host re-announces its mobs, players send where they look */
+    private void novaTick() {
+        if (mobNames.isEmpty() && sounds == null) return;
+        if (sounds != null && tick % 2 == 0) {
+            double[] v = localView();
+            if (v != null) sounds.listener(v[0], v[1] - 1.62, v[2], v[6]);
+        }
+        if (mobNames.isEmpty()) return;
+        boolean h = isHost();
+        if (h && tick % 40 == 7) {
+            double[] ids = host.nativeApi(ApiOps.ENTITY_LIST, new double[]{96}, "");
+            if (ids != null) for (double id : ids) if (!synced.containsKey(id)) syncMob(id, null, null, 0);
+            java.util.Iterator<Map.Entry<Double, MobSync>> it = synced.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<Double, MobSync> e = it.next();
+                double[] r = host.nativeApi(ApiOps.MOB_INFO, new double[]{e.getKey()}, "");
+                if (r == null || r.length == 0 || r[0] < 0) { it.remove(); continue; }
+                sendMob(e.getKey(), e.getValue());
+            }
+        }
+        if (!h && tick % 4 == 0) {
+            double[] v = localView();
+            if (v != null) {
+                String js = Json.write(Json.copy(java.util.Arrays.asList((Object) v[0], v[1], v[2], v[3], v[4], v[5]), 0));
+                host.nativeApiStr(1002, null, "__nova\u001feye\u001f" + js);
+            }
+        }
+    }
+
+    /** a message of "__nova" (see novaTick); true = handled */
+    private boolean novaReceive(String name, Map<String, Object> e) {
+        Object ch = e.get("channel"), d = e.get("data");
+        if (name.equals("host.receive")) {
+            if ("eye".equals(ch) && d instanceof List && ((List<?>) d).size() >= 6) {
+                double[] v = new double[6];
+                for (int i = 0; i < 6; i++) v[i] = ((Number) ((List<?>) d).get(i)).doubleValue();
+                views.put(String.valueOf(e.get("player")), v);
+            }
+            return true;
+        }
+        if (isHost()) return true;                   // the host's own messages to itself
+        if ("mob".equals(ch) && d instanceof List && ((List<?>) d).size() >= 2) {
+            List<?> l = (List<?>) d;
+            double uid = ((Number) l.get(0)).doubleValue();
+            host.nativeApi(ApiOps.MOB_BECOME, new double[]{uid}, String.valueOf(l.get(1)));
+            for (int i = 2; i + 1 < l.size(); i += 2)
+                host.nativeApi(ApiOps.MOB_SET, new double[]{uid, ((Number) l.get(i + 1)).doubleValue()}, String.valueOf(l.get(i)));
+        } else if ("snd".equals(ch) && d instanceof List && ((List<?>) d).size() >= 6 && sounds != null) {
+            List<?> l = (List<?>) d;
+            sounds.play(String.valueOf(l.get(0)), ((Number) l.get(1)).doubleValue(), ((Number) l.get(2)).doubleValue(),
+                    ((Number) l.get(3)).doubleValue(), ((Number) l.get(4)).doubleValue(), ((Number) l.get(5)).doubleValue());
+        } else if ("stop".equals(ch) && sounds != null) {
+            sounds.stop(d == null ? "" : String.valueOf(d));
+        }
+        return true;
+    }
 }

@@ -36,6 +36,9 @@ public class ModCheck {
                 if ("PLAYER_POS".equals(n)) return new double[]{10.5, 64, -3.5, 90, 0};
                 if ("PLAYER_HEALTH".equals(n)) return new double[]{health, 20};
                 if ("RECIPE".equals(n) || "SMELT".equals(n)) { recipes++; return new double[0]; }
+                if ("MOB_STATE".equals(n)) return new double[]{12, 20, -3, 0.15, 100, 0, 0, 0, 0};
+                if ("ENTITY_LIST".equals(n)) return new double[]{777};
+                if ("MOB_SPAWN".equals(n)) return new double[]{778};
                 return new double[]{0, 0, 0, 0, 0, 0, 0, 0};
             }
             public String nativeApiStr(int op, double[] args, final String s) {
@@ -81,6 +84,8 @@ public class ModCheck {
             }
         }
         System.out.println(id + ": " + nb + " blocks, " + ni + " items, " + nv + " by data");
+        String mobs = System.getProperty("nova.mobs");                 // names of mod mobs (-Dnova.mobs=mod:a,mod:b)
+        if (mobs != null) for (String m : mobs.split(",")) rt.mobNames.add(m);
         rt.event(EV.get("world.join"), null, null);
         flush();
         for (int k = 0; k < 400; k++) { rt.event(EV.get("tick"), null, null); flush(); }

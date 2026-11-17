@@ -15,3 +15,4 @@ host.receive	$mod,$channel,$player,$data	no	wip	У ХОСТА: игрок при
 client.receive	$mod,$channel,$data	no	wip	У ИГРОКА: хост прислал сообщение мода (players.send / players.sendAll). e.channel, e.data
 players.join	$player	no	wip	У ХОСТА: игрок вошёл в мир (e.player — имя)
 players.leave	$player	no	wip	У ХОСТА: игрок вышел (e.player — имя)
+__mobsound	type,kind,x,y,z	no	wip	внутреннее: звук моба мода (0 удар, 1 смерть, 2 шаг, 3 бормотание) — играет ModSounds

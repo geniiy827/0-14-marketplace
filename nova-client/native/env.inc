@@ -45,7 +45,8 @@ static int env_op(int op, const double *a, int n, double *out) {
         out[0] = w && ef_raining ? ef_raining(w) != 0 : 0;
         return 1;
     }
-    if (op == OP_WORLD_COUNT) {                                       /* a: x1 y1 z1 x2 y2 z2 id... */
+    if (op == OP_WORLD_COUNT || op == OP_WORLD_FIND) {               /* a: x1 y1 z1 x2 y2 z2 id...; FIND: x y z idx, up to 16 */
+        int find = op == OP_WORLD_FIND, nf = 0;
         int x1 = FL(0), y1 = FL(1), z1 = FL(2), x2 = FL(3), y2 = FL(4), z2 = FL(5), t;
         if (x1 > x2) { t = x1; x1 = x2; x2 = t; }
         if (y1 > y2) { t = y1; y1 = y2; y2 = t; }
@@ -56,7 +57,7 @@ static int env_op(int op, const double *a, int n, double *out) {
         if (k < 1) return 0;
         if (k > 10) k = 10;
         for (int i = 0; i < k; i++) out[i] = 0;
-        if ((long)(x2 - x1 + 1) * (y2 - y1 + 1) * (z2 - z1 + 1) > 65536) return k;
+        if ((long)(x2 - x1 + 1) * (y2 - y1 + 1) * (z2 - z1 + 1) > 65536) return find ? 0 : k;
         unsigned char want[256];                              /* id -> list index + 1; packed blocks (code >= 65536): by data */
         signed char wdata[256];
         unsigned char wsub[256][16];
@@ -77,13 +78,18 @@ static int env_op(int op, const double *a, int n, double *out) {
                 for (int y = y1; y <= y2; y++) {
                     int id = mm_blockid(bs, x, y, z);
                     if (id <= 0 || id >= 256) continue;
-                    if (want[id]) out[want[id] - 1] += 1;
+                    int hit = 0;
+                    if (want[id]) hit = want[id];
                     else if (anydata && wdata[id] && mf_getdata) {
                         int dt = mf_getdata(bs, x, y, z) & 15;
-                        if (wsub[id][dt]) out[wsub[id][dt] - 1] += 1;
+                        hit = wsub[id][dt];
                     }
+                    if (!hit) continue;
+                    if (!find) { out[hit - 1] += 1; continue; }
+                    out[nf * 4] = x; out[nf * 4 + 1] = y; out[nf * 4 + 2] = z; out[nf * 4 + 3] = hit - 1;
+                    if (++nf >= 16) return 64;
                 }
-        return k;
+        return find ? nf * 4 : k;
     }
     if (op == OP_WORLD_DROP) {                                        /* x y z item count (item = id + 65536 * aux) */
         if (!mf_isclient || !mf_getlevel || mf_isclient(mf_getlevel(bs)) || !ef_pop || !sf_item_ctor || !sf_items) { out[0] = 0; return 1; }

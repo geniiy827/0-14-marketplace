@@ -21,6 +21,10 @@
 #define NM_MAXT 32
 #define NM_SLOTS 64
 #define NM_CUSTOM0 16
+#define NM_F_NOAI 1        /* the carrier's goals do not run: the mod script drives the mob */
+#define NM_F_CLIMB 2       /* climbs walls like a spider */
+/* Model materials (Model ctor): entity, alphatest, alphablend, static, emissive, emissive_alpha, change_color */
+static const u16 NM_MAT[7] = {0x18, 0x24, 0x30, 0x3c, 0x48, 0x54, 0x60};
 
 typedef struct { u16 parent; float pivot[3], rot[3]; } NmBone;
 typedef struct { u16 bone; float n[3]; float v[4][5]; } NmQuad;
@@ -34,6 +38,8 @@ typedef struct { u8 kind; u16 index; const u8 *weight; } NmAnimate;
 typedef struct {
     const char *name, *tex;
     float scale, shadow, width, height, health, speed, damage;
+    int material, flags;        /* material: offset of the Model's MaterialPtr; flags: NM_F_* */
+    float pick, knockback;
     int nbone; NmBone *bone;
     int nquad; NmQuad *quad;
     int nanim; NmAnim *anim;
@@ -91,6 +97,7 @@ int Java_com_nova_client_ModBridge_nativeMobs(void **env, void *cls, void *arr) 
         T->name = nm_str(); T->tex = nm_str();
         T->scale = nm_f32(); T->shadow = nm_f32(); T->width = nm_f32(); T->height = nm_f32();
         T->health = nm_f32(); T->speed = nm_f32(); T->damage = nm_f32();
+        T->material = nm_u8(); T->flags = nm_u8(); T->pick = nm_f32(); T->knockback = nm_f32();
         T->nbone = nm_u16();
         T->bone = nm_alloc(sizeof(NmBone) * T->nbone);
         for (int i = 0; i < T->nbone; i++) {
@@ -405,6 +412,7 @@ static void nm_model_render(void *model, char *e, float limb, float amount, floa
     if (!E) return;
     nm_pose(T, E, e, limb, amount, age, yaw, pitch);
     void *mat = *(void **)((char *)model + 0x10);
+    if (mat == (char *)model + 0x18 && T->material < 7) mat = (char *)model + NM_MAT[T->material];   /* not overridden by the renderer */
     void *tex = *(void **)((char *)model + 0x14);
     if (!tex) tex = T->tex_ptr;
     if (!mat) return;
@@ -541,9 +549,29 @@ static void nm_vt_save(char *e, void *tag) {
 }
 /* _getAmbientSound returns const char* (null = no sound, Mob::playAmbientSound); _getHurtSound / _getDeathSound
  * return std::string (sret first) */
-static const char *nm_no_ambient(void *e) { return 0; }
-static void nm_silent_sound(u32 *sret, void *e) { gstr(sret, ""); }
-static void nm_no_step(void *e, void *pos, int block) { }
+/* sounds of mod mobs: the script side plays them (ModSounds) — event __mobsound(type, kind, x, y, z),
+ * kind 0 hurt, 1 death, 2 step, 3 ambient */
+static void nm_sound(void *e, int kind) {
+    int t = nm_type_of(e);
+    if (t < 0) return;
+    float *p = (float *)((char *)e + 8);
+    double a[5] = {t, kind, p[0], p[1] - *(float *)((char *)e + 0xc0), p[2]};
+    mm_fire(EV___MOBSOUND, 0, a, 5);
+}
+static const char *nm_no_ambient(void *e) { nm_sound(e, 3); return 0; }
+static void nm_hurt_sound(u32 *sret, void *e) { nm_sound(e, 0); gstr(sret, ""); }
+static void nm_death_sound(u32 *sret, void *e) { nm_sound(e, 1); gstr(sret, ""); }
+static u32 nm_o_ladder;
+static int nm_on_ladder(char *e, int b) {
+    int t = nm_type_of(e);
+    if (t >= 0 && (nm_types[t].flags & NM_F_CLIMB) && *(u8 *)(e + 0x12b)) return 1;   /* horizontalCollision */
+    return ((int (*)(void *, int))nm_o_ladder)(e, b);
+}
+static float nm_pick(char *e) {
+    int t = nm_type_of(e);
+    return t >= 0 ? nm_types[t].pick : 0.1f;
+}
+static void nm_no_step(void *e, void *pos, int block) { nm_sound(e, 2); }
 static int nm_no_xp(void *e) { return 5; }
 
 static void nm_make_vt(NmType *T, u32 *vt) {
@@ -555,9 +583,28 @@ static void nm_make_vt(NmType *T, u32 *vt) {
     c[2 + 114] = (u32)nm_vt_save;
     c[2 + 115] = (u32)nm_no_step;
     c[2 + 205] = (u32)nm_no_ambient;
-    c[2 + 206] = (u32)nm_silent_sound;
-    c[2 + 207] = (u32)nm_silent_sound;
+    c[2 + 206] = (u32)nm_hurt_sound;
+    c[2 + 207] = (u32)nm_death_sound;
+    if (!nm_o_ladder) nm_o_ladder = vt[127];
+    c[2 + 127] = (u32)nm_on_ladder;
+    c[2 + 72] = (u32)nm_pick;
     T->vt = c + 2;
+}
+
+static void *(*nm_getattr)(void *mob, void *attr);
+static void (*nm_attr_max)(void *ai, float v);
+static void (*nm_attr_reset)(void *ai);
+static void (*nm_attr_default)(void *ai, float v, int i);
+static void *nm_a_health, *nm_a_speed, *nm_a_damage, *nm_a_knock;
+static void nm_attributes(char *e, NmType *T, int fresh) {
+    if (!nm_getattr) return;
+    void *a;
+    if (nm_a_health && T->health > 0 && (a = nm_getattr(e, nm_a_health)) && nm_attr_max && nm_attr_reset) {
+        nm_attr_max(a, T->health); if (fresh) nm_attr_reset(a);
+    }
+    if (nm_a_speed && T->speed > 0 && (a = nm_getattr(e, nm_a_speed)) && nm_attr_default) nm_attr_default(a, T->speed, 0);
+    if (nm_a_damage && T->damage > 0 && (a = nm_getattr(e, nm_a_damage)) && nm_attr_default) nm_attr_default(a, T->damage, 0);
+    if (nm_a_knock && (a = nm_getattr(e, nm_a_knock)) && nm_attr_default) nm_attr_default(a, T->knockback, 0);
 }
 
 static void nm_become(char *e, int t) {
@@ -569,6 +616,7 @@ static void nm_become(char *e, int t) {
     if (nm_setbaby && *(u32 *)e == nm_pz_vt) nm_setbaby(e, 0);
     *(u32 **)e = T->vt;
     if (sf_setsize) sf_setsize(e, T->width, T->height);
+    nm_attributes(e, T, 0);
     nm_ent(e, 1);
 }
 
@@ -613,6 +661,25 @@ static void *nm_entity(double id) {
     return lvl && sf_getentity ? sf_getentity(lvl, (long long)id, 0) : 0;
 }
 
+static char *(*nm_mob_target)(void *mob);
+static void *(*nm_nav)(void *mob);
+static int (*nm_nav_to)(void *nav, float *pos, float speed);
+static int (*nm_nav_mob)(void *nav, void *mob, float speed);
+static void (*nm_nav_stop)(void *nav);
+static void *(*nm_look)(void *mob);
+static void (*nm_look_at)(void *lc, float *pos, float yawMax, float pitchMax);
+
+/* GoalSelector::tick(): mobs of mods that are driven by their script (NM_F_NOAI) skip both selectors */
+static u64 hc_nm_goals(u32 orig, u32 *w) {
+    char *sel = (char *)w[0];
+    if (nm_ntypes) {
+        int t = nm_type_of(sel - 0xc6c);
+        if (t < 0) t = nm_type_of(sel - 0xc60);
+        if (t >= 0 && (nm_types[t].flags & NM_F_NOAI)) return 0;
+    }
+    return nh_callw(orig, w);
+}
+
 static int nm_op(int op, const double *a, int n, const char *s, double *out) {
     char *pl = mm_player();
     if (!pl) return -1;
@@ -633,6 +700,7 @@ static int nm_op(int op, const double *a, int n, const char *s, double *out) {
         float rot[2] = {0, 0};
         if (nm_moveto) nm_moveto(e, pos, rot);
         nm_become(e, t);
+        nm_attributes(e, &nm_types[t], 1);
         long long uid = sf_uid(e);
         /* Level::addEntity(unique_ptr<Entity>) is virtual (slot 12): MultiPlayerLevel / ServerLevel */
         int ok = ((int (*)(void *, void **))((*(void ***)level)[12]))(level, &up);
@@ -644,6 +712,11 @@ static int nm_op(int op, const double *a, int n, const char *s, double *out) {
     if (n < 1) return -1;
     char *e = nm_entity(a[0]);
     if (!e) return 0;
+    if (op == OP_MOB_BECOME) {                       /* a player's copy of the host's mob: mark it */
+        int t = nm_find(s);
+        if (t >= 0) nm_become(e, t);
+        return 0;
+    }
     if (op == OP_ENTITY_REMOVE) { ((void (*)(void *))((*(void ***)e)[5]))(e); return 0; }
     int t = nm_type_of(e);
     if (op == OP_MOB_INFO) { out[0] = t; return 1; }
@@ -652,6 +725,72 @@ static int nm_op(int op, const double *a, int n, const char *s, double *out) {
     if (!E) return 0;
     int kl = 0;
     while (s[kl]) kl++;
+    void **vt = *(void ***)e;
+    switch (op) {
+    case OP_MOB_TARGET: {
+        char *tg = nm_mob_target ? nm_mob_target(e) : 0;
+        if (!tg) return 0;
+        out[0] = (double)sf_uid(tg);
+        return 1;
+    }
+    case OP_MOB_SET_TARGET: {
+        char *tg = n > 1 && a[1] != 0 ? nm_entity(a[1]) : 0;
+        ((void (*)(void *, void *))vt[171])(e, tg);                         /* Mob::setTarget */
+        return 0;
+    }
+    case OP_MOB_MOVE: case OP_MOB_FOLLOW: {
+        void *nav = nm_nav ? nm_nav(e) : 0;
+        if (!nav) return 0;
+        int ok;
+        if (op == OP_MOB_MOVE) {
+            if (n < 4 || !nm_nav_to) return 0;
+            float p[3] = {(float)a[1], (float)a[2], (float)a[3]};
+            ok = nm_nav_to(nav, p, n > 4 ? (float)a[4] : 1.f);
+        } else {
+            char *tg = n > 1 ? nm_entity(a[1]) : 0;
+            if (!tg || !nm_nav_mob) return 0;
+            ok = nm_nav_mob(nav, tg, n > 2 ? (float)a[2] : 1.f);
+        }
+        out[0] = ok & 1;
+        return 1;
+    }
+    case OP_MOB_STOP: { void *nav = nm_nav ? nm_nav(e) : 0; if (nav && nm_nav_stop) nm_nav_stop(nav); return 0; }
+    case OP_MOB_LOOK: {
+        void *lc = nm_look ? nm_look(e) : 0;
+        if (!lc || !nm_look_at || n < 4) return 0;
+        float p[3] = {(float)a[1], (float)a[2], (float)a[3]};
+        nm_look_at(lc, p, 30.f, 30.f);
+        return 0;
+    }
+    case OP_MOB_ATTACK: {
+        char *tg = n > 1 ? nm_entity(a[1]) : 0;
+        if (!tg) return 0;
+        out[0] = ((int (*)(void *, void *))vt[174])(e, tg) & 1;             /* doHurtTarget */
+        return 1;
+    }
+    case OP_MOB_STATE: {
+        float *p = (float *)(e + 8), *m = (float *)(e + 0x2c);
+        out[0] = p[0]; out[1] = p[1] - *(float *)(e + 0xc0); out[2] = p[2];
+        out[3] = sqrtf(m[0] * m[0] + m[2] * m[2]);
+        out[4] = f_mob_health ? f_mob_health(e) : 0;
+        out[5] = *(float *)(e + 0x178);
+        out[6] = *(u8 *)(e + 0x12b);
+        out[7] = *(u8 *)(e + 0x15a);
+        out[8] = m[1];
+        return 9;
+    }
+    case OP_MOB_SPEED: {
+        void *ai = nm_getattr && nm_a_speed ? nm_getattr(e, nm_a_speed) : 0;
+        if (ai && nm_attr_default && n > 1) nm_attr_default(ai, (float)a[1], 0);
+        return 0;
+    }
+    case OP_MOB_TP: {
+        if (n < 4 || !nm_moveto) return 0;
+        float p[3] = {(float)a[1], (float)a[2], (float)a[3]}, r[2] = {*(float *)(e + 60), *(float *)(e + 56)};
+        nm_moveto(e, p, r);
+        return 0;
+    }
+    }
     if (op == OP_MOB_SET) { nm_slot_set(&nm_types[t], E, s, kl, n > 1 ? (float)a[1] : 0); return 0; }
     if (op == OP_MOB_GET) {
         NmType *T = &nm_types[t];
@@ -683,6 +822,21 @@ static void mobs_init(void *mc) {
     S(nm_getstr, "_ZNK11CompoundTag9getStringERKSs");
     S(nm_contains, "_ZNK11CompoundTag8containsERKSs");
     S(f_mob_health, "_ZNK3Mob9getHealthEv");
+    S(nm_mob_target, "_ZN3Mob9getTargetEv");
+    S(nm_nav, "_ZN3Mob13getNavigationEv");
+    S(nm_nav_to, "_ZN14PathNavigation6moveToERK4Vec3f");
+    S(nm_nav_mob, "_ZN14PathNavigation6moveToER3Mobf");
+    S(nm_nav_stop, "_ZN14PathNavigation4stopEv");
+    S(nm_look, "_ZN3Mob14getLookControlEv");
+    S(nm_look_at, "_ZN11LookControl9setLookAtERK4Vec3ff");
+    S(nm_getattr, "_ZNK3Mob12getAttributeERK9Attribute");
+    S(nm_attr_max, "_ZN17AttributeInstance11setMaxValueEf");
+    S(nm_attr_reset, "_ZN17AttributeInstance15resetToMaxValueEv");
+    S(nm_attr_default, "_ZN17AttributeInstance15setDefaultValueEfi");
+    S(nm_a_health, "_ZN16SharedAttributes6HEALTHE");
+    S(nm_a_speed, "_ZN16SharedAttributes14MOVEMENT_SPEEDE");
+    S(nm_a_damage, "_ZN16SharedAttributes13ATTACK_DAMAGEE");
+    S(nm_a_knock, "_ZN16SharedAttributes20KNOCKBACK_RESISTANCEE");
     #undef S
     u32 *pzvt = dlsym(mc, "_ZTV9PigZombie");
     nm_pz_vt = pzvt ? (u32)(pzvt + 2) : 0;
@@ -699,5 +853,7 @@ static void nm_hooks(void) {
     void *rd = dlsym(mc, "_ZN9PigZombie22readAdditionalSaveDataERK11CompoundTag");
     if (gr) nh_hook_c((u32)gr, hc_nm_getrenderer); else LOGE("mobs: no getRenderer");
     if (rd) nh_hook_c((u32)rd, hc_nm_read); else LOGE("mobs: no PigZombie::readAdditionalSaveData");
+    void *gt = dlsym(mc, "_ZN12GoalSelector4tickEv");
+    if (!gt || nh_hook_c((u32)gt, hc_nm_goals) < 0) LOGE("mobs: no GoalSelector::tick hook");
     LOG("mobs: %d type(s), hooks in", nm_ntypes);
 }

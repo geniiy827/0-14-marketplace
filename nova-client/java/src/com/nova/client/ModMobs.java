@@ -41,6 +41,7 @@ final class ModMobs {
     final List<String> names = new ArrayList<String>();     // "modid:name" in blob order
     final Map<String, Integer> index = new HashMap<String, Integer>();
     final List<List<String>> slots = new ArrayList<List<String>>();
+    final List<String[]> sounds = new ArrayList<String[]>();      // per type: hurt, death, step, ambient
     byte[] blob;
 
     private final ModRuntime rt;
@@ -59,7 +60,10 @@ final class ModMobs {
             File dir = dirs.get(m.id);
             try {
                 ByteArrayOutputStream o = new ByteArrayOutputStream();
-                List<String> sl = compile(m.id, name, p, dir, o);
+                int ns = sounds.size();
+                List<String> sl;
+                try { sl = compile(m.id, name, p, dir, o); }
+                catch (Throwable ce) { while (sounds.size() > ns) sounds.remove(sounds.size() - 1); throw ce; }
                 byte[] b = o.toByteArray();
                 body.write(b, 0, b.length);
                 index.put(m.id + ":" + name, names.size());
@@ -89,6 +93,7 @@ final class ModMobs {
         final Map<String, JSONObject> ctrls = new HashMap<String, JSONObject>();         // controller id -> controller
         final Map<String, JSONObject> clients = new HashMap<String, JSONObject>();       // entity id -> description
         final Map<String, File> clientRoot = new HashMap<String, File>();                // entity id -> RP root
+        final Map<String, JSONObject> entitySounds = new HashMap<String, JSONObject>();  // entity id -> sounds.json events
     }
 
     private static final Map<File, Files> scanned = new HashMap<File, Files>();
@@ -131,6 +136,16 @@ final class ModMobs {
                     Iterator<String> ci = ac.keys();
                     while (ci.hasNext()) { String k = ci.next(); f.ctrls.put(k, ac.getJSONObject(k)); }
                 }
+                JSONObject esd = j.optJSONObject("entity_sounds");
+                JSONObject ents = esd == null ? null : esd.optJSONObject("entities");
+                if (ents != null) {
+                    Iterator<String> ei = ents.keys();
+                    while (ei.hasNext()) {
+                        String k = ei.next();
+                        JSONObject evs = ents.getJSONObject(k).optJSONObject("events");
+                        if (evs != null) f.entitySounds.put(k, evs);
+                    }
+                }
                 JSONObject ce = j.optJSONObject("minecraft:client_entity");
                 if (ce != null && ce.optJSONObject("description") != null) {
                     JSONObject desc = ce.getJSONObject("description");
@@ -161,6 +176,22 @@ final class ModMobs {
             b.append(c);
         }
         return b.toString();
+    }
+
+    static int material(String m) {
+        if (m == null) return 1;
+        switch (m) {
+            case "entity": return 0;
+            case "entity_alphatest": return 1;
+            case "entity_alphablend": return 2;
+            case "entity_static": return 3;
+            case "entity_emissive": return 4;
+            case "entity_emissive_alpha": return 5;
+            case "entity_change_color": return 6;
+        }
+        if (m.contains("emissive")) return 5;
+        if (m.contains("blend")) return 2;
+        return 1;
     }
 
     private static String str(Map<String, Object> p, String k, String dflt) {
@@ -243,6 +274,27 @@ final class ModMobs {
             f32(o, (float) num(p, "health", 20));
             f32(o, (float) num(p, "speed", 0.25));
             f32(o, (float) num(p, "damage", 3));
+            // material of the client file (entity_emissive_alpha: alpha of the texture = glow)
+            String mat = str(p, "material", null);
+            if (mat == null && client != null && client.optJSONObject("materials") != null)
+                mat = client.getJSONObject("materials").optString("default", null);
+            u8(o, material(mat));
+            int flags = 0;
+            if ("script".equals(str(p, "ai", ""))) flags |= 1;
+            if (Boolean.TRUE.equals(p.get("climb"))) flags |= 2;
+            u8(o, flags);
+            f32(o, (float) num(p, "pick", 0.1));
+            f32(o, (float) num(p, "knockback", 0));
+            // sounds: hurt, death, step, ambient — from sounds.json (entity_sounds) of the pack, or sounds: {..}
+            String[] snd = new String[4];
+            String[] ev = {"hurt", "death", "step", "ambient"};
+            JSONObject es = cid == null ? null : fs.entitySounds.get(cid);
+            for (int k = 0; k < 4; k++) if (es != null && es.has(ev[k])) snd[k] = es.optString(ev[k]);
+            if (p.get("sounds") instanceof Map) for (int k = 0; k < 4; k++) {
+                Object v = ((Map<?, ?>) p.get("sounds")).get(ev[k]);
+                if (v != null) snd[k] = String.valueOf(v);
+            }
+            sounds.add(snd);
             // model
             Map<String, Integer> boneIdx = new HashMap<String, Integer>();
             mesh(geo, o, boneIdx);

@@ -35,6 +35,7 @@ public final class ModBridge {
     static native int nativeArmorTextures(String spec);
     static native int nativeMobs(byte[] blob);
     static ModMobs mobs;
+    static ModSounds sounds;
     static native int nativeItemVariants(double[] data, String names);
     static native int nativeBlockSpecial(double[] data, String names);
 
@@ -229,6 +230,9 @@ public final class ModBridge {
                     try { nativeMobs(mm.blob); } catch (Throwable t) { Log.e(TAG, "mobs", t); }
                 }
                 mobs = mm;
+                ModSounds snd = new ModSounds();
+                try { snd.prepare(dirs); } catch (Throwable t) { Log.e(TAG, "sounds", t); }
+                sounds = snd;
                 try { nativeCreativeTabs(creativeTabs(rt, mb, mi)); } catch (Throwable t) { Log.e(TAG, "creative tabs", t); }
                 for (File d : dirs.values()) {             // structures.bin of mods (tools/port_rs.py): world generation
                     File sb = new File(d, "structures.bin");
@@ -239,7 +243,8 @@ public final class ModBridge {
                 rt.customIds.putAll(blocks.ids());
                 if (items != null) rt.customIds.putAll(items.ids);
             }
-            if (mobs != null) rt.mobNames.addAll(mobs.names);
+            if (mobs != null) { rt.mobNames.addAll(mobs.names); rt.mobSounds.addAll(mobs.sounds); }
+            rt.sounds = sounds;
             runtime = rt;
             Log.i(TAG, n + " mod(s) loaded");
         } catch (Throwable t) {

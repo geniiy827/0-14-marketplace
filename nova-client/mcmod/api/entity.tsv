@@ -14,3 +14,24 @@ __mobspawn	name:str	-	native:MOB_SPAWN	wip	внутреннее: entity.spawn
 __mobinfo	e:num	-	native:MOB_INFO	wip	внутреннее: entity.kind
 __mobset	key:str	-	native:MOB_SET	wip	внутреннее: entity.set
 __mobget	key:str	-	native:MOB_GET	wip	внутреннее: entity.get
+entity.target	e:num	any	java:entity.target	wip	ХОСТ: номер цели моба мода (игрок/моб) или null
+entity.setTarget	e:num, target:any	-	java:entity.setTarget	wip	ХОСТ: задать цель (null — забыть)
+entity.moveTo	e:num, x:num, y:num, z:num, speed:num=1	bool	java:entity.moveTo	wip	ХОСТ: идти в точку (поиск пути игры), speed — множитель скорости; false если пути нет
+entity.follow	e:num, target:num, speed:num=1	bool	java:entity.follow	wip	ХОСТ: идти к сущности (путь пересчитывай раз в несколько тиков)
+entity.stop	e:num	-	java:entity.stop	wip	ХОСТ: остановиться
+entity.lookAt	e:num, x:num, y:num, z:num	-	java:entity.lookAt	wip	ХОСТ: повернуть голову к точке
+entity.attack	e:num, target:num	bool	java:entity.attack	wip	ХОСТ: ударить цель (урон — damage из entity { })
+entity.state	e:num	any	java:entity.state	wip	{x, y, z, speed (блоков/тик по горизонтали), health, yaw, wall (упёрся в стену), water, vy} или null
+entity.setSpeed	e:num, speed:num	-	java:entity.setSpeed	wip	ХОСТ: базовая скорость моба (как speed в entity { })
+entity.teleport	e:num, x:num, y:num, z:num	-	java:entity.teleport	wip	ХОСТ: переместить сущность (y — ноги)
+__mobbecome	name:str	-	native:MOB_BECOME	wip	внутреннее: копия моба мода у игрока
+__mobtarget	e:num	-	native:MOB_TARGET	wip	внутреннее
+__mobsettarget	e:num	-	native:MOB_SET_TARGET	wip	внутреннее
+__mobmove	e:num	-	native:MOB_MOVE	wip	внутреннее
+__mobfollow	e:num	-	native:MOB_FOLLOW	wip	внутреннее
+__mobstop	e:num	-	native:MOB_STOP	wip	внутреннее
+__moblook	e:num	-	native:MOB_LOOK	wip	внутреннее
+__mobattack	e:num	-	native:MOB_ATTACK	wip	внутреннее
+__mobstate	e:num	-	native:MOB_STATE	wip	внутреннее
+__mobspeed	e:num	-	native:MOB_SPEED	wip	внутреннее
+__mobtp	e:num	-	native:MOB_TP	wip	внутреннее

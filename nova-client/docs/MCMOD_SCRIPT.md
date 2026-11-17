@@ -488,3 +488,17 @@ entity.remove(d)
 ```
 Ключевые кадры: linear, step, catmullrom; каналы rotation / position / scale; переходы с blend_transition.
 Пока: носитель — свинозомби (ходит, отвечает на удар, не горит), звуки носителя выключены.
+
+### Мобы модов: поведение, звуки, игра с друзьями (octa10)
+Поля `entity { }`: `health`, `speed` (атрибут скорости, как movement в Bedrock), `damage`, `knockback`,
+`pick` (на сколько шире/выше хитбокса по нему можно попасть), `climb: true` (лезет по стенам, как паук),
+`ai: "script"` (цели и ходьбу носителя выключить — моба ведёт скрипт), `material` (по умолчанию из client-файла:
+`entity_emissive_alpha` — светящиеся части по альфе текстуры), `sounds: {hurt, death, step, ambient}` (по умолчанию из
+sounds.json пака). Управление (ХОСТ): `entity.moveTo(e, x, y, z, скорость)`, `entity.follow(e, цель, скорость)`,
+`entity.stop`, `entity.lookAt`, `entity.attack(e, цель)`, `entity.state(e)` → `{x, y, z, speed, health, yaw, wall, water, vy}`,
+`entity.setSpeed`, `entity.teleport`, `entity.target / setTarget`. Игроки: `players.id(имя)` — номер сущности,
+`players.view(имя)` — глаза и взгляд `{x, y, z, lx, ly, lz}` (игроки присылают хосту сами).
+Звуки модов: каждый `sounds/sound_definitions.json` в моде; `world.sound("ns:имя", x, y, z, громкость, высота)` —
+громкость падает с расстоянием (16 блоков × громкость), лево/право по направлению; `world.stopSound(имя)`.
+Хост сам рассылает игрокам своих мобов (тип и значения для анимаций) и звуки модов — в моде ничего писать не надо.
+`world.find(x1, y1, z1, x2, y2, z2, [блоки])` — до 16 найденных блоков `{x, y, z, block}` (быстро, в C).

@@ -179,7 +179,7 @@ static int net_to_player(char *pl, const char *body) {
 }
 
 /* Java: nativeApiStr(1000 + op, numbers, text) -> text or null (not possible here: not the host, no such player) */
-enum { NET_IS_HOST = 1, NET_TO_HOST, NET_TO_PLAYER, NET_PLAYERS, NET_HURT, NET_HEAL, NET_TELEPORT, NET_GIVE, NET_INFO, NET_TELL, NET_MY_NAME, NET_FIRE };
+enum { NET_IS_HOST = 1, NET_TO_HOST, NET_TO_PLAYER, NET_PLAYERS, NET_HURT, NET_HEAL, NET_TELEPORT, NET_GIVE, NET_INFO, NET_TELL, NET_MY_NAME, NET_FIRE, NET_ID };
 static void *net_api(void **env, int op, void *darr, void *jstr) {
     void **f = *(void ***)env;
     double a[8] = {0};
@@ -257,6 +257,10 @@ static void *net_api(void **env, int op, void *darr, void *jstr) {
                 ok = out;
             } else if (op == NET_FIRE && nf_set_fire) {
                 nf_set_fire(pl, (int)a[0]);                               /* Entity::setOnFire(seconds) */
+            } else if (op == NET_ID) {                                    /* the player's entity number (entity.* API) */
+                long long uid = sf_uid(pl);
+                snprintf(out, sizeof out, "%lld", uid);
+                ok = out;
             } else if (op == NET_TELL) {
                 if (pl == mm_player()) { if (mf_gd_msg && f_guidata && g_client) { u32 st[1]; gstr(st, rest); mf_gd_msg(f_guidata(g_client), st); f_strdtor(st); } }
                 else if (!net_raw_to(pl, 0, rest)) return 0;
