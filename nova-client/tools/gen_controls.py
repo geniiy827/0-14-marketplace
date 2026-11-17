@@ -1,122 +1,155 @@
-"""NOVA custom controls (octa4): the atlas of new button pictures, drawn by geometry in the style of 0.14 buttons.
+"""NOVA custom controls: the atlas of new button pictures, computed (not hand-drawn) in the style of 0.14 buttons.
 
 Writes assets_new/images/gui/nova/controls.png (256x256) and native/controls_atlas.h (uv of every sprite).
-Buttons: the stone base of a 0.14 arrow button (gui.png 0,107 26x26) with its glyph removed, and a flat dark glyph
-(37..45 grey, like the arrows) drawn from polygons on a 22x22 grid. "On" states use the NOVA mint.
+
+Every shape is a function tested at pixel centres (x + 0.5, y + 0.5), so it comes out symmetric and centred.
+Buttons are 26x26 like the game's dpad cells: the stone face of a 0.14 arrow button (gui.png 0,107) without its
+arrow, and a flat dark glyph (the arrows' grey). The glyph centre is where the game's arrow sits: x 13, y 12 of the
+cell (the face has a thicker bottom edge, so its visual middle is one pixel up). "On" states use the NOVA mint.
+The joystick: square plates with rounded corners, a dark edge and a bevel like the game's buttons.
 """
 import math, sys
-from PIL import Image, ImageDraw
+from PIL import Image
 
 GUI = sys.argv[1] if len(sys.argv) > 1 else '/home/claude/apk/x/assets/images/gui/gui.png'
 OUT = 'assets_new/images/gui/nova/controls.png'
 HDR = 'native/controls_atlas.h'
 DARK = (40, 40, 40, 255)
+MID = (104, 104, 104, 255)
 MINT = (96, 222, 206, 255)
+CX, CY = 13.0, 12.0          # glyph centre in a 26x26 cell
 
 gui = Image.open(GUI).convert('RGBA')
 
 
+# ---------------- the stone button ----------------
 def blank26():
-    """the up-arrow cell with the arrow painted over by the button's own stone colours"""
     c = gui.crop((0, 107, 26, 133)).copy()
     p = c.load()
-    pal = [p[x, y] for y in range(18, 20) for x in range(4, 22)]   # clean stone rows under the arrow
+    pal = [p[x, y] for y in range(18, 20) for x in range(4, 22)]   # stone rows under the arrow
     ok = set(pal)
-    k = 0
-    for y in range(5, 18):                                          # the arrow and its soft edge
+    for y in range(5, 18):
         for x in range(5, 21):
             if p[x, y] not in ok:
-                p[x, y] = pal[(x * 7 + y * 13 + k) % len(pal)]
-                k += 1
+                p[x, y] = pal[(x * 7 + y * 13) % len(pal)]
     return c
 
 
 BASE = blank26()
 
 
-def glyph(draw_fn, color=DARK):
-    """a 26x26 button: stone base + glyph drawn on the 22x22 face (offset 2,2)"""
-    g = Image.new('RGBA', (22, 22), (0, 0, 0, 0))
-    d = ImageDraw.Draw(g)
-    draw_fn(d, color)
+# ---------------- a tiny rasteriser: shapes are functions of a point ----------------
+def fill(img, inside, color, box=None):
+    p = img.load()
+    W, H = img.size
+    x0, y0, x1, y1 = box or (0, 0, W, H)
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            if inside(x + 0.5, y + 0.5):
+                p[x, y] = color
+
+
+def rect(x0, y0, x1, y1):
+    return lambda x, y: x0 <= x < x1 and y0 <= y < y1
+
+
+def in_poly(pts):
+    def f(x, y):
+        c = False
+        n = len(pts)
+        for i in range(n):
+            ax, ay = pts[i]
+            bx, by = pts[(i + 1) % n]
+            if (ay > y) != (by > y) and x < (bx - ax) * (y - ay) / (by - ay) + ax:
+                c = not c
+        return c
+    return f
+
+
+def union(*fs):
+    return lambda x, y: any(f(x, y) for f in fs)
+
+
+def minus(a, b):
+    return lambda x, y: a(x, y) and not b(x, y)
+
+
+def button(shapes):
     b = BASE.copy()
-    b.alpha_composite(g, (2, 2))
+    for f, c in shapes:
+        fill(b, f, c, (4, 3, 22, 21))
     return b
 
 
-def poly(d, pts, c):
-    d.polygon([(round(x), round(y)) for x, y in pts], fill=c)
+# ---------------- glyphs, all centred on (CX, CY) ----------------
+def person(crouch):
+    c = CX
+    if not crouch:                                                # 4 + 6 + 6 rows, centred
+        return union(rect(c - 2, 4, c + 2, 8),                    # head 4x4
+                     rect(c - 3, 9, c + 3, 14),                   # body 6 wide
+                     rect(c - 5, 9, c - 4, 13), rect(c + 4, 9, c + 5, 13),   # arms, a pixel away
+                     rect(c - 3, 14, c - 1, 20), rect(c + 1, 14, c + 3, 20))  # legs
+    return union(rect(c - 2, 7, c + 2, 11),
+                 rect(c - 3, 12, c + 3, 16),
+                 rect(c - 5, 12, c - 4, 16), rect(c + 4, 12, c + 5, 16),
+                 rect(c - 5, 16, c - 1, 17), rect(c + 1, 16, c + 5, 17),      # thighs out
+                 rect(c - 5, 17, c - 3, 20), rect(c + 3, 17, c + 5, 20))      # shins down
 
 
-# ---- glyphs (22x22 face; the vanilla arrow glyph spans about 5..17) ----
-def person_stand(d, c):
-    d.rectangle([9, 3, 12, 6], fill=c)          # head
-    d.rectangle([9, 8, 12, 13], fill=c)         # body
-    d.rectangle([7, 8, 7, 12], fill=c)          # arms
-    d.rectangle([14, 8, 14, 12], fill=c)
-    d.rectangle([9, 14, 10, 18], fill=c)        # legs
-    d.rectangle([11, 14, 12, 18], fill=c)
+def sword():
+    """along the diagonal from the bottom-left to the top-right through the centre"""
+    s = math.sqrt(0.5)
+    def uv(x, y):
+        dx, dy = x - CX, y - CY
+        return (dx - dy) * s, (dx + dy) * s       # u: along (up-right), v: across
+    def f(x, y):
+        u, v = uv(x, y)
+        u -= 1.0                                   # balance the picture: the blade is longer than the grip
+        if -1.5 <= u <= 4.8:
+            return abs(v) <= 1.75                  # blade
+        if 4.8 < u <= 8.0:
+            return abs(v) <= 1.75 * (8.0 - u) / 3.2 + 0.05   # point
+        if -3.2 <= u < -1.5:
+            return abs(v) <= 4.6                   # guard
+        if -6.2 <= u < -3.2:
+            return abs(v) <= 1.05                  # grip
+        if -8.2 <= u < -6.2:
+            return abs(v) <= 2.0                   # pommel
+        return False
+    return f
 
 
-def person_crouch(d, c):
-    d.rectangle([9, 6, 12, 9], fill=c)          # head, lower
-    d.rectangle([9, 10, 12, 14], fill=c)        # shorter body
-    d.rectangle([7, 10, 7, 13], fill=c)         # arms
-    d.rectangle([14, 10, 14, 13], fill=c)
-    d.rectangle([8, 15, 10, 15], fill=c)        # thighs out
-    d.rectangle([11, 15, 13, 15], fill=c)
-    d.rectangle([7, 16, 8, 18], fill=c)         # shins
-    d.rectangle([13, 16, 14, 18], fill=c)
+def cube():
+    """an isometric block: the top face mid grey, the sides dark"""
+    c, t = CX, CY - 8.0
+    top = in_poly([(c, t), (c + 7, t + 3.5), (c, t + 7), (c - 7, t + 3.5)])
+    left = in_poly([(c - 7, t + 3.5), (c, t + 7), (c, t + 16), (c - 7, t + 12.5)])
+    right = in_poly([(c, t + 7), (c + 7, t + 3.5), (c + 7, t + 12.5), (c, t + 16)])
+    return top, union(left, right)
 
 
-def sword(d, c):
-    # blade from the bottom-left to the top-right corner, 3 px wide, a point at the end
-    a = math.radians(-45)
-    ux, uy = math.cos(a), math.sin(a)           # along the blade (up-right)
-    vx, vy = -uy, ux                             # across
-    def P(s, t, ox=8.0, oy=14.0):
-        return (ox + ux * s + vx * t, oy + uy * s + vy * t)
-    poly(d, [P(0, -1.6), P(8.5, -1.6), P(10.5, 0), P(8.5, 1.6), P(0, 1.6)], c)   # blade + point
-    poly(d, [P(-0.8, -4.2), P(0.9, -4.2), P(0.9, 4.2), P(-0.8, 4.2)], c)          # guard
-    poly(d, [P(-4.6, -1.1), P(-0.8, -1.1), P(-0.8, 1.1), P(-4.6, 1.1)], c)        # grip
-    poly(d, [P(-6.2, -1.7), P(-4.6, -1.7), P(-4.6, 1.7), P(-6.2, 1.7)], c)        # pommel
+def chevrons():
+    def chev(tip_y):                               # a ^ with straight 2.5-px arms, symmetric about CX
+        h, w, t = 6.0, 7.0, 3.6
+        return in_poly([(CX, tip_y), (CX + w, tip_y + h), (CX + w, tip_y + h + t * 0.9), (CX, tip_y + t),
+                        (CX - w, tip_y + h + t * 0.9), (CX - w, tip_y + h)])
+    return union(chev(CY - 8.0), chev(CY - 0.5))
 
 
-def hand(d, c):
-    d.rectangle([7, 10, 14, 17], fill=c)        # palm
-    d.rectangle([7, 5, 8, 10], fill=c)          # fingers
-    d.rectangle([9, 3, 10, 10], fill=c)
-    d.rectangle([11, 4, 12, 10], fill=c)
-    d.rectangle([13, 6, 14, 10], fill=c)
-    poly(d, [(4, 10), (6, 10), (7, 12), (7, 15), (5, 13)], c)   # thumb
-    d.rectangle([8, 17, 13, 18], fill=c)        # wrist
+def eye():
+    def lens(rx, ry):
+        def f(x, y):
+            k = abs(x - CX) / rx
+            return k <= 1 and abs(y - CY) <= ry * (1 - k * k) ** 0.75
+        return f
+    pupil = lambda x, y: (x - CX) ** 2 + (y - CY) ** 2 <= 2.5 ** 2
+    return union(minus(lens(8.0, 5.2), lens(6.2, 3.5)), pupil)
 
 
-def chevrons(d, c):
-    for y0 in (4, 10):                          # two chevrons pointing up (forward, fast)
-        poly(d, [(11, y0), (17, y0 + 6), (14, y0 + 6), (11, y0 + 3), (8, y0 + 6), (5, y0 + 6)], c)
-
-
-def eye(d, c):
-    pts_top = [(4 + i, 11 - 5 * math.sin(math.pi * i / 14)) for i in range(15)]
-    pts_bot = [(18 - i, 11 + 5 * math.sin(math.pi * i / 14)) for i in range(15)]
-    poly(d, pts_top + pts_bot, c)
-    hole = (0, 0, 0, 0)
-    pts_top = [(6 + i, 11 - 3 * math.sin(math.pi * i / 10)) for i in range(11)]
-    pts_bot = [(16 - i, 11 + 3 * math.sin(math.pi * i / 10)) for i in range(11)]
-    poly(d, pts_top + pts_bot, hole)
-    d.ellipse([9, 9, 13, 13], fill=c)           # pupil
-
-
-def drop(d, c):
-    d.rectangle([10, 3, 12, 10], fill=c)        # shaft
-    poly(d, [(6, 10), (16, 10), (11, 15)], c)   # head
-    d.rectangle([5, 17, 17, 18], fill=c)        # the ground
-
-
-def carve_holes(img):
-    """glyph pixels painted transparent (eye white) show the stone base again"""
-    return img
+def drop():
+    return union(rect(CX - 1, CY - 8, CX + 1, CY - 1),                       # shaft
+                 in_poly([(CX - 5, CY - 2), (CX + 5, CY - 2), (CX, CY + 3)]),  # head
+                 rect(CX - 6, CY + 5, CX + 6, CY + 7))                       # the ground
 
 
 SPRITES = {}
@@ -128,98 +161,100 @@ def put(name, img, x, y):
     SPRITES[name] = (x, y, img.width, img.height)
 
 
-def eye_button():
-    g = Image.new('RGBA', (22, 22), (0, 0, 0, 0))
-    d = ImageDraw.Draw(g)
-    eye(d, DARK)
-    # eye white: transparent ring -> stone shows through
-    b = BASE.copy()
-    b.alpha_composite(g, (2, 2))
-    return b
-
-
-row = [('blank', BASE), ('sneak_stand', glyph(person_stand)), ('sneak_crouch', glyph(person_crouch, MINT)),
-       ('attack', glyph(sword)), ('interact', glyph(hand)), ('sprint_off', glyph(chevrons)),
-       ('sprint_on', glyph(chevrons, MINT)), ('f5', eye_button()), ('drop', glyph(drop))]
+cube_top, cube_sides = cube()
+row = [('blank', BASE),
+       ('sneak_stand', button([(person(False), DARK)])),
+       ('sneak_crouch', button([(person(True), MINT)])),
+       ('attack', button([(sword(), DARK)])),
+       ('interact', button([(cube_top, MID), (cube_sides, DARK)])),
+       ('sprint_off', button([(chevrons(), DARK)])),
+       ('sprint_on', button([(chevrons(), MINT)])),
+       ('f5', button([(eye(), DARK)])),
+       ('drop', button([(drop(), DARK)]))]
 for i, (n, img) in enumerate(row):
     put(n, img, (i % 8) * 32, 32 * (i // 8))
 
 
-# ---- joystick: a stone ring and a round stone knob, shaded like the buttons ----
-def stone(x, y):
-    return BASE.getpixel((4 + (x * 5 + y * 3) % 18, 18 + (x + y * 7) % 2))
+# ---------------- joystick: rounded square plates ----------------
+def rounded(S, r, inset=0.0):
+    a, b = inset, S - inset
+    def f(x, y):
+        if not (a <= x <= b and a <= y <= b):
+            return False
+        cx = min(max(x, a + r), b - r)
+        cy = min(max(y, a + r), b - r)
+        return (x - cx) ** 2 + (y - cy) ** 2 <= r * r
+    return f
 
 
-def joy_base(S=64):
+STONE = [(126, 126, 126), (130, 130, 130), (126, 126, 126), (140, 140, 140), (126, 126, 126), (147, 147, 147), (126, 126, 126), (118, 118, 118)]
+
+
+def stone(x, y, k):
+    c = STONE[(x * 7 + y * 13 + (x * y) % 5) % len(STONE)]
+    return (int(c[0] * k), int(c[1] * k), int(c[2] * k), 255)
+
+
+def plate(S, r, k, marks):
     im = Image.new('RGBA', (S, S), (0, 0, 0, 0))
     p = im.load()
-    c = (S - 1) / 2
-    R = S / 2 - 1
+    edge = rounded(S, r)
+    in1 = rounded(S, r - 2, 2)                # inside the dark edge (2 px)
+    in2 = rounded(S, r - 4, 4)                # inside the bevel (2 px)
     for y in range(S):
         for x in range(S):
-            r = math.hypot(x - c, y - c)
-            if r > R:
+            X, Y = x + 0.5, y + 0.5
+            if not edge(X, Y):
                 continue
-            if r > R - 2:
-                p[x, y] = (30, 30, 30, 255)                       # dark rim
-            elif r > R - 4:
-                p[x, y] = (150, 150, 150, 255) if (x - c) + (y - c) < 0 else (93, 93, 93, 255)   # bevel
+            if not in1(X, Y):
+                p[x, y] = (24, 24, 24, 255)
+            elif not in2(X, Y):
+                light = X - 4 < S - Y - 4          # the top-left half of the ring is lit, as the game's buttons
+                p[x, y] = (171, 171, 171, 255) if light else (80, 80, 80, 255)
             else:
-                s = stone(x, y)
-                k = 0.78
-                p[x, y] = (int(s[0] * k), int(s[1] * k), int(s[2] * k), 255)
-    # four small direction marks
-    d = ImageDraw.Draw(im)
-    m = (60, 60, 60, 255)
-    for ang in range(4):
-        a = math.radians(90 * ang)
-        cx, cy = c + math.cos(a) * (R - 8), c - math.sin(a) * (R - 8)
-        ux, uy = math.cos(a), -math.sin(a)
-        vx, vy = -uy, ux
-        poly(d, [(cx + ux * 3, cy + uy * 3), (cx - ux * 2 + vx * 3, cy - uy * 2 + vy * 3),
-                 (cx - ux * 2 - vx * 3, cy - uy * 2 - vy * 3)], m)
+                p[x, y] = stone(x, y, k)
+    if marks:                                  # four arrows, exactly on the axes
+        c = S / 2
+        for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0)):
+            tip = (c + dx * (c - 8), c + dy * (c - 8))
+            back = (c + dx * (c - 13), c + dy * (c - 13))
+            ox, oy = -dy, dx
+            fill(im, in_poly([tip, (back[0] + ox * 5, back[1] + oy * 5), (back[0] - ox * 5, back[1] - oy * 5)]), DARK)
     return im
 
 
-def joy_knob(S=32):
-    im = Image.new('RGBA', (S, S), (0, 0, 0, 0))
-    p = im.load()
-    c = (S - 1) / 2
-    R = S / 2 - 1
-    for y in range(S):
-        for x in range(S):
-            r = math.hypot(x - c, y - c)
-            if r > R:
-                continue
-            if r > R - 1.6:
-                p[x, y] = (30, 30, 30, 255)
-            elif r > R - 3.4:
-                p[x, y] = (171, 171, 171, 255) if (x - c) + (y - c) < 0 else (87, 87, 87, 255)
-            else:
-                s = stone(x, y)
-                p[x, y] = (min(255, s[0] + 14), min(255, s[1] + 14), min(255, s[2] + 14), 255)
-    return im
+put('joy_base', plate(64, 12, 0.82, True), 0, 64)
+put('joy_knob', plate(30, 7, 1.06, False), 64, 64)
 
 
-put('joy_base', joy_base(), 0, 64)
-put('joy_knob', joy_knob(), 64, 64)
+# ---------------- editor chrome, 16x16 white (tinted when drawn), smooth edges ----------------
+def chrome(f):
+    big = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+    fill(big, f, (255, 255, 255, 255))
+    return big.resize((16, 16), Image.LANCZOS)
 
 
-# ---- editor chrome, 16x16, white on transparent (tinted when drawn) ----
-def chrome(fn):
-    im = Image.new('RGBA', (64, 64), (0, 0, 0, 0))   # drawn 4x, then reduced: smooth edges
-    d = ImageDraw.Draw(im)
-    fn(d)
-    return im.resize((16, 16), Image.LANCZOS)
+def bar(ax, ay, bx, by, w):
+    L = math.hypot(bx - ax, by - ay)
+    ux, uy = (bx - ax) / L, (by - ay) / L
+    def f(x, y):
+        t = (x - ax) * ux + (y - ay) * uy
+        if t < -w / 2 or t > L + w / 2:
+            return False
+        d = abs((x - ax) * uy - (y - ay) * ux)
+        if t < 0: d = math.hypot(x - ax, y - ay)
+        if t > L: d = math.hypot(x - bx, y - by)
+        return d <= w / 2
+    return f
 
 
 W = (255, 255, 255, 255)
-put('ic_close', chrome(lambda d: (d.line([(16, 16), (48, 48)], fill=W, width=8), d.line([(48, 16), (16, 48)], fill=W, width=8))), 96, 64)
-put('ic_check', chrome(lambda d: d.line([(12, 34), (26, 48), (52, 18)], fill=W, width=8, joint='curve')), 112, 64)
-put('ic_plus', chrome(lambda d: (d.line([(32, 12), (32, 52)], fill=W, width=8), d.line([(12, 32), (52, 32)], fill=W, width=8))), 128, 64)
-put('ic_dot', chrome(lambda d: d.ellipse([4, 4, 60, 60], fill=W)), 144, 64)
-put('ic_ring', chrome(lambda d: d.ellipse([6, 6, 58, 58], outline=W, width=6)), 160, 64)
-put('ic_round', chrome(lambda d: d.rounded_rectangle([0, 0, 63, 63], radius=14, fill=W)), 176, 64)
+put('ic_close', chrome(union(bar(19, 19, 45, 45, 8), bar(45, 19, 19, 45, 8))), 96, 64)
+put('ic_check', chrome(union(bar(15, 34, 27, 46, 8), bar(27, 46, 50, 20, 8))), 112, 64)
+put('ic_plus', chrome(union(bar(32, 14, 32, 50, 8), bar(14, 32, 50, 32, 8))), 128, 64)
+put('ic_dot', chrome(lambda x, y: (x - 32) ** 2 + (y - 32) ** 2 <= 28 ** 2), 144, 64)
+put('ic_ring', chrome(lambda x, y: 22 ** 2 <= (x - 32) ** 2 + (y - 32) ** 2 <= 28 ** 2), 160, 64)
+put('ic_round', chrome(rounded(64, 14)), 176, 64)
 put('white', Image.new('RGBA', (8, 8), W), 192, 64)
 
 atlas.save(OUT)
@@ -227,5 +262,4 @@ with open(HDR, 'w') as f:
     f.write('/* generated by tools/gen_controls.py: sprites of gui/nova/controls.png (x, y, w, h) */\n')
     for n, (x, y, w, h) in SPRITES.items():
         f.write('#define CA_%s %d, %d, %d, %d\n' % (n.upper(), x, y, w, h))
-atlas.resize((512, 512), Image.NEAREST).save('/tmp/controls_preview.png')
 print(len(SPRITES), 'sprites')

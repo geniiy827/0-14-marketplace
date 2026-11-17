@@ -633,6 +633,11 @@ static void cc_ed_move(float x, float y) {
     }
 }
 
+static int cc_sent_any(void) {
+    for (int b = 0; b < B_N; b++) if (cc_sent[b]) return 1;
+    return cc_dir_on;
+}
+
 /* ---- TouchControlSet::tick ---- */
 static u64 hc_ct_tick(u32 orig, u32 *w) {
     char *set = (char *)w[0];
@@ -643,6 +648,13 @@ static u64 hc_ct_tick(u32 orig, u32 *w) {
         cc_W = (float)mb_getw(g_client); cc_H = (float)mb_geth(g_client); cc_inv = mb_invscale();
     }
     if (cc_W < 10.f || cc_H < 10.f) return nh_callw(orig, w);
+    /* only the game itself: no player, or a screen (main menu, pause, chat, inventory) on top -> hands off */
+    if (!cc_player() || (cc_showingmenu && g_client && cc_showingmenu(g_client))) {
+        if (cc_sent_any()) cc_release_all(q);
+        for (int i = 0; i < CC_PTR; i++) cc_p[i].used = 0;
+        cc_edptr = -1; cc_drag = -1; cc_slider = -1;
+        return nh_callw(orig, w);
+    }
     char *b = *(char **)set, *e = *(char **)(set + 4);
     for (int i = 0; i < CC_PTR; i++) cc_p[i].seen = 0;
     if (cc_editing) {                                     /* every pointer is the editor's */
@@ -942,6 +954,7 @@ static void cc_draw_editor(void) {
 static u64 hc_ct_render(u32 orig, u32 *w) {
     u64 r = nh_callw(orig, w);
     if (!(cc_active || cc_editing) || cc_W < 10.f || cc_inv <= 0.f || !mb_tess) return r;
+    if (!cc_player() || (cc_showingmenu && g_client && cc_showingmenu(g_client))) return r;
     if (!cc_editing) {
         int fl = cc_is_flying();
         for (int i = 0; i < cc_n; i++) {

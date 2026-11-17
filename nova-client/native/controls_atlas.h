@@ -9,7 +9,7 @@
 #define CA_F5 224, 0, 26, 26
 #define CA_DROP 0, 32, 26, 26
 #define CA_JOY_BASE 0, 64, 64, 64
-#define CA_JOY_KNOB 64, 64, 32, 32
+#define CA_JOY_KNOB 64, 64, 30, 30
 #define CA_IC_CLOSE 96, 64, 16, 16
 #define CA_IC_CHECK 112, 64, 16, 16
 #define CA_IC_PLUS 128, 64, 16, 16
