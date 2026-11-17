@@ -481,5 +481,5 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   кость: T(pivot+pos) R S T(-pivot); точка -> (x, 24 - y, z) * scale. Порядок вершин граней — ModelBox Java
   (QUAD в ModMobs), per-face UV: up/down переставлены как в apply_face_uv.
 - Носитель PigZombie (EntityType 0x10b24): MonsterPlacerItem::spawnMobAt(r0 не используется, bs, type, Vec3*, item*)
-  -> Mob*. vtable PigZombie 229 слотов: 113 read/114 addAdditionalSaveData, 115 _playStepSound, 205-207 звуки (sret).
+  -> Mob*. vtable PigZombie 229 слотов: 113 read/114 addAdditionalSaveData, 115 _playStepSound, 205 _getAmbientSound -> const char* (null = тишина!), 206-207 hurt/death -> std::string (sret). octa8: краш при спавне был из-за записи строки в слот 205.
 - eval(): eval_nvars_hi — мобы читают до 64 значений.

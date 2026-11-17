@@ -534,7 +534,10 @@ static void nm_vt_save(char *e, void *tag) {
     ((void (*)(void *, void *))nm_o_save)(e, tag);
     nm_save_values(e, tag);
 }
-static void nm_silent_sound(u32 *sret, void *e) { gstr(sret, ""); }    /* _getAmbientSound / Hurt / Death */
+/* _getAmbientSound returns const char* (null = no sound, Mob::playAmbientSound); _getHurtSound / _getDeathSound
+ * return std::string (sret first) */
+static const char *nm_no_ambient(void *e) { return 0; }
+static void nm_silent_sound(u32 *sret, void *e) { gstr(sret, ""); }
 static void nm_no_step(void *e, void *pos, int block) { }
 static int nm_no_xp(void *e) { return 5; }
 
@@ -546,7 +549,7 @@ static void nm_make_vt(NmType *T, u32 *vt) {
     if (!nm_o_save) nm_o_save = vt[114];
     c[2 + 114] = (u32)nm_vt_save;
     c[2 + 115] = (u32)nm_no_step;
-    c[2 + 205] = (u32)nm_silent_sound;
+    c[2 + 205] = (u32)nm_no_ambient;
     c[2 + 206] = (u32)nm_silent_sound;
     c[2 + 207] = (u32)nm_silent_sound;
     T->vt = c + 2;
