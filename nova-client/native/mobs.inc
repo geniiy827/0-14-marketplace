@@ -162,7 +162,12 @@ static void (*nm_tbegin)(void *t, int n);
 static void (*nm_tnormal)(void *t, float x, float y, float z);
 static void (*nm_tvertex)(void *t, float x, float y, float z, float u, float v);
 static void (*nm_tdraw)(void *t, void *mat, void *tex);
-static void *(*nm_spawn)(void *self, void *bs, int type, float *pos, void *item);  /* MonsterPlacerItem::spawnMobAt (r0 unused) */
+/* MonsterPlacerItem::spawnMobAt returns Level::addEntity's bool, not the mob: we do its steps ourselves */
+static void (*nm_create)(void **sret, int type, void *bs, float *pos);    /* MobFactory::CreateMob -> unique_ptr<Mob> */
+static void (*nm_reset_attr)(void *mob);
+static void (*nm_persistent)(void *mob);
+static void (*nm_moveto)(void *e, float *pos, float *rot);
+static void *(*nm_getlevel)(void *bs);
 static void (*nm_ghast_ctor)(void *m);
 static void (*nm_mobrenderer_ctor)(void *r, void **model, void *tex, float shadow);
 static void (*nm_renderer_init)(void *r, void *dispatcher);
@@ -613,14 +618,27 @@ static int nm_op(int op, const double *a, int n, const char *s, double *out) {
     if (!pl) return -1;
     if (op == OP_MOB_SPAWN) {
         int t = nm_find(s);
-        if (t < 0 || n < 3 || !nm_spawn) return 0;
+        if (t < 0 || n < 3) return 0;
         void *bs = mm_region(pl);
         if (!bs) return 0;
         float pos[3] = {(float)a[0], (float)a[1], (float)a[2]};
-        char *e = nm_spawn(0, bs, NM_PIGZOMBIE, pos, 0);
+        void *level = nm_getlevel ? nm_getlevel(bs) : 0;
+        if (!level || !nm_create) return 0;
+        void *up = 0;
+        nm_create(&up, NM_PIGZOMBIE, bs, pos);
+        char *e = up;
         if (!e) return 0;
+        if (nm_reset_attr) nm_reset_attr(e);
+        if (nm_persistent) nm_persistent(e);
+        float rot[2] = {0, 0};
+        if (nm_moveto) nm_moveto(e, pos, rot);
         nm_become(e, t);
-        out[0] = (double)sf_uid(e);
+        long long uid = sf_uid(e);
+        /* Level::addEntity(unique_ptr<Entity>) is virtual (slot 12): MultiPlayerLevel / ServerLevel */
+        int ok = ((int (*)(void *, void **))((*(void ***)level)[12]))(level, &up);
+        if (up) { ((void (*)(void *))((*(void ***)up)[1]))(up); up = 0; }   /* not taken: delete it */
+        if (!ok) return 0;
+        out[0] = (double)uid;
         return 1;
     }
     if (n < 1) return -1;
@@ -652,7 +670,11 @@ static void mobs_init(void *mc) {
     S(nm_tnormal, "_ZN11Tessellator6normalEfff");
     S(nm_tvertex, "_ZN11Tessellator8vertexUVEfffff");
     S(nm_tdraw, "_ZN11Tessellator4drawERKN3mce11MaterialPtrERKNS0_10TexturePtrE");
-    S(nm_spawn, "_ZN17MonsterPlacerItem10spawnMobAtER11BlockSource10EntityTypeRK4Vec3PK12ItemInstance");
+    S(nm_create, "_ZN10MobFactory9CreateMobE10EntityTypeR11BlockSourceRK4Vec3");
+    S(nm_reset_attr, "_ZN3Mob15resetAttributesEv");
+    S(nm_persistent, "_ZN3Mob13setPersistentEv");
+    S(nm_moveto, "_ZN6Entity6moveToERK4Vec3RK4Vec2");
+    S(nm_getlevel, "_ZN11BlockSource8getLevelEv");
     S(nm_ghast_ctor, "_ZN10GhastModelC1Ev");
     S(nm_mobrenderer_ctor, "_ZN11MobRendererC1ESt10unique_ptrI5ModelSt14default_deleteIS1_EEN3mce10TexturePtrEf");
     S(nm_renderer_init, "_ZN14EntityRenderer4initEP22EntityRenderDispatcher");
