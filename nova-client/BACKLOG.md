@@ -1,3 +1,20 @@
+## octa7 — мобы из Bedrock-аддонов (порт Prehistoric Dweller, шаг 1)
+- Пользователь: портируем Bedrock-моды полностью, подстраивая под наш API (чего нет — добавляем). Первым — Prehistoric
+  Dweller (PnTMC). Siren Head — следующим (больше: постройки .mcstructure, камера, 51 звук).
+- Моды PnTMC: «DO NOT REUP» -> порт НЕ в репозиторий: /home/claude/ports/prehistoric_dweller (mod.json, main.mcs, rp/),
+  отправляется пользователю файлом .mcmod. В репозиторий — только движок.
+- Сделано: `entity имя { client: "id из rp/entity" }` (ModMobs.java -> blob NVM1 -> native/mobs.inc): модель Bedrock
+  (повёрнутые кубы, per-face UV) рисуется нашим render() модели (GhastModel + копия vtable) внутри MobRenderer
+  (свет/красный при ударе/тень — игры); анимации + контроллеры с blend, Molang (AnimationCompiler.mobVars).
+  Носитель — PigZombie с копией vtable на тип (так узнаём моба), сохранение тега NovaMob/NovaVals,
+  загрузка: хук PigZombie::readAdditionalSaveData. API: entity.spawn/kind/set/get/remove.
+  Превью на ПК: /home/claude/scripts/nmview.py (тот же разбор/поза, растр в PNG) — поза совпала с ожиданием.
+- Проверить на телефоне: виден ли моб, не зеркальный ли, не вывернуты ли грани (порядок вершин как у ModelBox Java),
+  прозрачность текстуры, анимации переключаются (/pd is_sheared 1 и т.п.), сохранение/загрузка мира.
+- Дальше (шаг 2): поведение без носителя-ИИ (цель/погоня/бегство/скорость/здоровье/урон из decl), «игрок смотрит на
+  моба» (looked_at), звуки модов (sound_definitions -> SoundPool, 3D по расстоянию), задувание факелов (блок
+  blown_torch), появление за спиной в туннелях, flee/trigger/ambient сущности, яйцо призыва, синхронизация с клиентами.
+
 # NOVA — задачи (можно бросать и возвращаться)
 
 Статусы: `[ ]` не начато · `[~]` начато (что сделано / что дальше) · `[?]` ждёт проверки на телефоне · `[x]` готово.

@@ -462,3 +462,29 @@ dimension wood {
 - Блоки: имя игры (`"planks"`, `"minecraft:log"`), `"имя:data"`, блок своего мода, номер.
 - Не больше 4 измерений из модов. Номера (2, 3, ...) хранятся в files/nova/dimids.json.
 - Пример: mcmod/examples/wood_world.
+
+## Мобы модов из Bedrock-аддонов (octa7)
+
+Модель (`*.geo.json`), текстура, анимации (`*.animation.json`) и контроллеры анимаций (`*.animation_controllers.json`)
+берутся из ресурс-пака Bedrock прямо как есть: положи папку RP в мод (например `rp/`) и объяви моба:
+```
+entity dweller {
+    client: "pntmc:prehistoric_dweller"   // идентификатор из rp/entity/*.entity.json: модель, текстура,
+                                          // анимации, scripts.animate и scripts.scale берутся оттуда
+    size: [0.9, 0.6]                      // хитбокс (ширина, высота)
+    health: 150
+}
+```
+Без `client` можно указать файлы прямо: `geometry: "geometry.x"`, `texture: "textures/x.png"`, `animate: ["ctrl"]`, `scale`.
+Молнг: `query.anim_time, life_time, modified_move_speed, modified_distance_moved, target_x/y_rotation, is_on_ground,
+all_animations_finished, any_animation_finished, health, is_moving` считает игра; **любое другое** `query.x` /
+`variable.x` — значение моба, которое ставит скрипт: `entity.set(e, "x", 1)` (так переносятся флаги из BP:
+`is_sheared`, `mark_variant`...). Значения сохраняются в мире вместе с мобом.
+```
+var d = entity.spawn("dweller", x, y, z)   // номер сущности
+entity.set(d, "mark_variant", 1)
+entity.kind(d)                             // "мод:dweller"; null у обычных мобов
+entity.remove(d)
+```
+Ключевые кадры: linear, step, catmullrom; каналы rotation / position / scale; переходы с blend_transition.
+Пока: носитель — свинозомби (ходит, отвечает на удар, не горит), звуки носителя выключены.

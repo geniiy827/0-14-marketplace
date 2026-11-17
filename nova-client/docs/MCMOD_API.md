@@ -13,6 +13,10 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `len(value:any)` | num | работает | Длина строки, списка или таблицы |
 | `type(value:any)` | str | работает | Тип значения: number string bool list map fn null |
 | `random(a:any=null, b:any=null)` | num | работает | random() дробное 0..1; random(a, b) целое от a до b включительно (если a и b целые); random(n) целое 0..n |
+| `__mobspawn(name:str)` | - | в работе | внутреннее: entity.spawn |
+| `__mobinfo(e:num)` | - | в работе | внутреннее: entity.kind |
+| `__mobset(key:str)` | - | в работе | внутреннее: entity.set |
+| `__mobget(key:str)` | - | в работе | внутреннее: entity.get |
 | `__recipe(result:num)` | - | в работе | внутреннее: recipe.shaped |
 | `__smelt(input:num)` | - | в работе | внутреннее: recipe.smelt |
 | `__hud(slot:str)` | - | в работе | внутреннее: ui.hud |
@@ -45,6 +49,11 @@ _Сгенерировано из `mcmod/api/*.tsv` (tools/gen_mcmod.py). Ста�
 | `entity.scale(e:num)` | num | в работе | Размер (1 = обычный) |
 | `entity.setScale(e:num, s:num)` | - | в работе | Изменить размер (0.05..16): хитбокс, глаза, шаг, прыжок, скорость, модель — всё вместе |
 | `entity.setFire(e:num, seconds:num)` | - | в работе | ХОСТ: поджечь сущность на seconds секунд |
+| `entity.spawn(name:str, x:num, y:num, z:num)` | num | в работе | ХОСТ: создать моба мода (entity имя { } этого мода, или "мод:имя") в точке; вернёт номер сущности |
+| `entity.kind(e:num)` | any | в работе | Имя моба мода ("мод:имя"), null если это не моб мода |
+| `entity.set(e:num, key:str, value:num)` | - | в работе | Значение моба мода: его читают анимации и контроллеры как query.key / variable.key (сохраняется в мире) |
+| `entity.get(e:num, key:str)` | num | в работе | Прочитать значение моба мода (0, если не задано) |
+| `entity.remove(e:num)` | - | в работе | ХОСТ: убрать сущность (без смерти и выпадения) |
 
 ## host
 

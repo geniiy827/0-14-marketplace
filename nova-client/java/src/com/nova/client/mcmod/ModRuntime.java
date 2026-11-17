@@ -59,6 +59,8 @@ public final class ModRuntime {
     private final List<String> pendingReports = new ArrayList<String>();
     /** mod blocks: "modid:name" and plain "name" -> block id (set by ModBlocks) */
     public final Map<String, Double> customIds = new HashMap<String, Double>();
+    /** mod mobs in libnova's order ("mod:name"), set by ModBridge */
+    public final List<String> mobNames = new ArrayList<String>();
     /** numbers of items by data (variants, packed plain items): for scripts such an item is number + 65536 * data */
     public final java.util.Set<Integer> carriers = new java.util.HashSet<Integer>();
     /** block numbers shared by several plain mod blocks (one per data): world.block / events say number + 65536 * data */
@@ -565,6 +567,29 @@ public final class ModRuntime {
                 host.nativeApi(ApiOps.WORLD_SOUND, nums, Interp.str(a.get(0)));
                 return null;
             }
+            case "entity.spawn": {
+                String nm = Interp.str(a.get(0));
+                if (nm.indexOf(':') < 0) nm = modOf(in).id + ":" + nm;
+                if (!mobNames.contains(nm)) throw new ScriptError("нет моба " + nm + " (объяви entity " + nm.substring(nm.indexOf(':') + 1) + " { })", line);
+                double[] r = host.nativeApi(ApiOps.MOB_SPAWN, new double[]{Interp.num(a.get(1), line), Interp.num(a.get(2), line),
+                        Interp.num(a.get(3), line)}, nm);
+                return r == null || r.length == 0 ? null : (Object) r[0];
+            }
+            case "entity.kind": {
+                double[] r = host.nativeApi(ApiOps.MOB_INFO, new double[]{Interp.num(a.get(0), line)}, "");
+                if (r == null || r.length == 0) return null;
+                int t = (int) r[0];
+                return t >= 0 && t < mobNames.size() ? mobNames.get(t) : null;
+            }
+            case "entity.set":
+                host.nativeApi(ApiOps.MOB_SET, new double[]{Interp.num(a.get(0), line), a.get(2) instanceof Boolean
+                        ? ((Boolean) a.get(2) ? 1 : 0) : Interp.num(a.get(2), line)},
+                        Interp.str(a.get(1)));
+                return null;
+            case "entity.get": {
+                double[] r = host.nativeApi(ApiOps.MOB_GET, new double[]{Interp.num(a.get(0), line)}, Interp.str(a.get(1)));
+                return r == null || r.length == 0 ? (Object) 0.0 : (Object) r[0];
+            }
             case "players.fire":
                 return host.nativeApiStr(1012, new double[]{Interp.num(a.get(1), line)}, netName(a.get(0))) != null;
             case "data.save": {
@@ -655,7 +680,7 @@ public final class ModRuntime {
                 Double id = customIds.get(m.id + ":" + d.name);
                 if ((d.kind.equals("block") || d.kind.equals("item")) && id != null) { m.in.globals.vars.put(d.name, id); continue; }
                 m.in.globals.vars.put(d.name, m.id + ":" + d.name);
-                if (!d.kind.equals("block") && !d.kind.equals("item") && !d.kind.equals("dimension"))
+                if (!d.kind.equals("block") && !d.kind.equals("item") && !d.kind.equals("dimension") && !d.kind.equals("entity"))
                     report(m, new ScriptError("'" + d.kind + "' появится в следующих версиях", d.line));
             }
             String pre = m.id + ":";                      // names of items by data (variants: [{name: ..}])

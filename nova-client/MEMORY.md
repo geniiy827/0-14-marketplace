@@ -467,3 +467,19 @@ nova build             # -> out/NOVA-0.14.3-<VERSION>.apk
   Рисунок: gui.png слот (1,1 20x20) + рамка выбранного слота (0,22 24x24) всегда, предмет — renderGuiItemNew (последний bool 0 —
   блеск зачарования игра берёт из ItemInstance::isFoil), прочность и количество рисуем сами. Inventory = player+0xda0, getItem — vfunc[4].
 - Краш в инвентаре (CustomRenderComponent::renderCustom -> прыжок по мусорному адресу) — не нашли причину, один раз; ждём повтора.
+
+## octa7: мобы модов из Bedrock (native/mobs.inc, ModMobs.java)
+- Решение пользователя: портировать качественные Bedrock-аддоны полностью под наш API (недостающее — добавлять).
+  Порты чужих модов с «DO NOT REUP» не коммитить: /home/claude/ports/<мод>/ -> .mcmod пользователю.
+- `entity x { client: "ns:id" }`: Java сканирует папку мода (geo/animation/controllers/entity json, комментарии в JSON
+  срезаются), компилирует blob NVM1; Molang-имена: 16 встроенных (ModMobs.BUILTIN), остальные — значения моба (16..63).
+- Натив: модель = GhastModel (0x6f4) с копией vtable (10 render, 11 setupAnim no-op), MobRenderer (0xc4,
+  ctor C1(this, unique_ptr<Model>*, TexturePtr* temp, float shadow)), EntityRenderer::init(dispatcher).
+  Хук EntityRenderDispatcher::getRenderer(Entity&) (у сущности renderer id в +0x104).
+  Model+0x10 материал, +0x14 текстура (ModelPart::draw). Тесселятор: begin(n), normal(fff), vertexUV, draw(mat, tex).
+- Bedrock -> 0.14: позируем в пространстве файла (x как в файле, y вверх, пиксели), поворот Rz(-z)Ry(y)Rx(-x),
+  кость: T(pivot+pos) R S T(-pivot); точка -> (x, 24 - y, z) * scale. Порядок вершин граней — ModelBox Java
+  (QUAD в ModMobs), per-face UV: up/down переставлены как в apply_face_uv.
+- Носитель PigZombie (EntityType 0x10b24): MonsterPlacerItem::spawnMobAt(r0 не используется, bs, type, Vec3*, item*)
+  -> Mob*. vtable PigZombie 229 слотов: 113 read/114 addAdditionalSaveData, 115 _playStepSound, 205-207 звуки (sret).
+- eval(): eval_nvars_hi — мобы читают до 64 значений.

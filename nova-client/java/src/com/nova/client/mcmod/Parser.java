@@ -106,7 +106,7 @@ final class Parser {
                 String name = ident("имя функции");
                 Lambda fn = lambdaRest(name, line);
                 prog.init.add(new Var(line, name, fn));
-            } else if ((k.is("item") || k.is("block") || k.is("recipe") || k.is("food") || k.is("dimension")) && peek(1).type == Lexer.ID
+            } else if ((k.is("item") || k.is("block") || k.is("recipe") || k.is("food") || k.is("dimension") || k.is("entity")) && peek(1).type == Lexer.ID
                     && peek(2).is("{")) {
                 next();
                 String name = ident("имя");

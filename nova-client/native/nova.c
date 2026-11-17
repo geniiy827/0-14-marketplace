@@ -242,6 +242,7 @@ static float fn_call(int fn, float *a, int n) {
 }
 
 /* program: u16 len + bytes; empty program evaluates to dflt */
+static int eval_nvars_hi;     /* mobs.inc: their Molang reads up to 64 values */
 static float eval(const u8 *prog, const float *vars, float dflt) {
     u32 n = rd16(prog);
     if (!n) return dflt;
@@ -253,7 +254,7 @@ static float eval(const u8 *prog, const float *vars, float dflt) {
         float a, b;
         switch (op) {
         case OP_PUSH: if (sp < 32) st[sp++] = rdf(p); p += 4; break;
-        case OP_VAR: { u8 v = *p++; if (sp < 32) st[sp++] = v < V_COUNT ? vars[v] : 0; break; }
+        case OP_VAR: { u8 v = *p++; if (sp < 32) st[sp++] = v < (eval_nvars_hi ? eval_nvars_hi : V_COUNT) ? vars[v] : 0; break; }
         case OP_NEG: if (sp) st[sp - 1] = -st[sp - 1]; break;
         case OP_NOT: if (sp) st[sp - 1] = st[sp - 1] == 0 ? 1.f : 0.f; break;
         case OP_SEL:
@@ -1254,6 +1255,7 @@ static int gate_ok(u32 base, u32 func, u32 orig) {
 #include "skinpacks.inc"
 #include "menubg.inc"
 #include "controls.inc"
+#include "mobs.inc"
 
 __attribute__((constructor)) static void nova_init(void) {
     void *mc = dlopen("libminecraftpe.so", 0x4 | 0x2 /* NOLOAD|NOW */);
@@ -1293,6 +1295,7 @@ __attribute__((constructor)) static void nova_init(void) {
     skinpacks_init(mc);
     menubg_init(mc);
     controls_init(mc);
+    mobs_init(mc);
     status = 1;
     LOG("NOVA native ready: bone trees, %d model vtables wrapped", hooked_vt);
 }

@@ -32,6 +32,10 @@ final class AnimationCompiler {
             OP_NOT = 16, OP_SEL = 17, OP_CALL = 18;
 
     static final Map<String, Integer> VARS = new HashMap<String, Integer>();
+
+    /** Molang names of one mod mob (ModMobs): built-in queries and per-entity values the script sets. */
+    interface MobVars { int slot(String fullName); }
+    static MobVars mobVars;   // set while ModMobs compiles a mob, null otherwise
     static final Map<String, Integer> FNS = new HashMap<String, Integer>();
     static {
         VARS.put("anim_time", 0);
@@ -192,6 +196,13 @@ final class AnimationCompiler {
                 if ("math".equals(ns) && "pi".equals(name)) { push((float) Math.PI); return; }
                 if ("true".equals(id)) { push(1); return; }
                 if ("false".equals(id)) { push(0); return; }
+                if (mobVars != null && (ns.equals("query") || ns.equals("q") || ns.equals("variable") || ns.equals("v")
+                        || ns.equals("temp") || ns.equals("t") || ns.equals("context") || ns.equals("c"))) {
+                    int k = mobVars.slot(ns.startsWith("q") ? "query." + name : "variable." + name);
+                    if (k >= 0) { op(OP_VAR); out.write(k); return; }
+                    push(0);
+                    return;
+                }
                 if ("query".equals(ns) || "q".equals(ns)) {
                     if ("is_moving".equals(name)) {          // speed > 0.01
                         op(OP_VAR); out.write(3); push(0.01f); op(OP_GT);

@@ -195,6 +195,7 @@ static void wt_frame(void *bs);
 static void wt_tick(void *level);
 static void wt_reset(void);
 static void *(*wt_region)(void *ent);
+static int nm_op(int op, const double *a, int n, const char *s, double *out);
 void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, void *darr, void *jstr) {
     void **f = *(void ***)env;
     double a[16];
@@ -216,6 +217,8 @@ void *Java_com_nova_client_ModBridge_nativeApi(void **env, void *cls, int op, vo
     else if (op == OP_WORLD_ENV || op == OP_WORLD_RAIN || op == OP_WORLD_COUNT || op == OP_WORLD_DROP || op == OP_PLAYER_ARMOR || op == OP_PLAYER_HAS)
         r = env_op(op, a, n, out);
     else if (op == OP_RECIPE || op == OP_SMELT) { rc_op(op, a, n, s); r = 0; }
+    else if (op == OP_MOB_SPAWN || op == OP_MOB_INFO || op == OP_MOB_SET || op == OP_MOB_GET || op == OP_ENTITY_REMOVE)
+        r = nm_op(op, a, n, s, out);
     else if (op == OP_WEATHER_RAIN || op == OP_WEATHER_FREEZE || op == OP_WEATHER_SNOW) { wt_op(op, a, n); r = 0; }
     else r = (op == OP_PLAYER_STATE || op == OP_PLAYER_TARGET || op == OP_UI_ACTION) ? ev_op(op, a, n, s, out)
         : (op == OP_ENTITY_LIST || op == OP_ENTITY_INFO || op == OP_ENTITY_SCALE || op == OP_ENTITY_SET_SCALE || op == OP_ENTITY_FIRE || op == OP_PLAYER_ID)
